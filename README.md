@@ -1,7 +1,7 @@
-# TeamPilot
-`TeamPilot` transforms raw Jira data into actionable intelligence. By orchestrating automated workflows through the lens of three expert AI personas — `The Scrum Master`, `The Agile Coach`, and `The Delivery Manager` — it provides the navigation and insights teams need to land their sprints on time, every time.
+# Team Pilot
+`Team Pilot` transforms raw Jira data into actionable intelligence. By orchestrating automated workflows through the lens of three expert AI personas — `The Scrum Master`, `The Agile Coach`, and `The Delivery Manager` — it provides the navigation and insights teams need to land their sprints on time, every time.
 
-|Persona |	TeamPilot Role	| Focus Area |
+|Persona | Role	| Focus Area |
 |---|--|---|
 | Scrum Master	| The Navigator |	Tactical sprint execution and obstacle removal.| 
 | Agile Coach	| The Flight Instructor	| Long-term growth, health metrics, and cultural evolution. | 
@@ -42,14 +42,15 @@ Create `Config.md` under `.clinerules` with following information:
 - Overwrite or update if any page with the same name already exists
 ```
 
+# Run Workflows
 
-# Run Data Extraction Workflow  
+## Data Extraction  
 
 ```
 \team-data.md 
 ```
 
-# Run Reporting Workflows 
+## Insight Generation 
 
 ```
 \sprint-insights.md 
