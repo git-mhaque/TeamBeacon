@@ -1,19 +1,21 @@
-# Team Pilot
-`Team Pilot` transforms raw Jira data into actionable intelligence. By orchestrating automated workflows through the lens of three expert AI personas — `The Scrum Master`, `The Agile Coach`, and `The Delivery Manager` — it provides the navigation and insights teams need to land their sprints on time, every time.
+# Team Beacon ✨
 
-|Persona | Role	| Focus Area |
-|---|--|---|
-| Scrum Master	| The Navigator |	Tactical sprint execution and obstacle removal.| 
-| Agile Coach	| The Flight Instructor	| Long-term growth, health metrics, and cultural evolution. | 
-| Delivery Manager |	The Mission Director |	Strategic alignment across multiple initiatives and timelines. |
+Illuminating the path from raw data to delivery excellence.
 
+**Team Beacon** orchestrates team workflows and generates high-fidelity insights via Cline. 
 
-This project orchestrates and automates team workflows and generates insights via Cline workflows. These workflows use Jira as a primary data source and leverage Python to fetch and preprocess relevant data, and then utilize AI to generate insightful artifacts. 
+By leveraging Jira as a data source and Python for deep-dive preprocessing, Beacon provides the "Signal" within the noise. It utilizes AI to generate artifacts that augment the team through three distinct guiding lights:
+
+- 🔦 **The Tactical Signal (Scrum Master) Focus**: The "Now." Keeps the current sprint on track by catching new work (scope creep), monitoring progress, and clearing blockers.
+
+- 🕯️ **The Strategic Signal (Agile Coach) Focus**: The "How." Helps the team grow over time by tracking "health" metrics and building a better work culture.
+
+- 🔭 **The Operational Signal (Delivery Manager) Focus**: The "Big Picture." Oversees multiple initiatives and milestones, and keeps an eye on live operations including system stability.
 
 
 # Quick Set Up
 
-## Set Up Environment Variables
+## Environment Variables
 
 Copy the example environment file and update it with your details:
 ```
@@ -28,7 +30,7 @@ Edit `.env` and set the required environment variables.
 - `JIRA_BOARD_ID`: The ID of your Jira Agile board (integer). 
 - `JIRA_STORY_POINTS_FIELD`: The custom field ID for story points (e.g., customfield_10004). 
 
-## Set Up Cline Rules 
+## Cline Rules 
 
 Create `Config.md` under `.clinerules` with following information:
 ```
@@ -38,7 +40,7 @@ Create `Config.md` under `.clinerules` with following information:
 
 # Conflucne 
 - Space key: <Default Space Key>
-- Create all pages under this parent page: `<Default Parent Page>` (pageId=<PArent Page ID>)
+- Create all pages under this parent page: `<Default Parent Page>` (pageId=<Parent Page ID>)
 - Overwrite or update if any page with the same name already exists
 ```
 
@@ -64,6 +66,8 @@ Create `Config.md` under `.clinerules` with following information:
 \initiative-insights.md 
 ```
 
+<!--
 # Schedule Workflows 
 
 Schedule the above workflows based on your preferred cadence. 
+-->
