@@ -30,7 +30,7 @@ Edit `.env` and set the required environment variables.
 
 ## Set Up Cline Rules 
 
-include `Config.md` in `.clinerules` with following information:
+Create `Config.md` under `.clinerules` with following information:
 ```
 # Jira 
 - Jira project: <Your Jira Project Key>
@@ -43,13 +43,13 @@ include `Config.md` in `.clinerules` with following information:
 ```
 
 
-# Extracting Data  
+# Run Data Extraction Workflow  
 
 ```
 \team-data.md 
 ```
 
-# Running Workflows 
+# Run Reporting Workflows 
 
 ```
 \sprint-insights.md 
@@ -62,3 +62,7 @@ include `Config.md` in `.clinerules` with following information:
 ```
 \initiative-insights.md 
 ```
+
+# Schedule Workflows 
+
+Schedule the above workflows based on your preferred cadence. 
