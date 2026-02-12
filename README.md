@@ -1,6 +1,6 @@
 # Team Beacon ✨
 
-**Illuminating the path from raw data to delivery excellence.**
+*Illuminating the path from raw data to delivery excellence.*
 
 **Team Beacon** orchestrates team workflows and generates high-fidelity insights using AI. 
 
