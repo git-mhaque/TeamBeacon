@@ -1,16 +1,16 @@
 # Team Beacon ✨
 
-Illuminating the path from raw data to delivery excellence.
+**Illuminating the path from raw data to delivery excellence.**
 
-**Team Beacon** orchestrates team workflows and generates high-fidelity insights via Cline. 
+**Team Beacon** orchestrates team workflows and generates high-fidelity insights using AI. 
 
-By leveraging Jira as a data source and Python for deep-dive preprocessing, Beacon provides the "Signal" within the noise. It utilizes AI to generate artifacts that augment the team through three distinct guiding lights:
+By leveraging Jira as a data source and Python for deep-dive preprocessing, Beacon provides the **"Signal"** within the noise. It utilizes **Cline** workflows to generate artifacts that augment the team through three distinct guiding lights:
 
-- 🔦 **The Tactical Signal (Scrum Master) Focus**: The "Now." Keeps the current sprint on track by catching new work (scope creep), monitoring progress, and clearing blockers.
+- 🔦 **The Tactical Signal (Scrum Master) Focus**: The Now. Empowers the team to manage the sprint by surfacing daily progress trends, scope creep, and potential blockers.
 
-- 🕯️ **The Strategic Signal (Agile Coach) Focus**: The "How." Helps the team grow over time by tracking "health" metrics and building a better work culture.
+- 🕯️ **The Strategic Signal (Agile Coach) Focus**: The How. Guides long-term growth by tracking health metrics, refining engineering practices, and evolving the team's work culture.
 
-- 🔭 **The Operational Signal (Delivery Manager) Focus**: The "Big Picture." Oversees multiple initiatives and milestones, and keeps an eye on live operations including system stability.
+- 🔭 **The Operational Signal (Delivery Manager) Focus**: The Big Picture. Helps the team see the broader landscape and achieve milestones by overseeing multiple initiatives.
 
 
 # Quick Set Up
