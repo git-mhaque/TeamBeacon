@@ -38,5 +38,8 @@ The report must include the following sections:
 
 Ensure the report is clear, well-structured, and professional.
 
+
+<!--
 ## Step 2: Publish the report to Confluence
 Page name: Team Insights (YYYY-MM-DD) 
+-->

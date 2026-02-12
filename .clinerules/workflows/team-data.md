@@ -25,13 +25,13 @@ Install dependencies:
 
 Run unit tests:
 ```
-    python -m pytest
+    python3 -m pytest
 ```
 
 
 Run the script:
 ```
-    python scripts/main.py
+    python3 scripts.main
 ```
 
 
