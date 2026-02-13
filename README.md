@@ -37,13 +37,17 @@ Edit `.env` and set the required environment variables.
 
 # Run Workflows
 
-## Data Extraction  
+## Extract Data  
+
+This workflow will extract data from Jira in `./data` directory. 
 
 ```
 \team-data.md 
 ```
 
-## Insight Generation 
+## Generate Insights 
+
+These workflows with generate markdown reports based on extracted data in `./reports` directory. 
 
 ```
 \sprint-insights.md 
@@ -57,7 +61,9 @@ Edit `.env` and set the required environment variables.
 \initiative-insights.md 
 ```
 
-## Publish Insights to Confluence 
+## Publish Insights 
+
+This workflow will publish reports generated in `./reports` to Confluece based on your Confluence configuration set up earlier.  
 
 ```
 \publish-insights.md 
