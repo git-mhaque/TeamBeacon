@@ -28,7 +28,11 @@ Edit `.env` and set the required environment variables.
 - `JIRA_PAT`: Your JIRA Personal Access Token (PAT). 
 - `JIRA_PROJECT_KEY`: Your Jira project key (e.g., MYPROJ).
 - `JIRA_BOARD_ID`: The ID of your Jira Agile board (integer). 
-- `JIRA_STORY_POINTS_FIELD`: The custom field ID for story points (e.g., customfield_10004). 
+- `JIRA_STORY_POINTS_FIELD`: The custom field ID for story points (e.g., customfield_10004).
+- `CONFLUENCE_URL`: Your Confluence URL. 
+- `CONFLUENCE_PAT`: Your Confluence Personal Access Token (PAT). 
+- `CONFLUENCE_SPACE_KEY`: Your Confluence space key. 
+- `CONFLUENCE_PARENT_PAGE_ID`: You Confluence parent page ID under which reports will be published  
 
 ## Cline Rules 
 
