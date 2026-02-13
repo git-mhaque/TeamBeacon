@@ -63,7 +63,7 @@ These workflows with generate markdown reports based on extracted data in `./rep
 
 ## Publish Insights 
 
-This workflow will publish reports generated in `./reports` to Confluece based on your Confluence configuration set up earlier.  
+This workflow will publish reports generated in `./reports` to Confluence.  
 
 ```
 \publish-insights.md 
