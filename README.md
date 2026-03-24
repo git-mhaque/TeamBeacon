@@ -1,6 +1,6 @@
 # TeamBeacon
 
-TeamBeacon is a desktop-first engineering insights application for Software Engineering Managers. It aggregates data from hosted JIRA and Confluence (PAT-authenticated) to provide initiative progress, team trends, individual activity, and executive reporting.
+TeamBeacon is a desktop engineering insights app that aggregates data from multiple sources to track initiative health, team performance, and executive reporting.
 
 ## Current Status
 - Product scope: [SPEC.md](SPEC.md)
