@@ -8,11 +8,12 @@ TeamBeacon is a desktop-first engineering insights application for Software Engi
 - Delivery plan: [docs/plans/PLAN.md](docs/plans/PLAN.md)
 - UI mockups: [docs/design/teambeacon-mockups.html](docs/design/teambeacon-mockups.html)
 - Initial DB migration and connector stubs are in place.
+- React + Vite UI shell and Tauri desktop wrapper are scaffolded in `app/`.
 
 ## Repository Layout
 ```text
 TeamBeacon/
-  app/
+  app/                       # React + Vite UI shell
   services/
     api/db/migrations/
     workers/
@@ -33,27 +34,38 @@ TeamBeacon/
 ```bash
 cp config/.env.example config/.env
 ```
-2. Apply the local schema:
+2. Start UI shell (optional):
+```bash
+cd app
+npm install
+npm run dev
+```
+3. Start desktop shell (requires Rust toolchain):
+```bash
+cd app
+npm run desktop:dev
+```
+4. Apply the local schema:
 ```bash
 sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
 ```
-3. Validate connector module syntax:
+5. Validate connector module syntax:
 ```bash
 PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py
 ```
-4. Run unit tests:
+6. Run unit tests:
 ```bash
 python3 -m unittest discover -s tests/unit -p "test_*.py" -v
 ```
-5. (Optional) Run live JIRA integration tests:
+7. (Optional) Run live JIRA integration tests:
 ```bash
 RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v
 ```
-6. Review contribution rules:
+8. Review contribution rules:
 ```bash
 cat AGENTS.md
 ```
-7. Open UI mockups:
+9. Open UI mockups:
 ```bash
 open docs/design/teambeacon-mockups.html
 ```

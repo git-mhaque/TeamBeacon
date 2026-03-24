@@ -34,6 +34,8 @@ TeamBeacon/
 ## Build, Test, and Development Commands
 Tooling is minimal right now. Use:
 - `cp config/.env.example config/.env` to initialize local connector config.
+- `cd app && npm run dev` to run web UI shell.
+- `cd app && npm run desktop:dev` to run the Tauri desktop shell (requires Rust toolchain).
 - `sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
 - `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
