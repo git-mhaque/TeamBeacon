@@ -10,6 +10,7 @@ TeamBeaconV2 is a local-first desktop analytics system:
 1. UI (`app/`)
 - Tauri + React frontend.
 - Screens: Integrations, Initiatives, Team Insights, Individuals, Current Sprint, Reports.
+- UX reference: `docs/design/teambeacon-mockups.html`
 
 2. API (`services/api/`)
 - FastAPI service exposing internal endpoints for UI.
@@ -72,3 +73,16 @@ Default thresholds:
 - Single-user local deployment for MVP.
 - Future-ready for shared service mode (Postgres + hosted API) with same domain model.
 
+## 9. UI Information Architecture
+- Primary navigation:
+  - Integrations & Field Mapping
+  - Initiative Insights
+  - Team Insights
+  - Individual Insights
+  - Current Sprint Work
+  - Executive Report
+- Interaction pattern:
+  - Left rail for filters/context scope.
+  - Main pane for KPI cards, trend widgets, and narrative insights.
+- Design source:
+  - `docs/design/teambeacon-mockups.html` should be updated with major flow changes.

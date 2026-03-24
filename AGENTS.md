@@ -9,6 +9,7 @@ TeamBeaconV2/
   app/                          # Desktop UI (planned: Tauri + React)
   docs/
     architecture/ARCHITECTURE.md
+    design/teambeacon-mockups.html
     plans/PLAN.md
   infra/                        # Local/dev infra templates
   packages/
@@ -34,6 +35,7 @@ TeamBeaconV2/
 Tooling is minimal right now. Use:
 - `sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
+- `open docs/design/teambeacon-mockups.html` to review current UI/UX mockups.
 - `git log --oneline -n 10` to review recent commit conventions.
 
 When FastAPI/Tauri projects are bootstrapped, add runnable commands to `README.md` and keep this section updated.
@@ -61,3 +63,8 @@ PRs should include:
 - Linked issue/task reference.
 - Validation evidence (test output, migration checks, or screenshots).
 - Notes on schema/config changes and backward compatibility impact.
+
+## Documentation Maintenance
+- Keep `SPEC.md`, `docs/architecture/ARCHITECTURE.md`, and `docs/plans/PLAN.md` aligned when scope changes.
+- Update `docs/design/teambeacon-mockups.html` when UI flows materially change.
+- Add links in `README.md` for any new top-level docs.

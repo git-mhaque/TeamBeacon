@@ -10,11 +10,13 @@ Deliver in thin vertical slices: integrate data first, then insights, then execu
 - Scaffold `app/`, `services/api/`, `services/workers/`, shared packages.
 - Define DB schema v1 and migrations.
 - Implement secure secret handling via OS keychain.
+- Establish baseline UI mockups for all MVP workflows.
 
 Exit criteria:
 - App launches locally.
 - API and DB connected.
 - PATs can be saved/read securely.
+- Design mockups exist for all six MVP screens.
 
 ## Phase 1 (Weeks 2-3): JIRA + Confluence Ingestion
 - Implement hosted JIRA connector (issues, epics, sprints, changelog).
@@ -31,10 +33,12 @@ Exit criteria:
 - Team metrics: committed/completed points, cycle time trends.
 - Individual insights by alias and date range.
 - Current sprint snapshot (`Done`, `In Progress`, `Planned`).
+- Align implemented UI routes/components with mockup intent.
 
 Exit criteria:
 - Dashboards render from local data without manual SQL.
 - RAG calculation configurable per initiative.
+- UX behavior is validated against design screens.
 
 ## Phase 3 (Weeks 6-7): Executive Reporting
 - Generate executive summary and initiative delta since last report.
@@ -67,4 +71,4 @@ Exit criteria:
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.
-
+5. Convert `docs/design/teambeacon-mockups.html` into app route/component skeletons.

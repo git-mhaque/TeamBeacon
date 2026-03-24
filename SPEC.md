@@ -30,6 +30,8 @@ TeamBeaconV2 is a desktop-first engineering management app that aggregates deliv
 - Executive report:
   - Summary since last report.
   - Initiative-level progress and risks.
+- UX mockups:
+  - Maintain mockup coverage for six core screens in `docs/design/teambeacon-mockups.html`.
 
 ## 5. Out of Scope (MVP)
 - Two-way updates to JIRA/Confluence.
@@ -66,8 +68,19 @@ TeamBeaconV2/
   packages/reporting/      # Executive report generation
   docs/
     architecture/
+    design/
     plans/
   infra/                   # Local/dev deployment and secrets templates
   tests/                   # Integration and end-to-end tests
 ```
 
+## 10. Design Artifacts
+- Primary UX reference: `docs/design/teambeacon-mockups.html`
+- Supporting notes: `docs/design/README.md`
+- Mockups must reflect:
+  - Integrations & field mapping
+  - Initiative insights
+  - Team insights
+  - Individual insights
+  - Current sprint work
+  - Executive report
