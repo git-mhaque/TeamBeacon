@@ -1,46 +1,63 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-`TeamBeaconV2` is currently an empty scaffold (no committed source, tests, or tooling yet).  
-When adding the first implementation, use this baseline layout:
-- `src/` for application code, organized by feature/module.
-- `tests/` for automated tests mirroring `src/` paths.
-- `assets/` for static files (images, fixtures, sample data).
-- `docs/` for architecture notes and decision records.
+## Repository Map
+```text
+TeamBeaconV2/
+  AGENTS.md
+  README.md
+  SPEC.md
+  app/                          # Desktop UI (planned: Tauri + React)
+  docs/
+    architecture/ARCHITECTURE.md
+    plans/PLAN.md
+  infra/                        # Local/dev infra templates
+  packages/
+    connectors/                 # Source connectors (JIRA/Confluence)
+    metrics/                    # KPI and RAG logic
+    reporting/                  # Executive report generation
+  services/
+    api/
+      db/
+        migrations/0001_initial.sql
+    workers/                    # Sync and background jobs
+  tests/                        # Integration and E2E tests
+```
 
-Keep modules small and cohesive. Prefer feature-first grouping (for example, `src/auth/`, `src/notifications/`) over large shared utility files.
+## Project Structure & Module Organization
+- `services/api` owns ingestion orchestration, persistence, and internal APIs.
+- `services/workers` owns scheduled/manual sync jobs.
+- `packages/connectors` defines interfaces and hosted Atlassian stubs.
+- `docs/` is the source of truth for product scope, architecture, and plan.
+- `app/` should stay UI-only; business logic belongs in services/packages.
 
 ## Build, Test, and Development Commands
-No build/test runner is configured yet. After initializing tooling, expose standard entry points so contributors can run:
-- `npm run dev` (or equivalent): local development workflow.
-- `npm test`: full automated test suite.
-- `npm run lint`: static analysis and style checks.
-- `npm run build`: production artifact build.
+Tooling is minimal right now. Use:
+- `sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
+- `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
+- `git log --oneline -n 10` to review recent commit conventions.
 
-If you choose a non-Node stack, provide equivalent `make`/CLI commands and document them in `README.md`.
+When FastAPI/Tauri projects are bootstrapped, add runnable commands to `README.md` and keep this section updated.
 
 ## Coding Style & Naming Conventions
-Until language-specific tooling is added:
-- Use 2- or 4-space indentation consistently per language default.
-- Use `camelCase` for variables/functions, `PascalCase` for classes/types, and `kebab-case` for file names.
-- Keep functions focused and side-effect boundaries explicit.
-
-Add formatter/linter configs early (for example, Prettier + ESLint, or Black + Ruff) and run them before opening PRs.
+- Follow language defaults with consistent indentation.
+- Python modules should use type hints and explicit dataclasses for data contracts.
+- Use `camelCase` for JS/TS identifiers, `snake_case` for Python file/function names, `PascalCase` for classes/types.
+- Keep connectors thin; map external payloads into normalized models early.
 
 ## Testing Guidelines
-Create tests alongside new code from the first feature onward.  
-Conventions:
-- Name tests after behavior (for example, `auth-login.test.ts`, `test_auth_login.py`).
-- Include at least one happy-path and one failure-path test per unit.
-- Target meaningful coverage on core logic before merging.
+- Add tests with each feature; avoid large untested batches.
+- Name tests by behavior (`test_incremental_sync_cursor.py`, `initiative-rag.spec.ts`).
+- Cover at least one success path and one failure path per unit.
+- Prioritize metric correctness and sync idempotency tests.
 
 ## Commit & Pull Request Guidelines
-No Git history exists yet in this folder, so no native commit pattern can be inferred. Start with Conventional Commits:
-- `feat: add login endpoint`
-- `fix: handle token expiry`
+Use Conventional Commits. Current history follows:
+- `docs: ...`
+- `chore: ...`
+- `feat: ...`
 
 PRs should include:
-- Clear problem/solution summary.
-- Linked issue/task ID (if available).
-- Test evidence (command output or screenshots for UI/API behavior).
-- Notes on config, migration, or breaking changes.
+- Brief problem/solution summary.
+- Linked issue/task reference.
+- Validation evidence (test output, migration checks, or screenshots).
+- Notes on schema/config changes and backward compatibility impact.
