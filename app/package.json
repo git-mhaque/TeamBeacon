@@ -8,8 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:dev": "./scripts/tauri-with-rust.sh dev",
+    "desktop:build": "./scripts/tauri-with-rust.sh build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

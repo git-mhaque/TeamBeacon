@@ -29,6 +29,8 @@ npm install
 npm run desktop:dev
 ```
 
+`desktop:dev` and `desktop:build` automatically source `~/.cargo/env` if `cargo` is not already on your PATH.
+
 ## Build
 ```bash
 cd app
@@ -39,6 +41,27 @@ npm run build
 ```bash
 cd app
 npm run desktop:build
+```
+
+## Troubleshooting: `cargo metadata` Not Found
+If you see:
+
+```text
+failed to run command cargo metadata ... No such file or directory (os error 2)
+```
+
+Install Rust once:
+
+```bash
+xcode-select -p || xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+```
+
+For future terminal sessions:
+
+```bash
+echo 'source "$HOME/.cargo/env"' >> ~/.zshrc
 ```
 
 ## Notes

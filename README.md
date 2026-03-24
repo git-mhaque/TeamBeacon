@@ -45,6 +45,7 @@ npm run dev
 cd app
 npm run desktop:dev
 ```
+`desktop:dev` auto-loads `~/.cargo/env` when available.
 4. Apply the local schema:
 ```bash
 sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
