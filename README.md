@@ -1,6 +1,6 @@
-# TeamBeaconV2
+# TeamBeacon
 
-TeamBeaconV2 is a desktop-first engineering insights application for Software Engineering Managers. It aggregates data from hosted JIRA and Confluence (PAT-authenticated) to provide initiative progress, team trends, individual activity, and executive reporting.
+TeamBeacon is a desktop-first engineering insights application for Software Engineering Managers. It aggregates data from hosted JIRA and Confluence (PAT-authenticated) to provide initiative progress, team trends, individual activity, and executive reporting.
 
 ## Current Status
 - Product scope: [SPEC.md](SPEC.md)
@@ -11,7 +11,7 @@ TeamBeaconV2 is a desktop-first engineering insights application for Software En
 
 ## Repository Layout
 ```text
-TeamBeaconV2/
+TeamBeacon/
   app/
   services/
     api/db/migrations/

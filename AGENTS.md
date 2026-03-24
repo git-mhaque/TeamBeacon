@@ -2,7 +2,7 @@
 
 ## Repository Map
 ```text
-TeamBeaconV2/
+TeamBeacon/
   AGENTS.md
   README.md
   SPEC.md

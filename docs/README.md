@@ -1,6 +1,6 @@
 # Documentation Index
 
-This directory contains product, architecture, plan, and design artifacts for TeamBeaconV2.
+This directory contains product, architecture, plan, and design artifacts for TeamBeacon.
 
 ## Core Documents
 - [../SPEC.md](../SPEC.md): product requirements, MVP boundaries, and success metrics.

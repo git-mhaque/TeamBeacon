@@ -1,6 +1,6 @@
-# TeamBeaconV2 UI Mockups
+# TeamBeacon UI Mockups
 
-This folder contains early screen mockups for the desktop-first TeamBeaconV2 experience.
+This folder contains early screen mockups for the desktop-first TeamBeacon experience.
 
 ## Files
 - `teambeacon-mockups.html`: visual prototype with six core screens.

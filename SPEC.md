@@ -1,7 +1,7 @@
-# TeamBeaconV2 Product Specification (SPEC)
+# TeamBeacon Product Specification (SPEC)
 
 ## 1. Purpose
-TeamBeaconV2 is a desktop-first engineering management app that aggregates delivery and operations data from hosted JIRA and Confluence (via PAT-authenticated APIs). It provides initiative, team, and individual insights, plus executive reporting.
+TeamBeacon is a desktop-first engineering management app that aggregates delivery and operations data from hosted JIRA and Confluence (via PAT-authenticated APIs). It provides initiative, team, and individual insights, plus executive reporting.
 
 ## 2. Primary User
 - Software Engineering Manager leading 9-11 engineers across multiple initiatives/services.
@@ -59,7 +59,7 @@ TeamBeaconV2 is a desktop-first engineering management app that aggregates deliv
 
 ## 9. Suggested Repository Structure
 ```text
-TeamBeaconV2/
+TeamBeacon/
   app/                     # Desktop UI (Tauri + React)
   services/api/            # FastAPI backend for sync + analytics
   services/workers/        # Scheduled jobs/sync processors

@@ -1,4 +1,4 @@
-# TeamBeaconV2 Delivery Plan
+# TeamBeacon Delivery Plan
 
 ## 1. Delivery Strategy
 Deliver in thin vertical slices: integrate data first, then insights, then executive reporting. Each phase ends with a usable demo and acceptance criteria.

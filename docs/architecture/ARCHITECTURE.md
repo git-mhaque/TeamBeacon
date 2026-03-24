@@ -1,7 +1,7 @@
-# TeamBeaconV2 Architecture
+# TeamBeacon Architecture
 
 ## 1. Overview
-TeamBeaconV2 is a local-first desktop analytics system:
+TeamBeacon is a local-first desktop analytics system:
 - Desktop app for configuration, dashboards, and reports.
 - Local API service for ingestion, normalization, metrics, and reporting.
 - SQLite as the source of truth for synced and computed data.
