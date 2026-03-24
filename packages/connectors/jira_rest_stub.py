@@ -1,15 +1,59 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import base64
+import json
+import re
+from datetime import datetime, timezone
+from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from .interfaces import ConnectorConfig, JiraConnector
 from .models import BoardRecord, ChangelogItemRecord, IssueRecord, SprintRecord, SyncBatch
 
+DEFAULT_STORY_POINTS_FIELD = "customfield_10016"
+DEFAULT_EPIC_LINK_FIELD = "customfield_10014"
+DEFAULT_SPRINT_FIELD_CANDIDATES = ("sprint", "customfield_10020")
 
-class JiraRestConnectorStub(JiraConnector):
+
+class JiraAPIError(RuntimeError):
+    def __init__(self, message: str, status_code: int | None = None, body: str | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.body = body
+
+
+def _parse_jira_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+class JiraRestConnector(JiraConnector):
     """
-    Hosted JIRA REST connector stub.
+    Hosted JIRA REST connector.
 
     Target APIs:
     - /rest/api/2/search
@@ -18,8 +62,26 @@ class JiraRestConnectorStub(JiraConnector):
     - /rest/agile/1.0/board/{id}/sprint
     """
 
-    def __init__(self, config: ConnectorConfig) -> None:
+    def __init__(
+        self,
+        config: ConnectorConfig,
+        project_key: str | None = None,
+        story_points_field: str = DEFAULT_STORY_POINTS_FIELD,
+        epic_link_field: str = DEFAULT_EPIC_LINK_FIELD,
+        sprint_field_candidates: tuple[str, ...] = DEFAULT_SPRINT_FIELD_CANDIDATES,
+    ) -> None:
         self.config = config
+        self.project_key = project_key
+        self.story_points_field = story_points_field
+        self.epic_link_field = epic_link_field
+        self.sprint_field_candidates = sprint_field_candidates
+
+    def _build_url(self, path: str, params: dict[str, Any] | None = None) -> str:
+        base = self.config.base_url.rstrip("/")
+        url = f"{base}/{path.lstrip('/')}"
+        if params:
+            url = f"{url}?{urlencode(params, doseq=True)}"
+        return url
 
     def _auth_headers(self) -> dict[str, str]:
         if self.config.auth_mode == "pat_bearer":
@@ -27,9 +89,123 @@ class JiraRestConnectorStub(JiraConnector):
         if self.config.auth_mode == "basic":
             if not self.config.username:
                 raise ValueError("username is required for basic auth")
-            # TODO: Replace with base64 user:pat encoding header.
-            return {"Authorization": "Basic <base64-user-pat>"}
+            auth_blob = f"{self.config.username}:{self.config.pat_token}".encode("utf-8")
+            encoded = base64.b64encode(auth_blob).decode("ascii")
+            return {"Authorization": f"Basic {encoded}"}
         raise ValueError(f"unsupported auth_mode: {self.config.auth_mode}")
+
+    def _request_json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        url = self._build_url(path, params)
+        headers = {"Accept": "application/json", **self._auth_headers()}
+        request = Request(url=url, headers=headers, method="GET")
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise JiraAPIError(
+                f"JIRA request failed with HTTP {exc.code}: {path}",
+                status_code=exc.code,
+                body=body,
+            ) from exc
+        except URLError as exc:
+            raise JiraAPIError(f"JIRA request failed for {path}: {exc}") from exc
+
+        if not raw:
+            return {}
+        try:
+            payload: dict[str, Any] = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise JiraAPIError(f"JIRA response was not valid JSON for {path}") from exc
+        return payload
+
+    def _extract_sprint_id(self, fields: dict[str, Any]) -> int | None:
+        for field_name in self.sprint_field_candidates:
+            candidate = fields.get(field_name)
+            if candidate is None:
+                continue
+
+            if isinstance(candidate, dict):
+                sprint_id = candidate.get("id")
+                if isinstance(sprint_id, int):
+                    return sprint_id
+                if isinstance(sprint_id, str) and sprint_id.isdigit():
+                    return int(sprint_id)
+
+            if isinstance(candidate, list):
+                for entry in reversed(candidate):
+                    if isinstance(entry, dict):
+                        sprint_id = entry.get("id")
+                        if isinstance(sprint_id, int):
+                            return sprint_id
+                        if isinstance(sprint_id, str) and sprint_id.isdigit():
+                            return int(sprint_id)
+                    if isinstance(entry, str):
+                        match = re.search(r"id=(\d+)", entry)
+                        if match:
+                            return int(match.group(1))
+
+            if isinstance(candidate, str):
+                match = re.search(r"id=(\d+)", candidate)
+                if match:
+                    return int(match.group(1))
+
+        return None
+
+    def _extract_epic_key(self, fields: dict[str, Any]) -> str | None:
+        epic_value = fields.get(self.epic_link_field)
+        if isinstance(epic_value, str) and epic_value:
+            return epic_value
+        if isinstance(epic_value, dict):
+            key = epic_value.get("key")
+            if isinstance(key, str) and key:
+                return key
+
+        parent = fields.get("parent")
+        if isinstance(parent, dict):
+            parent_key = parent.get("key")
+            if isinstance(parent_key, str) and parent_key:
+                return parent_key
+        return None
+
+    def _map_issue(self, raw_issue: dict[str, Any]) -> IssueRecord:
+        fields = raw_issue.get("fields") or {}
+        status = fields.get("status") or {}
+        status_category = status.get("statusCategory") or {}
+
+        assignee = fields.get("assignee") or {}
+        reporter = fields.get("reporter") or {}
+
+        components = []
+        for component in fields.get("components") or []:
+            if isinstance(component, dict):
+                name = component.get("name")
+                if isinstance(name, str):
+                    components.append(name)
+
+        labels = [label for label in (fields.get("labels") or []) if isinstance(label, str)]
+
+        return IssueRecord(
+            issue_key=raw_issue.get("key", ""),
+            issue_id=str(raw_issue.get("id", "")),
+            project_key=(fields.get("project") or {}).get("key"),
+            issue_type=(fields.get("issuetype") or {}).get("name"),
+            summary=fields.get("summary") or "",
+            status_name=status.get("name") or "",
+            status_category=status_category.get("name"),
+            priority=(fields.get("priority") or {}).get("name"),
+            assignee_account_id=assignee.get("accountId") or assignee.get("name"),
+            reporter_account_id=reporter.get("accountId") or reporter.get("name"),
+            story_points=_coerce_float(fields.get(self.story_points_field)),
+            sprint_external_id=self._extract_sprint_id(fields),
+            epic_key=self._extract_epic_key(fields),
+            labels=labels,
+            components=components,
+            created_at_source=_parse_jira_datetime(fields.get("created")),
+            updated_at_source=_parse_jira_datetime(fields.get("updated")),
+            resolved_at_source=_parse_jira_datetime(fields.get("resolutiondate")),
+            raw=raw_issue,
+        )
 
     def search_issues(
         self,
@@ -37,14 +213,19 @@ class JiraRestConnectorStub(JiraConnector):
         start_at: int = 0,
         max_results: int = 100,
     ) -> tuple[list[IssueRecord], SyncBatch]:
-        _ = self._auth_headers()
-        query = urlencode(
-            {"jql": jql, "startAt": start_at, "maxResults": max_results},
-            doseq=True,
+        payload = self._request_json(
+            "/rest/api/2/search",
+            params={"jql": jql, "startAt": start_at, "maxResults": max_results},
         )
-        _endpoint = f"{self.config.base_url}/rest/api/2/search?{query}"
-        # TODO: Call endpoint and map payload to IssueRecord list.
-        return [], SyncBatch(next_cursor=None, has_more=False)
+        raw_issues = payload.get("issues") or []
+        issues = [self._map_issue(raw_issue) for raw_issue in raw_issues if isinstance(raw_issue, dict)]
+
+        current_start = int(payload.get("startAt", start_at))
+        total = int(payload.get("total", len(issues)))
+        next_start = current_start + len(issues)
+        has_more = next_start < total
+
+        return issues, SyncBatch(next_cursor=str(next_start) if has_more else None, has_more=has_more)
 
     def incremental_issues(
         self,
@@ -52,26 +233,151 @@ class JiraRestConnectorStub(JiraConnector):
         start_at: int = 0,
         max_results: int = 100,
     ) -> tuple[list[IssueRecord], SyncBatch]:
-        cursor = updated_since or datetime.now(tz=UTC)
-        jql = f"updated >= '{cursor.strftime('%Y-%m-%d %H:%M')}' ORDER BY updated ASC"
+        clauses: list[str] = []
+        if self.project_key:
+            clauses.append(f"project = {self.project_key}")
+
+        if updated_since:
+            cursor = updated_since
+            if cursor.tzinfo is None:
+                cursor = cursor.replace(tzinfo=timezone.utc)
+            cursor = cursor.astimezone(timezone.utc)
+            clauses.append(f"updated >= '{cursor.strftime('%Y-%m-%d %H:%M')}'")
+
+        if clauses:
+            jql = " AND ".join(clauses) + " ORDER BY updated ASC"
+        else:
+            jql = "ORDER BY updated ASC"
         return self.search_issues(jql=jql, start_at=start_at, max_results=max_results)
 
     def get_boards(self) -> list[BoardRecord]:
-        _ = self._auth_headers()
-        _endpoint = f"{self.config.base_url}/rest/agile/1.0/board"
-        # TODO: Call endpoint and map boards.
-        return []
+        boards: list[BoardRecord] = []
+        start_at = 0
+        max_results = 50
+
+        while True:
+            payload = self._request_json(
+                "/rest/agile/1.0/board",
+                params={"startAt": start_at, "maxResults": max_results},
+            )
+            values = payload.get("values") or []
+            for board in values:
+                if not isinstance(board, dict):
+                    continue
+                board_id_raw = board.get("id")
+                try:
+                    board_id = int(str(board_id_raw))
+                except (TypeError, ValueError):
+                    continue
+                location = board.get("location") or {}
+                boards.append(
+                    BoardRecord(
+                        external_board_id=board_id,
+                        name=board.get("name") or "",
+                        project_key=location.get("projectKey"),
+                        board_type=board.get("type"),
+                        raw=board,
+                    )
+                )
+
+            if not values:
+                break
+            if bool(payload.get("isLast")):
+                break
+
+            start_at += len(values)
+            total = payload.get("total")
+            if isinstance(total, int) and start_at >= total:
+                break
+
+        return boards
 
     def get_sprints(self, board_id: int, state: str | None = None) -> list[SprintRecord]:
-        _ = self._auth_headers()
-        _state_query = f"?state={state}" if state else ""
-        _endpoint = f"{self.config.base_url}/rest/agile/1.0/board/{board_id}/sprint{_state_query}"
-        # TODO: Call endpoint and map sprints.
-        return []
+        sprints: list[SprintRecord] = []
+        start_at = 0
+        max_results = 50
+        while True:
+            params: dict[str, Any] = {"startAt": start_at, "maxResults": max_results}
+            if state:
+                params["state"] = state
+            payload = self._request_json(f"/rest/agile/1.0/board/{board_id}/sprint", params=params)
+
+            values = payload.get("values") or []
+            for sprint in values:
+                if not isinstance(sprint, dict):
+                    continue
+                sprint_id_raw = sprint.get("id")
+                if not isinstance(sprint_id_raw, int):
+                    try:
+                        sprint_id_raw = int(str(sprint_id_raw))
+                    except ValueError:
+                        continue
+
+                sprints.append(
+                    SprintRecord(
+                        external_sprint_id=sprint_id_raw,
+                        board_external_id=board_id,
+                        name=sprint.get("name") or "",
+                        state=sprint.get("state") or "",
+                        start_date=_parse_jira_datetime(sprint.get("startDate")),
+                        end_date=_parse_jira_datetime(sprint.get("endDate")),
+                        complete_date=_parse_jira_datetime(sprint.get("completeDate")),
+                        goal=sprint.get("goal"),
+                        raw=sprint,
+                    )
+                )
+
+            if not values:
+                break
+            if bool(payload.get("isLast")):
+                break
+
+            start_at += len(values)
+            total = payload.get("total")
+            if isinstance(total, int) and start_at >= total:
+                break
+
+        return sprints
 
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
-        _ = self._auth_headers()
-        _endpoint = f"{self.config.base_url}/rest/api/2/issue/{issue_key}?expand=changelog"
-        # TODO: Call endpoint and map changelog histories/items.
-        return []
+        payload = self._request_json(
+            f"/rest/api/2/issue/{issue_key}",
+            params={"expand": "changelog"},
+        )
+        changelog = payload.get("changelog") or {}
+        histories = changelog.get("histories") or []
 
+        items: list[ChangelogItemRecord] = []
+        for history in histories:
+            if not isinstance(history, dict):
+                continue
+            changed_at = _parse_jira_datetime(history.get("created")) or datetime.now(
+                tz=timezone.utc
+            )
+            author = history.get("author") or {}
+            author_account_id = author.get("accountId") or author.get("name")
+            history_id = history.get("id")
+
+            for change_item in history.get("items") or []:
+                if not isinstance(change_item, dict):
+                    continue
+                field_name = change_item.get("field")
+                if not field_name:
+                    continue
+                items.append(
+                    ChangelogItemRecord(
+                        issue_key=issue_key,
+                        history_id=str(history_id) if history_id is not None else None,
+                        changed_at=changed_at,
+                        author_account_id=author_account_id,
+                        field_name=str(field_name),
+                        from_value=change_item.get("fromString"),
+                        to_value=change_item.get("toString"),
+                        raw={"history": history, "item": change_item},
+                    )
+                )
+        return items
+
+
+# Backward-compatible alias to avoid breaking imports in early scaffolding.
+JiraRestConnectorStub = JiraRestConnector

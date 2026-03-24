@@ -29,19 +29,31 @@ TeamBeacon/
 ```
 
 ## Quick Start (Current Baseline)
-1. Apply the local schema:
+1. Copy configuration template (or use existing `config/.env`):
+```bash
+cp config/.env.example config/.env
+```
+2. Apply the local schema:
 ```bash
 sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
 ```
-2. Validate Python connector stubs:
+3. Validate connector module syntax:
 ```bash
 PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py
 ```
-3. Review contribution rules:
+4. Run unit tests:
+```bash
+python3 -m unittest discover -s tests/unit -p "test_*.py" -v
+```
+5. (Optional) Run live JIRA integration tests:
+```bash
+RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v
+```
+6. Review contribution rules:
 ```bash
 cat AGENTS.md
 ```
-4. Open UI mockups:
+7. Open UI mockups:
 ```bash
 open docs/design/teambeacon-mockups.html
 ```
@@ -54,7 +66,7 @@ open docs/design/teambeacon-mockups.html
 
 ## Next Implementation Milestones
 1. Bootstrap FastAPI service entrypoint and config.
-2. Implement real hosted JIRA sync (issues, sprints, changelog).
+2. Expand JIRA connector usage in workers (issues, sprints, changelog ingestion pipeline).
 3. Add initiative/team dashboard APIs backed by `metric_snapshots`.
 4. Generate first executive report from local data snapshots.
 
@@ -64,3 +76,4 @@ open docs/design/teambeacon-mockups.html
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline.
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap.
 - [docs/design/README.md](docs/design/README.md): design artifact overview.
+- [tests/README.md](tests/README.md): unit/integration test commands.

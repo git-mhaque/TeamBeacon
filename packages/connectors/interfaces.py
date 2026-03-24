@@ -14,7 +14,7 @@ from .models import (
 )
 
 
-@dataclass(slots=True)
+@dataclass
 class ConnectorConfig:
     base_url: str
     pat_token: str
@@ -72,4 +72,3 @@ class ConfluenceConnector(ABC):
         limit: int = 50,
     ) -> tuple[list[ConfluencePageRecord], SyncBatch]:
         """Fetch updated pages for incremental sync."""
-

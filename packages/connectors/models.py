@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 
-@dataclass(slots=True)
+@dataclass
 class BoardRecord:
     external_board_id: int
     name: str
@@ -14,7 +14,7 @@ class BoardRecord:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class SprintRecord:
     external_sprint_id: int
     board_external_id: int | None
@@ -27,7 +27,7 @@ class SprintRecord:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class IssueRecord:
     issue_key: str
     issue_id: str
@@ -50,7 +50,7 @@ class IssueRecord:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class ChangelogItemRecord:
     issue_key: str
     history_id: str | None
@@ -62,7 +62,7 @@ class ChangelogItemRecord:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class ConfluencePageRecord:
     page_id: str
     title: str
@@ -75,8 +75,7 @@ class ConfluencePageRecord:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class SyncBatch:
     next_cursor: str | None
     has_more: bool
-

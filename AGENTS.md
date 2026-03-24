@@ -33,8 +33,11 @@ TeamBeacon/
 
 ## Build, Test, and Development Commands
 Tooling is minimal right now. Use:
+- `cp config/.env.example config/.env` to initialize local connector config.
 - `sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
+- `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
+- `RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v` for live integration tests.
 - `open docs/design/teambeacon-mockups.html` to review current UI/UX mockups.
 - `git log --oneline -n 10` to review recent commit conventions.
 
