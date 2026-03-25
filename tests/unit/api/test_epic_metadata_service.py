@@ -323,6 +323,91 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["epics"][0]["groups"], [])
             self.assertEqual(payload["epics"][0]["workTypes"], [])
 
+    def test_epic_summary_uses_latest_synced_issue_name_when_metadata_name_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS issues (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      issue_key TEXT NOT NULL UNIQUE,
+                      issue_id TEXT NOT NULL,
+                      project_key TEXT,
+                      issue_type TEXT,
+                      summary TEXT NOT NULL,
+                      status_name TEXT NOT NULL,
+                      status_category TEXT,
+                      priority TEXT,
+                      assignee_account_id TEXT,
+                      reporter_account_id TEXT,
+                      story_points REAL,
+                      sprint_external_id INTEGER,
+                      epic_key TEXT,
+                      parent_issue_key TEXT,
+                      labels_json TEXT NOT NULL DEFAULT '[]',
+                      components_json TEXT NOT NULL DEFAULT '[]',
+                      created_at_source TEXT,
+                      updated_at_source TEXT,
+                      resolved_at_source TEXT,
+                      raw_json TEXT NOT NULL DEFAULT '{}',
+                      synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (issue_key, issue_id, issue_type, summary, status_name, status_category, updated_at_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "CEGBUPOL-3553",
+                        "3553",
+                        "Epic",
+                        "CloudNative Migration for Email Notification Service",
+                        "In Progress",
+                        "In Progress",
+                        "2026-03-25T06:00:00-07:00",
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-3553",
+                success_criteria=["Keep throughput stable"],
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    UPDATE issues
+                    SET summary = ?, updated_at_source = ?
+                    WHERE issue_key = ?
+                    """,
+                    (
+                        "OCI Native Migration for Email Notification Service ",
+                        "2026-03-25T06:22:38-07:00",
+                        "CEGBUPOL-3553",
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            summary_payload = get_configured_epic_summary(limit=20, db_path=db_path)
+            self.assertEqual(len(summary_payload["epics"]), 1)
+            self.assertEqual(
+                summary_payload["epics"][0]["epicName"],
+                "OCI Native Migration for Email Notification Service",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

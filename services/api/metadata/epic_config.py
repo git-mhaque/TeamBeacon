@@ -459,10 +459,12 @@ def _read_epic_metadata_entry(conn: sqlite3.Connection, epic_key: str) -> dict[s
         return None
 
     metadata_id = int(epic_row["id"])
-    persisted_epic_name = epic_row["epic_name"]
-    epic_title = str(persisted_epic_name).strip() if persisted_epic_name is not None else None
-    if not epic_title:
-        epic_title = _resolve_epic_name_from_issues(conn, epic_key)
+    synced_epic_name = _resolve_epic_name_from_issues(conn, epic_key)
+    if synced_epic_name:
+        epic_title = synced_epic_name
+    else:
+        persisted_epic_name = epic_row["epic_name"]
+        epic_title = str(persisted_epic_name).strip() if persisted_epic_name is not None else None
     criteria_raw = epic_row["success_criteria_json"] or "[]"
     try:
         criteria = json.loads(criteria_raw)
