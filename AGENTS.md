@@ -42,6 +42,7 @@ Tooling is minimal right now. Use:
 - `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
 - `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v` for local API integration tests.
 - `RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v` for live integration tests.
+- `cd app && npm run build` for TS compile checks and production build validation.
 - `open docs/design/teambeacon-mockups.html` to review current UI/UX mockups.
 - `git log --oneline -n 10` to review recent commit conventions.
 
@@ -54,16 +55,25 @@ When FastAPI/Tauri projects are bootstrapped, add runnable commands to `README.m
 - Keep connectors thin; map external payloads into normalized models early.
 
 ## Testing Guidelines
-- Add tests with each feature; avoid large untested batches.
+- Add/update tests with each feature; avoid large untested batches.
 - Name tests by behavior (`test_incremental_sync_cursor.py`, `initiative-rag.spec.ts`).
 - Cover at least one success path and one failure path per unit.
 - Prioritize metric correctness and sync idempotency tests.
+- Enforce `>=90%` coverage across touched modules using unit + integration tests. If coverage tooling is missing for a component, add it in the same change before merging.
 
 ## Commit & Pull Request Guidelines
 Use Conventional Commits. Current history follows:
 - `docs: ...`
 - `chore: ...`
 - `feat: ...`
+
+Strict pre-commit quality gate:
+- Run and pass unit and integration tests for impacted areas.
+- Keep combined test coverage for changed code at `90%+`.
+- Run style/lint checks before commit. For current baseline run:
+  - `cd app && npm run build`
+  - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py services/api/*.py services/api/integrations/*.py`
+- If new language/tooling is introduced, add and document an explicit lint command in `README.md` and enforce it in PR validation.
 
 PRs should include:
 - Brief problem/solution summary.
