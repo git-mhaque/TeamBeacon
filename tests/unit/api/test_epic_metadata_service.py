@@ -8,6 +8,7 @@ import sqlite3
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    delete_epic_metadata,
     delete_epic_group,
     delete_work_type,
     get_configured_epic_summary,
@@ -103,6 +104,43 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             lookup = get_epic_lookup_config(db_path=db_path)
             self.assertEqual(lookup["groups"], [])
             self.assertEqual(lookup["workTypes"], [])
+
+    def test_delete_epic_metadata_removes_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            group = add_epic_group("Platform", db_path=db_path)
+            work_type = add_work_type("Feature", db_path=db_path)
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO issues (issue_key, issue_id, summary, issue_type, status_name)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    ("CEGBUPOL-4482", "10001", "Unified Engineering Pulse", "Epic", "To Do"),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-4482",
+                success_criteria=["Zero blocker defects"],
+                group_ids=[group["id"]],
+                work_type_ids=[work_type["id"]],
+                db_path=db_path,
+            )
+
+            deleted = delete_epic_metadata("cegbupol-4482", db_path=db_path)
+            self.assertEqual(deleted["epicKey"], "CEGBUPOL-4482")
+            self.assertTrue(deleted["deleted"])
+            self.assertEqual(deleted["removedMetadataRows"], 1)
+
+            read_payload = get_epic_metadata(epic_key="CEGBUPOL-4482", db_path=db_path)
+            self.assertEqual(read_payload["epics"], [])
+
+            with self.assertRaisesRegex(ValueError, "is not configured"):
+                delete_epic_metadata("CEGBUPOL-4482", db_path=db_path)
 
     def test_search_unconfigured_epics_by_key_or_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

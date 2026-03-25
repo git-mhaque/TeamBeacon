@@ -950,6 +950,12 @@ body {
   white-space: nowrap;
 }
 
+.initiative-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
 .table-sort-btn {
   border: 0;
   padding: 0;

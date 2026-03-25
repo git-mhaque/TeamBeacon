@@ -369,6 +369,53 @@ def delete_work_type(lookup_id: int | str, db_path: str | None = None) -> dict[s
     )
 
 
+def delete_epic_metadata(
+    epic_key: str,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_key = _normalize_epic_key(epic_key)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        row = conn.execute(
+            """
+            SELECT id
+            FROM epic_metadata
+            WHERE epic_key = ?
+            LIMIT 1
+            """,
+            (normalized_key,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"epicKey {normalized_key} is not configured.")
+
+        metadata_id = int(row["id"])
+        group_result = conn.execute(
+            "DELETE FROM epic_metadata_groups WHERE epic_metadata_id = ?",
+            (metadata_id,),
+        )
+        work_type_result = conn.execute(
+            "DELETE FROM epic_metadata_work_types WHERE epic_metadata_id = ?",
+            (metadata_id,),
+        )
+        metadata_result = conn.execute(
+            "DELETE FROM epic_metadata WHERE id = ?",
+            (metadata_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "epicKey": normalized_key,
+        "deleted": True,
+        "removedGroupMappings": int(group_result.rowcount or 0),
+        "removedWorkTypeMappings": int(work_type_result.rowcount or 0),
+        "removedMetadataRows": int(metadata_result.rowcount or 0),
+    }
+
+
 def _validate_lookup_ids(
     conn: sqlite3.Connection,
     *,

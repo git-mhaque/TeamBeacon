@@ -3,6 +3,7 @@ import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
 import {
+  deleteEpicMetadata,
   EpicCandidate,
   EpicLookupConfig,
   fetchConfiguredEpicSummary,
@@ -69,6 +70,8 @@ export function InitiativesScreen() {
   const [isEpicEditOpen, setIsEpicEditOpen] = useState(false);
   const [editMetaSaving, setEditMetaSaving] = useState(false);
   const [editMetaError, setEditMetaError] = useState<string | null>(null);
+  const [removingEpicKey, setRemovingEpicKey] = useState<string | null>(null);
+  const [pendingRemoveEpic, setPendingRemoveEpic] = useState<SummaryRow | null>(null);
   const [editingEpic, setEditingEpic] = useState<SummaryRow | null>(null);
   const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
   const [editSelectedGroupIds, setEditSelectedGroupIds] = useState<number[]>([]);
@@ -451,6 +454,42 @@ export function InitiativesScreen() {
     loadEpicSummary,
   ]);
 
+  const openRemoveEpicOverlay = useCallback((entry: SummaryRow) => {
+    setEpicMetaError(null);
+    setEpicMetaSuccess(null);
+    setPendingRemoveEpic(entry);
+  }, []);
+
+  const closeRemoveEpicOverlay = useCallback(() => {
+    if (removingEpicKey) {
+      return;
+    }
+    setPendingRemoveEpic(null);
+  }, [removingEpicKey]);
+
+  const handleRemoveEpicConfig = useCallback(async () => {
+    if (!pendingRemoveEpic) {
+      return;
+    }
+    const epicKey = pendingRemoveEpic.epicKey;
+    setRemovingEpicKey(epicKey);
+    try {
+      await deleteEpicMetadata(epicKey);
+      await loadEpicSummary();
+      if (editingEpic?.epicKey === epicKey) {
+        setIsEpicEditOpen(false);
+        setEditingEpic(null);
+      }
+      setPendingRemoveEpic(null);
+      setEpicMetaSuccess(`Epic configuration removed for ${epicKey}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to remove epic configuration.";
+      setEpicMetaError(message);
+    } finally {
+      setRemovingEpicKey(null);
+    }
+  }, [editingEpic?.epicKey, loadEpicSummary, pendingRemoveEpic]);
+
   useEffect(() => {
     if (!isEpicConfigureOpen) {
       return;
@@ -646,7 +685,7 @@ export function InitiativesScreen() {
                     RAG{sortIndicator("rag")}
                   </button>
                 </th>
-                <th>Edit</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -694,9 +733,24 @@ export function InitiativesScreen() {
                     </span>
                   </td>
                   <td>
-                    <button className="mini-sync-btn" onClick={() => openEpicEditOverlay(entry)} type="button">
-                      Edit
-                    </button>
+                    <div className="initiative-actions">
+                      <button
+                        className="mini-sync-btn"
+                        onClick={() => openEpicEditOverlay(entry)}
+                        type="button"
+                        disabled={removingEpicKey === entry.epicKey}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="mini-sync-btn"
+                        onClick={() => openRemoveEpicOverlay(entry)}
+                        type="button"
+                        disabled={removingEpicKey === entry.epicKey}
+                      >
+                        {removingEpicKey === entry.epicKey ? "Removing..." : "Remove"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -750,6 +804,59 @@ export function InitiativesScreen() {
           Restrict additional scope intake this sprint and prioritize cross-team dependency clearance.
         </p>
       </Panel>
+
+      {pendingRemoveEpic ? (
+        <div className="epic-edit-overlay" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
+          <div className="epic-edit-backdrop" onClick={closeRemoveEpicOverlay} />
+          <div className="epic-edit-dialog">
+            <div className="sync-history-header">
+              <h3>Remove Epic Configuration</h3>
+              <button className="mini-sync-btn" onClick={closeRemoveEpicOverlay} type="button" disabled={removingEpicKey === pendingRemoveEpic.epicKey}>
+                Close
+              </button>
+            </div>
+
+            <p className="sync-options-note">
+              Remove configuration for{" "}
+              {jiraBaseUrl ? (
+                <a
+                  className="external-link"
+                  href={`${jiraBaseUrl}/browse/${pendingRemoveEpic.epicKey}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {pendingRemoveEpic.epicKey}
+                </a>
+              ) : (
+                pendingRemoveEpic.epicKey
+              )}
+              {pendingRemoveEpic.epicName ? ` (${pendingRemoveEpic.epicName})` : ""}?
+            </p>
+            <p className="sync-options-note">
+              This removes success criteria, group mappings, and work type mappings for this epic only.
+            </p>
+
+            <div className="sync-options-footer">
+              <button
+                className="mini-sync-btn"
+                onClick={closeRemoveEpicOverlay}
+                type="button"
+                disabled={removingEpicKey === pendingRemoveEpic.epicKey}
+              >
+                Cancel
+              </button>
+              <button
+                className="mini-sync-btn"
+                onClick={handleRemoveEpicConfig}
+                type="button"
+                disabled={removingEpicKey === pendingRemoveEpic.epicKey}
+              >
+                {removingEpicKey === pendingRemoveEpic.epicKey ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isEpicConfigureOpen ? (
         <div className="epic-edit-overlay" role="dialog" aria-modal="true" aria-label="Configure Epic Metadata">

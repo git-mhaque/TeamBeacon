@@ -16,6 +16,7 @@ from services.api.integrations.jira_sync import (
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    delete_epic_metadata,
     delete_epic_group,
     delete_work_type,
     get_configured_epic_summary,
@@ -40,6 +41,7 @@ MetadataEpicReadProvider = Callable[..., dict[str, Any]]
 MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
 MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
 MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
+MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -63,6 +65,7 @@ def build_handler(
     metadata_summary_provider: MetadataEpicSummaryProvider = get_configured_epic_summary,
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
+    metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_json_headers(self, status_code: int = 200) -> None:
@@ -390,6 +393,26 @@ def build_handler(
                         group_ids=group_ids_raw,
                         work_type_ids=work_type_ids_raw,
                     )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics/delete":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                epic_key_raw = body_payload.get("epicKey")
+                if not isinstance(epic_key_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "epicKey is required."}))
+                    return
+                try:
+                    payload = metadata_delete_epic_provider(epic_key_raw)
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))

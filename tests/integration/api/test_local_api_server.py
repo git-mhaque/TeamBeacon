@@ -21,6 +21,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.group_delete_calls: list[int] = []
         self.work_type_delete_calls: list[int] = []
         self.epic_upsert_calls: list[dict[str, object]] = []
+        self.epic_delete_calls: list[str] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
         self.epic_summary_calls: list[int] = []
 
@@ -205,6 +206,16 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "updatedAt": "2026-03-25T00:00:00+00:00",
             }
 
+        def fake_delete_epic(epic_key):  # noqa: ANN001
+            self.epic_delete_calls.append(epic_key)
+            return {
+                "epicKey": epic_key,
+                "deleted": True,
+                "removedGroupMappings": 1,
+                "removedWorkTypeMappings": 1,
+                "removedMetadataRows": 1,
+            }
+
         handler_cls = build_handler(
             jira_status_provider=fake_status,
             jira_sync_status_provider=fake_sync_status,
@@ -222,6 +233,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_summary_provider=fake_epic_summary,
             metadata_search_epics_provider=fake_search_epics,
             metadata_upsert_epic_provider=fake_upsert_epic,
+            metadata_delete_epic_provider=fake_delete_epic,
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -437,6 +449,21 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["groupIds"], [1])
         self.assertEqual(body["workTypeIds"], [10])
         self.assertEqual(self.epic_upsert_calls[-1]["epic_key"], "CEGBUPOL-4482")
+
+    def test_metadata_delete_epic_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/epics/delete",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"epicKey": "CEGBUPOL-4482"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["epicKey"], "CEGBUPOL-4482")
+        self.assertTrue(body["deleted"])
+        self.assertEqual(body["removedMetadataRows"], 1)
+        self.assertEqual(self.epic_delete_calls[-1], "CEGBUPOL-4482")
 
     def test_metadata_read_epic_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/epics?epicKey=CEGBUPOL-4482", timeout=5) as response:  # noqa: S310

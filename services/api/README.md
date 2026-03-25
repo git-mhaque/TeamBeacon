@@ -56,6 +56,9 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `successCriteria` (string array)
     - `groupIds` (int array)
     - `workTypeIds` (int array)
+- `POST /api/metadata/epics/delete`
+  - Body:
+    - `epicKey` (required)
 
 ## Notes
 - The JIRA status endpoint reads `config/.env` (or process env vars).

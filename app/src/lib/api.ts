@@ -346,3 +346,31 @@ export async function upsertEpicMetadata(payload: {
   }
   return (await response.json()) as EpicMetadataEntry;
 }
+
+export async function deleteEpicMetadata(epicKey: string): Promise<{
+  epicKey: string;
+  deleted: boolean;
+  removedGroupMappings: number;
+  removedWorkTypeMappings: number;
+  removedMetadataRows: number;
+}> {
+  const response = await fetch("/api/metadata/epics/delete", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ epicKey }),
+  });
+  if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid epic metadata delete payload.");
+    }
+    throw new Error(`Epic metadata delete failed (${response.status})`);
+  }
+  return (await response.json()) as {
+    epicKey: string;
+    deleted: boolean;
+    removedGroupMappings: number;
+    removedWorkTypeMappings: number;
+    removedMetadataRows: number;
+  };
+}
