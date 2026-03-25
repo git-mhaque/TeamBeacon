@@ -160,6 +160,72 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(changes[0].to_value, "In Progress")
         self.assertEqual(changes[1].field_name, "assignee")
 
+    def test_get_board_issues_maps_payload(self) -> None:
+        payload = {
+            "startAt": 0,
+            "maxResults": 1,
+            "total": 2,
+            "isLast": False,
+            "issues": [
+                {
+                    "id": "301",
+                    "key": "CEGBUPOL-301",
+                    "fields": {
+                        "project": {"key": "CEGBUPOL"},
+                        "issuetype": {"name": "Task"},
+                        "summary": "Board issue sample",
+                        "status": {"name": "To Do", "statusCategory": {"name": "To Do"}},
+                        "priority": {"name": "Low"},
+                        "assignee": {"accountId": "u1"},
+                        "reporter": {"accountId": "u2"},
+                        "labels": [],
+                        "components": [],
+                        "created": "2026-03-20T10:00:00.000+0000",
+                        "updated": "2026-03-21T11:00:00.000+0000",
+                        "resolutiondate": None,
+                        "customfield_10004": "1",
+                        "sprint": {"id": 700},
+                        "customfield_10014": "CEGBUPOL-1",
+                    },
+                }
+            ],
+        }
+        with patch.object(self.connector, "_request_json", return_value=payload) as mocked:
+            issues, batch, total = self.connector.get_board_issues(board_id=27193, start_at=0, max_results=1)
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(mocked.call_args.args[0], "/rest/agile/1.0/board/27193/issue")
+        self.assertEqual(total, 2)
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].issue_key, "CEGBUPOL-301")
+        self.assertTrue(batch.has_more)
+        self.assertEqual(batch.next_cursor, "1")
+
+    def test_get_board_issues_accepts_jql_filter(self) -> None:
+        payload = {
+            "startAt": 0,
+            "maxResults": 1,
+            "total": 1,
+            "isLast": True,
+            "issues": [],
+        }
+        with patch.object(self.connector, "_request_json", return_value=payload) as mocked:
+            issues, batch, total = self.connector.get_board_issues(
+                board_id=27193,
+                start_at=0,
+                max_results=1,
+                jql='updated >= "2026-03-23 12:00"',
+            )
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(
+            mocked.call_args.kwargs["params"]["jql"],
+            'updated >= "2026-03-23 12:00"',
+        )
+        self.assertEqual(issues, [])
+        self.assertFalse(batch.has_more)
+        self.assertEqual(total, 1)
+
     def test_basic_auth_header_uses_username_and_pat(self) -> None:
         connector = JiraRestConnector(
             config=ConnectorConfig(

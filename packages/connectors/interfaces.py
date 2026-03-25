@@ -51,6 +51,16 @@ class JiraConnector(ABC):
         """List sprints for a board."""
 
     @abstractmethod
+    def get_board_issues(
+        self,
+        board_id: int,
+        start_at: int = 0,
+        max_results: int = 100,
+        jql: str | None = None,
+    ) -> tuple[list[IssueRecord], SyncBatch, int | None]:
+        """Fetch paged issues for a specific board."""
+
+    @abstractmethod
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
         """Fetch changelog history for one issue."""
 

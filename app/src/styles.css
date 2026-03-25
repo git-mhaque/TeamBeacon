@@ -158,6 +158,22 @@ body {
   font-weight: 600;
 }
 
+.mini-sync-btn {
+  border: 1px solid #2a6f88;
+  border-radius: 0.58rem;
+  padding: 0.22rem 0.5rem;
+  background: #f4fbff;
+  color: #0f5570;
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.mini-sync-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .screen-body {
   padding-top: 0.9rem;
 }
@@ -250,6 +266,14 @@ body {
   margin-top: 0.2rem;
   color: var(--muted);
   font-size: 0.77rem;
+}
+
+.card-actions {
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .external-link {
@@ -364,6 +388,179 @@ body {
   color: #24434f;
   padding: 0.44rem;
   font-size: 0.84rem;
+}
+
+.sync-options-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+}
+
+.sync-options-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 31, 38, 0.45);
+}
+
+.sync-options-dialog {
+  position: relative;
+  width: min(560px, 92vw);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 1rem 2.5rem rgba(16, 31, 38, 0.3);
+  padding: 0.9rem;
+  z-index: 1;
+}
+
+.sync-options-dialog h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sync-options-dialog p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.sync-options-list {
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sync-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.6rem;
+  background: #f7fbfe;
+  cursor: pointer;
+}
+
+.sync-option.selected {
+  border-color: #2a6f88;
+  background: #ebf6fb;
+}
+
+.sync-option input {
+  margin-top: 0.16rem;
+}
+
+.sync-option-title {
+  display: block;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sync-option-desc {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sync-options-note {
+  margin-top: 0.64rem;
+}
+
+.sync-options-footer {
+  margin-top: 0.78rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.sync-history-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+}
+
+.sync-history-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 31, 38, 0.45);
+}
+
+.sync-history-dialog {
+  position: relative;
+  width: min(980px, 95vw);
+  max-height: 82vh;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 1rem 2.5rem rgba(16, 31, 38, 0.3);
+  padding: 0.9rem;
+  z-index: 1;
+}
+
+.sync-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.sync-history-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sync-history-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.sync-history-loading,
+.sync-history-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.sync-history-error {
+  color: var(--risk);
+}
+
+.sync-history-table-wrap {
+  margin-top: 0.7rem;
+  max-height: 62vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.68rem;
+}
+
+.sync-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  background: #fff;
+}
+
+.sync-history-table th,
+.sync-history-table td {
+  padding: 0.48rem 0.52rem;
+  border-bottom: 1px solid #e1ebf0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sync-history-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f3f8fb;
+  color: #2b4551;
 }
 
 @keyframes riseIn {

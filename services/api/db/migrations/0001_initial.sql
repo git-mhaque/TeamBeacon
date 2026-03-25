@@ -32,6 +32,24 @@ CREATE TABLE IF NOT EXISTS sync_checkpoints (
   UNIQUE(source_type, scope_key)
 );
 
+CREATE TABLE IF NOT EXISTS sync_run_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_type TEXT NOT NULL CHECK (source_type IN ('jira', 'confluence')),
+  scope_key TEXT NOT NULL,
+  board_external_id INTEGER,
+  board_name TEXT,
+  sync_mode TEXT NOT NULL DEFAULT 'full' CHECK (sync_mode IN ('full', 'since_last')),
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+  boards_synced INTEGER NOT NULL DEFAULT 0,
+  sprints_synced INTEGER NOT NULL DEFAULT 0,
+  issues_synced INTEGER NOT NULL DEFAULT 0,
+  total_issues INTEGER,
+  error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS team_members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id TEXT NOT NULL UNIQUE,
@@ -149,6 +167,6 @@ CREATE INDEX IF NOT EXISTS idx_issue_changelog_issue_changed ON issue_changelog(
 CREATE INDEX IF NOT EXISTS idx_metric_snapshots_lookup ON metric_snapshots(snapshot_type, scope_key, window_start, window_end);
 CREATE INDEX IF NOT EXISTS idx_report_runs_period ON report_runs(period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_sync_checkpoints_lookup ON sync_checkpoints(source_type, scope_key);
+CREATE INDEX IF NOT EXISTS idx_sync_run_history_lookup ON sync_run_history(source_type, started_at);
 
 INSERT OR IGNORE INTO schema_migrations(version) VALUES ('0001_initial');
-

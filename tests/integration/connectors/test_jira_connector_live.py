@@ -25,6 +25,7 @@ class JiraConnectorLiveIntegrationTests(unittest.TestCase):
             config=cls.runtime.to_connector_config(),
             project_key=cls.runtime.project_key,
             story_points_field=cls.runtime.story_points_field,
+            epic_link_field=cls.runtime.epic_link_field,
         )
 
     def test_search_issues_for_project(self) -> None:
@@ -89,4 +90,3 @@ class JiraConnectorLiveIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

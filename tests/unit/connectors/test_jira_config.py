@@ -20,6 +20,7 @@ class JiraConfigUnitTests(unittest.TestCase):
                         "JIRA_PROJECT_KEY=TEST",
                         "JIRA_BOARD_ID=123",
                         "JIRA_STORY_POINTS_FIELD=customfield_10004",
+                        "JIRA_EPIC_LINK_FIELD=customfield_10902",
                     ]
                 ),
                 encoding="utf-8",
@@ -32,6 +33,7 @@ class JiraConfigUnitTests(unittest.TestCase):
                 "JIRA_PROJECT_KEY",
                 "JIRA_BOARD_ID",
                 "JIRA_STORY_POINTS_FIELD",
+                "JIRA_EPIC_LINK_FIELD",
             ):
                 os.environ.pop(key, None)
 
@@ -42,6 +44,7 @@ class JiraConfigUnitTests(unittest.TestCase):
             self.assertEqual(runtime.project_key, "TEST")
             self.assertEqual(runtime.board_id, 123)
             self.assertEqual(runtime.story_points_field, "customfield_10004")
+            self.assertEqual(runtime.epic_link_field, "customfield_10902")
 
     def test_from_env_requires_base_url_and_pat(self) -> None:
         with self.assertRaises(ValueError):
@@ -50,4 +53,3 @@ class JiraConfigUnitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

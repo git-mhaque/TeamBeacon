@@ -349,6 +349,35 @@ class JiraRestConnector(JiraConnector):
 
         return sprints
 
+    def get_board_issues(
+        self,
+        board_id: int,
+        start_at: int = 0,
+        max_results: int = 100,
+        jql: str | None = None,
+    ) -> tuple[list[IssueRecord], SyncBatch, int | None]:
+        params: dict[str, Any] = {"startAt": start_at, "maxResults": max_results}
+        if jql:
+            params["jql"] = jql
+        payload = self._request_json(
+            f"/rest/agile/1.0/board/{board_id}/issue",
+            params=params,
+        )
+        raw_issues = payload.get("issues") or []
+        issues = [self._map_issue(raw_issue) for raw_issue in raw_issues if isinstance(raw_issue, dict)]
+
+        current_start = int(payload.get("startAt", start_at))
+        total_raw = payload.get("total")
+        total = int(total_raw) if isinstance(total_raw, int) else None
+        next_start = current_start + len(issues)
+        has_more = (
+            len(issues) > 0
+            and bool(payload.get("isLast")) is False
+            and (total is None or next_start < total)
+        )
+
+        return issues, SyncBatch(next_cursor=str(next_start) if has_more else None, has_more=has_more), total
+
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
         payload = self._request_json(
             f"/rest/api/2/issue/{issue_key}",

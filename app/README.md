@@ -49,6 +49,15 @@ npm run api:dev
 The Vite dev server proxies `/api/*` requests to `http://127.0.0.1:8000`.
 The npm scripts auto-clean stale generated `vite.config.js` artifacts so proxy config from `vite.config.ts` is always used.
 
+## JIRA Sync Data (Offline)
+- The JIRA card in **Source Connections** now has its own `Sync Data` button.
+- Clicking `Sync Data` opens a mode selector:
+  - `Sync Since Last Timestamp` (default) with internal 2-day overlap
+  - `Full Sync` (refreshes the entire configured board scope)
+- Sync progress is shown live (example: `12 of 5000 issues downloaded`).
+- `Last synced` is shown from persisted checkpoint data.
+- Synced entities are stored in local SQLite (`teambeacon.db`) for offline feature usage.
+
 ## Build
 ```bash
 cd app

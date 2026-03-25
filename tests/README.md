@@ -10,6 +10,7 @@ python3 -m unittest discover -s tests/unit -p "test_*.py" -v
 ## Integration Tests (Live JIRA)
 Integration tests include:
 - Local API server route checks (no external network)
+  - Includes JIRA sync status/start endpoint behavior
 - Optional live hosted JIRA checks (with credentials)
 
 Run API integration tests:

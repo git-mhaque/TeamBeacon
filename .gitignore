@@ -14,5 +14,10 @@ app/*.tsbuildinfo
 app/vite.config.js
 app/vite.config.d.ts
 
+# Local data
+teambeacon.db
+teambeacon.db-shm
+teambeacon.db-wal
+
 # macOS
 .DS_Store

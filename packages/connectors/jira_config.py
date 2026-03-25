@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from .interfaces import ConnectorConfig
-from .jira_rest_stub import DEFAULT_STORY_POINTS_FIELD
+from .jira_rest_stub import DEFAULT_EPIC_LINK_FIELD, DEFAULT_STORY_POINTS_FIELD
 
 DEFAULT_ENV_PATHS = (Path("config/.env"), Path(".env"))
 
@@ -35,6 +35,7 @@ class JiraRuntimeConfig:
     project_key: str | None
     board_id: int | None
     story_points_field: str
+    epic_link_field: str = DEFAULT_EPIC_LINK_FIELD
     auth_mode: str = "pat_bearer"
     username: str | None = None
     timeout_seconds: int = 30
@@ -60,6 +61,7 @@ class JiraRuntimeConfig:
             project_key=source.get("JIRA_PROJECT_KEY"),
             board_id=board_id,
             story_points_field=source.get("JIRA_STORY_POINTS_FIELD", DEFAULT_STORY_POINTS_FIELD),
+            epic_link_field=source.get("JIRA_EPIC_LINK_FIELD", DEFAULT_EPIC_LINK_FIELD),
             auth_mode=source.get("JIRA_AUTH_MODE", "pat_bearer"),
             username=source.get("JIRA_USERNAME"),
             timeout_seconds=timeout_seconds,
