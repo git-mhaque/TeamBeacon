@@ -34,8 +34,16 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `workTypes` (work-type taxonomy)
 - `POST /api/metadata/lookup/groups`
   - Body: `{"name":"Platform"}`
+- `POST /api/metadata/lookup/groups/update`
+  - Body: `{"id":1,"name":"Platform Core"}`
+- `POST /api/metadata/lookup/groups/delete`
+  - Body: `{"id":1}`
 - `POST /api/metadata/lookup/work-types`
   - Body: `{"name":"Feature"}`
+- `POST /api/metadata/lookup/work-types/update`
+  - Body: `{"id":10,"name":"Run"}`
+- `POST /api/metadata/lookup/work-types/delete`
+  - Body: `{"id":10}`
 - `GET /api/metadata/epics?limit=50`
   - Optional query param: `epicKey=CEGBUPOL-4482`
 - `GET /api/metadata/epics/summary?limit=50`

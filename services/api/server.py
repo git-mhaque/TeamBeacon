@@ -16,10 +16,14 @@ from services.api.integrations.jira_sync import (
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    delete_epic_group,
+    delete_work_type,
     get_configured_epic_summary,
     get_epic_lookup_config,
     get_epic_metadata,
     search_unconfigured_epics,
+    update_epic_group,
+    update_work_type,
     upsert_epic_metadata,
 )
 
@@ -30,6 +34,8 @@ HistoryProvider = Callable[[int], dict[str, Any]]
 IssueSearchProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
 MetadataCreateProvider = Callable[[str], dict[str, Any]]
+MetadataUpdateProvider = Callable[[int, str], dict[str, Any]]
+MetadataDeleteProvider = Callable[[int], dict[str, Any]]
 MetadataEpicReadProvider = Callable[..., dict[str, Any]]
 MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
 MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
@@ -49,6 +55,10 @@ def build_handler(
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
+    metadata_update_group_provider: MetadataUpdateProvider = update_epic_group,
+    metadata_delete_group_provider: MetadataDeleteProvider = delete_epic_group,
+    metadata_update_work_type_provider: MetadataUpdateProvider = update_work_type,
+    metadata_delete_work_type_provider: MetadataDeleteProvider = delete_work_type,
     metadata_read_epics_provider: MetadataEpicReadProvider = get_epic_metadata,
     metadata_summary_provider: MetadataEpicSummaryProvider = get_configured_epic_summary,
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
@@ -248,6 +258,96 @@ def build_handler(
                     return
                 try:
                     payload = metadata_add_work_type_provider(name_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/groups/update":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                name_raw = body_payload.get("name")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                try:
+                    payload = metadata_update_group_provider(id_raw, name_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/groups/delete":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                try:
+                    payload = metadata_delete_group_provider(id_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/work-types/update":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                name_raw = body_payload.get("name")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                try:
+                    payload = metadata_update_work_type_provider(id_raw, name_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/work-types/delete":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                try:
+                    payload = metadata_delete_work_type_provider(id_raw)
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))

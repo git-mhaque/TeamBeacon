@@ -5,6 +5,8 @@ import { StatusPill } from "../components/StatusPill";
 import {
   addEpicGroup,
   addWorkType,
+  deleteEpicGroup,
+  deleteWorkType,
   EpicCandidate,
   EpicLookupConfig,
   EpicMetadataEntry,
@@ -19,6 +21,8 @@ import {
   JiraSyncMode,
   JiraSyncStatus,
   startJiraSync,
+  updateEpicGroup,
+  updateWorkType,
   upsertEpicMetadata
 } from "../lib/api";
 
@@ -61,6 +65,10 @@ export function IntegrationsScreen() {
   const [editingEpic, setEditingEpic] = useState<EpicMetadataEntry | null>(null);
   const [groupDraft, setGroupDraft] = useState("");
   const [workTypeDraft, setWorkTypeDraft] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+  const [editingWorkTypeId, setEditingWorkTypeId] = useState<number | null>(null);
+  const [editingWorkTypeName, setEditingWorkTypeName] = useState("");
   const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
   const [editSelectedGroupIds, setEditSelectedGroupIds] = useState<number[]>([]);
   const [editSelectedWorkTypeIds, setEditSelectedWorkTypeIds] = useState<number[]>([]);
@@ -337,6 +345,122 @@ export function IntegrationsScreen() {
       setMetaError(message);
     }
   }, [loadEpicMetadataConfig, workTypeDraft]);
+
+  const beginEditGroup = useCallback((id: number, name: string) => {
+    setEditingGroupId(id);
+    setEditingGroupName(name);
+    setMetaError(null);
+    setMetaSuccess(null);
+  }, []);
+
+  const cancelEditGroup = useCallback(() => {
+    setEditingGroupId(null);
+    setEditingGroupName("");
+  }, []);
+
+  const handleSaveEditedGroup = useCallback(async () => {
+    if (editingGroupId === null) {
+      return;
+    }
+    const candidate = editingGroupName.trim();
+    if (!candidate) {
+      setMetaError("Epic group name is required.");
+      return;
+    }
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await updateEpicGroup(editingGroupId, candidate);
+      await loadEpicMetadataConfig();
+      setMetaSuccess("Epic group updated.");
+      setEditingGroupId(null);
+      setEditingGroupName("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update epic group.";
+      setMetaError(message);
+    }
+  }, [editingGroupId, editingGroupName, loadEpicMetadataConfig]);
+
+  const handleDeleteGroup = useCallback(
+    async (id: number, name: string) => {
+      if (!window.confirm(`Delete epic group "${name}"?`)) {
+        return;
+      }
+      setMetaError(null);
+      setMetaSuccess(null);
+      try {
+        await deleteEpicGroup(id);
+        await loadEpicMetadataConfig();
+        setMetaSuccess(`Epic group "${name}" deleted.`);
+        if (editingGroupId === id) {
+          setEditingGroupId(null);
+          setEditingGroupName("");
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to delete epic group.";
+        setMetaError(message);
+      }
+    },
+    [editingGroupId, loadEpicMetadataConfig],
+  );
+
+  const beginEditWorkType = useCallback((id: number, name: string) => {
+    setEditingWorkTypeId(id);
+    setEditingWorkTypeName(name);
+    setMetaError(null);
+    setMetaSuccess(null);
+  }, []);
+
+  const cancelEditWorkType = useCallback(() => {
+    setEditingWorkTypeId(null);
+    setEditingWorkTypeName("");
+  }, []);
+
+  const handleSaveEditedWorkType = useCallback(async () => {
+    if (editingWorkTypeId === null) {
+      return;
+    }
+    const candidate = editingWorkTypeName.trim();
+    if (!candidate) {
+      setMetaError("Work type name is required.");
+      return;
+    }
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await updateWorkType(editingWorkTypeId, candidate);
+      await loadEpicMetadataConfig();
+      setMetaSuccess("Work type updated.");
+      setEditingWorkTypeId(null);
+      setEditingWorkTypeName("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update work type.";
+      setMetaError(message);
+    }
+  }, [editingWorkTypeId, editingWorkTypeName, loadEpicMetadataConfig]);
+
+  const handleDeleteWorkType = useCallback(
+    async (id: number, name: string) => {
+      if (!window.confirm(`Delete work type "${name}"?`)) {
+        return;
+      }
+      setMetaError(null);
+      setMetaSuccess(null);
+      try {
+        await deleteWorkType(id);
+        await loadEpicMetadataConfig();
+        setMetaSuccess(`Work type "${name}" deleted.`);
+        if (editingWorkTypeId === id) {
+          setEditingWorkTypeId(null);
+          setEditingWorkTypeName("");
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to delete work type.";
+        setMetaError(message);
+      }
+    },
+    [editingWorkTypeId, loadEpicMetadataConfig],
+  );
 
   const loadEpicCandidates = useCallback(async (query: string) => {
     setEpicCandidatesLoading(true);
@@ -811,12 +935,50 @@ export function IntegrationsScreen() {
                 Add
               </button>
             </div>
-            <div className="epic-meta-chip-wrap">
+            <div className="epic-meta-item-list">
               {epicLookup.groups.length === 0 ? <span className="chip">No groups</span> : null}
               {epicLookup.groups.map((group) => (
-                <span key={group.id} className="chip">
-                  {group.name}
-                </span>
+                <div key={group.id} className="epic-meta-item-row">
+                  {editingGroupId === group.id ? (
+                    <input
+                      type="text"
+                      value={editingGroupName}
+                      onChange={(event) => setEditingGroupName(event.target.value)}
+                      placeholder="Epic group name"
+                    />
+                  ) : (
+                    <span className="chip">{group.name}</span>
+                  )}
+                  <div className="epic-meta-item-actions">
+                    {editingGroupId === group.id ? (
+                      <>
+                        <button className="mini-sync-btn" onClick={handleSaveEditedGroup} type="button">
+                          Save
+                        </button>
+                        <button className="mini-sync-btn" onClick={cancelEditGroup} type="button">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="mini-sync-btn"
+                          onClick={() => beginEditGroup(group.id, group.name)}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="mini-sync-btn"
+                          onClick={() => handleDeleteGroup(group.id, group.name)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -834,12 +996,50 @@ export function IntegrationsScreen() {
                 Add
               </button>
             </div>
-            <div className="epic-meta-chip-wrap">
+            <div className="epic-meta-item-list">
               {epicLookup.workTypes.length === 0 ? <span className="chip">No work types</span> : null}
               {epicLookup.workTypes.map((workType) => (
-                <span key={workType.id} className="chip">
-                  {workType.name}
-                </span>
+                <div key={workType.id} className="epic-meta-item-row">
+                  {editingWorkTypeId === workType.id ? (
+                    <input
+                      type="text"
+                      value={editingWorkTypeName}
+                      onChange={(event) => setEditingWorkTypeName(event.target.value)}
+                      placeholder="Work type name"
+                    />
+                  ) : (
+                    <span className="chip">{workType.name}</span>
+                  )}
+                  <div className="epic-meta-item-actions">
+                    {editingWorkTypeId === workType.id ? (
+                      <>
+                        <button className="mini-sync-btn" onClick={handleSaveEditedWorkType} type="button">
+                          Save
+                        </button>
+                        <button className="mini-sync-btn" onClick={cancelEditWorkType} type="button">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="mini-sync-btn"
+                          onClick={() => beginEditWorkType(workType.id, workType.name)}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="mini-sync-btn"
+                          onClick={() => handleDeleteWorkType(workType.id, workType.name)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -8,10 +8,14 @@ import sqlite3
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    delete_epic_group,
+    delete_work_type,
     get_configured_epic_summary,
     get_epic_lookup_config,
     get_epic_metadata,
     search_unconfigured_epics,
+    update_epic_group,
+    update_work_type,
     upsert_epic_metadata,
 )
 
@@ -79,6 +83,26 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
                     work_type_ids=[],
                     db_path=db_path,
                 )
+
+    def test_update_and_delete_group_and_work_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            group = add_epic_group("Platform", db_path=db_path)
+            work_type = add_work_type("Feature", db_path=db_path)
+
+            updated_group = update_epic_group(group["id"], "Platform Core", db_path=db_path)
+            updated_work_type = update_work_type(work_type["id"], "Run", db_path=db_path)
+            self.assertEqual(updated_group["name"], "Platform Core")
+            self.assertEqual(updated_work_type["name"], "Run")
+
+            group_delete = delete_epic_group(group["id"], db_path=db_path)
+            work_type_delete = delete_work_type(work_type["id"], db_path=db_path)
+            self.assertTrue(group_delete["deleted"])
+            self.assertTrue(work_type_delete["deleted"])
+
+            lookup = get_epic_lookup_config(db_path=db_path)
+            self.assertEqual(lookup["groups"], [])
+            self.assertEqual(lookup["workTypes"], [])
 
     def test_search_unconfigured_epics_by_key_or_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -205,6 +205,38 @@ export async function addEpicGroup(name: string): Promise<EpicLookupItem> {
   return (await response.json()) as EpicLookupItem;
 }
 
+export async function updateEpicGroup(id: number, name: string): Promise<EpicLookupItem> {
+  const response = await fetch("/api/metadata/lookup/groups/update", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name })
+  });
+  if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid epic group update payload.");
+    }
+    throw new Error(`Epic group update failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function deleteEpicGroup(id: number): Promise<{ id: number; deleted: boolean }> {
+  const response = await fetch("/api/metadata/lookup/groups/delete", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id })
+  });
+  if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid epic group delete payload.");
+    }
+    throw new Error(`Epic group delete failed (${response.status})`);
+  }
+  return (await response.json()) as { id: number; deleted: boolean };
+}
+
 export async function addWorkType(name: string): Promise<EpicLookupItem> {
   const response = await fetch("/api/metadata/lookup/work-types", {
     method: "POST",
@@ -219,6 +251,38 @@ export async function addWorkType(name: string): Promise<EpicLookupItem> {
     throw new Error(`Work type create failed (${response.status})`);
   }
   return (await response.json()) as EpicLookupItem;
+}
+
+export async function updateWorkType(id: number, name: string): Promise<EpicLookupItem> {
+  const response = await fetch("/api/metadata/lookup/work-types/update", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name })
+  });
+  if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid work type update payload.");
+    }
+    throw new Error(`Work type update failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function deleteWorkType(id: number): Promise<{ id: number; deleted: boolean }> {
+  const response = await fetch("/api/metadata/lookup/work-types/delete", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id })
+  });
+  if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid work type delete payload.");
+    }
+    throw new Error(`Work type delete failed (${response.status})`);
+  }
+  return (await response.json()) as { id: number; deleted: boolean };
 }
 
 export async function fetchEpicMetadata(limit = 50): Promise<EpicMetadataEntry[]> {

@@ -16,6 +16,10 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.issue_search_calls: list[dict[str, object]] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
+        self.group_update_calls: list[tuple[int, str]] = []
+        self.work_type_update_calls: list[tuple[int, str]] = []
+        self.group_delete_calls: list[int] = []
+        self.work_type_delete_calls: list[int] = []
         self.epic_upsert_calls: list[dict[str, object]] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
         self.epic_summary_calls: list[int] = []
@@ -123,6 +127,22 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             self.work_type_create_calls.append(name)
             return {"id": 11, "name": name}
 
+        def fake_update_group(lookup_id, name):  # noqa: ANN001
+            self.group_update_calls.append((lookup_id, name))
+            return {"id": lookup_id, "name": name}
+
+        def fake_update_work_type(lookup_id, name):  # noqa: ANN001
+            self.work_type_update_calls.append((lookup_id, name))
+            return {"id": lookup_id, "name": name}
+
+        def fake_delete_group(lookup_id):  # noqa: ANN001
+            self.group_delete_calls.append(lookup_id)
+            return {"id": lookup_id, "deleted": True, "removedMappings": 1, "removedLookupRows": 1}
+
+        def fake_delete_work_type(lookup_id):  # noqa: ANN001
+            self.work_type_delete_calls.append(lookup_id)
+            return {"id": lookup_id, "deleted": True, "removedMappings": 1, "removedLookupRows": 1}
+
         def fake_read_epics(epic_key=None, limit=50):  # noqa: ANN001
             _ = limit
             if epic_key:
@@ -194,6 +214,10 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
             metadata_add_work_type_provider=fake_add_work_type,
+            metadata_update_group_provider=fake_update_group,
+            metadata_delete_group_provider=fake_delete_group,
+            metadata_update_work_type_provider=fake_update_work_type,
+            metadata_delete_work_type_provider=fake_delete_work_type,
             metadata_read_epics_provider=fake_read_epics,
             metadata_summary_provider=fake_epic_summary,
             metadata_search_epics_provider=fake_search_epics,
@@ -335,6 +359,62 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             body = json.loads(response.read().decode("utf-8"))
         self.assertEqual(body["name"], "Run")
         self.assertEqual(self.work_type_create_calls[-1], "Run")
+
+    def test_metadata_update_group_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/groups/update",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"id": 1, "name": "Platform Core"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 1)
+        self.assertEqual(body["name"], "Platform Core")
+        self.assertEqual(self.group_update_calls[-1], (1, "Platform Core"))
+
+    def test_metadata_delete_group_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/groups/delete",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"id": 1}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 1)
+        self.assertTrue(body["deleted"])
+        self.assertEqual(self.group_delete_calls[-1], 1)
+
+    def test_metadata_update_work_type_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/work-types/update",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"id": 10, "name": "Feature+Run"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 10)
+        self.assertEqual(body["name"], "Feature+Run")
+        self.assertEqual(self.work_type_update_calls[-1], (10, "Feature+Run"))
+
+    def test_metadata_delete_work_type_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/work-types/delete",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"id": 10}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 10)
+        self.assertTrue(body["deleted"])
+        self.assertEqual(self.work_type_delete_calls[-1], 10)
 
     def test_metadata_upsert_epic_endpoint(self) -> None:
         request = Request(

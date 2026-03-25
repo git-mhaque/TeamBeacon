@@ -98,6 +98,16 @@ def _normalize_name(name: str) -> str:
     return normalized
 
 
+def _normalize_lookup_id(lookup_id: int | str) -> int:
+    try:
+        normalized = int(lookup_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("id must be an integer.") from exc
+    if normalized <= 0:
+        raise ValueError("id must be a positive integer.")
+    return normalized
+
+
 def _normalize_epic_key(epic_key: str) -> str:
     normalized = epic_key.strip().upper()
     if not normalized:
@@ -239,12 +249,124 @@ def _insert_lookup_item(table: str, name: str, db_path: str | None = None) -> di
     return {"id": int(row["id"]), "name": str(row["name"])}
 
 
+def _update_lookup_item(
+    table: str,
+    lookup_id: int | str,
+    name: str,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_id = _normalize_lookup_id(lookup_id)
+    normalized_name = _normalize_name(name)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        existing = conn.execute(
+            f"SELECT id FROM {table} WHERE id = ? LIMIT 1",
+            (normalized_id,),
+        ).fetchone()
+        if existing is None:
+            raise ValueError(f"id {normalized_id} was not found.")
+
+        try:
+            conn.execute(
+                f"""
+                UPDATE {table}
+                SET name = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (normalized_name, normalized_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError(f'Name "{normalized_name}" already exists.') from exc
+
+        row = conn.execute(
+            f"SELECT id, name FROM {table} WHERE id = ? LIMIT 1",
+            (normalized_id,),
+        ).fetchone()
+        conn.commit()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise RuntimeError("Lookup row was not persisted.")
+    return {"id": int(row["id"]), "name": str(row["name"])}
+
+
+def _delete_lookup_item(
+    *,
+    table: str,
+    mapping_table: str,
+    mapping_column: str,
+    lookup_id: int | str,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_id = _normalize_lookup_id(lookup_id)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        existing = conn.execute(
+            f"SELECT id FROM {table} WHERE id = ? LIMIT 1",
+            (normalized_id,),
+        ).fetchone()
+        if existing is None:
+            raise ValueError(f"id {normalized_id} was not found.")
+
+        mapping_result = conn.execute(
+            f"DELETE FROM {mapping_table} WHERE {mapping_column} = ?",
+            (normalized_id,),
+        )
+        lookup_result = conn.execute(
+            f"DELETE FROM {table} WHERE id = ?",
+            (normalized_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "id": normalized_id,
+        "deleted": True,
+        "removedMappings": int(mapping_result.rowcount or 0),
+        "removedLookupRows": int(lookup_result.rowcount or 0),
+    }
+
+
 def add_epic_group(name: str, db_path: str | None = None) -> dict[str, Any]:
     return _insert_lookup_item("epic_groups", name, db_path=db_path)
 
 
 def add_work_type(name: str, db_path: str | None = None) -> dict[str, Any]:
     return _insert_lookup_item("work_types", name, db_path=db_path)
+
+
+def update_epic_group(lookup_id: int | str, name: str, db_path: str | None = None) -> dict[str, Any]:
+    return _update_lookup_item("epic_groups", lookup_id, name, db_path=db_path)
+
+
+def update_work_type(lookup_id: int | str, name: str, db_path: str | None = None) -> dict[str, Any]:
+    return _update_lookup_item("work_types", lookup_id, name, db_path=db_path)
+
+
+def delete_epic_group(lookup_id: int | str, db_path: str | None = None) -> dict[str, Any]:
+    return _delete_lookup_item(
+        table="epic_groups",
+        mapping_table="epic_metadata_groups",
+        mapping_column="group_id",
+        lookup_id=lookup_id,
+        db_path=db_path,
+    )
+
+
+def delete_work_type(lookup_id: int | str, db_path: str | None = None) -> dict[str, Any]:
+    return _delete_lookup_item(
+        table="work_types",
+        mapping_table="epic_metadata_work_types",
+        mapping_column="work_type_id",
+        lookup_id=lookup_id,
+        db_path=db_path,
+    )
 
 
 def _validate_lookup_ids(

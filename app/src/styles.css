@@ -664,6 +664,36 @@ body {
   gap: 0.32rem;
 }
 
+.epic-meta-item-list {
+  margin-top: 0.52rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.epic-meta-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.34rem;
+}
+
+.epic-meta-item-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.42rem;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+
+.epic-meta-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .epic-meta-form {
   margin-top: 0.72rem;
   padding-top: 0.72rem;
