@@ -3,9 +3,14 @@ import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
 import {
+  EpicCandidate,
+  EpicLookupConfig,
   fetchConfiguredEpicSummary,
+  fetchEpicCandidates,
+  fetchEpicLookupConfig,
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
+  upsertEpicMetadata,
 } from "../lib/api";
 
 type SummarySortKey = "epicKey" | "group" | "type" | "epicName" | "completion" | "rag";
@@ -35,8 +40,11 @@ function ragRank(label: "Red" | "Amber" | "Green"): number {
 
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
+  const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [epicMetaError, setEpicMetaError] = useState<string | null>(null);
+  const [epicMetaSuccess, setEpicMetaSuccess] = useState<string | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SummarySortKey>("epicKey");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -46,6 +54,25 @@ export function InitiativesScreen() {
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<string[]>([]);
   const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const [isEpicConfigureOpen, setIsEpicConfigureOpen] = useState(false);
+  const [configureMetaSaving, setConfigureMetaSaving] = useState(false);
+  const [configureMetaError, setConfigureMetaError] = useState<string | null>(null);
+  const [epicSearchQuery, setEpicSearchQuery] = useState("");
+  const [isEpicSearchFocused, setIsEpicSearchFocused] = useState(false);
+  const [epicCandidatesLoading, setEpicCandidatesLoading] = useState(false);
+  const [epicCandidatesError, setEpicCandidatesError] = useState<string | null>(null);
+  const [epicCandidates, setEpicCandidates] = useState<EpicCandidate[]>([]);
+  const [selectedEpicCandidate, setSelectedEpicCandidate] = useState<EpicCandidate | null>(null);
+  const [configureSuccessCriteriaText, setConfigureSuccessCriteriaText] = useState("");
+  const [configureSelectedGroupIds, setConfigureSelectedGroupIds] = useState<number[]>([]);
+  const [configureSelectedWorkTypeIds, setConfigureSelectedWorkTypeIds] = useState<number[]>([]);
+  const [isEpicEditOpen, setIsEpicEditOpen] = useState(false);
+  const [editMetaSaving, setEditMetaSaving] = useState(false);
+  const [editMetaError, setEditMetaError] = useState<string | null>(null);
+  const [editingEpic, setEditingEpic] = useState<SummaryRow | null>(null);
+  const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
+  const [editSelectedGroupIds, setEditSelectedGroupIds] = useState<number[]>([]);
+  const [editSelectedWorkTypeIds, setEditSelectedWorkTypeIds] = useState<number[]>([]);
   const groupFilterRef = useRef<HTMLDivElement | null>(null);
   const typeFilterRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,11 +107,26 @@ export function InitiativesScreen() {
     }
   }, []);
 
+  const loadEpicLookup = useCallback(async () => {
+    try {
+      const lookup = await fetchEpicLookupConfig();
+      setEpicLookup(lookup);
+      setEpicMetaError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown epic lookup failure";
+      setEpicMetaError(message);
+      setEpicLookup({ groups: [], workTypes: [] });
+    }
+  }, []);
+
   useEffect(() => {
     loadEpicSummary().catch(() => {
       // loadEpicSummary already sets local error state.
     });
-  }, [loadEpicSummary]);
+    loadEpicLookup().catch(() => {
+      // loadEpicLookup already sets local error state.
+    });
+  }, [loadEpicLookup, loadEpicSummary]);
 
   const configuredEpicSummaryText = useMemo(() => {
     if (loading) return "Loading...";
@@ -256,6 +298,182 @@ export function InitiativesScreen() {
     });
   }, []);
 
+  const toggleSelection = useCallback((current: number[], id: number): number[] => {
+    if (current.includes(id)) {
+      return current.filter((value) => value !== id);
+    }
+    return [...current, id];
+  }, []);
+
+  const loadEpicCandidates = useCallback(async (query: string) => {
+    setEpicCandidatesLoading(true);
+    setEpicCandidatesError(null);
+    try {
+      const candidates = await fetchEpicCandidates(query, 20);
+      setEpicCandidates(candidates);
+      if (candidates.length === 0) {
+        setSelectedEpicCandidate(null);
+        return;
+      }
+      setSelectedEpicCandidate((current) => {
+        if (!current) {
+          return candidates[0];
+        }
+        return candidates.find((candidate) => candidate.epicKey === current.epicKey) ?? candidates[0];
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load epic candidates.";
+      setEpicCandidatesError(message);
+      setEpicCandidates([]);
+      setSelectedEpicCandidate(null);
+    } finally {
+      setEpicCandidatesLoading(false);
+    }
+  }, []);
+
+  const openEpicConfigureOverlay = useCallback(() => {
+    setEpicMetaError(null);
+    setEpicMetaSuccess(null);
+    setConfigureMetaSaving(false);
+    setConfigureMetaError(null);
+    setEpicSearchQuery("");
+    setIsEpicSearchFocused(false);
+    setEpicCandidates([]);
+    setEpicCandidatesError(null);
+    setSelectedEpicCandidate(null);
+    setConfigureSuccessCriteriaText("");
+    setConfigureSelectedGroupIds([]);
+    setConfigureSelectedWorkTypeIds([]);
+    setIsEpicConfigureOpen(true);
+  }, []);
+
+  const closeEpicConfigureOverlay = useCallback(() => {
+    if (configureMetaSaving) {
+      return;
+    }
+    setIsEpicConfigureOpen(false);
+    setConfigureMetaError(null);
+  }, [configureMetaSaving]);
+
+  const openEpicEditOverlay = useCallback((entry: SummaryRow) => {
+    setEpicMetaError(null);
+    setEpicMetaSuccess(null);
+    setEditingEpic(entry);
+    setEditSuccessCriteriaText(entry.successCriteria.join("\n"));
+    setEditSelectedGroupIds(entry.groups.map((group) => group.id));
+    setEditSelectedWorkTypeIds(entry.workTypes.map((workType) => workType.id));
+    setEditMetaError(null);
+    setIsEpicEditOpen(true);
+  }, []);
+
+  const closeEpicEditOverlay = useCallback(() => {
+    if (editMetaSaving) {
+      return;
+    }
+    setIsEpicEditOpen(false);
+    setEditingEpic(null);
+    setEditMetaError(null);
+  }, [editMetaSaving]);
+
+  const handleSaveConfiguredEpicMetadata = useCallback(async () => {
+    if (!selectedEpicCandidate) {
+      setConfigureMetaError("Please select an epic to configure.");
+      return;
+    }
+    const criteria = configureSuccessCriteriaText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    setConfigureMetaSaving(true);
+    setConfigureMetaError(null);
+    setEpicMetaError(null);
+    setEpicMetaSuccess(null);
+    try {
+      await upsertEpicMetadata({
+        epicKey: selectedEpicCandidate.epicKey,
+        successCriteria: criteria,
+        groupIds: configureSelectedGroupIds,
+        workTypeIds: configureSelectedWorkTypeIds,
+      });
+      await loadEpicSummary();
+      setEpicMetaSuccess(`Epic metadata saved for ${selectedEpicCandidate.epicKey}.`);
+      setIsEpicConfigureOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save epic metadata.";
+      setConfigureMetaError(message);
+    } finally {
+      setConfigureMetaSaving(false);
+    }
+  }, [
+    configureSelectedGroupIds,
+    configureSelectedWorkTypeIds,
+    configureSuccessCriteriaText,
+    loadEpicSummary,
+    selectedEpicCandidate,
+  ]);
+
+  const handleSaveEditedEpicMetadata = useCallback(async () => {
+    if (!editingEpic) {
+      return;
+    }
+    const criteria = editSuccessCriteriaText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    setEditMetaSaving(true);
+    setEditMetaError(null);
+    setEpicMetaError(null);
+    setEpicMetaSuccess(null);
+    try {
+      await upsertEpicMetadata({
+        epicKey: editingEpic.epicKey,
+        successCriteria: criteria,
+        groupIds: editSelectedGroupIds,
+        workTypeIds: editSelectedWorkTypeIds,
+      });
+      await loadEpicSummary();
+      setEpicMetaSuccess(`Epic metadata updated for ${editingEpic.epicKey}.`);
+      setIsEpicEditOpen(false);
+      setEditingEpic(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update epic metadata.";
+      setEditMetaError(message);
+    } finally {
+      setEditMetaSaving(false);
+    }
+  }, [
+    editSelectedGroupIds,
+    editSelectedWorkTypeIds,
+    editSuccessCriteriaText,
+    editingEpic,
+    loadEpicSummary,
+  ]);
+
+  useEffect(() => {
+    if (!isEpicConfigureOpen) {
+      return;
+    }
+    const normalizedQuery = epicSearchQuery.trim();
+    if (!normalizedQuery) {
+      setEpicCandidatesLoading(false);
+      setEpicCandidatesError(null);
+      setEpicCandidates([]);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      loadEpicCandidates(epicSearchQuery).catch(() => {
+        // loadEpicCandidates already sets local error state.
+      });
+    }, 250);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [epicSearchQuery, isEpicConfigureOpen, loadEpicCandidates]);
+
+  const showEpicAutocomplete = isEpicSearchFocused && epicSearchQuery.trim().length > 0;
+
   const groupFilterLabel = useMemo(() => {
     if (selectedGroupFilters.length === 0) return "All";
     if (selectedGroupFilters.length === 1) return selectedGroupFilters[0];
@@ -282,6 +500,14 @@ export function InitiativesScreen() {
       >
         {error ? <p className="sync-history-error">Initiative summary error: {error}</p> : null}
         {loading ? <p className="sync-history-loading">Loading configured epics...</p> : null}
+        {epicMetaError ? <p className="sync-history-error">Epic metadata error: {epicMetaError}</p> : null}
+        {epicMetaSuccess ? <p className="sync-history-loading">{epicMetaSuccess}</p> : null}
+
+        <div className="epic-meta-table-actions">
+          <button className="mini-sync-btn" onClick={openEpicConfigureOverlay} type="button">
+            Configure Epic
+          </button>
+        </div>
 
         <div className="initiative-summary-toolbar">
           <div className="initiative-column-toggles">
@@ -420,6 +646,7 @@ export function InitiativesScreen() {
                     RAG{sortIndicator("rag")}
                   </button>
                 </th>
+                <th>Edit</th>
               </tr>
             </thead>
             <tbody>
@@ -444,8 +671,17 @@ export function InitiativesScreen() {
                   <td className="initiative-name-cell">{entry.epicName || "-"}</td>
                   <td>
                     <div className="initiative-progress-cell" title={entry.successCriteriaTooltip}>
-                      <span className="initiative-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={entry.completionPercent}>
-                        <span className="initiative-progress-fill" style={{ width: `${Math.max(0, Math.min(100, entry.completionPercent))}%` }} />
+                      <span
+                        className="initiative-progress-track"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={entry.completionPercent}
+                      >
+                        <span
+                          className="initiative-progress-fill"
+                          style={{ width: `${Math.max(0, Math.min(100, entry.completionPercent))}%` }}
+                        />
                       </span>
                       <span className="initiative-progress-label">
                         {entry.completionPercent.toFixed(1).replace(/\.0$/, "")}% ({entry.completedCards}/{entry.totalCards})
@@ -457,11 +693,16 @@ export function InitiativesScreen() {
                       <span className="rag-dot rag-dot-large" />
                     </span>
                   </td>
+                  <td>
+                    <button className="mini-sync-btn" onClick={() => openEpicEditOverlay(entry)} type="button">
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!loading && sortedEpicSummary.length === 0 ? (
                 <tr>
-                  <td colSpan={4 + (showGroupColumn ? 1 : 0) + (showTypeColumn ? 1 : 0)}>
+                  <td colSpan={5 + (showGroupColumn ? 1 : 0) + (showTypeColumn ? 1 : 0)}>
                     {epicSummary.length === 0
                       ? "No configured epics found yet."
                       : "No epics match the selected filters."}
@@ -509,6 +750,232 @@ export function InitiativesScreen() {
           Restrict additional scope intake this sprint and prioritize cross-team dependency clearance.
         </p>
       </Panel>
+
+      {isEpicConfigureOpen ? (
+        <div className="epic-edit-overlay" role="dialog" aria-modal="true" aria-label="Configure Epic Metadata">
+          <div className="epic-edit-backdrop" onClick={closeEpicConfigureOverlay} />
+          <div className="epic-edit-dialog">
+            <div className="sync-history-header">
+              <h3>Configure Epic Metadata</h3>
+              <button
+                className="mini-sync-btn"
+                onClick={closeEpicConfigureOverlay}
+                type="button"
+                disabled={configureMetaSaving}
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="epic-meta-field epic-autocomplete">
+              <span>Search Unconfigured Epic (Key or Name)</span>
+              <input
+                type="text"
+                value={epicSearchQuery}
+                onChange={(event) => setEpicSearchQuery(event.target.value)}
+                onFocus={() => setIsEpicSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsEpicSearchFocused(false);
+                  }, 120);
+                }}
+                placeholder="CEGBUPOL-5000 or Unified Engineering Pulse"
+              />
+              {showEpicAutocomplete ? (
+                <div className="epic-candidate-dropdown" role="listbox" aria-label="Epic candidates">
+                  {epicCandidatesError ? (
+                    <p className="sync-history-error">Epic search error: {epicCandidatesError}</p>
+                  ) : null}
+                  {epicCandidatesLoading ? <p className="sync-history-loading">Searching epics...</p> : null}
+                  {!epicCandidatesLoading && !epicCandidatesError && epicCandidates.length === 0 ? (
+                    <p className="sync-history-loading">No unconfigured epics found.</p>
+                  ) : null}
+                  {epicCandidates.map((candidate) => (
+                    <button
+                      key={candidate.epicKey}
+                      type="button"
+                      className={`epic-candidate-option ${selectedEpicCandidate?.epicKey === candidate.epicKey ? "selected" : ""}`}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setSelectedEpicCandidate(candidate);
+                        setEpicSearchQuery(candidate.epicKey);
+                        setIsEpicSearchFocused(false);
+                      }}
+                    >
+                      <span>{candidate.epicKey}</span>
+                      <small>{candidate.epicName || "No epic name"}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </label>
+
+            {selectedEpicCandidate ? (
+              <p className="sync-options-note">
+                Selected epic:{" "}
+                {jiraBaseUrl ? (
+                  <a
+                    className="external-link"
+                    href={`${jiraBaseUrl}/browse/${selectedEpicCandidate.epicKey}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {selectedEpicCandidate.epicKey}
+                  </a>
+                ) : (
+                  selectedEpicCandidate.epicKey
+                )}
+                {selectedEpicCandidate.epicName ? ` (${selectedEpicCandidate.epicName})` : ""}
+              </p>
+            ) : null}
+
+            <label className="epic-meta-field epic-meta-field-spaced">
+              <span>Success Criteria Checklist (one per line)</span>
+              <textarea
+                value={configureSuccessCriteriaText}
+                onChange={(event) => setConfigureSuccessCriteriaText(event.target.value)}
+                rows={6}
+              />
+            </label>
+
+            <div className="epic-meta-selection-grid">
+              <div className="epic-meta-select-card">
+                <h4>Epic Groups</h4>
+                {epicLookup.groups.length === 0 ? <p>No groups configured yet.</p> : null}
+                {epicLookup.groups.map((group) => (
+                  <label key={group.id} className="epic-meta-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={configureSelectedGroupIds.includes(group.id)}
+                      onChange={() => setConfigureSelectedGroupIds((current) => toggleSelection(current, group.id))}
+                    />
+                    <span>{group.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="epic-meta-select-card">
+                <h4>Work Types</h4>
+                {epicLookup.workTypes.length === 0 ? <p>No work types configured yet.</p> : null}
+                {epicLookup.workTypes.map((workType) => (
+                  <label key={workType.id} className="epic-meta-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={configureSelectedWorkTypeIds.includes(workType.id)}
+                      onChange={() => setConfigureSelectedWorkTypeIds((current) => toggleSelection(current, workType.id))}
+                    />
+                    <span>{workType.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {configureMetaError ? <p className="sync-history-error">{configureMetaError}</p> : null}
+
+            <div className="sync-options-footer">
+              <button
+                className="mini-sync-btn"
+                onClick={closeEpicConfigureOverlay}
+                type="button"
+                disabled={configureMetaSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="mini-sync-btn"
+                onClick={handleSaveConfiguredEpicMetadata}
+                type="button"
+                disabled={configureMetaSaving || !selectedEpicCandidate}
+              >
+                {configureMetaSaving ? "Saving..." : "Save Epic Metadata"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isEpicEditOpen && editingEpic ? (
+        <div className="epic-edit-overlay" role="dialog" aria-modal="true" aria-label="Edit Epic Metadata">
+          <div className="epic-edit-backdrop" onClick={closeEpicEditOverlay} />
+          <div className="epic-edit-dialog">
+            <div className="sync-history-header">
+              <h3>Edit Epic Metadata</h3>
+              <button className="mini-sync-btn" onClick={closeEpicEditOverlay} type="button" disabled={editMetaSaving}>
+                Close
+              </button>
+            </div>
+
+            <p className="sync-options-note">
+              Epic:{" "}
+              {jiraBaseUrl ? (
+                <a
+                  className="external-link"
+                  href={`${jiraBaseUrl}/browse/${editingEpic.epicKey}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {editingEpic.epicKey}
+                </a>
+              ) : (
+                editingEpic.epicKey
+              )}
+              {editingEpic.epicName ? ` (${editingEpic.epicName})` : ""}
+            </p>
+
+            <label className="epic-meta-field epic-meta-field-spaced">
+              <span>Success Criteria Checklist (one per line)</span>
+              <textarea
+                value={editSuccessCriteriaText}
+                onChange={(event) => setEditSuccessCriteriaText(event.target.value)}
+                rows={6}
+              />
+            </label>
+
+            <div className="epic-meta-selection-grid">
+              <div className="epic-meta-select-card">
+                <h4>Epic Groups</h4>
+                {epicLookup.groups.length === 0 ? <p>No groups configured yet.</p> : null}
+                {epicLookup.groups.map((group) => (
+                  <label key={group.id} className="epic-meta-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={editSelectedGroupIds.includes(group.id)}
+                      onChange={() => setEditSelectedGroupIds((current) => toggleSelection(current, group.id))}
+                    />
+                    <span>{group.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="epic-meta-select-card">
+                <h4>Work Types</h4>
+                {epicLookup.workTypes.length === 0 ? <p>No work types configured yet.</p> : null}
+                {epicLookup.workTypes.map((workType) => (
+                  <label key={workType.id} className="epic-meta-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={editSelectedWorkTypeIds.includes(workType.id)}
+                      onChange={() => setEditSelectedWorkTypeIds((current) => toggleSelection(current, workType.id))}
+                    />
+                    <span>{workType.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {editMetaError ? <p className="sync-history-error">{editMetaError}</p> : null}
+
+            <div className="sync-options-footer">
+              <button className="mini-sync-btn" onClick={closeEpicEditOverlay} type="button" disabled={editMetaSaving}>
+                Cancel
+              </button>
+              <button className="mini-sync-btn" onClick={handleSaveEditedEpicMetadata} type="button" disabled={editMetaSaving}>
+                {editMetaSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
