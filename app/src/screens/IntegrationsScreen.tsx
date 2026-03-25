@@ -392,7 +392,7 @@ export function IntegrationsScreen() {
               )
             }
             hint="JIRA_PROJECT_KEY from local config."
-            tone={jiraStatus?.config.projectKey ? "neutral" : "warn"}
+            tone={jiraStatus?.config.projectKey ? "good" : "warn"}
           />
         </div>
       </Panel>
