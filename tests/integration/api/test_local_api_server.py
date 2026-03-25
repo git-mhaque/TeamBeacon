@@ -13,6 +13,7 @@ from services.api.server import build_handler
 class LocalApiServerIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.sync_start_modes: list[str | None] = []
+        self.issue_search_calls: list[dict[str, object]] = []
 
         def fake_status():
             return {
@@ -82,7 +83,31 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ],
             }
 
-        handler_cls = build_handler(fake_status, fake_sync_status, fake_sync_start, fake_sync_history)
+        def fake_issue_search(**kwargs):  # noqa: ANN003
+            self.issue_search_calls.append(kwargs)
+            return {
+                "source": "local",
+                "filters": {
+                    "epicKey": kwargs.get("epic_key"),
+                    "workedBy": kwargs.get("worked_by"),
+                },
+                "count": 1,
+                "issues": [
+                    {
+                        "issueKey": "CEGBUPOL-101",
+                        "summary": "Sample",
+                        "contributors": ["user-dev", "user-qa"],
+                    }
+                ],
+            }
+
+        handler_cls = build_handler(
+            fake_status,
+            fake_sync_status,
+            fake_sync_start,
+            fake_sync_history,
+            fake_issue_search,
+        )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -152,6 +177,25 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["history"][0]["boardName"], "CEGBU Polaris")
         self.assertEqual(body["history"][0]["syncMode"], "since_last")
         self.assertEqual(body["history"][0]["issuesSynced"], 5000)
+
+    def test_issue_search_endpoint(self) -> None:
+        with urlopen(
+            f"{self.base_url}/api/issues/search?epicKey=CEGBUPOL-4482&workedBy=user-qa&limit=25",
+            timeout=5,
+        ) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["issues"][0]["issueKey"], "CEGBUPOL-101")
+        self.assertEqual(body["issues"][0]["contributors"], ["user-dev", "user-qa"])
+
+        self.assertEqual(len(self.issue_search_calls), 1)
+        call = self.issue_search_calls[0]
+        self.assertEqual(call["epic_key"], "CEGBUPOL-4482")
+        self.assertEqual(call["worked_by"], "user-qa")
+        self.assertEqual(call["limit"], 25)
 
 
 if __name__ == "__main__":

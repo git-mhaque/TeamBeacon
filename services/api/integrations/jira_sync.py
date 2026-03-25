@@ -10,7 +10,7 @@ from typing import Any, Callable, Literal
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from packages.connectors.jira_rest_stub import JiraRestConnector
-from packages.connectors.models import BoardRecord, IssueRecord, SprintRecord
+from packages.connectors.models import BoardRecord, ChangelogItemRecord, IssueRecord, SprintRecord
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 SyncRunner = Callable[..., dict[str, Any]]
@@ -54,6 +54,33 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             ADD COLUMN sync_mode TEXT NOT NULL DEFAULT 'full'
             """
         )
+    if not _column_exists(conn, "issues", "parent_issue_key"):
+        conn.execute(
+            """
+            ALTER TABLE issues
+            ADD COLUMN parent_issue_key TEXT
+            """
+        )
+    conn.execute(
+        """
+        UPDATE issues
+        SET parent_issue_key = COALESCE(
+          NULLIF(parent_issue_key, ''),
+          NULLIF(json_extract(raw_json, '$.fields.parent.key'), ''),
+          NULLIF(epic_key, '')
+        )
+        WHERE (parent_issue_key IS NULL OR TRIM(parent_issue_key) = '')
+          AND (
+            NULLIF(json_extract(raw_json, '$.fields.parent.key'), '') IS NOT NULL
+            OR NULLIF(epic_key, '') IS NOT NULL
+          )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_epic_key ON issues(epic_key)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_parent_issue_key ON issues(parent_issue_key)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_issue_changelog_author_issue ON issue_changelog(author_account_id, issue_key)"
+    )
 
 
 def _scope_key(board_id: int) -> str:
@@ -594,6 +621,7 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
               story_points,
               sprint_external_id,
               epic_key,
+              parent_issue_key,
               labels_json,
               components_json,
               created_at_source,
@@ -601,7 +629,7 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
               resolved_at_source,
               raw_json,
               synced_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(issue_key) DO UPDATE SET
               issue_id = excluded.issue_id,
               project_key = excluded.project_key,
@@ -615,6 +643,7 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
               story_points = excluded.story_points,
               sprint_external_id = excluded.sprint_external_id,
               epic_key = excluded.epic_key,
+              parent_issue_key = excluded.parent_issue_key,
               labels_json = excluded.labels_json,
               components_json = excluded.components_json,
               created_at_source = excluded.created_at_source,
@@ -637,12 +666,46 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
                 issue.story_points,
                 issue.sprint_external_id,
                 issue.epic_key,
+                issue.parent_issue_key,
                 _to_json(issue.labels),
                 _to_json(issue.components),
                 _to_iso(issue.created_at_source),
                 _to_iso(issue.updated_at_source),
                 _to_iso(issue.resolved_at_source),
                 _to_json(issue.raw),
+            ),
+        )
+
+
+def _replace_issue_changelog(
+    conn: sqlite3.Connection,
+    issue_key: str,
+    changelog_items: list[ChangelogItemRecord],
+) -> None:
+    conn.execute("DELETE FROM issue_changelog WHERE issue_key = ?", (issue_key,))
+    for item in changelog_items:
+        conn.execute(
+            """
+            INSERT INTO issue_changelog (
+              issue_key,
+              history_id,
+              changed_at,
+              author_account_id,
+              field_name,
+              from_value,
+              to_value,
+              raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item.issue_key,
+                item.history_id,
+                _to_iso(item.changed_at) or _utc_iso_now(),
+                item.author_account_id,
+                item.field_name,
+                item.from_value,
+                item.to_value,
+                _to_json(item.raw),
             ),
         )
 
@@ -790,6 +853,7 @@ def run_jira_sync_once(
             }
         )
         downloaded = 0
+        changelog_entries_synced = 0
         total_issues: int | None = None
         start_at = 0
         while True:
@@ -810,6 +874,39 @@ def run_jira_sync_once(
                 total_issues = page_total
 
             _upsert_issues(conn, issues)
+            for index, issue in enumerate(issues, start=1):
+                changelog_items = connector.get_issue_changelog(issue.issue_key)
+                _replace_issue_changelog(conn, issue.issue_key, changelog_items)
+                changelog_entries_synced += len(changelog_items)
+                current_downloaded = downloaded + index
+                if index % 10 == 0 or index == len(issues):
+                    _update_sync_run(
+                        conn,
+                        sync_run_id,
+                        issues_synced=current_downloaded,
+                        total_issues=total_issues,
+                    )
+                    conn.commit()
+                    percent = _safe_percent(current_downloaded, total_issues)
+                    emit(
+                        {
+                            "phase": "issues",
+                            "boardsSynced": 1,
+                            "sprintsSynced": len(sprints),
+                            "downloadedIssues": current_downloaded,
+                            "totalIssues": total_issues,
+                            "percent": percent,
+                            "message": (
+                                f"{current_downloaded} of {total_issues} issues downloaded; "
+                                f"{changelog_entries_synced} changelog events synced"
+                                if total_issues is not None
+                                else (
+                                    f"{current_downloaded} issues downloaded; "
+                                    f"{changelog_entries_synced} changelog events synced"
+                                )
+                            ),
+                        }
+                    )
             downloaded += len(issues)
             _update_sync_run(
                 conn,
@@ -818,22 +915,6 @@ def run_jira_sync_once(
                 total_issues=total_issues,
             )
             conn.commit()
-            percent = _safe_percent(downloaded, total_issues)
-            emit(
-                {
-                    "phase": "issues",
-                    "boardsSynced": 1,
-                    "sprintsSynced": len(sprints),
-                    "downloadedIssues": downloaded,
-                    "totalIssues": total_issues,
-                    "percent": percent,
-                    "message": (
-                        f"{downloaded} of {total_issues} issues downloaded"
-                        if total_issues is not None
-                        else f"{downloaded} issues downloaded"
-                    ),
-                }
-            )
 
             if not batch.has_more:
                 break

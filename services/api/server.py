@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
+from services.api.issues.query import search_synced_issues
 from services.api.integrations.jira_status import get_jira_status
 from services.api.integrations.jira_sync import (
     get_jira_sync_history,
@@ -17,6 +18,7 @@ from services.api.integrations.jira_sync import (
 StatusProvider = Callable[[], dict[str, Any]]
 StartProvider = Callable[[Optional[str]], dict[str, Any]]
 HistoryProvider = Callable[[int], dict[str, Any]]
+IssueSearchProvider = Callable[..., dict[str, Any]]
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -28,6 +30,7 @@ def build_handler(
     jira_sync_status_provider: StatusProvider = get_jira_sync_status,
     jira_sync_start_provider: StartProvider = start_jira_sync,
     jira_sync_history_provider: HistoryProvider = get_jira_sync_history,
+    issue_search_provider: IssueSearchProvider = search_synced_issues,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_json_headers(self, status_code: int = 200) -> None:
@@ -72,6 +75,37 @@ def build_handler(
                 except ValueError:
                     limit = 20
                 payload = jira_sync_history_provider(limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/issues/search":
+                query = parse_qs(parsed.query)
+
+                def _param(name: str) -> str | None:
+                    value = query.get(name, [None])[0]
+                    if isinstance(value, str):
+                        value = value.strip()
+                        return value or None
+                    return None
+
+                limit_raw = _param("limit") or "100"
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    limit = 100
+
+                payload = issue_search_provider(
+                    epic_key=_param("epicKey"),
+                    assignee=_param("assignee"),
+                    reporter=_param("reporter"),
+                    worked_by=_param("workedBy"),
+                    issue_type=_param("issueType"),
+                    status=_param("status"),
+                    updated_since=_param("updatedSince"),
+                    updated_until=_param("updatedUntil"),
+                    limit=limit,
+                )
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

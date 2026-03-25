@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from packages.connectors.jira_config import JiraRuntimeConfig
-from packages.connectors.models import BoardRecord, IssueRecord, SprintRecord, SyncBatch
+from packages.connectors.models import ChangelogItemRecord, BoardRecord, IssueRecord, SprintRecord, SyncBatch
 from services.api.integrations.jira_sync import JiraSyncManager, run_jira_sync_once
 
 
@@ -112,6 +112,30 @@ class _SuccessfulConnectorStub:
             return [self.issue_2], SyncBatch(next_cursor=None, has_more=False)
         return [], SyncBatch(next_cursor=None, has_more=False)
 
+    def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
+        return [
+            ChangelogItemRecord(
+                issue_key=issue_key,
+                history_id=f"{issue_key}-1",
+                changed_at=datetime(2026, 3, 22, 12, 0, tzinfo=timezone.utc),
+                author_account_id="user-dev",
+                field_name="status",
+                from_value="To Do",
+                to_value="In Progress",
+                raw={"issue": issue_key},
+            ),
+            ChangelogItemRecord(
+                issue_key=issue_key,
+                history_id=f"{issue_key}-2",
+                changed_at=datetime(2026, 3, 23, 12, 0, tzinfo=timezone.utc),
+                author_account_id="user-qa",
+                field_name="status",
+                from_value="In Progress",
+                to_value="Done",
+                raw={"issue": issue_key},
+            ),
+        ]
+
 
 class _FailingConnectorStub:
     def get_board(self, board_id: int) -> BoardRecord:
@@ -144,6 +168,10 @@ class _FailingConnectorStub:
         _ = start_at
         _ = max_results
         return [], SyncBatch(next_cursor=None, has_more=False)
+
+    def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
+        _ = issue_key
+        return []
 
 
 class JiraSyncServiceUnitTests(unittest.TestCase):
@@ -181,6 +209,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 boards_count = conn.execute("SELECT COUNT(*) FROM boards").fetchone()[0]
                 sprints_count = conn.execute("SELECT COUNT(*) FROM sprints").fetchone()[0]
                 issues_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+                changelog_count = conn.execute("SELECT COUNT(*) FROM issue_changelog").fetchone()[0]
                 checkpoint = conn.execute(
                     """
                     SELECT status, last_synced_at, error_message
@@ -203,6 +232,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(boards_count, 1)
             self.assertEqual(sprints_count, 1)
             self.assertEqual(issues_count, 2)
+            self.assertEqual(changelog_count, 4)
             self.assertIsNotNone(checkpoint)
             self.assertEqual(checkpoint[0], "idle")
             self.assertIsNotNone(checkpoint[1])

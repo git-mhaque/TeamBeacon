@@ -46,6 +46,30 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 5. Compute configurable metrics and RAG statuses.
 6. Generate exportable executive report (Markdown/PDF-ready format).
 
+## 6.1 JIRA Sync Semantics (Current Behavior)
+- Sync modes:
+  - `full`: fetch full board issue dataset.
+  - `since_last`: incremental sync from last cursor.
+- Incremental cursor logic:
+  - Primary cursor = `sync_checkpoints.last_synced_at` for current board scope.
+  - Fallback cursor = latest completed sync run `finished_at` for that board.
+  - Effective cursor = selected cursor minus 2-day overlap (to avoid missed late updates or clock skew).
+  - If no valid cursor exists, `since_last` automatically falls back to `full`.
+- Incremental JQL pattern:
+  - `project = <JIRA_PROJECT_KEY> AND updated >= '<UTC timestamp>' ORDER BY updated ASC`
+- Per-run sync order:
+  1. Board metadata
+  2. Board sprints
+  3. Issues (paged)
+  4. Full changelog per downloaded issue
+- Persistence guarantees:
+  - `issues` stores issue type (including epics), epic link, parent issue link, assignee/reporter, sprint, and timestamps.
+  - `issue_changelog` stores per-change author, field, before/after values, and change time.
+  - `sync_run_history` stores run mode/status and counters.
+  - `sync_checkpoints` stores latest successful cursor/timestamp.
+- User-level attribution rule:
+  - “Worked by user X” matches issue assignee, reporter, or any changelog author on that issue.
+
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.
 - Resilient sync with retry/backoff and clear error states.

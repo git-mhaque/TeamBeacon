@@ -42,6 +42,7 @@ class JiraConnectorUnitTests(unittest.TestCase):
                         "customfield_10004": "8",
                         "sprint": {"id": 555},
                         "customfield_10014": "CEGBUPOL-1",
+                        "parent": {"key": "CEGBUPOL-100"},
                     },
                 }
             ],
@@ -65,6 +66,7 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(issue.story_points, 8.0)
         self.assertEqual(issue.sprint_external_id, 555)
         self.assertEqual(issue.epic_key, "CEGBUPOL-1")
+        self.assertEqual(issue.parent_issue_key, "CEGBUPOL-100")
         self.assertEqual(issue.components, ["api"])
         self.assertEqual(issue.labels, ["ops", "release"])
         self.assertTrue(batch.has_more)
@@ -198,6 +200,7 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(total, 2)
         self.assertEqual(len(issues), 1)
         self.assertEqual(issues[0].issue_key, "CEGBUPOL-301")
+        self.assertEqual(issues[0].parent_issue_key, "CEGBUPOL-1")
         self.assertTrue(batch.has_more)
         self.assertEqual(batch.next_cursor, "1")
 

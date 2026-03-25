@@ -168,10 +168,22 @@ class JiraRestConnector(JiraConnector):
                 return parent_key
         return None
 
+    @staticmethod
+    def _extract_parent_issue_key(fields: dict[str, Any]) -> str | None:
+        parent = fields.get("parent")
+        if not isinstance(parent, dict):
+            return None
+        parent_key = parent.get("key")
+        if isinstance(parent_key, str) and parent_key:
+            return parent_key
+        return None
+
     def _map_issue(self, raw_issue: dict[str, Any]) -> IssueRecord:
         fields = raw_issue.get("fields") or {}
         status = fields.get("status") or {}
         status_category = status.get("statusCategory") or {}
+        epic_key = self._extract_epic_key(fields)
+        parent_issue_key = self._extract_parent_issue_key(fields) or epic_key
 
         assignee = fields.get("assignee") or {}
         reporter = fields.get("reporter") or {}
@@ -198,7 +210,8 @@ class JiraRestConnector(JiraConnector):
             reporter_account_id=reporter.get("accountId") or reporter.get("name"),
             story_points=_coerce_float(fields.get(self.story_points_field)),
             sprint_external_id=self._extract_sprint_id(fields),
-            epic_key=self._extract_epic_key(fields),
+            epic_key=epic_key,
+            parent_issue_key=parent_issue_key,
             labels=labels,
             components=components,
             created_at_source=_parse_jira_datetime(fields.get("created")),

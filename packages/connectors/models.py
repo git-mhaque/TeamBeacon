@@ -42,6 +42,7 @@ class IssueRecord:
     story_points: float | None
     sprint_external_id: int | None
     epic_key: str | None
+    parent_issue_key: str | None = None
     labels: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)
     created_at_source: datetime | None = None

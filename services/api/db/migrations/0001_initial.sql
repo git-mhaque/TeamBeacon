@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS issues (
   story_points REAL,
   sprint_external_id INTEGER,
   epic_key TEXT,
+  parent_issue_key TEXT,
   labels_json TEXT NOT NULL DEFAULT '[]',
   components_json TEXT NOT NULL DEFAULT '[]',
   created_at_source TEXT,
