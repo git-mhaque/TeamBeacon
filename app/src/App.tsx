@@ -104,13 +104,15 @@ export default function App() {
             <p className="eyebrow">TeamBeacon Insights</p>
             <h2>{heading}</h2>
           </div>
-          <div className="topbar-actions">
-            <span className="chip">Team: Platform</span>
-            <span className="chip">Window: Last 7 Days</span>
-            <button className="sync-btn" type="button">
-              Sync Data
-            </button>
-          </div>
+          {active !== "integrations" ? (
+            <div className="topbar-actions">
+              <span className="chip">Team: Platform</span>
+              <span className="chip">Window: Last 7 Days</span>
+              <button className="sync-btn" type="button">
+                Sync Data
+              </button>
+            </div>
+          ) : null}
         </header>
 
         <section className="screen-body">{renderScreen(active)}</section>
