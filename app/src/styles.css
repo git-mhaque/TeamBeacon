@@ -771,9 +771,65 @@ body {
   overflow: auto;
 }
 
+.initiative-summary-toolbar {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.initiative-column-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.initiative-column-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: #1f3740;
+}
+
+.initiative-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.initiative-filter-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.initiative-filter-controls select {
+  border: 1px solid var(--line);
+  border-radius: 0.48rem;
+  padding: 0.22rem 0.34rem;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+
 .sync-history-table td.initiative-name-cell,
+.sync-history-table td.initiative-group-cell,
+.sync-history-table td.initiative-type-cell,
 .sync-history-table td.initiative-comment-cell {
   white-space: normal;
+}
+
+.sync-history-table td.initiative-group-cell,
+.sync-history-table td.initiative-type-cell {
+  min-width: 9rem;
+  max-width: 16rem;
 }
 
 .sync-history-table td.initiative-name-cell {
@@ -816,6 +872,63 @@ body {
   color: #1d724f;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.table-sort-btn {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #2b4551;
+  background: transparent;
+  cursor: pointer;
+}
+
+.table-sort-btn:hover {
+  color: #0f5570;
+}
+
+.rag-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+}
+
+.rag-dot {
+  width: 0.56rem;
+  height: 0.56rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.rag-dot-large {
+  width: 0.78rem;
+  height: 0.78rem;
+}
+
+.rag-red {
+  color: #8e281f;
+}
+
+.rag-red .rag-dot {
+  background: #c2372e;
+}
+
+.rag-amber {
+  color: #875900;
+}
+
+.rag-amber .rag-dot {
+  background: #b77700;
+}
+
+.rag-green {
+  color: #1d724f;
+}
+
+.rag-green .rag-dot {
+  background: #1f8f63;
 }
 
 .epic-autocomplete {
@@ -958,6 +1071,11 @@ body {
 
   .sidebar nav {
     grid-template-columns: 1fr;
+  }
+
+  .initiative-summary-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .epic-edit-dialog {

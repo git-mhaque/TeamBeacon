@@ -8,11 +8,42 @@ import {
   InitiativeEpicSummary,
 } from "../lib/api";
 
+type SummarySortKey = "epicKey" | "group" | "type" | "epicName" | "completion" | "rag";
+type SortDirection = "asc" | "desc";
+
+type SummaryRow = InitiativeEpicSummary & {
+  groupNames: string[];
+  typeNames: string[];
+  groupText: string;
+  typeText: string;
+  ragLabel: "Red" | "Amber" | "Green";
+  successCriteriaTooltip: string;
+  insightTooltip: string;
+};
+
+function ragFromCompletion(percent: number): "Red" | "Amber" | "Green" {
+  if (percent < 33) return "Red";
+  if (percent < 66) return "Amber";
+  return "Green";
+}
+
+function ragRank(label: "Red" | "Amber" | "Green"): number {
+  if (label === "Red") return 1;
+  if (label === "Amber") return 2;
+  return 3;
+}
+
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SummarySortKey>("epicKey");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [showGroupColumn, setShowGroupColumn] = useState(true);
+  const [showTypeColumn, setShowTypeColumn] = useState(true);
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   const loadEpicSummary = useCallback(async () => {
     setLoading(true);
@@ -57,10 +88,124 @@ export function InitiativesScreen() {
     return `${epicSummary.length} configured epics`;
   }, [epicSummary.length, error, loading]);
 
+  const summaryRows = useMemo(() => {
+    const rows: SummaryRow[] = epicSummary.map((entry) => {
+      const groupNames = entry.groups.map((group) => group.name);
+      const typeNames = entry.workTypes.map((workType) => workType.name);
+      const groupText = groupNames.join(", ");
+      const typeText = typeNames.join(", ");
+      const ragLabel = ragFromCompletion(entry.completionPercent);
+      const successCriteriaTooltip = entry.successCriteria.length
+        ? entry.successCriteria.map((item, index) => `${index + 1}. ${item}`).join("\n")
+        : "No success criteria configured.";
+      const insightTooltip = entry.insightComment?.trim() || "Insight pending LLM output.";
+      return {
+        ...entry,
+        groupNames,
+        typeNames,
+        groupText,
+        typeText,
+        ragLabel,
+        successCriteriaTooltip,
+        insightTooltip,
+      };
+    });
+    return rows;
+  }, [epicSummary]);
+
+  const groupFilterOptions = useMemo(() => {
+    const unique = new Set<string>();
+    for (const row of summaryRows) {
+      for (const groupName of row.groupNames) {
+        if (groupName.trim()) {
+          unique.add(groupName.trim());
+        }
+      }
+    }
+    return Array.from(unique).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+  }, [summaryRows]);
+
+  const typeFilterOptions = useMemo(() => {
+    const unique = new Set<string>();
+    for (const row of summaryRows) {
+      for (const typeName of row.typeNames) {
+        if (typeName.trim()) {
+          unique.add(typeName.trim());
+        }
+      }
+    }
+    return Array.from(unique).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+  }, [summaryRows]);
+
+  const filteredEpicSummary = useMemo(() => {
+    return summaryRows.filter((row) => {
+      const groupMatch = groupFilter === "all" || row.groupNames.includes(groupFilter);
+      const typeMatch = typeFilter === "all" || row.typeNames.includes(typeFilter);
+      return groupMatch && typeMatch;
+    });
+  }, [groupFilter, summaryRows, typeFilter]);
+
+  const sortedEpicSummary = useMemo(() => {
+    const sorted = [...filteredEpicSummary].sort((left, right) => {
+      if (sortKey === "completion") {
+        return left.completionPercent - right.completionPercent;
+      }
+      if (sortKey === "rag") {
+        return ragRank(left.ragLabel) - ragRank(right.ragLabel);
+      }
+      const leftText =
+        sortKey === "epicKey"
+          ? left.epicKey
+          : sortKey === "group"
+            ? left.groupText
+            : sortKey === "type"
+              ? left.typeText
+              : left.epicName;
+      const rightText =
+        sortKey === "epicKey"
+          ? right.epicKey
+          : sortKey === "group"
+            ? right.groupText
+            : sortKey === "type"
+              ? right.typeText
+              : right.epicName;
+      return leftText.localeCompare(rightText, undefined, { sensitivity: "base" });
+    });
+
+    if (sortDirection === "desc") {
+      sorted.reverse();
+    }
+    return sorted;
+  }, [filteredEpicSummary, sortDirection, sortKey]);
+
+  const handleSort = useCallback(
+    (key: SummarySortKey) => {
+      if (sortKey === key) {
+        setSortDirection((currentDirection) => (currentDirection === "asc" ? "desc" : "asc"));
+        return;
+      }
+      setSortKey(key);
+      setSortDirection("asc");
+    },
+    [sortKey],
+  );
+
+  const sortIndicator = useCallback(
+    (key: SummarySortKey) => {
+      if (sortKey !== key) return "";
+      return sortDirection === "asc" ? " ▲" : " ▼";
+    },
+    [sortDirection, sortKey],
+  );
+
   return (
     <div className="screen-grid">
       <Panel
-        title="Configured Epics Summary"
+        title="Initiative Epics Summary"
         subtitle="Configured epics with completion progress derived from synced cards."
         action={
           <StatusPill
@@ -72,19 +217,94 @@ export function InitiativesScreen() {
         {error ? <p className="sync-history-error">Initiative summary error: {error}</p> : null}
         {loading ? <p className="sync-history-loading">Loading configured epics...</p> : null}
 
+        <div className="initiative-summary-toolbar">
+          <div className="initiative-column-toggles">
+            <span>Columns:</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={showGroupColumn}
+                onChange={(event) => setShowGroupColumn(event.target.checked)}
+              />
+              Group
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showTypeColumn}
+                onChange={(event) => setShowTypeColumn(event.target.checked)}
+              />
+              Type
+            </label>
+          </div>
+          <div className="initiative-filter-controls">
+            <label>
+              <span>Group:</span>
+              <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+                <option value="all">All</option>
+                {groupFilterOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Type:</span>
+              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                <option value="all">All</option>
+                {typeFilterOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
         <div className="initiative-summary-table-wrap">
           <table className="sync-history-table">
             <thead>
               <tr>
-                <th>Epic Key</th>
-                <th>Epic Name</th>
-                <th>Completion</th>
-                <th>RAG Score</th>
-                <th>Insight Comment</th>
+                <th>
+                  <button className="table-sort-btn" type="button" onClick={() => handleSort("epicKey")}>
+                    Epic Key{sortIndicator("epicKey")}
+                  </button>
+                </th>
+                {showGroupColumn ? (
+                  <th>
+                    <button className="table-sort-btn" type="button" onClick={() => handleSort("group")}>
+                      Group{sortIndicator("group")}
+                    </button>
+                  </th>
+                ) : null}
+                {showTypeColumn ? (
+                  <th>
+                    <button className="table-sort-btn" type="button" onClick={() => handleSort("type")}>
+                      Type{sortIndicator("type")}
+                    </button>
+                  </th>
+                ) : null}
+                <th>
+                  <button className="table-sort-btn" type="button" onClick={() => handleSort("epicName")}>
+                    Epic Name{sortIndicator("epicName")}
+                  </button>
+                </th>
+                <th>
+                  <button className="table-sort-btn" type="button" onClick={() => handleSort("completion")}>
+                    Completion{sortIndicator("completion")}
+                  </button>
+                </th>
+                <th>
+                  <button className="table-sort-btn" type="button" onClick={() => handleSort("rag")}>
+                    RAG{sortIndicator("rag")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {epicSummary.map((entry) => (
+              {sortedEpicSummary.map((entry) => (
                 <tr key={entry.epicKey}>
                   <td>
                     {jiraBaseUrl ? (
@@ -100,9 +320,11 @@ export function InitiativesScreen() {
                       entry.epicKey
                     )}
                   </td>
+                  {showGroupColumn ? <td className="initiative-group-cell">{entry.groupText || "-"}</td> : null}
+                  {showTypeColumn ? <td className="initiative-type-cell">{entry.typeText || "-"}</td> : null}
                   <td className="initiative-name-cell">{entry.epicName || "-"}</td>
                   <td>
-                    <div className="initiative-progress-cell">
+                    <div className="initiative-progress-cell" title={entry.successCriteriaTooltip}>
                       <span className="initiative-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={entry.completionPercent}>
                         <span className="initiative-progress-fill" style={{ width: `${Math.max(0, Math.min(100, entry.completionPercent))}%` }} />
                       </span>
@@ -111,13 +333,20 @@ export function InitiativesScreen() {
                       </span>
                     </div>
                   </td>
-                  <td className="initiative-empty-cell">{entry.ragScore ?? ""}</td>
-                  <td className="initiative-comment-cell">{entry.insightComment ?? ""}</td>
+                  <td title={entry.insightTooltip}>
+                    <span className={`rag-indicator rag-${entry.ragLabel.toLowerCase()}`}>
+                      <span className="rag-dot rag-dot-large" />
+                    </span>
+                  </td>
                 </tr>
               ))}
-              {!loading && epicSummary.length === 0 ? (
+              {!loading && sortedEpicSummary.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>No configured epics found yet.</td>
+                  <td colSpan={4 + (showGroupColumn ? 1 : 0) + (showTypeColumn ? 1 : 0)}>
+                    {epicSummary.length === 0
+                      ? "No configured epics found yet."
+                      : "No epics match the selected filters."}
+                  </td>
                 </tr>
               ) : null}
             </tbody>

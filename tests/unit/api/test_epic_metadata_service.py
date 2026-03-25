@@ -227,6 +227,9 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["epics"][0]["totalCards"], 2)
             self.assertEqual(payload["epics"][0]["completedCards"], 1)
             self.assertEqual(payload["epics"][0]["completionPercent"], 50.0)
+            self.assertEqual(payload["epics"][0]["successCriteria"], ["Keep blockers at zero"])
+            self.assertEqual(payload["epics"][0]["groups"], [])
+            self.assertEqual(payload["epics"][0]["workTypes"], [])
 
 
 if __name__ == "__main__":

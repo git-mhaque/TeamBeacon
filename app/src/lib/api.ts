@@ -106,6 +106,9 @@ export type InitiativeEpicSummary = {
   completedCards: number;
   totalCards: number;
   completionPercent: number;
+  groups: EpicLookupItem[];
+  workTypes: EpicLookupItem[];
+  successCriteria: string[];
   ragScore?: string | null;
   insightComment?: string | null;
   updatedAt?: string | null;

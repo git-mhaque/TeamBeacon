@@ -440,10 +440,20 @@ def get_configured_epic_summary(
         epics: list[dict[str, Any]] = []
         for row in rows:
             epic_key = str(row["epic_key"])
+            metadata_entry = _read_epic_metadata_entry(conn, epic_key)
             epic_name_raw = row["epic_name"] if row["epic_name"] is not None else row["issue_summary"]
+            if metadata_entry and metadata_entry.get("epicTitle"):
+                epic_name_raw = metadata_entry.get("epicTitle")
             epic_name = str(epic_name_raw).strip() if epic_name_raw is not None else ""
             total_cards, completed_cards = _read_epic_completion_counts(conn, epic_key)
             completion_percent = round((completed_cards / total_cards) * 100, 1) if total_cards > 0 else 0.0
+            success_criteria = (
+                [str(item) for item in metadata_entry.get("successCriteria", []) if isinstance(item, str)]
+                if metadata_entry
+                else []
+            )
+            groups = metadata_entry.get("groups", []) if metadata_entry else []
+            work_types = metadata_entry.get("workTypes", []) if metadata_entry else []
             epics.append(
                 {
                     "epicKey": epic_key,
@@ -451,6 +461,9 @@ def get_configured_epic_summary(
                     "completedCards": completed_cards,
                     "totalCards": total_cards,
                     "completionPercent": completion_percent,
+                    "groups": groups,
+                    "workTypes": work_types,
+                    "successCriteria": success_criteria,
                     "ragScore": None,
                     "insightComment": None,
                     "updatedAt": row["updated_at"],

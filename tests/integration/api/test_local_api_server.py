@@ -163,6 +163,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "completedCards": 8,
                         "totalCards": 10,
                         "completionPercent": 80.0,
+                        "groups": [{"id": 1, "name": "Platform"}],
+                        "workTypes": [{"id": 10, "name": "Feature"}],
+                        "successCriteria": ["Zero blocker defects"],
                         "ragScore": None,
                         "insightComment": None,
                         "updatedAt": "2026-03-25T00:00:00+00:00",
@@ -379,6 +382,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(len(body["epics"]), 1)
         self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-4482")
         self.assertEqual(body["epics"][0]["completionPercent"], 80.0)
+        self.assertEqual(body["epics"][0]["groups"][0]["name"], "Platform")
+        self.assertEqual(body["epics"][0]["workTypes"][0]["name"], "Feature")
+        self.assertEqual(body["epics"][0]["successCriteria"][0], "Zero blocker defects")
         self.assertIsNone(body["epics"][0]["ragScore"])
         self.assertEqual(self.epic_summary_calls[-1], 30)
 
