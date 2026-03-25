@@ -1,29 +1,100 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
+import { fetchJiraIntegrationStatus, JiraIntegrationStatus } from "../lib/api";
 
 export function IntegrationsScreen() {
+  const [jiraStatus, setJiraStatus] = useState<JiraIntegrationStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadJiraStatus = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const status = await fetchJiraIntegrationStatus();
+      setJiraStatus(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown request failure";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadJiraStatus().catch(() => {
+      // loadJiraStatus already sets local error state.
+    });
+  }, [loadJiraStatus]);
+
+  const jiraTone = useMemo(() => {
+    if (error) return "risk";
+    if (loading) return "warn";
+    return jiraStatus?.connected ? "good" : "warn";
+  }, [error, jiraStatus, loading]);
+
+  const jiraValue = useMemo(() => {
+    if (error) return "Unavailable";
+    if (loading) return "Checking...";
+    return jiraStatus?.connected ? "Connected" : "Check Required";
+  }, [error, jiraStatus, loading]);
+
+  const jiraHint = useMemo(() => {
+    if (error) return `Failed to reach local API: ${error}`;
+    if (loading) return "Testing JIRA API reachability and board/project access.";
+    if (!jiraStatus) return "Status not loaded.";
+    if (jiraStatus.error) return jiraStatus.error;
+    const checksPassed = jiraStatus.checks.filter((check) => check.ok).length;
+    return `${checksPassed}/${jiraStatus.checks.length} connectivity checks passed.`;
+  }, [error, jiraStatus, loading]);
+
+  const storyPointsField = jiraStatus?.config.storyPointsField ?? "customfield_10004";
+  const boardCountText =
+    jiraStatus?.metrics.boardCount !== undefined ? String(jiraStatus.metrics.boardCount) : "n/a";
+  const sampleIssueText = jiraStatus?.sampleIssueKey ?? "none";
+
   return (
     <div className="screen-grid">
       <Panel
         title="Source Connections"
-        subtitle="Hosted Atlassian data source health and setup status."
-        action={<StatusPill tone="good" text="2/2 Connected" />}
+        subtitle="Live connectivity checks from local API to configured systems."
+        action={
+          <button className="sync-btn" onClick={loadJiraStatus} type="button">
+            {loading ? "Checking..." : "Check Now"}
+          </button>
+        }
       >
         <div className="metrics-grid two-up">
-          <MetricCard label="JIRA Connection" value="Connected" hint="PAT validated; project + board access confirmed." tone="good" />
-          <MetricCard label="Confluence Connection" value="Connected" hint="Space reads enabled for initiative context pages." tone="good" />
+          <MetricCard
+            label="JIRA Connection"
+            value={jiraValue}
+            hint={jiraHint}
+            tone={jiraTone}
+          />
+          <MetricCard
+            label="Confluence Connection"
+            value="Not Implemented"
+            hint="Confluence health endpoint not wired yet."
+            tone="warn"
+          />
         </div>
       </Panel>
 
       <Panel
         title="Field Mapping Readiness"
         subtitle="Track required custom fields before sync pipelines run."
-        action={<StatusPill tone="warn" text="1 Missing Field" />}
+        action={
+          <StatusPill
+            tone={jiraStatus?.connected ? "good" : "warn"}
+            text={jiraStatus?.connected ? "JIRA Mapping Loaded" : "Pending Live Check"}
+          />
+        }
       >
         <ul className="list">
           <li>
-            Story Points <StatusPill tone="good" text="customfield_10004" />
+            Story Points <StatusPill tone="good" text={storyPointsField} />
           </li>
           <li>
             Sprint <StatusPill tone="good" text="auto-detected" />
@@ -34,6 +105,37 @@ export function IntegrationsScreen() {
           <li>
             Cycle Start Date <StatusPill tone="warn" text="pending" />
           </li>
+        </ul>
+      </Panel>
+
+      <Panel title="JIRA Diagnostics" subtitle="Board and project checks from live API response.">
+        <div className="metrics-grid three-up">
+          <MetricCard
+            label="Visible Boards"
+            value={boardCountText}
+            hint="Boards returned by JIRA Agile API."
+            tone={jiraStatus?.connected ? "good" : "warn"}
+          />
+          <MetricCard
+            label="Sample Issue"
+            value={sampleIssueText}
+            hint="Latest issue from configured project."
+            tone={jiraStatus?.sampleIssueKey ? "good" : "warn"}
+          />
+          <MetricCard
+            label="Configured Project"
+            value={jiraStatus?.config.projectKey ?? "n/a"}
+            hint="JIRA_PROJECT_KEY from local config."
+            tone={jiraStatus?.config.projectKey ? "neutral" : "warn"}
+          />
+        </div>
+        <ul className="list">
+          {(jiraStatus?.checks ?? []).map((check) => (
+            <li key={check.name}>
+              {check.name} <StatusPill tone={check.ok ? "good" : "risk"} text={check.detail} />
+            </li>
+          ))}
+          {!jiraStatus && !loading ? <li>No diagnostics available.</li> : null}
         </ul>
       </Panel>
 

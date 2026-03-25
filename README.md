@@ -40,6 +40,7 @@ cd app
 npm install
 npm run dev
 ```
+`npm run dev` starts both UI and local API together.
 3. Start desktop shell (requires Rust toolchain):
 ```bash
 cd app
@@ -58,15 +59,19 @@ PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py
 ```bash
 python3 -m unittest discover -s tests/unit -p "test_*.py" -v
 ```
-7. (Optional) Run live JIRA integration tests:
+7. Run API integration tests:
+```bash
+python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
+```
+8. (Optional) Run live JIRA integration tests:
 ```bash
 RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v
 ```
-8. Review contribution rules:
+9. Review contribution rules:
 ```bash
 cat AGENTS.md
 ```
-9. Open UI mockups:
+10. Open UI mockups:
 ```bash
 open docs/design/teambeacon-mockups.html
 ```

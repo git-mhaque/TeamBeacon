@@ -17,6 +17,10 @@ npm install
 npm run dev
 ```
 
+`npm run dev` now starts both:
+- local API on `127.0.0.1:8000`
+- Vite UI on `localhost:5173` (or next free port if 5173 is busy)
+
 ## Desktop Development (Tauri)
 Prerequisites:
 - Rust toolchain (`rustup`, `cargo`, `rustc`)
@@ -30,6 +34,19 @@ npm run desktop:dev
 ```
 
 `desktop:dev` and `desktop:build` automatically source `~/.cargo/env` if `cargo` is not already on your PATH.
+
+## JIRA Integrations Screen Connectivity
+`npm run dev` is the recommended path and starts everything needed for the Integrations screen.
+
+If you want to run only the API service:
+
+```bash
+cd app
+npm run api:dev
+```
+
+The Vite dev server proxies `/api/*` requests to `http://127.0.0.1:8000`.
+The npm scripts auto-clean stale generated `vite.config.js` artifacts so proxy config from `vite.config.ts` is always used.
 
 ## Build
 ```bash
@@ -65,5 +82,5 @@ echo 'source "$HOME/.cargo/env"' >> ~/.zshrc
 ```
 
 ## Notes
-- Current implementation uses static mock data and local component state.
-- Next step is wiring screens to API endpoints in `services/api`.
+- Most screens still use mock data and local component state.
+- Integrations is wired to the local API endpoint in `services/api`.
