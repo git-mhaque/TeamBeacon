@@ -252,6 +252,17 @@ body {
   font-size: 0.77rem;
 }
 
+.external-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.external-link:hover {
+  text-decoration-thickness: 2px;
+}
+
 .status-pill {
   display: inline-block;
   border-radius: 999px;
@@ -419,4 +430,3 @@ body {
     grid-template-columns: 1fr;
   }
 }
-

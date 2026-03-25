@@ -19,7 +19,8 @@ npm run dev
 
 `npm run dev` now starts both:
 - local API on `127.0.0.1:8000`
-- Vite UI on `localhost:5173` (or next free port if 5173 is busy)
+- Vite UI on `localhost:5173`
+- pre-start cleanup automatically stops any existing listeners on ports `8000` and `5173` so dev always starts on the same ports
 
 ## Desktop Development (Tauri)
 Prerequisites:

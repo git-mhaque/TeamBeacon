@@ -51,9 +51,29 @@ export function IntegrationsScreen() {
   }, [error, jiraStatus, loading]);
 
   const storyPointsField = jiraStatus?.config.storyPointsField ?? "customfield_10004";
-  const boardCountText =
-    jiraStatus?.metrics.boardCount !== undefined ? String(jiraStatus.metrics.boardCount) : "n/a";
   const sampleIssueText = jiraStatus?.sampleIssueKey ?? "none";
+  const configuredBoard = jiraStatus?.configuredBoard;
+  const configuredBoardUrl =
+    configuredBoard?.url ??
+    (jiraStatus?.config.baseUrl && jiraStatus?.config.boardId
+      ? `${jiraStatus.config.baseUrl.replace(/\/$/, "")}/secure/RapidBoard.jspa?rapidView=${jiraStatus.config.boardId}`
+      : null);
+  const configuredProjectUrl =
+    jiraStatus?.configuredProjectUrl ??
+    (jiraStatus?.config.baseUrl && jiraStatus?.config.projectKey
+      ? `${jiraStatus.config.baseUrl.replace(/\/$/, "")}/projects/${jiraStatus.config.projectKey}`
+      : null);
+  const sampleIssueUrl =
+    jiraStatus?.sampleIssueUrl ??
+    (jiraStatus?.config.baseUrl && jiraStatus?.sampleIssueKey
+      ? `${jiraStatus.config.baseUrl.replace(/\/$/, "")}/browse/${jiraStatus.sampleIssueKey}`
+      : null);
+  const configuredBoardText =
+    configuredBoard?.id !== undefined
+      ? `${configuredBoard.name} (${configuredBoard.id})`
+      : jiraStatus?.config.boardId !== undefined && jiraStatus?.config.boardId !== null
+        ? `Board ${jiraStatus.config.boardId}`
+        : "n/a";
 
   return (
     <div className="screen-grid">
@@ -66,7 +86,7 @@ export function IntegrationsScreen() {
           </button>
         }
       >
-        <div className="metrics-grid two-up">
+        <div className="metrics-grid three-up">
           <MetricCard
             label="JIRA Connection"
             value={jiraValue}
@@ -77,6 +97,12 @@ export function IntegrationsScreen() {
             label="Confluence Connection"
             value="Not Implemented"
             hint="Confluence health endpoint not wired yet."
+            tone="warn"
+          />
+          <MetricCard
+            label="SCM Connection"
+            value="Not Implemented"
+            hint="SCM connectivity endpoint not wired yet."
             tone="warn"
           />
         </div>
@@ -111,32 +137,63 @@ export function IntegrationsScreen() {
       <Panel title="JIRA Diagnostics" subtitle="Board and project checks from live API response.">
         <div className="metrics-grid three-up">
           <MetricCard
-            label="Visible Boards"
-            value={boardCountText}
-            hint="Boards returned by JIRA Agile API."
+            label="Configured Board"
+            value={
+              configuredBoardUrl ? (
+                <a
+                  className="external-link"
+                  href={configuredBoardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {configuredBoardText}
+                </a>
+              ) : (
+                configuredBoardText
+              )
+            }
+            hint="JIRA_BOARD_ID from local config."
             tone={jiraStatus?.connected ? "good" : "warn"}
           />
           <MetricCard
             label="Sample Issue"
-            value={sampleIssueText}
+            value={
+              sampleIssueUrl && jiraStatus?.sampleIssueKey ? (
+                <a
+                  className="external-link"
+                  href={sampleIssueUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {sampleIssueText}
+                </a>
+              ) : (
+                sampleIssueText
+              )
+            }
             hint="Latest issue from configured project."
             tone={jiraStatus?.sampleIssueKey ? "good" : "warn"}
           />
           <MetricCard
             label="Configured Project"
-            value={jiraStatus?.config.projectKey ?? "n/a"}
+            value={
+              configuredProjectUrl && jiraStatus?.config.projectKey ? (
+                <a
+                  className="external-link"
+                  href={configuredProjectUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {jiraStatus.config.projectKey}
+                </a>
+              ) : (
+                jiraStatus?.config.projectKey ?? "n/a"
+              )
+            }
             hint="JIRA_PROJECT_KEY from local config."
             tone={jiraStatus?.config.projectKey ? "neutral" : "warn"}
           />
         </div>
-        <ul className="list">
-          {(jiraStatus?.checks ?? []).map((check) => (
-            <li key={check.name}>
-              {check.name} <StatusPill tone={check.ok ? "good" : "risk"} text={check.detail} />
-            </li>
-          ))}
-          {!jiraStatus && !loading ? <li>No diagnostics available.</li> : null}
-        </ul>
       </Panel>
 
       <Panel title="Alias Mapping" subtitle="Identity privacy mapping for individual views and executive exports.">

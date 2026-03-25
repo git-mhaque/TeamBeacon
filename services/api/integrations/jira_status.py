@@ -11,6 +11,24 @@ def _utc_iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _build_board_url(base_url: str, board_id: int | None) -> str | None:
+    if board_id is None:
+        return None
+    return f"{base_url.rstrip('/')}/secure/RapidBoard.jspa?rapidView={board_id}"
+
+
+def _build_issue_url(base_url: str, issue_key: str | None) -> str | None:
+    if not issue_key:
+        return None
+    return f"{base_url.rstrip('/')}/browse/{issue_key}"
+
+
+def _build_project_url(base_url: str, project_key: str | None) -> str | None:
+    if not project_key:
+        return None
+    return f"{base_url.rstrip('/')}/projects/{project_key}"
+
+
 def get_jira_status() -> dict[str, Any]:
     load_env_files()
     base_payload: dict[str, Any] = {
@@ -53,39 +71,77 @@ def get_jira_status() -> dict[str, Any]:
     checks = []
     metrics: dict[str, Any] = {}
     sample_issue_key: str | None = None
+    configured_board: dict[str, Any] | None = None
+    configured_project_url = _build_project_url(runtime.base_url, runtime.project_key)
+    errors: list[str] = []
+    board_check_ok = False
+    project_check_ok = False
 
-    try:
-        boards = connector.get_boards()
-        metrics["boardCount"] = len(boards)
+    if runtime.board_id is not None:
+        try:
+            board = connector.get_board(runtime.board_id)
+            configured_board = {
+                "id": board.external_board_id,
+                "name": board.name or f"Board {runtime.board_id}",
+                "url": _build_board_url(runtime.base_url, runtime.board_id),
+                "visible": True,
+            }
+            board_check_ok = True
+            checks.append(
+                {
+                    "name": "configured_board_access",
+                    "ok": True,
+                    "detail": f"Board {runtime.board_id} ({configured_board['name']}) is accessible.",
+                }
+            )
+        except JiraAPIError as exc:
+            configured_board = {
+                "id": runtime.board_id,
+                "name": f"Board {runtime.board_id}",
+                "url": _build_board_url(runtime.base_url, runtime.board_id),
+                "visible": False,
+            }
+            checks.append(
+                {
+                    "name": "configured_board_access",
+                    "ok": False,
+                    "detail": f"Board {runtime.board_id} is not accessible ({exc.status_code or 'n/a'}).",
+                }
+            )
+            errors.append(str(exc))
+        except Exception as exc:  # noqa: BLE001
+            configured_board = {
+                "id": runtime.board_id,
+                "name": f"Board {runtime.board_id}",
+                "url": _build_board_url(runtime.base_url, runtime.board_id),
+                "visible": False,
+            }
+            checks.append(
+                {
+                    "name": "configured_board_access",
+                    "ok": False,
+                    "detail": f"Unexpected failure while checking board {runtime.board_id}.",
+                }
+            )
+            errors.append(str(exc))
+    else:
         checks.append(
             {
-                "name": "board_access",
-                "ok": True,
-                "detail": f"Retrieved {len(boards)} boards.",
+                "name": "configured_board_access",
+                "ok": False,
+                "detail": "JIRA_BOARD_ID not configured.",
             }
         )
 
-        if runtime.board_id is not None:
-            visible = any(board.external_board_id == runtime.board_id for board in boards)
-            checks.append(
-                {
-                    "name": "configured_board_visible",
-                    "ok": visible,
-                    "detail": (
-                        f"Board {runtime.board_id} is accessible."
-                        if visible
-                        else f"Board {runtime.board_id} is not visible to this token."
-                    ),
-                }
-            )
-
-        if runtime.project_key:
+    if runtime.project_key:
+        try:
             issues, _ = connector.search_issues(
                 jql=f"project = {runtime.project_key} ORDER BY updated DESC",
                 max_results=1,
             )
             metrics["projectSampleIssueCount"] = len(issues)
             sample_issue_key = issues[0].issue_key if issues else None
+            project_check_ok = True
             checks.append(
                 {
                     "name": "project_query",
@@ -97,37 +153,41 @@ def get_jira_status() -> dict[str, Any]:
                     ),
                 }
             )
-        else:
+        except JiraAPIError as exc:
             checks.append(
                 {
                     "name": "project_query",
                     "ok": False,
-                    "detail": "JIRA_PROJECT_KEY not configured.",
+                    "detail": f"Project query failed for {runtime.project_key} ({exc.status_code or 'n/a'}).",
                 }
             )
+            errors.append(str(exc))
+        except Exception as exc:  # noqa: BLE001
+            checks.append(
+                {
+                    "name": "project_query",
+                    "ok": False,
+                    "detail": f"Unexpected failure while querying project {runtime.project_key}.",
+                }
+            )
+            errors.append(str(exc))
+    else:
+        checks.append(
+            {
+                "name": "project_query",
+                "ok": False,
+                "detail": "JIRA_PROJECT_KEY not configured.",
+            }
+        )
 
-        base_payload["connected"] = all(check["ok"] for check in checks if check["name"] != "project_query")
-    except JiraAPIError as exc:
-        checks.append(
-            {
-                "name": "api_reachability",
-                "ok": False,
-                "detail": f"JIRA API error ({exc.status_code or 'n/a'}).",
-            }
-        )
-        base_payload["error"] = str(exc)
-    except Exception as exc:  # noqa: BLE001
-        checks.append(
-            {
-                "name": "unexpected_error",
-                "ok": False,
-                "detail": "Unexpected runtime failure while checking JIRA connectivity.",
-            }
-        )
-        base_payload["error"] = str(exc)
+    base_payload["connected"] = board_check_ok and project_check_ok
+    if errors:
+        base_payload["error"] = "; ".join(errors)
 
     base_payload["checks"] = checks
     base_payload["metrics"] = metrics
     base_payload["sampleIssueKey"] = sample_issue_key
+    base_payload["sampleIssueUrl"] = _build_issue_url(runtime.base_url, sample_issue_key)
+    base_payload["configuredProjectUrl"] = configured_project_url
+    base_payload["configuredBoard"] = configured_board
     return base_payload
-

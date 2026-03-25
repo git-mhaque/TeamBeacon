@@ -264,21 +264,9 @@ class JiraRestConnector(JiraConnector):
             for board in values:
                 if not isinstance(board, dict):
                     continue
-                board_id_raw = board.get("id")
-                try:
-                    board_id = int(str(board_id_raw))
-                except (TypeError, ValueError):
-                    continue
-                location = board.get("location") or {}
-                boards.append(
-                    BoardRecord(
-                        external_board_id=board_id,
-                        name=board.get("name") or "",
-                        project_key=location.get("projectKey"),
-                        board_type=board.get("type"),
-                        raw=board,
-                    )
-                )
+                mapped = self._map_board(board)
+                if mapped is not None:
+                    boards.append(mapped)
 
             if not values:
                 break
@@ -291,6 +279,28 @@ class JiraRestConnector(JiraConnector):
                 break
 
         return boards
+
+    def _map_board(self, board: dict[str, Any]) -> BoardRecord | None:
+        board_id_raw = board.get("id")
+        try:
+            board_id = int(str(board_id_raw))
+        except (TypeError, ValueError):
+            return None
+        location = board.get("location") or {}
+        return BoardRecord(
+            external_board_id=board_id,
+            name=board.get("name") or "",
+            project_key=location.get("projectKey"),
+            board_type=board.get("type"),
+            raw=board,
+        )
+
+    def get_board(self, board_id: int) -> BoardRecord:
+        payload = self._request_json(f"/rest/agile/1.0/board/{board_id}")
+        board = self._map_board(payload)
+        if board is None:
+            raise JiraAPIError(f"Configured board payload was invalid for board {board_id}.")
+        return board
 
     def get_sprints(self, board_id: int, state: str | None = None) -> list[SprintRecord]:
         sprints: list[SprintRecord] = []

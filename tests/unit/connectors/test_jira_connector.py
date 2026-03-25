@@ -111,6 +111,22 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(boards[2].project_key, "CCC")
         self.assertEqual(mocked.call_count, 2)
 
+    def test_get_board_maps_configured_board(self) -> None:
+        payload = {
+            "id": 27193,
+            "name": "CEGBU Polaris",
+            "type": "scrum",
+            "location": {"projectKey": "CEGBUPOL"},
+        }
+        with patch.object(self.connector, "_request_json", return_value=payload) as mocked:
+            board = self.connector.get_board(27193)
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(mocked.call_args.args[0], "/rest/agile/1.0/board/27193")
+        self.assertEqual(board.external_board_id, 27193)
+        self.assertEqual(board.name, "CEGBU Polaris")
+        self.assertEqual(board.project_key, "CEGBUPOL")
+
     def test_get_issue_changelog_maps_items(self) -> None:
         payload = {
             "changelog": {

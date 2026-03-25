@@ -81,7 +81,7 @@ export default function App() {
         <div className="brand-block">
           <p className="eyebrow">TeamBeacon</p>
           <h1>Manager Console</h1>
-          <small>Desktop Shell Prototype</small>
+          <small>Unified Engineering Pulse</small>
         </div>
         <nav>
           {NAV_ITEMS.map((item) => (
@@ -118,4 +118,3 @@ export default function App() {
     </div>
   );
 }
-

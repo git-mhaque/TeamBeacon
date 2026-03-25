@@ -34,11 +34,12 @@ class JiraStatusServiceUnitTests(unittest.TestCase):
             def __init__(self, *args, **kwargs):  # noqa: ANN002, ANN003
                 pass
 
-            def get_boards(self):
+            def get_board(self, board_id):  # noqa: ANN001
                 Board = type("Board", (), {})
                 board = Board()
-                board.external_board_id = 27193
-                return [board]
+                board.external_board_id = board_id
+                board.name = "CEGBU Delivery Board"
+                return board
 
             def search_issues(self, jql, max_results):  # noqa: ANN001
                 Issue = type("Issue", (), {})
@@ -57,10 +58,17 @@ class JiraStatusServiceUnitTests(unittest.TestCase):
 
         self.assertTrue(payload["connected"])
         self.assertEqual(payload["sampleIssueKey"], "CEGBUPOL-123")
-        self.assertEqual(payload["metrics"]["boardCount"], 1)
+        self.assertEqual(payload["metrics"]["projectSampleIssueCount"], 1)
         self.assertEqual(payload["config"]["projectKey"], "CEGBUPOL")
+        self.assertEqual(payload["sampleIssueUrl"], "https://jira.example.com/browse/CEGBUPOL-123")
+        self.assertEqual(payload["configuredProjectUrl"], "https://jira.example.com/projects/CEGBUPOL")
+        self.assertEqual(payload["configuredBoard"]["name"], "CEGBU Delivery Board")
+        self.assertEqual(
+            payload["configuredBoard"]["url"],
+            "https://jira.example.com/secure/RapidBoard.jspa?rapidView=27193",
+        )
+        self.assertEqual(len(payload["checks"]), 2)
 
 
 if __name__ == "__main__":
     unittest.main()
-

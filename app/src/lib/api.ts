@@ -21,6 +21,14 @@ export type JiraIntegrationStatus = {
     projectSampleIssueCount?: number;
   };
   sampleIssueKey?: string | null;
+  sampleIssueUrl?: string | null;
+  configuredProjectUrl?: string | null;
+  configuredBoard?: {
+    id: number;
+    name: string;
+    url?: string | null;
+    visible: boolean;
+  } | null;
   error?: string | null;
 };
 
@@ -34,4 +42,3 @@ export async function fetchJiraIntegrationStatus(): Promise<JiraIntegrationStatu
   }
   return (await response.json()) as JiraIntegrationStatus;
 }
-

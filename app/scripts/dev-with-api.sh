@@ -3,6 +3,49 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+kill_port_listeners() {
+  local port="$1"
+  local pids
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN || true)"
+
+  if [ -z "${pids}" ]; then
+    return
+  fi
+
+  echo "Stopping existing listeners on port ${port}: ${pids}"
+  for pid in ${pids}; do
+    kill "${pid}" >/dev/null 2>&1 || true
+  done
+
+  sleep 0.3
+
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN || true)"
+  if [ -z "${pids}" ]; then
+    return
+  fi
+
+  echo "Force-stopping remaining listeners on port ${port}: ${pids}"
+  for pid in ${pids}; do
+    kill -9 "${pid}" >/dev/null 2>&1 || true
+  done
+}
+
+ensure_port_free() {
+  local port="$1"
+  local pids
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN || true)"
+  if [ -n "${pids}" ]; then
+    echo "Unable to free port ${port}. Still listening PID(s): ${pids}"
+    echo "Please stop those processes manually, then retry npm run dev."
+    exit 1
+  fi
+}
+
+kill_port_listeners 8000
+kill_port_listeners 5173
+ensure_port_free 8000
+ensure_port_free 5173
+
 "${SCRIPT_DIR}/run-api.sh" &
 API_PID=$!
 

@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
+
 type Tone = "neutral" | "good" | "warn" | "risk";
 
 type MetricCardProps = {
   label: string;
-  value: string;
-  hint: string;
+  value: ReactNode;
+  hint: ReactNode;
   tone?: Tone;
 };
 
@@ -16,4 +18,3 @@ export function MetricCard({ label, value, hint, tone = "neutral" }: MetricCardP
     </article>
   );
 }
-
