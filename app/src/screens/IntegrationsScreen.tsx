@@ -169,26 +169,31 @@ export function IntegrationsScreen() {
     return "Idle";
   }, [syncError, jiraSyncStatus]);
 
-  const jiraSyncProgressText = useMemo(() => {
+  const jiraSyncPercent = useMemo(() => {
+    if (!jiraSyncStatus || syncError) return null;
+    if (typeof jiraSyncStatus.percent === "number" && Number.isFinite(jiraSyncStatus.percent)) {
+      const bounded = Math.max(0, Math.min(100, jiraSyncStatus.percent));
+      return Math.round(bounded * 10) / 10;
+    }
+    if (jiraSyncStatus.state === "completed") {
+      return 100;
+    }
+    return null;
+  }, [syncError, jiraSyncStatus]);
+
+  const jiraSyncProgressSummary = useMemo(() => {
     if (syncError) return `Sync status error: ${syncError}`;
     if (!jiraSyncStatus) return "Sync not started.";
-    if (jiraSyncStatus.state === "running") {
-      if (jiraSyncStatus.message) {
-        return jiraSyncStatus.message;
-      }
-      if (jiraSyncStatus.totalIssues !== undefined && jiraSyncStatus.totalIssues !== null) {
-        return `${jiraSyncStatus.downloadedIssues} of ${jiraSyncStatus.totalIssues} issues downloaded`;
-      }
-      return `${jiraSyncStatus.downloadedIssues} issues downloaded`;
-    }
     if (jiraSyncStatus.state === "failed") {
       return jiraSyncStatus.error ?? "Last sync failed.";
     }
-    if (jiraSyncStatus.state === "completed") {
-      const total = jiraSyncStatus.totalIssues ?? jiraSyncStatus.downloadedIssues;
-      return `${jiraSyncStatus.downloadedIssues} of ${total} issues downloaded`;
+    if (jiraSyncStatus.state === "running") {
+      return "In progress";
     }
-    if (jiraSyncStatus.state === "idle" && jiraSyncStatus.lastSyncedAt) {
+    if (jiraSyncStatus.state === "completed") {
+      return "Sync complete.";
+    }
+    if (jiraSyncStatus.lastSyncedAt) {
       return "Not currently syncing.";
     }
     return "Sync not started.";
@@ -267,7 +272,32 @@ export function IntegrationsScreen() {
               <>
                 {jiraHint}
                 <br />
-                Sync: {jiraSyncProgressText}
+                <span className="sync-progress-row">
+                  <span>Sync:</span>
+                  {jiraSyncPercent !== null ? (
+                    <>
+                      <span
+                        className="sync-progress-track"
+                        role="progressbar"
+                        aria-label="JIRA sync progress"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={jiraSyncPercent}
+                      >
+                        <span className="sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
+                      </span>
+                      <span className="sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                    </>
+                  ) : (
+                    <span className="sync-progress-fallback">{jiraSyncProgressSummary}</span>
+                  )}
+                </span>
+                {jiraSyncPercent !== null ? (
+                  <>
+                    <br />
+                    <span className="sync-progress-note">{jiraSyncProgressSummary}</span>
+                  </>
+                ) : null}
                 <br />
                 Last synced: {jiraLastSyncedText}
                 <br />

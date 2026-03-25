@@ -268,6 +268,47 @@ body {
   font-size: 0.77rem;
 }
 
+.sync-progress-row {
+  margin-top: 0.08rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.sync-progress-track {
+  flex: 1;
+  min-width: 8.2rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  border: 1px solid #c5d6de;
+  background: #e5edf1;
+  overflow: hidden;
+}
+
+.sync-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1f8f63 0%, #39a274 100%);
+  transition: width 180ms ease;
+}
+
+.sync-progress-percent {
+  min-width: 2.6rem;
+  text-align: right;
+  color: #1d724f;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-progress-fallback {
+  color: var(--muted);
+}
+
+.sync-progress-note {
+  color: var(--muted);
+}
+
 .card-actions {
   margin-top: 0.45rem;
   display: flex;
