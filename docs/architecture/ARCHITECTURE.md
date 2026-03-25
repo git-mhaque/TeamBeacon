@@ -40,11 +40,13 @@ TeamBeacon is a local-first desktop analytics system:
 - `team_members`: real account + alias (`SE 1`, `QA 1`).
 - `initiative_config`: epic keys, initiative rules/success criteria.
 - `issues`, `issue_changelog`, `sprints`, `boards`.
+- `epic_groups`, `work_types`: reusable lookup/reference data.
+- `epic_metadata` + mapping tables: per-epic success checklist and group/work-type assignments.
 - `metric_snapshots`: time-windowed aggregates.
 - `report_runs`: generated outputs and baseline references.
 
 ## 5. Data Flow
-1. User configures integrations and field mappings.
+1. User configures integrations, field mappings, and epic metadata taxonomy.
 2. Worker pulls incremental issue/sprint/content changes.
 3. API normalizes and stores data.
 4. Metrics engine computes initiative/team/individual KPIs.

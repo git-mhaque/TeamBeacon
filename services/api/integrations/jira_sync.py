@@ -14,10 +14,11 @@ from packages.connectors.models import BoardRecord, ChangelogItemRecord, IssueRe
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 SyncRunner = Callable[..., dict[str, Any]]
-SyncMode = Literal["full", "since_last"]
+SyncMode = Literal["full", "since_last", "since_date"]
 
 SYNC_MODE_FULL: SyncMode = "full"
 SYNC_MODE_SINCE_LAST: SyncMode = "since_last"
+SYNC_MODE_SINCE_DATE: SyncMode = "since_date"
 SYNC_OVERLAP_DAYS = 2
 
 
@@ -52,6 +53,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             """
             ALTER TABLE sync_run_history
             ADD COLUMN sync_mode TEXT NOT NULL DEFAULT 'full'
+            """
+        )
+    if not _column_exists(conn, "sync_run_history", "requested_since"):
+        conn.execute(
+            """
+            ALTER TABLE sync_run_history
+            ADD COLUMN requested_since TEXT
             """
         )
     if not _column_exists(conn, "issues", "parent_issue_key"):
@@ -111,7 +119,9 @@ def _normalize_sync_mode(mode: str | None) -> SyncMode:
         return SYNC_MODE_FULL
     if normalized == SYNC_MODE_SINCE_LAST:
         return SYNC_MODE_SINCE_LAST
-    raise ValueError("Unsupported sync mode. Allowed values: full, since_last.")
+    if normalized == SYNC_MODE_SINCE_DATE:
+        return SYNC_MODE_SINCE_DATE
+    raise ValueError("Unsupported sync mode. Allowed values: full, since_last, since_date.")
 
 
 def _parse_iso_datetime(value: str | None) -> datetime | None:
@@ -129,6 +139,20 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _parse_requested_since(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        date_only = datetime.strptime(candidate, "%Y-%m-%d")
+        return date_only.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    return _parse_iso_datetime(candidate)
 
 
 def _upsert_checkpoint(
@@ -212,7 +236,8 @@ def _insert_sync_run(
     scope_key: str,
     board_external_id: int | None,
     board_name: str | None,
-    sync_mode: SyncMode,
+    sync_mode: str,
+    requested_since: str | None,
     started_at: str,
 ) -> int:
     cursor = conn.execute(
@@ -223,11 +248,12 @@ def _insert_sync_run(
           board_external_id,
           board_name,
           sync_mode,
+          requested_since,
           started_at,
           status
-        ) VALUES ('jira', ?, ?, ?, ?, ?, 'running')
+        ) VALUES ('jira', ?, ?, ?, ?, ?, ?, 'running')
         """,
-        (scope_key, board_external_id, board_name, sync_mode, started_at),
+        (scope_key, board_external_id, board_name, sync_mode, requested_since, started_at),
     )
     return int(cursor.lastrowid)
 
@@ -302,6 +328,7 @@ def _read_sync_history(db_path: str, limit: int) -> list[dict[str, Any]]:
               issues_synced,
               total_issues,
               sync_mode,
+              requested_since,
               status,
               error_message,
               started_at,
@@ -370,7 +397,8 @@ def _read_sync_history(db_path: str, limit: int) -> list[dict[str, Any]]:
         issues_synced = int(row[6] or 0)
         total_issues = row[7]
         sync_mode_raw = row[8]
-        status = row[9]
+        requested_since = row[9]
+        status = row[10]
         estimated_count = 0
 
         if board_external_id is not None:
@@ -398,11 +426,20 @@ def _read_sync_history(db_path: str, limit: int) -> list[dict[str, Any]]:
                 "sprintsSynced": row[5],
                 "issuesSynced": issues_synced,
                 "totalIssues": total_issues,
-                "syncMode": sync_mode_raw if sync_mode_raw in {SYNC_MODE_FULL, SYNC_MODE_SINCE_LAST} else SYNC_MODE_FULL,
+                "syncMode": (
+                    SYNC_MODE_SINCE_DATE
+                    if requested_since
+                    else (
+                        sync_mode_raw
+                        if sync_mode_raw in {SYNC_MODE_FULL, SYNC_MODE_SINCE_LAST}
+                        else SYNC_MODE_FULL
+                    )
+                ),
+                "requestedSince": requested_since,
                 "status": status,
-                "error": row[10],
-                "startedAt": row[11],
-                "finishedAt": row[12],
+                "error": row[11],
+                "startedAt": row[12],
+                "finishedAt": row[13],
             }
         )
     return history
@@ -730,6 +767,7 @@ def run_jira_sync_once(
     runtime: JiraRuntimeConfig | None = None,
     connector: JiraRestConnector | None = None,
     sync_mode: SyncMode | str = SYNC_MODE_FULL,
+    since_date: str | None = None,
 ) -> dict[str, Any]:
     runtime = runtime or _load_runtime()
     if runtime.board_id is None:
@@ -740,9 +778,23 @@ def run_jira_sync_once(
     scope = _scope_key(runtime.board_id)
     requested_mode = _normalize_sync_mode(sync_mode)
     effective_mode: SyncMode = requested_mode
+    persisted_mode: str = requested_mode
+    requested_since: str | None = None
     incremental_since_utc: datetime | None = None
 
-    if requested_mode == SYNC_MODE_SINCE_LAST:
+    if requested_mode == SYNC_MODE_SINCE_DATE:
+        parsed_requested_since = _parse_requested_since(since_date)
+        if parsed_requested_since is None:
+            raise ValueError(
+                "sinceDate is required in YYYY-MM-DD or ISO-8601 format when mode is since_date."
+            )
+        if parsed_requested_since > datetime.now(timezone.utc):
+            raise ValueError("sinceDate must be in the past.")
+        incremental_since_utc = parsed_requested_since
+        requested_since = parsed_requested_since.isoformat()
+        # Keep persisted mode compatible with pre-existing DB CHECK constraint.
+        persisted_mode = SYNC_MODE_SINCE_LAST
+    elif requested_mode == SYNC_MODE_SINCE_LAST:
         last_synced_at = _read_last_synced_at(resolved_db_path, scope)
         parsed_last_synced_at = _parse_iso_datetime(last_synced_at)
         if parsed_last_synced_at is None:
@@ -768,7 +820,8 @@ def run_jira_sync_once(
             scope_key=scope,
             board_external_id=runtime.board_id,
             board_name=None,
-            sync_mode=effective_mode,
+            sync_mode=persisted_mode if effective_mode != SYNC_MODE_FULL else SYNC_MODE_FULL,
+            requested_since=requested_since,
             started_at=started_at,
         )
         _upsert_checkpoint(conn, scope, status="running", error_message=None)
@@ -846,8 +899,13 @@ def run_jira_sync_once(
                     if incremental_since_utc is None
                     else (
                         "Syncing issues updated since "
-                        f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC "
-                        f"({SYNC_OVERLAP_DAYS}-day overlap)."
+                        f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC."
+                        if requested_mode == SYNC_MODE_SINCE_DATE
+                        else (
+                            "Syncing issues updated since "
+                            f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC "
+                            f"({SYNC_OVERLAP_DAYS}-day overlap)."
+                        )
                     )
                 ),
             }
@@ -855,6 +913,16 @@ def run_jira_sync_once(
         downloaded = 0
         changelog_entries_synced = 0
         total_issues: int | None = None
+        if incremental_since_utc is not None:
+            count_incremental = getattr(connector, "count_incremental_issues", None)
+            if callable(count_incremental):
+                try:
+                    counted_total = count_incremental(incremental_since_utc)
+                    if isinstance(counted_total, int) and counted_total >= 0:
+                        total_issues = counted_total
+                except Exception:  # noqa: BLE001
+                    # Keep sync running even if total pre-count fails.
+                    total_issues = None
         start_at = 0
         while True:
             if incremental_since_utc is not None:
@@ -957,6 +1025,7 @@ def run_jira_sync_once(
             "lastSyncedAt": completed_at,
             "syncMode": effective_mode,
             "requestedSyncMode": requested_mode,
+            "requestedSince": requested_since,
             "overlapDays": SYNC_OVERLAP_DAYS if requested_mode == SYNC_MODE_SINCE_LAST else None,
             "error": None,
             "message": "Sync complete.",
@@ -995,6 +1064,7 @@ class JiraSyncManager:
             "state": "idle",
             "phase": "idle",
             "syncMode": SYNC_MODE_FULL,
+            "requestedSince": None,
             "boardsSynced": 0,
             "sprintsSynced": 0,
             "downloadedIssues": 0,
@@ -1070,6 +1140,7 @@ class JiraSyncManager:
                     "state": mapped_state,
                     "phase": phase,
                     "syncMode": latest_run.get("syncMode", self._state.get("syncMode", SYNC_MODE_FULL)),
+                    "requestedSince": latest_run.get("requestedSince"),
                     "boardsSynced": int(latest_run.get("boardsSynced") or 0),
                     "sprintsSynced": int(latest_run.get("sprintsSynced") or 0),
                     "downloadedIssues": int(latest_run.get("issuesSynced") or 0),
@@ -1095,6 +1166,7 @@ class JiraSyncManager:
                         "state": state.get("state", self._state["state"]),
                         "phase": state.get("phase", self._state["phase"]),
                         "syncMode": state.get("syncMode", self._state["syncMode"]),
+                        "requestedSince": state.get("requestedSince", self._state["requestedSince"]),
                         "boardsSynced": state.get("boardsSynced", self._state["boardsSynced"]),
                         "sprintsSynced": state.get("sprintsSynced", self._state["sprintsSynced"]),
                         "downloadedIssues": state.get("downloadedIssues", self._state["downloadedIssues"]),
@@ -1121,8 +1193,18 @@ class JiraSyncManager:
             _ = self._hydrate_from_persisted(dict(state))
         return _read_sync_history(self._db_path_provider(), safe_limit)
 
-    def start(self, mode: str | None = None) -> dict[str, Any]:
+    def start(self, mode: str | None = None, since_date: str | None = None) -> dict[str, Any]:
         normalized_mode = _normalize_sync_mode(mode)
+        requested_since = _parse_requested_since(since_date) if normalized_mode == SYNC_MODE_SINCE_DATE else None
+        if normalized_mode == SYNC_MODE_SINCE_DATE:
+            if requested_since is None:
+                raise ValueError(
+                    "sinceDate is required in YYYY-MM-DD or ISO-8601 format when mode is since_date."
+                )
+            if requested_since > datetime.now(timezone.utc):
+                raise ValueError("sinceDate must be in the past.")
+
+        normalized_since = requested_since.isoformat() if requested_since is not None else None
         with self._lock:
             if self._state["state"] == "running":
                 snapshot = dict(self._state)
@@ -1135,6 +1217,7 @@ class JiraSyncManager:
                     "state": "running",
                     "phase": "initializing",
                     "syncMode": normalized_mode,
+                    "requestedSince": normalized_since,
                     "boardsSynced": 0,
                     "sprintsSynced": 0,
                     "downloadedIssues": 0,
@@ -1147,19 +1230,24 @@ class JiraSyncManager:
                 }
             )
 
-        thread = threading.Thread(target=self._run_background, args=(normalized_mode,), daemon=True)
+        thread = threading.Thread(
+            target=self._run_background,
+            args=(normalized_mode, normalized_since),
+            daemon=True,
+        )
         thread.start()
 
         snapshot = self._snapshot()
         snapshot["started"] = True
         return snapshot
 
-    def _run_background(self, sync_mode: SyncMode) -> None:
+    def _run_background(self, sync_mode: SyncMode, since_date: str | None = None) -> None:
         try:
             result = self._sync_runner(
                 progress_callback=self._update_progress,
                 db_path=self._db_path_provider(),
                 sync_mode=sync_mode,
+                since_date=since_date,
             )
         except Exception as exc:  # noqa: BLE001
             failed_at = _utc_iso_now()
@@ -1169,6 +1257,7 @@ class JiraSyncManager:
                         "state": "failed",
                         "phase": "failed",
                         "syncMode": sync_mode,
+                        "requestedSince": since_date,
                         "boardsSynced": self._state.get("boardsSynced", 0),
                         "sprintsSynced": self._state.get("sprintsSynced", 0),
                         "finishedAt": failed_at,
@@ -1184,6 +1273,7 @@ class JiraSyncManager:
                     "state": result.get("state", "completed"),
                     "phase": result.get("phase", "done"),
                     "syncMode": result.get("syncMode", sync_mode),
+                    "requestedSince": result.get("requestedSince", since_date),
                     "boardsSynced": result.get("boardsSynced", self._state.get("boardsSynced", 0)),
                     "sprintsSynced": result.get("sprintsSynced", self._state.get("sprintsSynced", 0)),
                     "downloadedIssues": result.get("downloadedIssues", 0),
@@ -1204,8 +1294,8 @@ def get_jira_sync_status() -> dict[str, Any]:
     return JIRA_SYNC_MANAGER.get_status()
 
 
-def start_jira_sync(mode: str | None = None) -> dict[str, Any]:
-    return JIRA_SYNC_MANAGER.start(mode=mode)
+def start_jira_sync(mode: str | None = None, since_date: str | None = None) -> dict[str, Any]:
+    return JIRA_SYNC_MANAGER.start(mode=mode, since_date=since_date)
 
 
 def get_jira_sync_history(limit: int = 20) -> dict[str, Any]:

@@ -13,12 +13,27 @@ from services.api.integrations.jira_sync import (
     get_jira_sync_status,
     start_jira_sync,
 )
+from services.api.metadata.epic_config import (
+    add_epic_group,
+    add_work_type,
+    get_configured_epic_summary,
+    get_epic_lookup_config,
+    get_epic_metadata,
+    search_unconfigured_epics,
+    upsert_epic_metadata,
+)
 
 
 StatusProvider = Callable[[], dict[str, Any]]
-StartProvider = Callable[[Optional[str]], dict[str, Any]]
+StartProvider = Callable[[Optional[str], Optional[str]], dict[str, Any]]
 HistoryProvider = Callable[[int], dict[str, Any]]
 IssueSearchProvider = Callable[..., dict[str, Any]]
+MetadataLookupProvider = Callable[[], dict[str, Any]]
+MetadataCreateProvider = Callable[[str], dict[str, Any]]
+MetadataEpicReadProvider = Callable[..., dict[str, Any]]
+MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
+MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
+MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -31,6 +46,13 @@ def build_handler(
     jira_sync_start_provider: StartProvider = start_jira_sync,
     jira_sync_history_provider: HistoryProvider = get_jira_sync_history,
     issue_search_provider: IssueSearchProvider = search_synced_issues,
+    metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
+    metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
+    metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
+    metadata_read_epics_provider: MetadataEpicReadProvider = get_epic_metadata,
+    metadata_summary_provider: MetadataEpicSummaryProvider = get_configured_epic_summary,
+    metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
+    metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_json_headers(self, status_code: int = 200) -> None:
@@ -110,6 +132,52 @@ def build_handler(
                 self.wfile.write(_json_bytes(payload))
                 return
 
+            if path == "/api/metadata/lookup":
+                payload = metadata_lookup_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics":
+                query = parse_qs(parsed.query)
+                epic_key_raw = query.get("epicKey", [None])[0]
+                epic_key = epic_key_raw.strip() if isinstance(epic_key_raw, str) else None
+                limit_raw = query.get("limit", ["50"])[0]
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    limit = 50
+                payload = metadata_read_epics_provider(epic_key=epic_key, limit=limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics/summary":
+                query = parse_qs(parsed.query)
+                limit_raw = query.get("limit", ["50"])[0]
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    limit = 50
+                payload = metadata_summary_provider(limit=limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics/candidates":
+                query = parse_qs(parsed.query)
+                query_raw = query.get("q", [None])[0]
+                candidate_query = query_raw.strip() if isinstance(query_raw, str) else None
+                limit_raw = query.get("limit", ["20"])[0]
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    limit = 20
+                payload = metadata_search_epics_provider(query=candidate_query, limit=limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
             self._set_json_headers(404)
             self.wfile.write(_json_bytes({"error": "not_found"}))
 
@@ -131,17 +199,102 @@ def build_handler(
 
             if path == "/api/integrations/jira/sync/start":
                 mode = None
+                since_date = None
                 if isinstance(body_payload, dict):
                     mode_raw = body_payload.get("mode")
                     mode = mode_raw if isinstance(mode_raw, str) else None
+                    since_date_raw = body_payload.get("sinceDate")
+                    since_date = since_date_raw if isinstance(since_date_raw, str) else None
                 try:
-                    payload = jira_sync_start_provider(mode)
+                    payload = jira_sync_start_provider(mode, since_date)
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
                     return
                 status_code = 202 if payload.get("started") else 200
                 self._set_json_headers(status_code)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/groups":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                name_raw = body_payload.get("name")
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                try:
+                    payload = metadata_add_group_provider(name_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/lookup/work-types":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                name_raw = body_payload.get("name")
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                try:
+                    payload = metadata_add_work_type_provider(name_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                epic_key_raw = body_payload.get("epicKey")
+                if not isinstance(epic_key_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "epicKey is required."}))
+                    return
+
+                success_criteria_raw = body_payload.get("successCriteria")
+                if success_criteria_raw is not None and not isinstance(success_criteria_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "successCriteria must be a list of strings."}))
+                    return
+                group_ids_raw = body_payload.get("groupIds")
+                if group_ids_raw is not None and not isinstance(group_ids_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "groupIds must be a list of integers."}))
+                    return
+                work_type_ids_raw = body_payload.get("workTypeIds")
+                if work_type_ids_raw is not None and not isinstance(work_type_ids_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "workTypeIds must be a list of integers."}))
+                    return
+
+                try:
+                    payload = metadata_upsert_epic_provider(
+                        epic_key=epic_key_raw,
+                        success_criteria=success_criteria_raw,
+                        group_ids=group_ids_raw,
+                        work_type_ids=work_type_ids_raw,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
 

@@ -17,6 +17,10 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 - Initiative insights (epic-centric):
   - Search/select epics via JQL.
   - Configure initiative success criteria (target completion, due date, blockers, scope change thresholds).
+  - Configure epic metadata:
+    - success criteria checklist
+    - one or more epic groups
+    - one or more work types
   - Generate RAG status and explanation.
 - Team insights:
   - Sprint committed vs completed story points.
@@ -45,16 +49,19 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 4. Persist normalized local analytics data.
 5. Compute configurable metrics and RAG statuses.
 6. Generate exportable executive report (Markdown/PDF-ready format).
+7. Configure and persist epic metadata lookups (`epic groups`, `work types`) and per-epic assignments.
 
 ## 6.1 JIRA Sync Semantics (Current Behavior)
 - Sync modes:
   - `full`: fetch full board issue dataset.
   - `since_last`: incremental sync from last cursor.
+  - `since_date`: incremental sync from a user-specified past date.
 - Incremental cursor logic:
   - Primary cursor = `sync_checkpoints.last_synced_at` for current board scope.
   - Fallback cursor = latest completed sync run `finished_at` for that board.
   - Effective cursor = selected cursor minus 2-day overlap (to avoid missed late updates or clock skew).
   - If no valid cursor exists, `since_last` automatically falls back to `full`.
+  - For `since_date`, cursor is the provided date at `00:00:00Z` (or provided ISO-8601 timestamp) and must be in the past.
 - Incremental JQL pattern:
   - `project = <JIRA_PROJECT_KEY> AND updated >= '<UTC timestamp>' ORDER BY updated ASC`
 - Per-run sync order:
@@ -69,6 +76,23 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - `sync_checkpoints` stores latest successful cursor/timestamp.
 - User-level attribution rule:
   - “Worked by user X” matches issue assignee, reporter, or any changelog author on that issue.
+
+## 6.2 Epic Metadata Configuration (Current Behavior)
+- Epic metadata is managed from Integrations & Field Mapping.
+- Lookup/reference data:
+  - `epic groups` can be added and reused.
+  - `work types` can be added and reused.
+- Per-epic configuration payload:
+  - `epicKey`
+  - `successCriteria[]`
+  - `groupIds[]`
+  - `workTypeIds[]`
+- Persisted storage:
+  - `epic_groups`
+  - `work_types`
+  - `epic_metadata`
+  - `epic_metadata_groups`
+  - `epic_metadata_work_types`
 
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS sync_run_history (
   board_external_id INTEGER,
   board_name TEXT,
   sync_mode TEXT NOT NULL DEFAULT 'full' CHECK (sync_mode IN ('full', 'since_last')),
+  requested_since TEXT,
   started_at TEXT NOT NULL,
   finished_at TEXT,
   status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
@@ -161,6 +162,45 @@ CREATE TABLE IF NOT EXISTS report_runs (
   FOREIGN KEY (baseline_report_id) REFERENCES report_runs(id)
 );
 
+CREATE TABLE IF NOT EXISTS epic_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS work_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS epic_metadata (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  epic_key TEXT NOT NULL UNIQUE,
+  epic_name TEXT,
+  success_criteria_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS epic_metadata_groups (
+  epic_metadata_id INTEGER NOT NULL,
+  group_id INTEGER NOT NULL,
+  PRIMARY KEY(epic_metadata_id, group_id),
+  FOREIGN KEY (epic_metadata_id) REFERENCES epic_metadata(id),
+  FOREIGN KEY (group_id) REFERENCES epic_groups(id)
+);
+
+CREATE TABLE IF NOT EXISTS epic_metadata_work_types (
+  epic_metadata_id INTEGER NOT NULL,
+  work_type_id INTEGER NOT NULL,
+  PRIMARY KEY(epic_metadata_id, work_type_id),
+  FOREIGN KEY (epic_metadata_id) REFERENCES epic_metadata(id),
+  FOREIGN KEY (work_type_id) REFERENCES work_types(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_issues_updated_at_source ON issues(updated_at_source);
 CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee_account_id);
 CREATE INDEX IF NOT EXISTS idx_issues_sprint ON issues(sprint_external_id);
@@ -169,5 +209,6 @@ CREATE INDEX IF NOT EXISTS idx_metric_snapshots_lookup ON metric_snapshots(snaps
 CREATE INDEX IF NOT EXISTS idx_report_runs_period ON report_runs(period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_sync_checkpoints_lookup ON sync_checkpoints(source_type, scope_key);
 CREATE INDEX IF NOT EXISTS idx_sync_run_history_lookup ON sync_run_history(source_type, started_at);
+CREATE INDEX IF NOT EXISTS idx_epic_metadata_updated ON epic_metadata(updated_at);
 
 INSERT OR IGNORE INTO schema_migrations(version) VALUES ('0001_initial');

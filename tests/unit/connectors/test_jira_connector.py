@@ -89,6 +89,21 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(mocked.call_args.kwargs["start_at"], 5)
         self.assertEqual(mocked.call_args.kwargs["max_results"], 25)
 
+    def test_count_incremental_issues_returns_total(self) -> None:
+        with patch.object(self.connector, "_request_json", return_value={"total": 123}) as mocked:
+            total = self.connector.count_incremental_issues(
+                updated_since=datetime(2026, 3, 22, 14, 30, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(total, 123)
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(mocked.call_args.args[0], "/rest/api/2/search")
+        params = mocked.call_args.kwargs["params"]
+        self.assertEqual(params["startAt"], 0)
+        self.assertEqual(params["maxResults"], 0)
+        self.assertIn("project = CEGBUPOL", params["jql"])
+        self.assertIn("updated >=", params["jql"])
+
     def test_get_boards_handles_pagination(self) -> None:
         page_1 = {
             "isLast": False,

@@ -12,8 +12,13 @@ from services.api.server import build_handler
 
 class LocalApiServerIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.sync_start_modes: list[str | None] = []
+        self.sync_start_calls: list[tuple[str | None, str | None]] = []
         self.issue_search_calls: list[dict[str, object]] = []
+        self.group_create_calls: list[str] = []
+        self.work_type_create_calls: list[str] = []
+        self.epic_upsert_calls: list[dict[str, object]] = []
+        self.epic_candidate_calls: list[tuple[str | None, int]] = []
+        self.epic_summary_calls: list[int] = []
 
         def fake_status():
             return {
@@ -42,15 +47,18 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
-        def fake_sync_start(mode=None):  # noqa: ANN001
-            if mode not in {None, "full", "since_last"}:
-                raise ValueError("Unsupported sync mode. Allowed values: full, since_last.")
-            self.sync_start_modes.append(mode)
+        def fake_sync_start(mode=None, since_date=None):  # noqa: ANN001
+            if mode not in {None, "full", "since_last", "since_date"}:
+                raise ValueError("Unsupported sync mode. Allowed values: full, since_last, since_date.")
+            if mode == "since_date" and not since_date:
+                raise ValueError("sinceDate is required in YYYY-MM-DD or ISO-8601 format when mode is since_date.")
+            self.sync_start_calls.append((mode, since_date))
             return {
                 "source": "jira",
                 "state": "running",
                 "phase": "issues",
                 "syncMode": mode or "full",
+                "requestedSince": since_date,
                 "boardsSynced": 1,
                 "sprintsSynced": 12,
                 "downloadedIssues": 12,
@@ -101,12 +109,92 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ],
             }
 
+        def fake_metadata_lookup():
+            return {
+                "groups": [{"id": 1, "name": "Platform"}],
+                "workTypes": [{"id": 10, "name": "Feature"}],
+            }
+
+        def fake_add_group(name):  # noqa: ANN001
+            self.group_create_calls.append(name)
+            return {"id": 2, "name": name}
+
+        def fake_add_work_type(name):  # noqa: ANN001
+            self.work_type_create_calls.append(name)
+            return {"id": 11, "name": name}
+
+        def fake_read_epics(epic_key=None, limit=50):  # noqa: ANN001
+            _ = limit
+            if epic_key:
+                return {
+                    "epics": [
+                        {
+                            "epicKey": epic_key,
+                            "epicTitle": "Enable offline initiative scoring",
+                            "successCriteria": ["Zero blocker defects"],
+                            "groupIds": [1],
+                            "groups": [{"id": 1, "name": "Platform"}],
+                            "workTypeIds": [10],
+                            "workTypes": [{"id": 10, "name": "Feature"}],
+                            "updatedAt": "2026-03-25T00:00:00+00:00",
+                        }
+                    ]
+                }
+            return {"epics": []}
+
+        def fake_search_epics(query=None, limit=20):  # noqa: ANN001
+            self.epic_candidate_calls.append((query, limit))
+            return {
+                "epics": [
+                    {
+                        "epicKey": "CEGBUPOL-5000",
+                        "epicName": "Unified Engineering Pulse",
+                    }
+                ]
+            }
+
+        def fake_epic_summary(limit=50):  # noqa: ANN001
+            self.epic_summary_calls.append(limit)
+            return {
+                "epics": [
+                    {
+                        "epicKey": "CEGBUPOL-4482",
+                        "epicName": "Enable offline initiative scoring",
+                        "completedCards": 8,
+                        "totalCards": 10,
+                        "completionPercent": 80.0,
+                        "ragScore": None,
+                        "insightComment": None,
+                        "updatedAt": "2026-03-25T00:00:00+00:00",
+                    }
+                ]
+            }
+
+        def fake_upsert_epic(**kwargs):  # noqa: ANN003
+            self.epic_upsert_calls.append(kwargs)
+            return {
+                "epicKey": kwargs["epic_key"],
+                "successCriteria": kwargs.get("success_criteria") or [],
+                "groupIds": kwargs.get("group_ids") or [],
+                "groups": [{"id": 1, "name": "Platform"}],
+                "workTypeIds": kwargs.get("work_type_ids") or [],
+                "workTypes": [{"id": 10, "name": "Feature"}],
+                "updatedAt": "2026-03-25T00:00:00+00:00",
+            }
+
         handler_cls = build_handler(
-            fake_status,
-            fake_sync_status,
-            fake_sync_start,
-            fake_sync_history,
-            fake_issue_search,
+            jira_status_provider=fake_status,
+            jira_sync_status_provider=fake_sync_status,
+            jira_sync_start_provider=fake_sync_start,
+            jira_sync_history_provider=fake_sync_history,
+            issue_search_provider=fake_issue_search,
+            metadata_lookup_provider=fake_metadata_lookup,
+            metadata_add_group_provider=fake_add_group,
+            metadata_add_work_type_provider=fake_add_work_type,
+            metadata_read_epics_provider=fake_read_epics,
+            metadata_summary_provider=fake_epic_summary,
+            metadata_search_epics_provider=fake_search_epics,
+            metadata_upsert_epic_provider=fake_upsert_epic,
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -155,7 +243,22 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["syncMode"], "since_last")
         self.assertEqual(body["downloadedIssues"], 12)
         self.assertEqual(body["totalIssues"], 5000)
-        self.assertEqual(self.sync_start_modes[-1], "since_last")
+        self.assertEqual(self.sync_start_calls[-1], ("since_last", None))
+
+    def test_jira_sync_start_endpoint_since_date_mode(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/integrations/jira/sync/start",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"mode": "since_date", "sinceDate": "2026-03-01"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 202)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertTrue(body["started"])
+        self.assertEqual(body["syncMode"], "since_date")
+        self.assertEqual(body["requestedSince"], "2026-03-01")
+        self.assertEqual(self.sync_start_calls[-1], ("since_date", "2026-03-01"))
 
     def test_jira_sync_start_endpoint_rejects_invalid_mode(self) -> None:
         request = Request(
@@ -196,6 +299,88 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(call["epic_key"], "CEGBUPOL-4482")
         self.assertEqual(call["worked_by"], "user-qa")
         self.assertEqual(call["limit"], 25)
+
+    def test_metadata_lookup_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["groups"][0]["name"], "Platform")
+        self.assertEqual(body["workTypes"][0]["name"], "Feature")
+
+    def test_metadata_add_group_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/groups",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"name": "Operations"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["name"], "Operations")
+        self.assertEqual(self.group_create_calls[-1], "Operations")
+
+    def test_metadata_add_work_type_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/lookup/work-types",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"name": "Run"}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["name"], "Run")
+        self.assertEqual(self.work_type_create_calls[-1], "Run")
+
+    def test_metadata_upsert_epic_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/epics",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "epicKey": "CEGBUPOL-4482",
+                    "successCriteria": ["Zero blocker defects"],
+                    "groupIds": [1],
+                    "workTypeIds": [10],
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["epicKey"], "CEGBUPOL-4482")
+        self.assertEqual(body["groupIds"], [1])
+        self.assertEqual(body["workTypeIds"], [10])
+        self.assertEqual(self.epic_upsert_calls[-1]["epic_key"], "CEGBUPOL-4482")
+
+    def test_metadata_read_epic_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/metadata/epics?epicKey=CEGBUPOL-4482", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(len(body["epics"]), 1)
+        self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-4482")
+        self.assertEqual(body["epics"][0]["epicTitle"], "Enable offline initiative scoring")
+
+    def test_metadata_search_epic_candidates_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/metadata/epics/candidates?q=pulse&limit=12", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(len(body["epics"]), 1)
+        self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-5000")
+        self.assertEqual(body["epics"][0]["epicName"], "Unified Engineering Pulse")
+        self.assertEqual(self.epic_candidate_calls[-1], ("pulse", 12))
+
+    def test_metadata_epic_summary_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/metadata/epics/summary?limit=30", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(len(body["epics"]), 1)
+        self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-4482")
+        self.assertEqual(body["epics"][0]["completionPercent"], 80.0)
+        self.assertIsNone(body["epics"][0]["ragScore"])
+        self.assertEqual(self.epic_summary_calls[-1], 30)
 
 
 if __name__ == "__main__":

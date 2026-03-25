@@ -246,6 +246,10 @@ class JiraRestConnector(JiraConnector):
         start_at: int = 0,
         max_results: int = 100,
     ) -> tuple[list[IssueRecord], SyncBatch]:
+        jql = self._build_incremental_jql(updated_since)
+        return self.search_issues(jql=jql, start_at=start_at, max_results=max_results)
+
+    def _build_incremental_jql(self, updated_since: datetime | None) -> str:
         clauses: list[str] = []
         if self.project_key:
             clauses.append(f"project = {self.project_key}")
@@ -258,10 +262,22 @@ class JiraRestConnector(JiraConnector):
             clauses.append(f"updated >= '{cursor.strftime('%Y-%m-%d %H:%M')}'")
 
         if clauses:
-            jql = " AND ".join(clauses) + " ORDER BY updated ASC"
-        else:
-            jql = "ORDER BY updated ASC"
-        return self.search_issues(jql=jql, start_at=start_at, max_results=max_results)
+            return " AND ".join(clauses) + " ORDER BY updated ASC"
+        return "ORDER BY updated ASC"
+
+    def count_incremental_issues(self, updated_since: datetime | None) -> int | None:
+        jql = self._build_incremental_jql(updated_since)
+        payload = self._request_json(
+            "/rest/api/2/search",
+            params={"jql": jql, "startAt": 0, "maxResults": 0},
+        )
+        total_raw = payload.get("total")
+        if isinstance(total_raw, int):
+            return total_raw
+        try:
+            return int(str(total_raw))
+        except (TypeError, ValueError):
+            return None
 
     def get_boards(self) -> list[BoardRecord]:
         boards: list[BoardRecord] = []

@@ -353,6 +353,42 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertIsNotNone(sync_mode)
             self.assertEqual(sync_mode[0], "since_last")
 
+    def test_run_sync_since_date_uses_explicit_cursor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+
+            connector = _SuccessfulConnectorStub()
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=connector,
+                sync_mode="since_date",
+                since_date="2026-03-10",
+            )
+
+            self.assertEqual(
+                connector.incremental_cursor,
+                datetime(2026, 3, 10, 0, 0, tzinfo=timezone.utc),
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                row = conn.execute(
+                    """
+                    SELECT sync_mode, requested_since
+                    FROM sync_run_history
+                    WHERE source_type = 'jira'
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], "since_last")
+            self.assertTrue(str(row[1]).startswith("2026-03-10T00:00:00"))
+
     def test_run_sync_marks_checkpoint_failed_on_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
@@ -397,8 +433,9 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
 
         captured_modes: list[str] = []
 
-        def fake_sync_runner(progress_callback, db_path, sync_mode):  # noqa: ANN001
+        def fake_sync_runner(progress_callback, db_path, sync_mode, since_date=None):  # noqa: ANN001
             _ = db_path
+            _ = since_date
             captured_modes.append(sync_mode)
             progress_callback(
                 {
@@ -451,6 +488,54 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
         self.assertEqual(status["boardsSynced"], 1)
         self.assertEqual(status["sprintsSynced"], 23)
         self.assertEqual(captured_modes, ["since_last"])
+
+    def test_manager_start_since_date_sets_requested_since(self) -> None:
+        captured: list[tuple[str, str | None]] = []
+
+        def fake_sync_runner(progress_callback, db_path, sync_mode, since_date=None):  # noqa: ANN001
+            _ = progress_callback
+            _ = db_path
+            captured.append((sync_mode, since_date))
+            return {
+                "source": "jira",
+                "state": "completed",
+                "phase": "done",
+                "syncMode": sync_mode,
+                "requestedSince": since_date,
+                "boardsSynced": 0,
+                "sprintsSynced": 0,
+                "downloadedIssues": 0,
+                "totalIssues": 0,
+                "percent": 100.0,
+                "finishedAt": "2026-03-25T00:00:00+00:00",
+                "lastSyncedAt": "2026-03-25T00:00:00+00:00",
+                "error": None,
+                "message": "Sync complete.",
+            }
+
+        manager = JiraSyncManager(
+            db_path_provider=lambda: "/tmp/teambeacon-test.db",
+            sync_runner=fake_sync_runner,
+        )
+
+        start_payload = manager.start(mode="since_date", since_date="2026-03-01")
+        self.assertTrue(start_payload["started"])
+        self.assertEqual(start_payload["syncMode"], "since_date")
+        self.assertTrue(str(start_payload["requestedSince"]).startswith("2026-03-01T00:00:00"))
+
+        status = manager.get_status()
+        for _ in range(50):
+            if status.get("state") == "completed":
+                break
+            time.sleep(0.01)
+            status = manager.get_status()
+
+        self.assertEqual(status["state"], "completed")
+        self.assertEqual(status["syncMode"], "since_date")
+        self.assertTrue(str(status["requestedSince"]).startswith("2026-03-01T00:00:00"))
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0][0], "since_date")
+        self.assertTrue(str(captured[0][1]).startswith("2026-03-01T00:00:00"))
 
     def test_manager_reconciles_stale_running_sync_from_db(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
