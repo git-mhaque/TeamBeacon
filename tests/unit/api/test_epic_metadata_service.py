@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import tempfile
 import unittest
 from pathlib import Path
@@ -219,6 +220,8 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
     def test_configured_epic_summary_returns_completion_percent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = str(Path(tmp_dir) / "teambeacon.db")
+            recent_done_at = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+            older_updated_at = (datetime.now(timezone.utc) - timedelta(days=15)).isoformat()
             conn = sqlite3.connect(db_path)
             try:
                 conn.execute(
@@ -258,17 +261,42 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
                 )
                 conn.execute(
                     """
-                    INSERT INTO issues (issue_key, issue_id, issue_type, summary, status_name, status_category, epic_key)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category,
+                      epic_key, updated_at_source, resolved_at_source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    ("CEGBUPOL-101", "101", "Story", "Story done", "Done", "Done", "CEGBUPOL-4482"),
+                    (
+                        "CEGBUPOL-101",
+                        "101",
+                        "Story",
+                        "Story done",
+                        "Done",
+                        "Done",
+                        "CEGBUPOL-4482",
+                        recent_done_at,
+                        recent_done_at,
+                    ),
                 )
                 conn.execute(
                     """
-                    INSERT INTO issues (issue_key, issue_id, issue_type, summary, status_name, status_category, epic_key)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category,
+                      epic_key, updated_at_source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    ("CEGBUPOL-102", "102", "Story", "Story in progress", "In Progress", "In Progress", "CEGBUPOL-4482"),
+                    (
+                        "CEGBUPOL-102",
+                        "102",
+                        "Story",
+                        "Story in progress",
+                        "In Progress",
+                        "In Progress",
+                        "CEGBUPOL-4482",
+                        older_updated_at,
+                    ),
                 )
                 conn.commit()
             finally:
@@ -289,6 +317,8 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["epics"][0]["totalCards"], 2)
             self.assertEqual(payload["epics"][0]["completedCards"], 1)
             self.assertEqual(payload["epics"][0]["completionPercent"], 50.0)
+            self.assertEqual(payload["epics"][0]["completedLastWeek"], 1)
+            self.assertEqual(payload["epics"][0]["deltaPercent"], 50.0)
             self.assertEqual(payload["epics"][0]["successCriteria"], ["Keep blockers at zero"])
             self.assertEqual(payload["epics"][0]["groups"], [])
             self.assertEqual(payload["epics"][0]["workTypes"], [])

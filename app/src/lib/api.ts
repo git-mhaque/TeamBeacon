@@ -106,6 +106,8 @@ export type InitiativeEpicSummary = {
   completedCards: number;
   totalCards: number;
   completionPercent: number;
+  completedLastWeek?: number;
+  deltaPercent?: number;
   groups: EpicLookupItem[];
   workTypes: EpicLookupItem[];
   successCriteria: string[];

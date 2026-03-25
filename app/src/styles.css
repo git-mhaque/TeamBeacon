@@ -950,10 +950,58 @@ body {
   white-space: nowrap;
 }
 
+.initiative-delta-cell {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #1b5f44;
+  font-variant-numeric: tabular-nums;
+}
+
 .initiative-actions {
   display: flex;
   align-items: center;
   gap: 0.32rem;
+}
+
+.initiative-icon-btn {
+  width: 1.72rem;
+  height: 1.72rem;
+  border: 1px solid #9fb7c3;
+  border-radius: 0.44rem;
+  background: #f5fbff;
+  color: #1f4f63;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.initiative-icon-btn svg {
+  width: 0.94rem;
+  height: 0.94rem;
+  fill: currentColor;
+}
+
+.initiative-icon-btn:hover {
+  border-color: #2a6f88;
+  background: #ebf8ff;
+}
+
+.initiative-icon-btn:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.initiative-icon-btn-danger {
+  color: #8e281f;
+  border-color: #d7b7b1;
+  background: #fff8f7;
+}
+
+.initiative-icon-btn-danger:hover {
+  border-color: #b74438;
+  background: #fff1ef;
 }
 
 .table-sort-btn {

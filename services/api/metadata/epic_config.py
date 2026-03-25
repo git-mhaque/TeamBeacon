@@ -543,7 +543,7 @@ def get_epic_metadata(
     return {"epics": entries}
 
 
-def _read_epic_completion_counts(conn: sqlite3.Connection, epic_key: str) -> tuple[int, int]:
+def _read_epic_completion_metrics(conn: sqlite3.Connection, epic_key: str) -> tuple[int, int, int]:
     row = conn.execute(
         """
         SELECT
@@ -557,7 +557,28 @@ def _read_epic_completion_counts(conn: sqlite3.Connection, epic_key: str) -> tup
               ) THEN 1
               ELSE 0
             END
-          ) AS completed_cards
+          ) AS completed_cards,
+          SUM(
+            CASE
+              WHEN (
+                LOWER(COALESCE(i.status_category, '')) = 'done'
+                OR LOWER(COALESCE(i.status_name, '')) IN ('done', 'closed', 'resolved')
+                OR i.resolved_at_source IS NOT NULL
+              )
+              AND (
+                (
+                  i.resolved_at_source IS NOT NULL
+                  AND datetime(i.resolved_at_source) >= datetime('now', '-7 days')
+                )
+                OR (
+                  i.resolved_at_source IS NULL
+                  AND datetime(COALESCE(i.updated_at_source, i.synced_at)) >= datetime('now', '-7 days')
+                )
+              )
+              THEN 1
+              ELSE 0
+            END
+          ) AS completed_last_week
         FROM issues i
         WHERE i.issue_key <> ?
           AND LOWER(COALESCE(i.issue_type, '')) <> 'epic'
@@ -575,10 +596,11 @@ def _read_epic_completion_counts(conn: sqlite3.Connection, epic_key: str) -> tup
         (epic_key, epic_key, epic_key, epic_key),
     ).fetchone()
     if row is None:
-        return (0, 0)
+        return (0, 0, 0)
     total_cards = int(row["total_cards"] or 0)
     completed_cards = int(row["completed_cards"] or 0)
-    return (total_cards, completed_cards)
+    completed_last_week = int(row["completed_last_week"] or 0)
+    return (total_cards, completed_cards, completed_last_week)
 
 
 def get_configured_epic_summary(
@@ -614,8 +636,9 @@ def get_configured_epic_summary(
             if metadata_entry and metadata_entry.get("epicTitle"):
                 epic_name_raw = metadata_entry.get("epicTitle")
             epic_name = str(epic_name_raw).strip() if epic_name_raw is not None else ""
-            total_cards, completed_cards = _read_epic_completion_counts(conn, epic_key)
+            total_cards, completed_cards, completed_last_week = _read_epic_completion_metrics(conn, epic_key)
             completion_percent = round((completed_cards / total_cards) * 100, 1) if total_cards > 0 else 0.0
+            delta_percent = round((completed_last_week / total_cards) * 100, 1) if total_cards > 0 else 0.0
             success_criteria = (
                 [str(item) for item in metadata_entry.get("successCriteria", []) if isinstance(item, str)]
                 if metadata_entry
@@ -630,6 +653,8 @@ def get_configured_epic_summary(
                     "completedCards": completed_cards,
                     "totalCards": total_cards,
                     "completionPercent": completion_percent,
+                    "completedLastWeek": completed_last_week,
+                    "deltaPercent": delta_percent,
                     "groups": groups,
                     "workTypes": work_types,
                     "successCriteria": success_criteria,

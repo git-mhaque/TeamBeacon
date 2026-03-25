@@ -14,7 +14,7 @@ import {
   upsertEpicMetadata,
 } from "../lib/api";
 
-type SummarySortKey = "epicKey" | "group" | "type" | "epicName" | "completion" | "rag";
+type SummarySortKey = "epicKey" | "group" | "type" | "epicName" | "completion" | "delta" | "rag";
 type SortDirection = "asc" | "desc";
 
 type SummaryRow = InitiativeEpicSummary & {
@@ -24,6 +24,9 @@ type SummaryRow = InitiativeEpicSummary & {
   typeText: string;
   ragLabel: "Red" | "Amber" | "Green";
   successCriteriaTooltip: string;
+  completedLastWeekValue: number;
+  deltaPercentValue: number;
+  deltaTooltip: string;
   insightTooltip: string;
 };
 
@@ -49,8 +52,10 @@ export function InitiativesScreen() {
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SummarySortKey>("epicKey");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [showGroupColumn, setShowGroupColumn] = useState(true);
+  const [showGroupColumn, setShowGroupColumn] = useState(false);
   const [showTypeColumn, setShowTypeColumn] = useState(true);
+  const [showDeltaColumn, setShowDeltaColumn] = useState(true);
+  const [showRagColumn, setShowRagColumn] = useState(false);
   const [selectedGroupFilters, setSelectedGroupFilters] = useState<string[]>([]);
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<string[]>([]);
   const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
@@ -144,9 +149,19 @@ export function InitiativesScreen() {
       const groupText = groupNames.join(", ");
       const typeText = typeNames.join(", ");
       const ragLabel = ragFromCompletion(entry.completionPercent);
+      const completedLastWeekValue = Math.max(0, entry.completedLastWeek ?? 0);
+      const deltaPercentCandidate =
+        typeof entry.deltaPercent === "number"
+          ? entry.deltaPercent
+          : entry.totalCards > 0
+            ? (completedLastWeekValue / entry.totalCards) * 100
+            : 0;
+      const deltaPercentValue = Math.round(Math.max(0, deltaPercentCandidate) * 10) / 10;
       const successCriteriaTooltip = entry.successCriteria.length
         ? entry.successCriteria.map((item, index) => `${index + 1}. ${item}`).join("\n")
         : "No success criteria configured.";
+      const deltaTooltip =
+        `${completedLastWeekValue} completed in last 7 days out of ${entry.totalCards} total cards.`;
       const insightTooltip = entry.insightComment?.trim() || "Insight pending LLM output.";
       return {
         ...entry,
@@ -156,6 +171,9 @@ export function InitiativesScreen() {
         typeText,
         ragLabel,
         successCriteriaTooltip,
+        completedLastWeekValue,
+        deltaPercentValue,
+        deltaTooltip,
         insightTooltip,
       };
     });
@@ -218,6 +236,9 @@ export function InitiativesScreen() {
     const sorted = [...filteredEpicSummary].sort((left, right) => {
       if (sortKey === "completion") {
         return left.completionPercent - right.completionPercent;
+      }
+      if (sortKey === "delta") {
+        return left.deltaPercentValue - right.deltaPercentValue;
       }
       if (sortKey === "rag") {
         return ragRank(left.ragLabel) - ragRank(right.ragLabel);
@@ -567,6 +588,22 @@ export function InitiativesScreen() {
               />
               Type
             </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showDeltaColumn}
+                onChange={(event) => setShowDeltaColumn(event.target.checked)}
+              />
+              Delta
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showRagColumn}
+                onChange={(event) => setShowRagColumn(event.target.checked)}
+              />
+              RAG
+            </label>
           </div>
           <div className="initiative-filter-controls">
             <div className="initiative-filter-dropdown" ref={groupFilterRef}>
@@ -680,11 +717,20 @@ export function InitiativesScreen() {
                     Completion{sortIndicator("completion")}
                   </button>
                 </th>
-                <th>
-                  <button className="table-sort-btn" type="button" onClick={() => handleSort("rag")}>
-                    RAG{sortIndicator("rag")}
-                  </button>
-                </th>
+                {showDeltaColumn ? (
+                  <th>
+                    <button className="table-sort-btn" type="button" onClick={() => handleSort("delta")}>
+                      Delta{sortIndicator("delta")}
+                    </button>
+                  </th>
+                ) : null}
+                {showRagColumn ? (
+                  <th>
+                    <button className="table-sort-btn" type="button" onClick={() => handleSort("rag")}>
+                      RAG{sortIndicator("rag")}
+                    </button>
+                  </th>
+                ) : null}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -727,28 +773,43 @@ export function InitiativesScreen() {
                       </span>
                     </div>
                   </td>
-                  <td title={entry.insightTooltip}>
-                    <span className={`rag-indicator rag-${entry.ragLabel.toLowerCase()}`}>
-                      <span className="rag-dot rag-dot-large" />
-                    </span>
-                  </td>
+                  {showDeltaColumn ? (
+                    <td className="initiative-delta-cell" title={entry.deltaTooltip}>
+                      {entry.deltaPercentValue.toFixed(1).replace(/\.0$/, "")}%
+                    </td>
+                  ) : null}
+                  {showRagColumn ? (
+                    <td title={entry.insightTooltip}>
+                      <span className={`rag-indicator rag-${entry.ragLabel.toLowerCase()}`}>
+                        <span className="rag-dot rag-dot-large" />
+                      </span>
+                    </td>
+                  ) : null}
                   <td>
                     <div className="initiative-actions">
                       <button
-                        className="mini-sync-btn"
+                        className="initiative-icon-btn"
                         onClick={() => openEpicEditOverlay(entry)}
                         type="button"
+                        aria-label={`Edit ${entry.epicKey}`}
+                        title="Edit"
                         disabled={removingEpicKey === entry.epicKey}
                       >
-                        Edit
+                        <svg viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M14.7 2.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4l-9.6 9.6-3.5.4.4-3.5zM3 17h14v1.5H3z" />
+                        </svg>
                       </button>
                       <button
-                        className="mini-sync-btn"
+                        className="initiative-icon-btn initiative-icon-btn-danger"
                         onClick={() => openRemoveEpicOverlay(entry)}
                         type="button"
+                        aria-label={removingEpicKey === entry.epicKey ? `Removing ${entry.epicKey}` : `Remove ${entry.epicKey}`}
+                        title={removingEpicKey === entry.epicKey ? "Removing..." : "Remove"}
                         disabled={removingEpicKey === entry.epicKey}
                       >
-                        {removingEpicKey === entry.epicKey ? "Removing..." : "Remove"}
+                        <svg viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M7 2h6l.8 1.5H17V5H3V3.5h3.2zM5 6.5h10l-.7 10.2a1.5 1.5 0 0 1-1.5 1.3H7.2a1.5 1.5 0 0 1-1.5-1.3zM8.2 8v8.2h1.4V8zm3.2 0v8.2h1.4V8z" />
+                        </svg>
                       </button>
                     </div>
                   </td>
@@ -756,7 +817,15 @@ export function InitiativesScreen() {
               ))}
               {!loading && sortedEpicSummary.length === 0 ? (
                 <tr>
-                  <td colSpan={5 + (showGroupColumn ? 1 : 0) + (showTypeColumn ? 1 : 0)}>
+                  <td
+                    colSpan={
+                      4
+                      + (showGroupColumn ? 1 : 0)
+                      + (showTypeColumn ? 1 : 0)
+                      + (showDeltaColumn ? 1 : 0)
+                      + (showRagColumn ? 1 : 0)
+                    }
+                  >
                     {epicSummary.length === 0
                       ? "No configured epics found yet."
                       : "No epics match the selected filters."}
