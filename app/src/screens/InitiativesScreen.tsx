@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
@@ -42,8 +42,12 @@ export function InitiativesScreen() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showGroupColumn, setShowGroupColumn] = useState(true);
   const [showTypeColumn, setShowTypeColumn] = useState(true);
-  const [groupFilter, setGroupFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [selectedGroupFilters, setSelectedGroupFilters] = useState<string[]>([]);
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<string[]>([]);
+  const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const groupFilterRef = useRef<HTMLDivElement | null>(null);
+  const typeFilterRef = useRef<HTMLDivElement | null>(null);
 
   const loadEpicSummary = useCallback(async () => {
     setLoading(true);
@@ -141,13 +145,29 @@ export function InitiativesScreen() {
     );
   }, [summaryRows]);
 
+  useEffect(() => {
+    setSelectedGroupFilters((current) =>
+      current.filter((value) => groupFilterOptions.includes(value)),
+    );
+  }, [groupFilterOptions]);
+
+  useEffect(() => {
+    setSelectedTypeFilters((current) =>
+      current.filter((value) => typeFilterOptions.includes(value)),
+    );
+  }, [typeFilterOptions]);
+
   const filteredEpicSummary = useMemo(() => {
     return summaryRows.filter((row) => {
-      const groupMatch = groupFilter === "all" || row.groupNames.includes(groupFilter);
-      const typeMatch = typeFilter === "all" || row.typeNames.includes(typeFilter);
+      const groupMatch =
+        selectedGroupFilters.length === 0
+        || selectedGroupFilters.some((value) => row.groupNames.includes(value));
+      const typeMatch =
+        selectedTypeFilters.length === 0
+        || selectedTypeFilters.some((value) => row.typeNames.includes(value));
       return groupMatch && typeMatch;
     });
-  }, [groupFilter, summaryRows, typeFilter]);
+  }, [selectedGroupFilters, selectedTypeFilters, summaryRows]);
 
   const sortedEpicSummary = useMemo(() => {
     const sorted = [...filteredEpicSummary].sort((left, right) => {
@@ -202,6 +222,52 @@ export function InitiativesScreen() {
     [sortDirection, sortKey],
   );
 
+  useEffect(() => {
+    const onDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (groupFilterRef.current && target && !groupFilterRef.current.contains(target)) {
+        setIsGroupFilterOpen(false);
+      }
+      if (typeFilterRef.current && target && !typeFilterRef.current.contains(target)) {
+        setIsTypeFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocumentMouseDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentMouseDown);
+    };
+  }, []);
+
+  const toggleGroupFilter = useCallback((value: string) => {
+    setSelectedGroupFilters((current) => {
+      if (current.includes(value)) {
+        return current.filter((item) => item !== value);
+      }
+      return [...current, value];
+    });
+  }, []);
+
+  const toggleTypeFilter = useCallback((value: string) => {
+    setSelectedTypeFilters((current) => {
+      if (current.includes(value)) {
+        return current.filter((item) => item !== value);
+      }
+      return [...current, value];
+    });
+  }, []);
+
+  const groupFilterLabel = useMemo(() => {
+    if (selectedGroupFilters.length === 0) return "All";
+    if (selectedGroupFilters.length === 1) return selectedGroupFilters[0];
+    return `${selectedGroupFilters.length} selected`;
+  }, [selectedGroupFilters]);
+
+  const typeFilterLabel = useMemo(() => {
+    if (selectedTypeFilters.length === 0) return "All";
+    if (selectedTypeFilters.length === 1) return selectedTypeFilters[0];
+    return `${selectedTypeFilters.length} selected`;
+  }, [selectedTypeFilters]);
+
   return (
     <div className="screen-grid">
       <Panel
@@ -238,28 +304,81 @@ export function InitiativesScreen() {
             </label>
           </div>
           <div className="initiative-filter-controls">
-            <label>
-              <span>Group:</span>
-              <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
-                <option value="all">All</option>
-                {groupFilterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Type:</span>
-              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                <option value="all">All</option>
-                {typeFilterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="initiative-filter-dropdown" ref={groupFilterRef}>
+              <button
+                className="initiative-filter-trigger"
+                type="button"
+                onClick={() => {
+                  setIsTypeFilterOpen(false);
+                  setIsGroupFilterOpen((current) => !current);
+                }}
+              >
+                Group: {groupFilterLabel}
+              </button>
+              {isGroupFilterOpen ? (
+                <div className="initiative-filter-menu">
+                  <button
+                    className="initiative-filter-clear"
+                    type="button"
+                    onClick={() => setSelectedGroupFilters([])}
+                    disabled={selectedGroupFilters.length === 0}
+                  >
+                    Clear
+                  </button>
+                  {groupFilterOptions.length === 0 ? (
+                    <p className="sync-history-loading">No groups available.</p>
+                  ) : null}
+                  {groupFilterOptions.map((option) => (
+                    <label key={option} className="initiative-filter-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedGroupFilters.includes(option)}
+                        onChange={() => toggleGroupFilter(option)}
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="initiative-filter-dropdown" ref={typeFilterRef}>
+              <button
+                className="initiative-filter-trigger"
+                type="button"
+                onClick={() => {
+                  setIsGroupFilterOpen(false);
+                  setIsTypeFilterOpen((current) => !current);
+                }}
+              >
+                Type: {typeFilterLabel}
+              </button>
+              {isTypeFilterOpen ? (
+                <div className="initiative-filter-menu">
+                  <button
+                    className="initiative-filter-clear"
+                    type="button"
+                    onClick={() => setSelectedTypeFilters([])}
+                    disabled={selectedTypeFilters.length === 0}
+                  >
+                    Clear
+                  </button>
+                  {typeFilterOptions.length === 0 ? (
+                    <p className="sync-history-loading">No types available.</p>
+                  ) : null}
+                  {typeFilterOptions.map((option) => (
+                    <label key={option} className="initiative-filter-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedTypeFilters.includes(option)}
+                        onChange={() => toggleTypeFilter(option)}
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 

@@ -802,21 +802,67 @@ body {
   flex-wrap: wrap;
 }
 
-.initiative-filter-controls label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  color: var(--muted);
+.initiative-filter-dropdown {
+  position: relative;
 }
 
-.initiative-filter-controls select {
+.initiative-filter-trigger {
   border: 1px solid var(--line);
   border-radius: 0.48rem;
-  padding: 0.22rem 0.34rem;
+  padding: 0.24rem 0.46rem;
   font: inherit;
   color: var(--ink);
+  background: #f7fbfe;
+  cursor: pointer;
+}
+
+.initiative-filter-trigger:hover {
+  border-color: #99b8c5;
+}
+
+.initiative-filter-menu {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  left: 0;
+  min-width: 12.5rem;
+  max-width: 18rem;
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.62rem;
   background: #fff;
+  box-shadow: 0 0.7rem 1.4rem rgba(16, 31, 38, 0.16);
+  padding: 0.34rem;
+  z-index: 4;
+}
+
+.initiative-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.78rem;
+  color: #1f3740;
+  margin-top: 0.2rem;
+}
+
+.initiative-filter-option input {
+  margin: 0;
+}
+
+.initiative-filter-clear {
+  border: 1px solid #2a6f88;
+  border-radius: 0.46rem;
+  padding: 0.15rem 0.42rem;
+  background: #f4fbff;
+  color: #0f5570;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.initiative-filter-clear:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .sync-history-table td.initiative-name-cell,
