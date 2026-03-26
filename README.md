@@ -88,6 +88,17 @@ open docs/design/teambeacon-mockups.html
 3. Add initiative/team dashboard APIs backed by `metric_snapshots`.
 4. Generate first executive report from local data snapshots.
 
+## CI Pipeline
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Triggers:
+  - Push to `main`
+  - Pull request targeting `main`
+  - Manual run (`workflow_dispatch`)
+- Checks:
+  - Backend unit tests: `python3 -m unittest discover -s tests/unit -p "test_*.py" -v`
+  - Backend API integration tests: `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v`
+  - Frontend build: `cd app && npm ci && npm run build`
+
 ## Documentation Index
 - [AGENTS.md](AGENTS.md): contributor conventions and repository map.
 - [SPEC.md](SPEC.md): product requirements and scope boundaries.
