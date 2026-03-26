@@ -132,38 +132,50 @@ class JiraRestConnector(JiraConnector):
             raise JiraAPIError(f"JIRA response was not valid JSON for {path}") from exc
         return payload
 
-    def _extract_sprint_id(self, fields: dict[str, Any]) -> int | None:
+    def _extract_sprint_details(self, fields: dict[str, Any]) -> tuple[int | None, bool]:
         for field_name in self.sprint_field_candidates:
-            candidate = fields.get(field_name)
-            if candidate is None:
+            if field_name not in fields:
                 continue
+            candidate = fields.get(field_name)
+
+            if candidate is None:
+                return (None, True)
 
             if isinstance(candidate, dict):
                 sprint_id = candidate.get("id")
                 if isinstance(sprint_id, int):
-                    return sprint_id
+                    return (sprint_id, True)
                 if isinstance(sprint_id, str) and sprint_id.isdigit():
-                    return int(sprint_id)
+                    return (int(sprint_id), True)
+                return (None, True)
 
             if isinstance(candidate, list):
                 for entry in reversed(candidate):
                     if isinstance(entry, dict):
                         sprint_id = entry.get("id")
                         if isinstance(sprint_id, int):
-                            return sprint_id
+                            return (sprint_id, True)
                         if isinstance(sprint_id, str) and sprint_id.isdigit():
-                            return int(sprint_id)
+                            return (int(sprint_id), True)
                     if isinstance(entry, str):
                         match = re.search(r"id=(\d+)", entry)
                         if match:
-                            return int(match.group(1))
+                            return (int(match.group(1)), True)
+                return (None, True)
 
             if isinstance(candidate, str):
                 match = re.search(r"id=(\d+)", candidate)
                 if match:
-                    return int(match.group(1))
+                    return (int(match.group(1)), True)
+                return (None, True)
 
-        return None
+            return (None, True)
+
+        return (None, False)
+
+    def _extract_sprint_id(self, fields: dict[str, Any]) -> int | None:
+        sprint_id, _ = self._extract_sprint_details(fields)
+        return sprint_id
 
     def _extract_epic_key(self, fields: dict[str, Any]) -> str | None:
         epic_value = fields.get(self.epic_link_field)
@@ -195,6 +207,7 @@ class JiraRestConnector(JiraConnector):
         fields = raw_issue.get("fields") or {}
         status = fields.get("status") or {}
         status_category = status.get("statusCategory") or {}
+        sprint_external_id, sprint_field_present = self._extract_sprint_details(fields)
         epic_key = self._extract_epic_key(fields)
         parent_issue_key = self._extract_parent_issue_key(fields) or epic_key
 
@@ -222,8 +235,9 @@ class JiraRestConnector(JiraConnector):
             assignee_account_id=assignee.get("accountId") or assignee.get("name"),
             reporter_account_id=reporter.get("accountId") or reporter.get("name"),
             story_points=_coerce_float(fields.get(self.story_points_field)),
-            sprint_external_id=self._extract_sprint_id(fields),
+            sprint_external_id=sprint_external_id,
             epic_key=epic_key,
+            sprint_field_present=sprint_field_present,
             parent_issue_key=parent_issue_key,
             labels=labels,
             components=components,

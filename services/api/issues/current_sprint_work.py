@@ -188,25 +188,25 @@ def get_current_sprint_work(
             """,
             (sprint["id"],),
         ).fetchall()
-
-        fallback_rows: list[sqlite3.Row] = []
-        if not rows:
-            fallback_rows = conn.execute(
-                """
-                SELECT
-                  i.issue_key,
-                  i.summary,
-                  i.status_name,
-                  i.status_category,
-                  i.story_points,
-                  i.epic_key,
-                  e.summary AS epic_summary,
-                  i.raw_json
-                FROM issues i
-                LEFT JOIN issues e ON e.issue_key = i.epic_key
-                ORDER BY i.issue_key ASC
-                """
-            ).fetchall()
+        supplemental_rows = conn.execute(
+            """
+            SELECT
+              i.issue_key,
+              i.summary,
+              i.status_name,
+              i.status_category,
+              i.story_points,
+              i.epic_key,
+              e.summary AS epic_summary,
+              i.raw_json
+            FROM issues i
+            LEFT JOIN issues e ON e.issue_key = i.epic_key
+            WHERE i.sprint_external_id IS NULL
+              AND i.raw_json LIKE ?
+            ORDER BY i.issue_key ASC
+            """,
+            (f"%id={sprint['id']}%",),
+        ).fetchall()
     finally:
         conn.close()
 
@@ -218,33 +218,46 @@ def get_current_sprint_work(
     planned_story_points = 0.0
     jira_base_url = _resolve_jira_base_url()
 
-    if rows:
-        filtered_rows = rows
-    else:
-        sprint_field_candidates = _resolve_sprint_field_candidates()
-        filtered_rows: list[dict[str, Any]] = []
-        for row in fallback_rows:
-            try:
-                payload = json.loads(row["raw_json"] or "{}")
-            except (TypeError, json.JSONDecodeError):
-                continue
-            fields = payload.get("fields")
-            if not isinstance(fields, dict):
-                continue
-            sprint_external_id = _extract_sprint_id_from_fields(fields, sprint_field_candidates)
-            if sprint_external_id != sprint["id"]:
-                continue
-            filtered_rows.append(
-                {
-                    "issue_key": row["issue_key"],
-                    "summary": row["summary"],
-                    "status_name": row["status_name"],
-                    "status_category": row["status_category"],
-                    "story_points": row["story_points"],
-                    "epic_key": row["epic_key"],
-                    "epic_summary": row["epic_summary"],
-                }
-            )
+    sprint_field_candidates = _resolve_sprint_field_candidates()
+    filtered_rows: list[dict[str, Any]] = [
+        {
+            "issue_key": row["issue_key"],
+            "summary": row["summary"],
+            "status_name": row["status_name"],
+            "status_category": row["status_category"],
+            "story_points": row["story_points"],
+            "epic_key": row["epic_key"],
+            "epic_summary": row["epic_summary"],
+        }
+        for row in rows
+    ]
+    seen_issue_keys = {str(row["issue_key"]) for row in rows}
+    for row in supplemental_rows:
+        issue_key = str(row["issue_key"])
+        if issue_key in seen_issue_keys:
+            continue
+        try:
+            payload = json.loads(row["raw_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            continue
+        fields = payload.get("fields")
+        if not isinstance(fields, dict):
+            continue
+        sprint_external_id = _extract_sprint_id_from_fields(fields, sprint_field_candidates)
+        if sprint_external_id != sprint["id"]:
+            continue
+        filtered_rows.append(
+            {
+                "issue_key": issue_key,
+                "summary": row["summary"],
+                "status_name": row["status_name"],
+                "status_category": row["status_category"],
+                "story_points": row["story_points"],
+                "epic_key": row["epic_key"],
+                "epic_summary": row["epic_summary"],
+            }
+        )
+        seen_issue_keys.add(issue_key)
 
     for row in filtered_rows:
         story_points = _coerce_story_points(row["story_points"])

@@ -9,7 +9,13 @@ from pathlib import Path
 
 from packages.connectors.jira_config import JiraRuntimeConfig
 from packages.connectors.models import ChangelogItemRecord, BoardRecord, IssueRecord, SprintRecord, SyncBatch
-from services.api.integrations.jira_sync import JiraSyncManager, run_jira_sync_once
+from services.api.integrations.jira_sync import (
+    JiraSyncManager,
+    _backfill_missing_sprint_external_ids,
+    _ensure_schema,
+    _upsert_issues,
+    run_jira_sync_once,
+)
 
 
 class _SuccessfulConnectorStub:
@@ -183,6 +189,32 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             board_id=27193,
             story_points_field="customfield_10004",
             auth_mode="pat_bearer",
+        )
+
+    def _issue(
+        self,
+        *,
+        issue_key: str,
+        sprint_external_id: int | None,
+        sprint_field_present: bool,
+        raw: dict[str, object],
+    ) -> IssueRecord:
+        return IssueRecord(
+            issue_key=issue_key,
+            issue_id=issue_key,
+            project_key="CEGBUPOL",
+            issue_type="Story",
+            summary=f"Summary {issue_key}",
+            status_name="In Progress",
+            status_category="In Progress",
+            priority="Medium",
+            assignee_account_id="user-1",
+            reporter_account_id="user-2",
+            story_points=3.0,
+            sprint_external_id=sprint_external_id,
+            epic_key="CEGBUPOL-EPIC-1",
+            sprint_field_present=sprint_field_present,
+            raw=raw,
         )
 
     def test_run_sync_persists_entities_and_checkpoint(self) -> None:
@@ -427,6 +459,113 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertIsNotNone(run_history)
             self.assertEqual(run_history[0], "failed")
             self.assertIn("board 27193 failed", run_history[1])
+
+    def test_upsert_issues_preserves_or_clears_sprint_based_on_field_presence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            conn = sqlite3.connect(str(db_path))
+            try:
+                _ensure_schema(conn)
+                _upsert_issues(
+                    conn,
+                    [
+                        self._issue(
+                            issue_key="CEGBUPOL-9991",
+                            sprint_external_id=44001,
+                            sprint_field_present=True,
+                            raw={"fields": {"customfield_10901": ["id=44001"]}},
+                        )
+                    ],
+                )
+                conn.commit()
+
+                _upsert_issues(
+                    conn,
+                    [
+                        self._issue(
+                            issue_key="CEGBUPOL-9991",
+                            sprint_external_id=None,
+                            sprint_field_present=False,
+                            raw={"fields": {}},
+                        )
+                    ],
+                )
+                conn.commit()
+
+                preserved = conn.execute(
+                    "SELECT sprint_external_id FROM issues WHERE issue_key = 'CEGBUPOL-9991'"
+                ).fetchone()
+                self.assertIsNotNone(preserved)
+                self.assertEqual(preserved[0], 44001)
+
+                _upsert_issues(
+                    conn,
+                    [
+                        self._issue(
+                            issue_key="CEGBUPOL-9991",
+                            sprint_external_id=None,
+                            sprint_field_present=True,
+                            raw={"fields": {"customfield_10901": []}},
+                        )
+                    ],
+                )
+                conn.commit()
+
+                cleared = conn.execute(
+                    "SELECT sprint_external_id FROM issues WHERE issue_key = 'CEGBUPOL-9991'"
+                ).fetchone()
+                self.assertIsNotNone(cleared)
+                self.assertIsNone(cleared[0])
+            finally:
+                conn.close()
+
+    def test_backfill_missing_sprint_external_ids_from_raw_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            conn = sqlite3.connect(str(db_path))
+            try:
+                _ensure_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      sprint_external_id,
+                      raw_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "CEGBUPOL-9992",
+                        "9992",
+                        "CEGBUPOL",
+                        "Story",
+                        "Repair sprint id",
+                        "In Progress",
+                        "In Progress",
+                        None,
+                        '{"fields":{"customfield_10901":["com.atlassian.greenhopper.service.sprint.Sprint@abcd[id=55001,rapidViewId=27193]"]}}',
+                    ),
+                )
+                conn.commit()
+
+                updated = _backfill_missing_sprint_external_ids(
+                    conn, ("customfield_10901", "sprint", "customfield_10020")
+                )
+                conn.commit()
+
+                row = conn.execute(
+                    "SELECT sprint_external_id FROM issues WHERE issue_key = 'CEGBUPOL-9992'"
+                ).fetchone()
+                self.assertEqual(updated, 1)
+                self.assertIsNotNone(row)
+                self.assertEqual(row[0], 55001)
+            finally:
+                conn.close()
 
     def test_manager_start_runs_sync_runner_and_updates_state(self) -> None:
         finished_at = "2026-03-25T01:40:00+00:00"

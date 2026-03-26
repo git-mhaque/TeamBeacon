@@ -185,6 +185,73 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["work"]["inProgress"][0]["epicKey"], "CEGBUPOL-9001")
             self.assertEqual(payload["work"]["inProgress"][0]["epicName"], "Fallback Epic")
 
+    def test_get_current_sprint_work_merges_primary_and_raw_json_fallback_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            self._init_db(db_path)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO sprints (
+                      external_sprint_id,
+                      board_external_id,
+                      name,
+                      state,
+                      start_date,
+                      end_date
+                    ) VALUES (66001, 27193, 'Merge Sprint', 'active', '2026-03-20T00:00:00+00:00', '2026-03-31T00:00:00+00:00')
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      sprint_external_id,
+                      story_points
+                    ) VALUES ('CEGBUPOL-4001', '4001', 'CEGBUPOL', 'Story', 'Primary sprint row', 'In Progress', 'In Progress', 66001, 5)
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      sprint_external_id,
+                      story_points,
+                      raw_json
+                    ) VALUES ('CEGBUPOL-4002', '4002', 'CEGBUPOL', 'Story', 'Fallback sprint row', 'To Do', 'To Do', NULL, 3, ?)
+                    """,
+                    (
+                        '{"fields":{"customfield_10901":["com.atlassian.greenhopper.service.sprint.Sprint@abcd[id=66001,rapidViewId=27193,state=ACTIVE,name=Merge Sprint]"]}}',
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            payload = get_current_sprint_work(db_path=str(db_path))
+            self.assertEqual(payload["source"], "local")
+            self.assertIsNone(payload["error"])
+            self.assertEqual(payload["work"]["totals"]["total"], 2)
+            self.assertEqual(payload["work"]["totals"]["inProgress"], 1)
+            self.assertEqual(payload["work"]["totals"]["planned"], 1)
+            self.assertEqual(payload["work"]["totals"]["storyPoints"]["total"], 8.0)
+            keys = [item["issueKey"] for item in payload["work"]["inProgress"] + payload["work"]["planned"]]
+            self.assertEqual(set(keys), {"CEGBUPOL-4001", "CEGBUPOL-4002"})
+
     def test_get_current_sprint_work_orders_items_by_status_category(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"

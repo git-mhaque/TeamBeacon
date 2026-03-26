@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -108,6 +109,93 @@ def _safe_percent(downloaded: int, total: int | None) -> float | None:
     if total is None or total <= 0:
         return None
     return round((downloaded / total) * 100, 2)
+
+
+def _extract_sprint_id_from_fields(fields: dict[str, Any], sprint_field_candidates: tuple[str, ...]) -> int | None:
+    for field_name in sprint_field_candidates:
+        if field_name not in fields:
+            continue
+        candidate = fields.get(field_name)
+
+        if candidate is None:
+            return None
+
+        if isinstance(candidate, dict):
+            sprint_id = candidate.get("id")
+            if isinstance(sprint_id, int):
+                return sprint_id
+            if isinstance(sprint_id, str) and sprint_id.isdigit():
+                return int(sprint_id)
+            return None
+
+        if isinstance(candidate, list):
+            for entry in reversed(candidate):
+                if isinstance(entry, dict):
+                    sprint_id = entry.get("id")
+                    if isinstance(sprint_id, int):
+                        return sprint_id
+                    if isinstance(sprint_id, str) and sprint_id.isdigit():
+                        return int(sprint_id)
+                if isinstance(entry, str):
+                    match = re.search(r"id=(\d+)", entry)
+                    if match:
+                        return int(match.group(1))
+            return None
+
+        if isinstance(candidate, str):
+            match = re.search(r"id=(\d+)", candidate)
+            if match:
+                return int(match.group(1))
+            return None
+
+        return None
+
+    return None
+
+
+def _extract_sprint_id_from_raw_json(raw_json: str | None, sprint_field_candidates: tuple[str, ...]) -> int | None:
+    if not raw_json:
+        return None
+    try:
+        payload = json.loads(raw_json)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    fields = payload.get("fields")
+    if not isinstance(fields, dict):
+        return None
+    return _extract_sprint_id_from_fields(fields, sprint_field_candidates)
+
+
+def _backfill_missing_sprint_external_ids(
+    conn: sqlite3.Connection,
+    sprint_field_candidates: tuple[str, ...],
+) -> int:
+    rows = conn.execute(
+        """
+        SELECT issue_key, raw_json
+        FROM issues
+        WHERE sprint_external_id IS NULL
+          AND raw_json IS NOT NULL
+          AND TRIM(raw_json) <> ''
+        """
+    ).fetchall()
+    updated = 0
+    for issue_key, raw_json in rows:
+        sprint_id = _extract_sprint_id_from_raw_json(raw_json, sprint_field_candidates)
+        if sprint_id is None:
+            continue
+        result = conn.execute(
+            """
+            UPDATE issues
+            SET sprint_external_id = ?, synced_at = CURRENT_TIMESTAMP
+            WHERE issue_key = ? AND sprint_external_id IS NULL
+            """,
+            (sprint_id, issue_key),
+        )
+        updated += int(result.rowcount or 0)
+    return updated
 
 
 def _normalize_sync_mode(mode: str | None) -> SyncMode:
@@ -677,7 +765,10 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
               assignee_account_id = excluded.assignee_account_id,
               reporter_account_id = excluded.reporter_account_id,
               story_points = excluded.story_points,
-              sprint_external_id = excluded.sprint_external_id,
+              sprint_external_id = CASE
+                WHEN ? = 1 THEN excluded.sprint_external_id
+                ELSE issues.sprint_external_id
+              END,
               epic_key = excluded.epic_key,
               parent_issue_key = excluded.parent_issue_key,
               labels_json = excluded.labels_json,
@@ -709,6 +800,7 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
                 _to_iso(issue.updated_at_source),
                 _to_iso(issue.resolved_at_source),
                 _to_json(issue.raw),
+                1 if issue.sprint_field_present else 0,
             ),
         )
 
@@ -814,6 +906,7 @@ def run_jira_sync_once(
     sync_run_id: int | None = None
     try:
         _ensure_schema(conn)
+        _backfill_missing_sprint_external_ids(conn, runtime.sprint_field_candidates)
         started_at = _utc_iso_now()
         sync_run_id = _insert_sync_run(
             conn,

@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 
 
@@ -35,13 +36,24 @@ def _remaining_days(end_date: datetime | None, now_utc: datetime) -> int | None:
     return max(0, int(math.ceil(delta_seconds / 86400)))
 
 
+def _resolve_configured_board_id() -> int | None:
+    try:
+        load_env_files()
+        runtime = JiraRuntimeConfig.from_env()
+        return runtime.board_id
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def get_current_sprint(
     *,
     db_path: str | None = None,
     now_utc: datetime | None = None,
+    board_id: int | None = None,
 ) -> dict[str, Any]:
     resolved_db_path = db_path or _resolve_db_path()
     current_time = now_utc or datetime.now(timezone.utc)
+    scoped_board_id = board_id if board_id is not None else _resolve_configured_board_id()
 
     conn = sqlite3.connect(resolved_db_path)
     conn.row_factory = sqlite3.Row
@@ -58,13 +70,15 @@ def get_current_sprint(
               end_date
             FROM sprints
             WHERE lower(state) = 'active'
+              AND (? IS NULL OR board_external_id = ?)
             ORDER BY
               CASE WHEN start_date IS NULL THEN 1 ELSE 0 END ASC,
               datetime(start_date) DESC,
               datetime(updated_at) DESC,
               external_sprint_id DESC
             LIMIT 1
-            """
+            """,
+            (scoped_board_id, scoped_board_id),
         ).fetchone()
     finally:
         conn.close()
