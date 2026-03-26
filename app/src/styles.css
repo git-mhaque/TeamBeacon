@@ -1107,6 +1107,23 @@ body {
   background: #1f8f63;
 }
 
+.executive-mini-table h4 {
+  margin: 0 0 0.42rem;
+  font-size: 0.9rem;
+  color: #1f3740;
+}
+
+.executive-mini-table .sync-history-table th,
+.executive-mini-table .sync-history-table td {
+  padding: 0.4rem 0.46rem;
+}
+
+.executive-list-title {
+  margin: 0 0 0.42rem;
+  font-size: 0.9rem;
+  color: #1f3740;
+}
+
 .epic-autocomplete {
   position: relative;
 }
