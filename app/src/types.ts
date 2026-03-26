@@ -4,6 +4,9 @@ export type ScreenId =
   | "team"
   | "individuals"
   | "sprint"
+  | "security"
+  | "incidents"
+  | "releases"
   | "executive";
 
 export type NavItem = {
@@ -11,4 +14,3 @@ export type NavItem = {
   label: string;
   blurb: string;
 };
-

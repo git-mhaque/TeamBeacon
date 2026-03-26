@@ -955,7 +955,7 @@ export function InitiativesScreen() {
                     setIsEpicSearchFocused(false);
                   }, 120);
                 }}
-                placeholder="CEGBUPOL-5000 or Unified Engineering Pulse"
+                placeholder="CEGBUPOL-5000 or Illuminating Engineering Insights"
               />
               {showEpicAutocomplete ? (
                 <div className="epic-candidate-dropdown" role="listbox" aria-label="Epic candidates">

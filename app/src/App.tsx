@@ -5,6 +5,9 @@ import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { TeamInsightsScreen } from "./screens/TeamInsightsScreen";
 import { IndividualsScreen } from "./screens/IndividualsScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
+import { SecurityScreen } from "./screens/SecurityScreen";
+import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
+import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { ExecutiveReportScreen } from "./screens/ExecutiveReportScreen";
 
 const NAV_ITEMS: NavItem[] = [
@@ -34,6 +37,21 @@ const NAV_ITEMS: NavItem[] = [
     blurb: "Done / In Progress / Planned"
   },
   {
+    id: "security",
+    label: "Security",
+    blurb: "Vulnerability and remediation view"
+  },
+  {
+    id: "incidents",
+    label: "Incident Response",
+    blurb: "Operational incidents and SLAs"
+  },
+  {
+    id: "releases",
+    label: "Releases",
+    blurb: "Release health and deployment cadence"
+  },
+  {
     id: "executive",
     label: "Executive Report",
     blurb: "Leadership summary output"
@@ -47,6 +65,9 @@ function currentScreenTitle(id: ScreenId): string {
     team: "Team Insights",
     individuals: "Individual Insights",
     sprint: "Current Sprint Work",
+    security: "Security",
+    incidents: "Incident Response",
+    releases: "Releases",
     executive: "Executive Report"
   };
   return mapping[id];
@@ -64,6 +85,12 @@ function renderScreen(id: ScreenId) {
       return <IndividualsScreen />;
     case "sprint":
       return <SprintBoardScreen />;
+    case "security":
+      return <SecurityScreen />;
+    case "incidents":
+      return <IncidentResponseScreen />;
+    case "releases":
+      return <ReleasesScreen />;
     case "executive":
       return <ExecutiveReportScreen />;
     default:
@@ -81,7 +108,7 @@ export default function App() {
         <div className="brand-block">
           <p className="eyebrow">TeamBeacon</p>
           <h1>Manager Console</h1>
-          <small>Unified Engineering Pulse</small>
+          <small>Illuminating Engineering Insights</small>
         </div>
         <nav>
           {NAV_ITEMS.map((item) => (
@@ -104,15 +131,6 @@ export default function App() {
             <p className="eyebrow">TeamBeacon Insights</p>
             <h2>{heading}</h2>
           </div>
-          {active !== "integrations" ? (
-            <div className="topbar-actions">
-              <span className="chip">Team: Platform</span>
-              <span className="chip">Window: Last 7 Days</span>
-              <button className="sync-btn" type="button">
-                Sync Data
-              </button>
-            </div>
-          ) : null}
         </header>
 
         <section className="screen-body">{renderScreen(active)}</section>
