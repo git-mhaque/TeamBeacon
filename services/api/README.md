@@ -18,7 +18,6 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `{"mode":"full"}`
     - `{"mode":"since_last"}`
     - `{"mode":"since_date","sinceDate":"2026-03-01"}`
-  - `since_last` uses an internal 2-day overlap from the previous sync timestamp
 - `GET /api/integrations/jira/sync/history?limit=30`
 - `GET /api/issues/search`
   - Optional query params:

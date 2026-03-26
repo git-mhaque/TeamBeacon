@@ -43,7 +43,6 @@ export type JiraSyncStatus = {
   syncMode?: JiraSyncMode;
   requestedSyncMode?: JiraSyncMode;
   requestedSince?: string | null;
-  overlapDays?: number | null;
   boardsSynced?: number;
   sprintsSynced?: number;
   downloadedIssues: number;

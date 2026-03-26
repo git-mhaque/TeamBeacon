@@ -59,7 +59,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 - Incremental cursor logic:
   - Primary cursor = `sync_checkpoints.last_synced_at` for current board scope.
   - Fallback cursor = latest completed sync run `finished_at` for that board.
-  - Effective cursor = selected cursor minus 2-day overlap (to avoid missed late updates or clock skew).
+  - Effective cursor = selected cursor as-is (no overlap).
   - If no valid cursor exists, `since_last` automatically falls back to `full`.
   - For `since_date`, cursor is the provided date at `00:00:00Z` (or provided ISO-8601 timestamp) and must be in the past.
 - Incremental JQL pattern:

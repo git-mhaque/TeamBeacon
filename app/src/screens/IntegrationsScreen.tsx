@@ -256,7 +256,7 @@ export function IntegrationsScreen() {
       return `Since ${requestedDate.toLocaleDateString()}`;
     }
     if (mode === "since_last") {
-      return "Since last checkpoint (2-day overlap)";
+      return "Since last checkpoint";
     }
     return "Full";
   }, [jiraSyncStatus?.requestedSince, jiraSyncStatus?.syncMode]);
@@ -796,7 +796,7 @@ export function IntegrationsScreen() {
                 <span>
                   <span className="sync-option-title">Sync Since Last Timestamp</span>
                   <span className="sync-option-desc">
-                    Pull issues updated since the previous sync with a built-in 2-day overlap.
+                    Pull issues updated since the previous sync timestamp.
                   </span>
                 </span>
               </label>

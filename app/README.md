@@ -52,7 +52,7 @@ The npm scripts auto-clean stale generated `vite.config.js` artifacts so proxy c
 ## JIRA Sync Data (Offline)
 - The JIRA card in **Source Connections** now has its own `Sync Data` button.
 - Clicking `Sync Data` opens a mode selector:
-  - `Sync Since Last Timestamp` (default) with internal 2-day overlap
+  - `Sync Since Last Timestamp` (default) using the last successful sync timestamp
   - `Full Sync` (refreshes the entire configured board scope)
 - Sync progress is shown live (example: `12 of 5000 issues downloaded`).
 - `Last synced` is shown from persisted checkpoint data.

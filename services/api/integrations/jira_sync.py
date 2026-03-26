@@ -4,7 +4,7 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -19,7 +19,6 @@ SyncMode = Literal["full", "since_last", "since_date"]
 SYNC_MODE_FULL: SyncMode = "full"
 SYNC_MODE_SINCE_LAST: SyncMode = "since_last"
 SYNC_MODE_SINCE_DATE: SyncMode = "since_date"
-SYNC_OVERLAP_DAYS = 2
 
 
 def _utc_iso_now() -> str:
@@ -801,7 +800,7 @@ def run_jira_sync_once(
             fallback_last_synced_at = _read_last_completed_sync_finished_at(resolved_db_path, scope)
             parsed_last_synced_at = _parse_iso_datetime(fallback_last_synced_at)
         if parsed_last_synced_at is not None:
-            incremental_since_utc = parsed_last_synced_at - timedelta(days=SYNC_OVERLAP_DAYS)
+            incremental_since_utc = parsed_last_synced_at
         else:
             effective_mode = SYNC_MODE_FULL
 
@@ -900,12 +899,6 @@ def run_jira_sync_once(
                     else (
                         "Syncing issues updated since "
                         f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC."
-                        if requested_mode == SYNC_MODE_SINCE_DATE
-                        else (
-                            "Syncing issues updated since "
-                            f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC "
-                            f"({SYNC_OVERLAP_DAYS}-day overlap)."
-                        )
                     )
                 ),
             }
@@ -1026,7 +1019,6 @@ def run_jira_sync_once(
             "syncMode": effective_mode,
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
-            "overlapDays": SYNC_OVERLAP_DAYS if requested_mode == SYNC_MODE_SINCE_LAST else None,
             "error": None,
             "message": "Sync complete.",
         }

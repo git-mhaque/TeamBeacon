@@ -4,7 +4,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from packages.connectors.jira_config import JiraRuntimeConfig
@@ -246,7 +246,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(run_history[5], 2)
             self.assertEqual(run_history[6], "completed")
 
-    def test_run_sync_since_last_uses_2_day_overlap_cursor(self) -> None:
+    def test_run_sync_since_last_uses_last_synced_cursor_without_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             runtime = self._runtime()
@@ -281,7 +281,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertIsNotNone(connector.incremental_cursor)
             self.assertEqual(
                 connector.incremental_cursor,
-                datetime(2026, 3, 23, 12, 0, tzinfo=timezone.utc),
+                datetime(2026, 3, 25, 12, 0, tzinfo=timezone.utc),
             )
 
             conn = sqlite3.connect(str(db_path))
@@ -313,7 +313,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             finished_at_raw = first_summary.get("finishedAt")
             self.assertIsInstance(finished_at_raw, str)
             finished_at = datetime.fromisoformat(finished_at_raw)
-            expected_cursor = finished_at - timedelta(days=2)
+            expected_cursor = finished_at
 
             conn = sqlite3.connect(str(db_path))
             try:
