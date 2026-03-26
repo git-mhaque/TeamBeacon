@@ -72,6 +72,44 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertTrue(batch.has_more)
         self.assertEqual(batch.next_cursor, "1")
 
+    def test_search_issues_extracts_sprint_id_from_custom_sprint_field(self) -> None:
+        payload = {
+            "startAt": 0,
+            "maxResults": 1,
+            "total": 1,
+            "issues": [
+                {
+                    "id": "102",
+                    "key": "CEGBUPOL-102",
+                    "fields": {
+                        "project": {"key": "CEGBUPOL"},
+                        "issuetype": {"name": "Story"},
+                        "summary": "Sprint custom field mapping",
+                        "status": {"name": "To Do", "statusCategory": {"name": "To Do"}},
+                        "priority": {"name": "Medium"},
+                        "assignee": {"accountId": "abc123"},
+                        "reporter": {"accountId": "xyz999"},
+                        "customfield_10004": "5",
+                        "customfield_10901": [
+                            "com.atlassian.greenhopper.service.sprint.Sprint@abcd[id=106412,rapidViewId=27193,state=ACTIVE,name=Sprint 2]"
+                        ],
+                        "customfield_10014": "CEGBUPOL-1",
+                    },
+                }
+            ],
+        }
+
+        with patch.object(self.connector, "_request_json", return_value=payload):
+            issues, batch = self.connector.search_issues(
+                jql="project = CEGBUPOL ORDER BY updated DESC",
+                start_at=0,
+                max_results=1,
+            )
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].sprint_external_id, 106412)
+        self.assertFalse(batch.has_more)
+
     def test_incremental_issues_builds_project_scoped_jql(self) -> None:
         expected = ([], SyncBatch(next_cursor=None, has_more=False))
         with patch.object(self.connector, "search_issues", return_value=expected) as mocked:

@@ -14,6 +14,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.sync_start_calls: list[tuple[str | None, str | None]] = []
         self.issue_search_calls: list[dict[str, object]] = []
+        self.current_sprint_calls: list[bool] = []
+        self.current_sprint_work_calls: list[bool] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
         self.group_update_calls: list[tuple[int, str]] = []
@@ -112,6 +114,83 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "contributors": ["user-dev", "user-qa"],
                     }
                 ],
+            }
+
+        def fake_current_sprint():
+            self.current_sprint_calls.append(True)
+            return {
+                "source": "local",
+                "sprint": {
+                    "id": 55421,
+                    "boardId": 27193,
+                    "name": "CEGBU Polaris Sprint 45",
+                    "state": "active",
+                    "startDate": "2026-03-20T00:00:00+00:00",
+                    "endDate": "2026-03-31T00:00:00+00:00",
+                    "remainingDays": 5,
+                },
+                "error": None,
+            }
+
+        def fake_current_sprint_work():
+            self.current_sprint_work_calls.append(True)
+            return {
+                "source": "local",
+                "sprint": {
+                    "id": 55421,
+                    "boardId": 27193,
+                    "name": "CEGBU Polaris Sprint 45",
+                    "state": "active",
+                    "startDate": "2026-03-20T00:00:00+00:00",
+                    "endDate": "2026-03-31T00:00:00+00:00",
+                    "remainingDays": 5,
+                },
+                "work": {
+                    "done": [
+                        {
+                            "issueKey": "CEGBUPOL-6001",
+                            "summary": "Completed migration",
+                            "status": "Done",
+                            "statusCategory": "Done",
+                            "storyPoints": 8.0,
+                            "epicKey": "CEGBUPOL-5000",
+                            "epicName": "Platform Reliability Epic",
+                            "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6001",
+                        },
+                    ],
+                    "inProgress": [
+                        {
+                            "issueKey": "CEGBUPOL-6002",
+                            "summary": "Deploy validation",
+                            "status": "In Progress",
+                            "statusCategory": "In Progress",
+                            "storyPoints": 5.0,
+                            "epicKey": "CEGBUPOL-5000",
+                            "epicName": "Platform Reliability Epic",
+                            "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6002",
+                        },
+                    ],
+                    "planned": [
+                        {
+                            "issueKey": "CEGBUPOL-6003",
+                            "summary": "Canary extension",
+                            "status": "To Do",
+                            "statusCategory": "To Do",
+                            "storyPoints": 3.0,
+                            "epicKey": "CEGBUPOL-5000",
+                            "epicName": "Platform Reliability Epic",
+                            "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6003",
+                        },
+                    ],
+                    "totals": {
+                        "done": 1,
+                        "inProgress": 1,
+                        "planned": 1,
+                        "total": 3,
+                        "storyPoints": {"done": 8.0, "inProgress": 5.0, "planned": 3.0, "total": 16.0},
+                    },
+                },
+                "error": None,
             }
 
         def fake_metadata_lookup():
@@ -224,6 +303,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             jira_sync_start_provider=fake_sync_start,
             jira_sync_history_provider=fake_sync_history,
             issue_search_provider=fake_issue_search,
+            current_sprint_provider=fake_current_sprint,
+            current_sprint_work_provider=fake_current_sprint_work,
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
             metadata_add_work_type_provider=fake_add_work_type,
@@ -340,6 +421,45 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(call["epic_key"], "CEGBUPOL-4482")
         self.assertEqual(call["worked_by"], "user-qa")
         self.assertEqual(call["limit"], 25)
+
+    def test_current_sprint_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/sprints/current", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["sprint"]["id"], 55421)
+        self.assertEqual(body["sprint"]["boardId"], 27193)
+        self.assertEqual(body["sprint"]["name"], "CEGBU Polaris Sprint 45")
+        self.assertEqual(body["sprint"]["state"], "active")
+        self.assertEqual(body["sprint"]["remainingDays"], 5)
+        self.assertEqual(len(self.current_sprint_calls), 1)
+
+    def test_current_sprint_work_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/sprints/current/work", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["sprint"]["id"], 55421)
+        self.assertEqual(body["work"]["totals"]["done"], 1)
+        self.assertEqual(body["work"]["totals"]["inProgress"], 1)
+        self.assertEqual(body["work"]["totals"]["planned"], 1)
+        self.assertEqual(body["work"]["totals"]["total"], 3)
+        self.assertEqual(body["work"]["totals"]["storyPoints"]["done"], 8.0)
+        self.assertEqual(body["work"]["totals"]["storyPoints"]["inProgress"], 5.0)
+        self.assertEqual(body["work"]["totals"]["storyPoints"]["planned"], 3.0)
+        self.assertEqual(body["work"]["totals"]["storyPoints"]["total"], 16.0)
+        self.assertEqual(body["work"]["done"][0]["issueKey"], "CEGBUPOL-6001")
+        self.assertEqual(body["work"]["done"][0]["storyPoints"], 8.0)
+        self.assertEqual(body["work"]["done"][0]["epicName"], "Platform Reliability Epic")
+        self.assertEqual(body["work"]["inProgress"][0]["issueKey"], "CEGBUPOL-6002")
+        self.assertEqual(body["work"]["inProgress"][0]["storyPoints"], 5.0)
+        self.assertEqual(body["work"]["inProgress"][0]["epicName"], "Platform Reliability Epic")
+        self.assertEqual(body["work"]["planned"][0]["issueKey"], "CEGBUPOL-6003")
+        self.assertEqual(body["work"]["planned"][0]["storyPoints"], 3.0)
+        self.assertEqual(body["work"]["planned"][0]["epicName"], "Platform Reliability Epic")
+        self.assertEqual(len(self.current_sprint_work_calls), 1)
 
     def test_metadata_lookup_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310

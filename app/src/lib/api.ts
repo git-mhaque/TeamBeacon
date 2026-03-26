@@ -14,6 +14,7 @@ export type JiraIntegrationStatus = {
     boardId?: number | null;
     storyPointsField?: string;
     epicLinkField?: string;
+    sprintFields?: string[];
     authMode?: string;
   };
   checks: IntegrationCheck[];
@@ -115,6 +116,57 @@ export type InitiativeEpicSummary = {
   updatedAt?: string | null;
 };
 
+export type CurrentSprint = {
+  id: number;
+  boardId?: number | null;
+  name: string;
+  state: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  remainingDays?: number | null;
+};
+
+export type CurrentSprintResponse = {
+  source: "local";
+  sprint: CurrentSprint | null;
+  error?: string | null;
+};
+
+export type CurrentSprintWorkIssue = {
+  issueKey: string;
+  summary: string;
+  status: string;
+  statusCategory?: string | null;
+  storyPoints?: number | null;
+  epicKey?: string | null;
+  epicName?: string | null;
+  epicUrl?: string | null;
+  issueUrl?: string | null;
+};
+
+export type CurrentSprintWorkResponse = {
+  source: "local";
+  sprint: CurrentSprint | null;
+  work: {
+    done: CurrentSprintWorkIssue[];
+    inProgress: CurrentSprintWorkIssue[];
+    planned: CurrentSprintWorkIssue[];
+    totals: {
+      done: number;
+      inProgress: number;
+      planned: number;
+      total: number;
+      storyPoints: {
+        done: number;
+        inProgress: number;
+        planned: number;
+        total: number;
+      };
+    };
+  };
+  error?: string | null;
+};
+
 export async function fetchJiraIntegrationStatus(): Promise<JiraIntegrationStatus> {
   const response = await fetch("/api/integrations/jira/status", {
     method: "GET",
@@ -177,6 +229,28 @@ export async function fetchJiraSyncHistory(limit = 20): Promise<JiraSyncHistoryE
   }
   const payload = (await response.json()) as { source: string; history?: JiraSyncHistoryEntry[] };
   return payload.history ?? [];
+}
+
+export async function fetchCurrentSprint(): Promise<CurrentSprintResponse> {
+  const response = await fetch("/api/sprints/current", {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Current sprint request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintResponse;
+}
+
+export async function fetchCurrentSprintWork(): Promise<CurrentSprintWorkResponse> {
+  const response = await fetch("/api/sprints/current/work", {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Current sprint work request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintWorkResponse;
 }
 
 export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {

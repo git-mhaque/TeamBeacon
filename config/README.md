@@ -13,6 +13,7 @@
 
 ## Optional Variables
 - `JIRA_EPIC_LINK_FIELD` (default: `customfield_10014`; set to your environment value, e.g. `customfield_10902`)
+- `JIRA_SPRINT_FIELDS` (comma-separated sprint field priority; default: `sprint,customfield_10901,customfield_10020`)
 - `JIRA_AUTH_MODE` (`pat_bearer` default, `basic` also supported)
 - `JIRA_USERNAME` (only needed for `basic` auth mode)
 - `JIRA_TIMEOUT_SECONDS` (default: `30`)

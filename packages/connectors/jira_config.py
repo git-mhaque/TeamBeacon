@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from .interfaces import ConnectorConfig
-from .jira_rest_stub import DEFAULT_EPIC_LINK_FIELD, DEFAULT_STORY_POINTS_FIELD
+from .jira_rest_stub import (
+    DEFAULT_EPIC_LINK_FIELD,
+    DEFAULT_SPRINT_FIELD_CANDIDATES,
+    DEFAULT_STORY_POINTS_FIELD,
+)
 
 DEFAULT_ENV_PATHS = (Path("config/.env"), Path(".env"))
 
@@ -36,6 +40,7 @@ class JiraRuntimeConfig:
     board_id: int | None
     story_points_field: str
     epic_link_field: str = DEFAULT_EPIC_LINK_FIELD
+    sprint_field_candidates: tuple[str, ...] = DEFAULT_SPRINT_FIELD_CANDIDATES
     auth_mode: str = "pat_bearer"
     username: str | None = None
     timeout_seconds: int = 30
@@ -55,6 +60,15 @@ class JiraRuntimeConfig:
         timeout_raw = source.get("JIRA_TIMEOUT_SECONDS", "30")
         timeout_seconds = int(timeout_raw)
 
+        sprint_fields_value = source.get("JIRA_SPRINT_FIELDS", source.get("JIRA_SPRINT_FIELD"))
+        if sprint_fields_value:
+            parsed_candidates = tuple(
+                segment.strip() for segment in sprint_fields_value.split(",") if segment.strip()
+            )
+            sprint_field_candidates = parsed_candidates or DEFAULT_SPRINT_FIELD_CANDIDATES
+        else:
+            sprint_field_candidates = DEFAULT_SPRINT_FIELD_CANDIDATES
+
         return cls(
             base_url=source["JIRA_BASE_URL"],
             pat_token=source["JIRA_PAT"],
@@ -62,6 +76,7 @@ class JiraRuntimeConfig:
             board_id=board_id,
             story_points_field=source.get("JIRA_STORY_POINTS_FIELD", DEFAULT_STORY_POINTS_FIELD),
             epic_link_field=source.get("JIRA_EPIC_LINK_FIELD", DEFAULT_EPIC_LINK_FIELD),
+            sprint_field_candidates=sprint_field_candidates,
             auth_mode=source.get("JIRA_AUTH_MODE", "pat_bearer"),
             username=source.get("JIRA_USERNAME"),
             timeout_seconds=timeout_seconds,

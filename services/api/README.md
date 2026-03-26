@@ -27,6 +27,13 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `issueType=Story`, `status=In Progress`
     - `updatedSince=2026-03-01T00:00:00+00:00`, `updatedUntil=2026-03-31T23:59:59+00:00`
     - `limit=100` (1-500)
+- `GET /api/sprints/current`
+  - Returns active sprint metadata from local synced data:
+    - `name`, `startDate`, `endDate`, `remainingDays`
+- `GET /api/sprints/current/work`
+  - Returns active sprint work buckets:
+    - `done`, `inProgress`, `planned`
+    - Includes `totals` per bucket and aggregate `total`
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:
     - `groups` (epic groups)

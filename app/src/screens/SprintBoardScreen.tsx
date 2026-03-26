@@ -1,47 +1,240 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
+import { StatusPill } from "../components/StatusPill";
+import {
+  CurrentSprint,
+  CurrentSprintWorkIssue,
+  CurrentSprintWorkResponse,
+  fetchCurrentSprint,
+  fetchCurrentSprintWork
+} from "../lib/api";
 
-const DONE = [
-  "CEG-8464 - audit log compression",
-  "CEG-8451 - idempotency patch",
-  "CEG-8432 - alert threshold tuning"
-];
+const EMPTY_WORK: CurrentSprintWorkResponse["work"] = {
+  done: [],
+  inProgress: [],
+  planned: [],
+  totals: {
+    done: 0,
+    inProgress: 0,
+    planned: 0,
+    total: 0,
+    storyPoints: {
+      done: 0,
+      inProgress: 0,
+      planned: 0,
+      total: 0
+    }
+  }
+};
 
-const IN_PROGRESS = [
-  "CEG-8478 - release guard automation",
-  "CEG-8483 - failed deploy triage",
-  "CEG-8491 - security fix rollout"
-];
+type Tone = "neutral" | "good" | "warn" | "risk";
 
-const PLANNED = [
-  "CEG-8504 - canary expansion",
-  "CEG-8508 - flaky test stabilization",
-  "CEG-8510 - runbook consolidation"
-];
+function formatStoryPoints(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(/\.0$/, "");
+}
 
-function WorkColumn({ title, items }: { title: string; items: string[] }) {
+function formatEpicName(issue: CurrentSprintWorkIssue): string {
+  if (issue.epicName) return issue.epicName;
+  return "-";
+}
+
+function resolveStatusTone(issue: CurrentSprintWorkIssue): Tone {
+  const category = issue.statusCategory?.toLowerCase().trim() ?? "";
+  const status = issue.status.toLowerCase().trim();
+  if (category === "done" || ["done", "closed", "resolved", "complete", "completed"].includes(status)) {
+    return "good";
+  }
+  if (category === "in progress" || ["in progress", "in review", "qa required", "testing"].includes(status)) {
+    return "warn";
+  }
+  if (["blocked", "failed"].some((marker) => status.includes(marker))) {
+    return "risk";
+  }
+  return "neutral";
+}
+
+function WorkColumn({
+  title,
+  items,
+  loading
+}: {
+  title: string;
+  items: CurrentSprintWorkIssue[];
+  loading: boolean;
+}) {
   return (
     <article className="work-column">
       <h4>{title}</h4>
-      {items.map((item) => (
-        <p key={item} className="ticket">
-          {item}
-        </p>
-      ))}
+      {loading ? <p className="ticket">Loading...</p> : null}
+      {!loading && items.length === 0 ? <p className="ticket">No items.</p> : null}
+      {!loading
+        ? items.map((item) => (
+            <div key={item.issueKey} className="ticket">
+              <div className="ticket-header">
+                {item.issueUrl ? (
+                  <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+                    <strong>{item.issueKey}</strong>
+                  </a>
+                ) : (
+                  <strong>{item.issueKey}</strong>
+                )}
+                <span className="ticket-info">{item.summary}</span>
+              </div>
+              <div className="ticket-pill-row">
+                <StatusPill tone={resolveStatusTone(item)} text={item.status} />
+              </div>
+              <small>
+                Epic:{" "}
+                {item.epicName && item.epicUrl ? (
+                  <a className="external-link" href={item.epicUrl} target="_blank" rel="noopener noreferrer">
+                    {formatEpicName(item)}
+                  </a>
+                ) : (
+                  formatEpicName(item)
+                )}
+              </small>
+              <br />
+              <small>Story Points: {formatStoryPoints(item.storyPoints)}</small>
+            </div>
+          ))
+        : null}
     </article>
   );
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
+}
+
 export function SprintBoardScreen() {
+  const [sprint, setSprint] = useState<CurrentSprint | null>(null);
+  const [sprintLoading, setSprintLoading] = useState(true);
+  const [sprintError, setSprintError] = useState<string | null>(null);
+  const [work, setWork] = useState<CurrentSprintWorkResponse["work"]>(EMPTY_WORK);
+  const [workLoading, setWorkLoading] = useState(true);
+  const [workError, setWorkError] = useState<string | null>(null);
+
+  const loadCurrentSprint = useCallback(async () => {
+    setSprintLoading(true);
+    setSprintError(null);
+    try {
+      const payload = await fetchCurrentSprint();
+      setSprint(payload.sprint);
+      if (payload.error) {
+        setSprintError(payload.error);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown current sprint request failure.";
+      setSprintError(message);
+      setSprint(null);
+    } finally {
+      setSprintLoading(false);
+    }
+  }, []);
+
+  const loadCurrentSprintWork = useCallback(async () => {
+    setWorkLoading(true);
+    setWorkError(null);
+    try {
+      const payload = await fetchCurrentSprintWork();
+      setWork(payload.work);
+      if (payload.error) {
+        setWorkError(payload.error);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown current sprint work request failure.";
+      setWorkError(message);
+      setWork(EMPTY_WORK);
+    } finally {
+      setWorkLoading(false);
+    }
+  }, []);
+
+  const refreshSprintPanels = useCallback(async () => {
+    await Promise.all([loadCurrentSprint(), loadCurrentSprintWork()]);
+  }, [loadCurrentSprint, loadCurrentSprintWork]);
+
+  useEffect(() => {
+    refreshSprintPanels().catch(() => {
+      // refreshSprintPanels already updates local state.
+    });
+  }, [refreshSprintPanels]);
+
+  const remainingDays = sprint?.remainingDays;
+  const remainingDaysTone = useMemo(() => {
+    if (remainingDays === undefined || remainingDays === null) return "neutral";
+    if (remainingDays <= 0) return "risk";
+    if (remainingDays <= 2) return "warn";
+    return "good";
+  }, [remainingDays]);
+
   return (
     <div className="screen-grid">
-      <Panel title="Current Sprint Work" subtitle="Done, in-progress, and planned items for active sprint filter set.">
+      <Panel
+        title="Current Sprint"
+        subtitle="Active sprint metadata from local synced JIRA data."
+        action={
+          <button className="mini-sync-btn" onClick={refreshSprintPanels} type="button">
+            {sprintLoading || workLoading ? "Loading..." : "Refresh"}
+          </button>
+        }
+      >
+        <div className="metrics-grid four-up">
+          <MetricCard
+            label="Sprint Name"
+            value={sprintLoading ? "Loading..." : sprint?.name ?? "Not Available"}
+            hint={sprint?.state ? `State: ${sprint.state}` : "No active sprint state available."}
+            tone={sprint ? "good" : "warn"}
+          />
+          <MetricCard
+            label="Start Date"
+            value={sprintLoading ? "Loading..." : formatDate(sprint?.startDate)}
+            hint="Sprint start date from JIRA sprint metadata."
+          />
+          <MetricCard
+            label="End Date"
+            value={sprintLoading ? "Loading..." : formatDate(sprint?.endDate)}
+            hint="Sprint target end date from JIRA sprint metadata."
+          />
+          <MetricCard
+            label="Remaining Days"
+            value={sprintLoading ? "Loading..." : remainingDays ?? "-"}
+            hint={sprint?.endDate ? `Until ${formatDate(sprint.endDate)}` : "End date not available."}
+            tone={remainingDaysTone}
+          />
+        </div>
+        {sprintError && !sprintLoading ? <p className="sync-history-error">Current sprint status: {sprintError}</p> : null}
+      </Panel>
+
+      <Panel
+        title="Current Sprint Work"
+        subtitle="Completed, in-progress, and planned issues from the active sprint."
+      >
+        {workError && !workLoading ? <p className="sync-history-error">Current sprint work: {workError}</p> : null}
         <div className="kanban-grid">
-          <WorkColumn title="Done (17)" items={DONE} />
-          <WorkColumn title="In Progress (9)" items={IN_PROGRESS} />
-          <WorkColumn title="Planned (12)" items={PLANNED} />
+          <WorkColumn
+            title={`Done (${work.totals.done} | ${formatStoryPoints(work.totals.storyPoints.done)} SP)`}
+            items={work.done}
+            loading={workLoading}
+          />
+          <WorkColumn
+            title={`In Progress (${work.totals.inProgress} | ${formatStoryPoints(work.totals.storyPoints.inProgress)} SP)`}
+            items={work.inProgress}
+            loading={workLoading}
+          />
+          <WorkColumn
+            title={`Planned (${work.totals.planned} | ${formatStoryPoints(work.totals.storyPoints.planned)} SP)`}
+            items={work.planned}
+            loading={workLoading}
+          />
         </div>
       </Panel>
     </div>
   );
 }
-

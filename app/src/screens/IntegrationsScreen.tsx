@@ -436,6 +436,9 @@ export function IntegrationsScreen() {
 
   const storyPointsField = jiraStatus?.config.storyPointsField ?? "customfield_10004";
   const epicLinkField = jiraStatus?.config.epicLinkField ?? "customfield_10902";
+  const sprintFields = jiraStatus?.config.sprintFields?.length
+    ? jiraStatus.config.sprintFields.join(", ")
+    : "auto-detected";
   const jiraBaseUrl = jiraStatus?.config.baseUrl ? jiraStatus.config.baseUrl.replace(/\/$/, "") : null;
   const sampleIssueText = jiraStatus?.sampleIssueKey ?? "none";
   const configuredBoard = jiraStatus?.configuredBoard;
@@ -624,7 +627,7 @@ export function IntegrationsScreen() {
             Story Points <StatusPill tone="good" text={storyPointsField} />
           </li>
           <li>
-            Sprint <StatusPill tone="good" text="auto-detected" />
+            Sprint Fields <StatusPill tone="good" text={sprintFields} />
           </li>
           <li>
             Epic Link <StatusPill tone="good" text={epicLinkField} />

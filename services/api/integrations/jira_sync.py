@@ -757,6 +757,7 @@ def _build_connector(runtime: JiraRuntimeConfig) -> JiraRestConnector:
         project_key=runtime.project_key,
         story_points_field=runtime.story_points_field,
         epic_link_field=runtime.epic_link_field,
+        sprint_field_candidates=runtime.sprint_field_candidates,
     )
 
 

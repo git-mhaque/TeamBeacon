@@ -26,6 +26,7 @@ class JiraStatusServiceUnitTests(unittest.TestCase):
             board_id = 27193
             story_points_field = "customfield_10004"
             epic_link_field = "customfield_10902"
+            sprint_field_candidates = ("customfield_10901",)
             auth_mode = "pat_bearer"
 
             def to_connector_config(self):  # noqa: D401
@@ -62,6 +63,7 @@ class JiraStatusServiceUnitTests(unittest.TestCase):
         self.assertEqual(payload["metrics"]["projectSampleIssueCount"], 1)
         self.assertEqual(payload["config"]["projectKey"], "CEGBUPOL")
         self.assertEqual(payload["config"]["epicLinkField"], "customfield_10902")
+        self.assertEqual(payload["config"]["sprintFields"], ["customfield_10901"])
         self.assertEqual(payload["sampleIssueUrl"], "https://jira.example.com/browse/CEGBUPOL-123")
         self.assertEqual(payload["configuredProjectUrl"], "https://jira.example.com/projects/CEGBUPOL")
         self.assertEqual(payload["configuredBoard"]["name"], "CEGBU Delivery Board")

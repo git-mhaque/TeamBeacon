@@ -14,7 +14,7 @@ from .models import BoardRecord, ChangelogItemRecord, IssueRecord, SprintRecord,
 
 DEFAULT_STORY_POINTS_FIELD = "customfield_10016"
 DEFAULT_EPIC_LINK_FIELD = "customfield_10014"
-DEFAULT_SPRINT_FIELD_CANDIDATES = ("sprint", "customfield_10020")
+DEFAULT_SPRINT_FIELD_CANDIDATES = ("sprint", "customfield_10901", "customfield_10020")
 
 
 class JiraAPIError(RuntimeError):
@@ -74,7 +74,20 @@ class JiraRestConnector(JiraConnector):
         self.project_key = project_key
         self.story_points_field = story_points_field
         self.epic_link_field = epic_link_field
-        self.sprint_field_candidates = sprint_field_candidates
+        self.sprint_field_candidates = self._normalize_sprint_field_candidates(sprint_field_candidates)
+
+    @staticmethod
+    def _normalize_sprint_field_candidates(candidates: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        for candidate in candidates:
+            trimmed = candidate.strip()
+            if not trimmed:
+                continue
+            if trimmed not in normalized:
+                normalized.append(trimmed)
+        if not normalized:
+            return DEFAULT_SPRINT_FIELD_CANDIDATES
+        return tuple(normalized)
 
     def _build_url(self, path: str, params: dict[str, Any] | None = None) -> str:
         base = self.config.base_url.rstrip("/")

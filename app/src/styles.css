@@ -431,6 +431,34 @@ body {
   font-size: 0.84rem;
 }
 
+.ticket-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.ticket-link {
+  display: inline-block;
+}
+
+.ticket-pill-row {
+  margin-top: 0.36rem;
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  flex-wrap: wrap;
+}
+
+.ticket-info {
+  color: #24434f;
+}
+
+.ticket-summary {
+  margin: 0.35rem 0 0.3rem;
+}
+
 .sync-options-overlay {
   position: fixed;
   inset: 0;

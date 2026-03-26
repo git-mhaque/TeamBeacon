@@ -60,6 +60,7 @@ def get_jira_status() -> dict[str, Any]:
         "boardId": runtime.board_id,
         "storyPointsField": runtime.story_points_field,
         "epicLinkField": runtime.epic_link_field,
+        "sprintFields": list(runtime.sprint_field_candidates),
         "authMode": runtime.auth_mode,
     }
 
@@ -68,6 +69,7 @@ def get_jira_status() -> dict[str, Any]:
         project_key=runtime.project_key,
         story_points_field=runtime.story_points_field,
         epic_link_field=runtime.epic_link_field,
+        sprint_field_candidates=runtime.sprint_field_candidates,
     )
 
     checks = []
