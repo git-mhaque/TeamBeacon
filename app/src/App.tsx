@@ -58,6 +58,56 @@ const NAV_ITEMS: NavItem[] = [
   }
 ];
 
+function LighthouseMark() {
+  return (
+    <svg
+      className="lighthouse-mark"
+      viewBox="0 0 120 120"
+      role="img"
+      aria-label="Lighthouse icon"
+    >
+      <defs>
+        <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f6fbff" />
+          <stop offset="100%" stopColor="#d6e4ef" />
+        </linearGradient>
+        <linearGradient id="towerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#d9e4ee" />
+        </linearGradient>
+        <linearGradient id="capGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1d5f86" />
+          <stop offset="100%" stopColor="#123f5a" />
+        </linearGradient>
+        <linearGradient id="beamGradientRight" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#ffd36a" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#ff9f3f" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="beamGradientLeft" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="#ffd36a" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#ff9f3f" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="windowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#2a6f95" />
+          <stop offset="100%" stopColor="#184d6b" />
+        </linearGradient>
+      </defs>
+
+      <circle cx="60" cy="60" r="56" fill="url(#badgeGradient)" stroke="#a8bfd0" strokeWidth="2" />
+      <path d="M60 34 L114 22 L114 49 L60 43 Z" fill="url(#beamGradientRight)" />
+      <path d="M60 34 L6 22 L6 49 L60 43 Z" fill="url(#beamGradientLeft)" />
+      <ellipse cx="60" cy="94" rx="31" ry="7" fill="#87aec6" />
+      <polygon points="44,92 76,92 70,36 50,36" fill="url(#towerGradient)" stroke="#8ea8bb" strokeWidth="2" />
+      <rect x="48" y="52" width="24" height="6" fill="#1f5f84" />
+      <rect x="48" y="64" width="24" height="6" fill="#1f5f84" />
+      <rect x="53" y="31" width="14" height="8" rx="1.5" fill="#1d5b7f" />
+      <polygon points="60,16 74,31 46,31" fill="url(#capGradient)" />
+      <rect x="56" y="74" width="8" height="18" rx="1.5" fill="url(#windowGradient)" />
+      <rect x="39" y="92" width="42" height="5" rx="2" fill="#245f82" />
+    </svg>
+  );
+}
+
 function currentScreenTitle(id: ScreenId): string {
   const mapping: Record<ScreenId, string> = {
     integrations: "Integrations & Field Mapping",
@@ -106,9 +156,12 @@ export default function App() {
     <div className="app-frame">
       <aside className="sidebar">
         <div className="brand-block">
-          <p className="eyebrow">TeamBeacon</p>
-          <h1>Manager Console</h1>
-          <small>Illuminating Engineering Insights</small>
+          <LighthouseMark />
+          <div className="brand-copy">
+            <p className="eyebrow">TeamBeacon</p>
+            <h1>Manager Console</h1>
+            <small>Illuminating Engineering Insights</small>
+          </div>
         </div>
         <nav>
           {NAV_ITEMS.map((item) => (

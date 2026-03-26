@@ -53,14 +53,32 @@ body {
   animation: slideIn 420ms ease-out;
 }
 
-.brand-block h1 {
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 0.68rem;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.brand-copy h1 {
   margin: 0.15rem 0 0;
   font-size: 1.2rem;
   letter-spacing: 0.02em;
 }
 
-.brand-block small {
+.brand-copy small {
   color: var(--muted);
+}
+
+.lighthouse-mark {
+  width: 3.2rem;
+  height: 3.2rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0.3rem 0.72rem rgba(17, 58, 82, 0.14);
 }
 
 .eyebrow {
