@@ -732,7 +732,7 @@ export function ExecutiveReportScreen() {
       </Panel>
 
       <Panel title="Report Signals" subtitle="High-level confidence snapshot for final review.">
-        <div className="metrics-grid four-up">
+        <div className="metrics-grid three-up">
           <MetricCard
             label="Ongoing Initiatives"
             value={loading ? "..." : visibleInitiativeSignals.totalEpics}
@@ -759,12 +759,6 @@ export function ExecutiveReportScreen() {
             }
             hint="For selected initiatives."
             tone="neutral"
-          />
-          <MetricCard
-            label="Export Bundle"
-            value="Markdown + PDF"
-            hint="Generated with weekly configured-epic deltas."
-            tone="good"
           />
         </div>
       </Panel>
