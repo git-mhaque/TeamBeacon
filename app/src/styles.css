@@ -620,10 +620,16 @@ body {
   overflow: auto;
 }
 
+.initiative-config-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
 .initiative-config-search {
   margin-top: 0.7rem;
-  display: grid;
-  gap: 0.35rem;
+  display: block;
   font-size: 0.8rem;
   color: var(--muted);
 }
@@ -640,6 +646,11 @@ body {
 
 .initiative-config-actions-top {
   margin-top: 0.6rem;
+}
+
+.initiative-config-top-actions {
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 .initiative-config-columns {
@@ -1570,6 +1581,15 @@ body {
   .initiative-summary-toolbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .initiative-config-header {
+    flex-direction: column;
+  }
+
+  .initiative-config-top-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .epic-edit-dialog {

@@ -779,16 +779,28 @@ export function ExecutiveReportScreen() {
         <div className="sync-options-overlay" role="dialog" aria-modal="true" aria-label="Configure initiative epics">
           <div className="sync-options-backdrop" onClick={closeInitiativeConfig} />
           <div className="sync-options-dialog initiative-config-dialog">
-            <h3>Configure Initiative Epics</h3>
-            <p>Select which configured epics appear in Weekly Progress by Initiative.</p>
+            <div className="initiative-config-header">
+              <div>
+                <h3>Configure Initiative Epics</h3>
+                <p>Select which configured epics appear in Weekly Progress by Initiative.</p>
+              </div>
+              <div className="sync-options-footer initiative-config-top-actions">
+                <button className="mini-sync-btn" type="button" onClick={closeInitiativeConfig}>
+                  Cancel
+                </button>
+                <button className="sync-btn" type="button" onClick={saveInitiativeConfig}>
+                  Save
+                </button>
+              </div>
+            </div>
 
             <label className="initiative-config-search">
-              <span>Search</span>
               <input
                 type="text"
                 value={initiativeConfigQuery}
                 onChange={(event) => setInitiativeConfigQuery(event.target.value)}
-                placeholder="Epic key, name, group, or type"
+                placeholder="Search epics"
+                aria-label="Search epics"
               />
             </label>
 
@@ -871,14 +883,6 @@ export function ExecutiveReportScreen() {
               </section>
             </div>
 
-            <div className="sync-options-footer">
-              <button className="mini-sync-btn" type="button" onClick={closeInitiativeConfig}>
-                Cancel
-              </button>
-              <button className="sync-btn" type="button" onClick={saveInitiativeConfig}>
-                Save
-              </button>
-            </div>
           </div>
         </div>
       ) : null}
