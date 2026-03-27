@@ -583,6 +583,101 @@ body {
   gap: 0.35rem;
 }
 
+.initiative-selection-summary {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.initiative-config-dialog {
+  width: min(760px, 94vw);
+  max-height: 86vh;
+  overflow: auto;
+}
+
+.initiative-config-search {
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.initiative-config-search input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.48rem;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+
+.initiative-config-actions-top {
+  margin-top: 0.6rem;
+}
+
+.initiative-config-list {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.initiative-config-order-panel {
+  margin-top: 0.68rem;
+  border: 1px solid var(--line);
+  border-radius: 0.68rem;
+  padding: 0.62rem;
+  background: #f7fbfe;
+}
+
+.initiative-config-order-panel h4 {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #1f3740;
+}
+
+.initiative-config-order-panel p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.initiative-config-order-list {
+  margin-top: 0.52rem;
+  display: grid;
+  gap: 0.28rem;
+  max-height: 11.5rem;
+  overflow: auto;
+}
+
+.initiative-config-order-item {
+  display: flex;
+  align-items: center;
+  gap: 0.44rem;
+  border: 1px solid #d2e1e8;
+  border-radius: 0.56rem;
+  padding: 0.36rem 0.45rem;
+  background: #fff;
+  cursor: grab;
+  user-select: none;
+}
+
+.initiative-config-order-item.dragging {
+  opacity: 0.65;
+  background: #edf6fb;
+}
+
+.initiative-drag-handle {
+  color: #4d6d7b;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.initiative-config-order-label {
+  color: #223f4b;
+  font-size: 0.8rem;
+}
+
 .sync-history-overlay {
   position: fixed;
   inset: 0;
@@ -967,11 +1062,73 @@ body {
   color: var(--muted);
 }
 
-.initiative-progress-cell {
-  display: flex;
+.sync-history-table td.initiative-summary-name-cell,
+.sync-history-table td.initiative-summary-group-cell,
+.sync-history-table td.initiative-summary-type-cell {
+  white-space: normal;
+}
+
+.sync-history-table td.initiative-summary-group-cell,
+.sync-history-table td.initiative-summary-type-cell {
+  min-width: 9rem;
+  max-width: 16rem;
+}
+
+.sync-history-table td.initiative-summary-name-cell {
+  min-width: 16rem;
+  max-width: 32rem;
+}
+
+.initiative-summary-progress-cell {
+  vertical-align: middle;
+  min-width: 15rem;
+}
+
+.initiative-summary-progress-content {
+  display: inline-flex;
   align-items: center;
   gap: 0.44rem;
+}
+
+.initiative-summary-progress-track {
+  display: inline-block;
+  width: 8rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  border: 1px solid #c5d6de;
+  background: #e5edf1;
+  overflow: hidden;
+}
+
+.initiative-summary-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1f8f63 0%, #39a274 100%);
+}
+
+.initiative-summary-progress-label {
+  font-size: 0.78rem;
+  color: #1d724f;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.initiative-summary-delta-cell {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #1b5f44;
+  font-variant-numeric: tabular-nums;
+}
+
+.initiative-progress-cell {
+  vertical-align: middle;
   min-width: 15rem;
+}
+
+.initiative-progress-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.44rem;
 }
 
 .initiative-progress-track {

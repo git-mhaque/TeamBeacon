@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
@@ -17,6 +17,8 @@ type ExecutiveRow = InitiativeEpicSummary & {
   completedLastWeekValue: number;
   deltaPercentValue: number;
 };
+
+const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
 
 function ragFromCompletion(percent: number): RagLabel {
   if (percent < 33) return "Red";
@@ -39,6 +41,21 @@ export function ExecutiveReportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
+  const [selectedInitiativeEpicKeys, setSelectedInitiativeEpicKeys] = useState<string[]>([]);
+  const [initiativeConfigOpen, setInitiativeConfigOpen] = useState(false);
+  const [initiativeConfigDraftKeys, setInitiativeConfigDraftKeys] = useState<string[]>([]);
+  const [initiativeConfigQuery, setInitiativeConfigQuery] = useState("");
+  const [initiativeConfigDraggingKey, setInitiativeConfigDraggingKey] = useState<string | null>(null);
+  const hasInitializedInitiativeSelection = useRef(false);
+
+  const persistInitiativeSelection = useCallback((keys: string[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify(keys));
+    } catch {
+      // Persisting local selection is best-effort only.
+    }
+  }, []);
 
   const loadExecutiveData = useCallback(async () => {
     setLoading(true);
@@ -232,6 +249,149 @@ export function ExecutiveReportScreen() {
   }, [groupProgress, metrics, rows, typeProgress]);
 
   const reportTone = metrics.redCount > 0 ? "warn" : "good";
+  const initiativeRows = useMemo(() => {
+    const sorted = [...rows];
+    sorted.sort((left, right) => {
+      const leftGroup = left.groupText.trim();
+      const rightGroup = right.groupText.trim();
+      if (leftGroup !== rightGroup) {
+        if (leftGroup === "Unassigned") return 1;
+        if (rightGroup === "Unassigned") return -1;
+        return leftGroup.localeCompare(rightGroup, undefined, { sensitivity: "base" });
+      }
+      if (left.typeText !== right.typeText) {
+        if (left.typeText === "Unassigned") return 1;
+        if (right.typeText === "Unassigned") return -1;
+        return left.typeText.localeCompare(right.typeText, undefined, { sensitivity: "base" });
+      }
+      if (right.completedLastWeekValue !== left.completedLastWeekValue) {
+        return right.completedLastWeekValue - left.completedLastWeekValue;
+      }
+      return (left.epicName || left.epicKey).localeCompare(right.epicName || right.epicKey, undefined, {
+        sensitivity: "base",
+      });
+    });
+    return sorted;
+  }, [rows]);
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelectedInitiativeEpicKeys([]);
+      hasInitializedInitiativeSelection.current = false;
+      return;
+    }
+
+    const allEpicKeys = rows.map((row) => row.epicKey);
+    const available = new Set(allEpicKeys);
+
+    if (!hasInitializedInitiativeSelection.current) {
+      let storedKeys: string[] = [];
+      if (typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem(INITIATIVE_SECTION_SELECTION_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              storedKeys = parsed.filter((value): value is string => typeof value === "string");
+            }
+          }
+        } catch {
+          storedKeys = [];
+        }
+      }
+      const initialKeys = storedKeys.filter((key) => available.has(key));
+      const nextSelection = initialKeys.length > 0 ? initialKeys : allEpicKeys;
+      setSelectedInitiativeEpicKeys(nextSelection);
+      persistInitiativeSelection(nextSelection);
+      hasInitializedInitiativeSelection.current = true;
+      return;
+    }
+
+    setSelectedInitiativeEpicKeys((previous) => {
+      const nextSelection = previous.filter((key) => available.has(key));
+      const normalized = nextSelection.length > 0 ? nextSelection : allEpicKeys;
+      if (normalized.length !== previous.length || normalized.some((key, index) => key !== previous[index])) {
+        persistInitiativeSelection(normalized);
+      }
+      return normalized;
+    });
+  }, [persistInitiativeSelection, rows]);
+
+  const visibleInitiativeRows = useMemo(() => {
+    const rowByKey = new Map(initiativeRows.map((row) => [row.epicKey, row]));
+    const orderedRows: ExecutiveRow[] = [];
+    for (const key of selectedInitiativeEpicKeys) {
+      const row = rowByKey.get(key);
+      if (row) orderedRows.push(row);
+    }
+    return orderedRows;
+  }, [initiativeRows, selectedInitiativeEpicKeys]);
+
+  const initiativeConfigRows = useMemo(() => {
+    const query = initiativeConfigQuery.trim().toLowerCase();
+    if (!query) return initiativeRows;
+    return initiativeRows.filter((row) => {
+      return (
+        row.epicKey.toLowerCase().includes(query) ||
+        (row.epicName || "").toLowerCase().includes(query) ||
+        row.groupText.toLowerCase().includes(query) ||
+        row.typeText.toLowerCase().includes(query)
+      );
+    });
+  }, [initiativeConfigQuery, initiativeRows]);
+
+  const selectedInitiativeConfigRows = useMemo(() => {
+    const rowByKey = new Map(initiativeRows.map((row) => [row.epicKey, row]));
+    const selectedRows: ExecutiveRow[] = [];
+    for (const key of initiativeConfigDraftKeys) {
+      const row = rowByKey.get(key);
+      if (row) selectedRows.push(row);
+    }
+    return selectedRows;
+  }, [initiativeConfigDraftKeys, initiativeRows]);
+
+  const openInitiativeConfig = useCallback(() => {
+    setInitiativeConfigDraftKeys(selectedInitiativeEpicKeys);
+    setInitiativeConfigQuery("");
+    setInitiativeConfigDraggingKey(null);
+    setInitiativeConfigOpen(true);
+  }, [selectedInitiativeEpicKeys]);
+
+  const closeInitiativeConfig = useCallback(() => {
+    setInitiativeConfigOpen(false);
+    setInitiativeConfigQuery("");
+    setInitiativeConfigDraggingKey(null);
+  }, []);
+
+  const toggleInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftKeys((previous) => {
+      if (previous.includes(epicKey)) {
+        return previous.filter((key) => key !== epicKey);
+      }
+      return [...previous, epicKey];
+    });
+  }, []);
+
+  const moveInitiativeDraftKey = useCallback((sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return;
+    setInitiativeConfigDraftKeys((previous) => {
+      const sourceIndex = previous.indexOf(sourceKey);
+      const targetIndex = previous.indexOf(targetKey);
+      if (sourceIndex < 0 || targetIndex < 0) return previous;
+      const reordered = [...previous];
+      reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, sourceKey);
+      return reordered;
+    });
+  }, []);
+
+  const saveInitiativeConfig = useCallback(() => {
+    const available = new Set(initiativeRows.map((row) => row.epicKey));
+    const normalized = initiativeConfigDraftKeys.filter((key, index, source) => available.has(key) && source.indexOf(key) === index);
+    setSelectedInitiativeEpicKeys(normalized);
+    persistInitiativeSelection(normalized);
+    closeInitiativeConfig();
+  }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
 
   return (
     <div className="screen-grid">
@@ -324,22 +484,34 @@ export function ExecutiveReportScreen() {
         </div>
       </Panel>
 
-      <Panel title="Weekly Progress by Initiative" subtitle="Configured epics with group/type context and weekly deltas.">
+      <Panel
+        title="Weekly Progress by Initiative"
+        subtitle="Configured epics with group/type context and weekly deltas."
+        action={
+          <button className="mini-sync-btn" type="button" onClick={openInitiativeConfig}>
+            Configure
+          </button>
+        }
+      >
+        <p className="initiative-selection-summary">
+          Showing {visibleInitiativeRows.length} of {initiativeRows.length} configured epics.
+        </p>
         <div className="initiative-summary-table-wrap">
           <table className="sync-history-table">
             <thead>
               <tr>
-                <th>Epic</th>
                 <th>Group</th>
+                <th>Epic</th>
                 <th>Type</th>
                 <th>Weekly Progress</th>
-                <th>Completion</th>
+                <th>Overall Progress</th>
                 <th>RAG</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visibleInitiativeRows.map((row) => (
                 <tr key={row.epicKey}>
+                  <td className="initiative-group-cell">{row.groupText}</td>
                   <td className="initiative-name-cell">
                     {jiraBaseUrl ? (
                       <a
@@ -354,25 +526,30 @@ export function ExecutiveReportScreen() {
                       row.epicName || row.epicKey
                     )}
                   </td>
-                  <td className="initiative-group-cell">{row.groupText}</td>
                   <td className="initiative-type-cell">{row.typeText}</td>
                   <td className="initiative-delta-cell">
                     {row.completedLastWeekValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
                   </td>
                   <td className="initiative-progress-cell">
-                    <span className="initiative-progress-track">
-                      <span className="initiative-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
-                    </span>
-                    <span className="initiative-progress-label">{formatPercent(row.completionPercent)}</span>
+                    <div className="initiative-progress-content">
+                      <span className="initiative-progress-track">
+                        <span className="initiative-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
+                      </span>
+                      <span className="initiative-progress-label">{formatPercent(row.completionPercent)}</span>
+                    </div>
                   </td>
                   <td>
                     <StatusPill tone={toneForRag(row.rag)} text={row.rag} />
                   </td>
                 </tr>
               ))}
-              {!loading && rows.length === 0 ? (
+              {!loading && visibleInitiativeRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>No configured epic data available yet.</td>
+                  <td colSpan={6}>
+                    {initiativeRows.length > 0
+                      ? "No epics selected. Use Configure to include epics in this section."
+                      : "No configured epic data available yet."}
+                  </td>
                 </tr>
               ) : null}
             </tbody>
@@ -407,6 +584,107 @@ export function ExecutiveReportScreen() {
           />
         </div>
       </Panel>
+
+      {initiativeConfigOpen ? (
+        <div className="sync-options-overlay" role="dialog" aria-modal="true" aria-label="Configure initiative epics">
+          <div className="sync-options-backdrop" onClick={closeInitiativeConfig} />
+          <div className="sync-options-dialog initiative-config-dialog">
+            <h3>Configure Initiative Epics</h3>
+            <p>Select which configured epics appear in Weekly Progress by Initiative.</p>
+
+            <label className="initiative-config-search">
+              <span>Search epics</span>
+              <input
+                type="text"
+                value={initiativeConfigQuery}
+                onChange={(event) => setInitiativeConfigQuery(event.target.value)}
+                placeholder="Epic key, name, group, or type"
+              />
+            </label>
+
+            <div className="sync-options-footer initiative-config-actions-top">
+              <button
+                className="mini-sync-btn"
+                type="button"
+                onClick={() => setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey))}
+              >
+                Select All
+              </button>
+              <button className="mini-sync-btn" type="button" onClick={() => setInitiativeConfigDraftKeys([])}>
+                Clear All
+              </button>
+            </div>
+
+            <div className="initiative-config-order-panel">
+              <h4>Selected Epic Order</h4>
+              <p>Drag selected epics to control table order.</p>
+              <div className="initiative-config-order-list">
+                {selectedInitiativeConfigRows.map((row) => (
+                  <div
+                    key={row.epicKey}
+                    className={`initiative-config-order-item ${
+                      initiativeConfigDraggingKey === row.epicKey ? "dragging" : ""
+                    }`}
+                    draggable
+                    onDragStart={() => setInitiativeConfigDraggingKey(row.epicKey)}
+                    onDragEnd={() => setInitiativeConfigDraggingKey(null)}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!initiativeConfigDraggingKey) return;
+                      moveInitiativeDraftKey(initiativeConfigDraggingKey, row.epicKey);
+                      setInitiativeConfigDraggingKey(null);
+                    }}
+                  >
+                    <span className="initiative-drag-handle" aria-hidden="true">
+                      ::
+                    </span>
+                    <span className="initiative-config-order-label">{row.groupText} | {row.epicName || row.epicKey}</span>
+                  </div>
+                ))}
+                {selectedInitiativeConfigRows.length === 0 ? (
+                  <p className="sync-options-note">No epics selected yet.</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="sync-options-list initiative-config-list">
+              {initiativeConfigRows.map((row) => {
+                const checked = initiativeConfigDraftKeys.includes(row.epicKey);
+                return (
+                  <label key={row.epicKey} className={`sync-option ${checked ? "selected" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleInitiativeDraftKey(row.epicKey)}
+                    />
+                    <span>
+                      <span className="sync-option-title">{row.epicName || row.epicKey}</span>
+                      <span className="sync-option-desc">
+                        {row.epicKey} | {row.groupText} | {row.typeText}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+              {initiativeConfigRows.length === 0 ? (
+                <p className="sync-options-note">No epics match the current search.</p>
+              ) : null}
+            </div>
+
+            <div className="sync-options-footer">
+              <button className="mini-sync-btn" type="button" onClick={closeInitiativeConfig}>
+                Cancel
+              </button>
+              <button className="sync-btn" type="button" onClick={saveInitiativeConfig}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

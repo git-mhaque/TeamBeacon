@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { InitiativeSummaryProgress } from "../components/InitiativeSummaryProgress";
 import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
@@ -751,30 +752,19 @@ export function InitiativesScreen() {
                       entry.epicKey
                     )}
                   </td>
-                  {showGroupColumn ? <td className="initiative-group-cell">{entry.groupText || "-"}</td> : null}
-                  {showTypeColumn ? <td className="initiative-type-cell">{entry.typeText || "-"}</td> : null}
-                  <td className="initiative-name-cell">{entry.epicName || "-"}</td>
-                  <td>
-                    <div className="initiative-progress-cell" title={entry.successCriteriaTooltip}>
-                      <span
-                        className="initiative-progress-track"
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={entry.completionPercent}
-                      >
-                        <span
-                          className="initiative-progress-fill"
-                          style={{ width: `${Math.max(0, Math.min(100, entry.completionPercent))}%` }}
-                        />
-                      </span>
-                      <span className="initiative-progress-label">
-                        {entry.completionPercent.toFixed(1).replace(/\.0$/, "")}% ({entry.completedCards}/{entry.totalCards})
-                      </span>
-                    </div>
+                  {showGroupColumn ? <td className="initiative-summary-group-cell">{entry.groupText || "-"}</td> : null}
+                  {showTypeColumn ? <td className="initiative-summary-type-cell">{entry.typeText || "-"}</td> : null}
+                  <td className="initiative-summary-name-cell">{entry.epicName || "-"}</td>
+                  <td className="initiative-summary-progress-cell">
+                    <InitiativeSummaryProgress
+                      completionPercent={entry.completionPercent}
+                      completedCards={entry.completedCards}
+                      totalCards={entry.totalCards}
+                      title={entry.successCriteriaTooltip}
+                    />
                   </td>
                   {showDeltaColumn ? (
-                    <td className="initiative-delta-cell" title={entry.deltaTooltip}>
+                    <td className="initiative-summary-delta-cell" title={entry.deltaTooltip}>
                       {entry.deltaPercentValue.toFixed(1).replace(/\.0$/, "")}%
                     </td>
                   ) : null}
