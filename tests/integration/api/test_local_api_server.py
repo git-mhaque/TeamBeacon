@@ -323,6 +323,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                             "epicTitle": "Enable offline initiative scoring",
                             "successCriteria": ["Zero blocker defects"],
                             "timelineEnabled": False,
+                            "timelineStartDate": None,
                             "targetCompletionDate": None,
                             "groupIds": [1],
                             "groups": [{"id": 1, "name": "Platform"}],
@@ -361,6 +362,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "workTypes": [{"id": 10, "name": "Feature"}],
                         "successCriteria": ["Zero blocker defects"],
                         "timelineEnabled": True,
+                        "timelineStartDate": "2026-04-01",
                         "targetCompletionDate": "2026-04-15",
                         "ragScore": None,
                         "insightComment": None,
@@ -375,6 +377,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "epicKey": kwargs["epic_key"],
                 "successCriteria": kwargs.get("success_criteria") or [],
                 "timelineEnabled": bool(kwargs.get("timeline_enabled")),
+                "timelineStartDate": kwargs.get("timeline_start_date"),
                 "targetCompletionDate": kwargs.get("target_completion_date"),
                 "groupIds": kwargs.get("group_ids") or [],
                 "groups": [{"id": 1, "name": "Platform"}],
@@ -690,6 +693,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                     "epicKey": "CEGBUPOL-4482",
                     "successCriteria": ["Zero blocker defects"],
                     "timelineEnabled": True,
+                    "timelineStartDate": "2026-04-01",
                     "targetCompletionDate": "2026-04-15",
                     "groupIds": [1],
                     "workTypeIds": [10],
@@ -701,11 +705,13 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             body = json.loads(response.read().decode("utf-8"))
         self.assertEqual(body["epicKey"], "CEGBUPOL-4482")
         self.assertTrue(body["timelineEnabled"])
+        self.assertEqual(body["timelineStartDate"], "2026-04-01")
         self.assertEqual(body["targetCompletionDate"], "2026-04-15")
         self.assertEqual(body["groupIds"], [1])
         self.assertEqual(body["workTypeIds"], [10])
         self.assertEqual(self.epic_upsert_calls[-1]["epic_key"], "CEGBUPOL-4482")
         self.assertTrue(self.epic_upsert_calls[-1]["timeline_enabled"])
+        self.assertEqual(self.epic_upsert_calls[-1]["timeline_start_date"], "2026-04-01")
         self.assertEqual(self.epic_upsert_calls[-1]["target_completion_date"], "2026-04-15")
 
     def test_metadata_upsert_epic_endpoint_rejects_non_boolean_timeline_flag(self) -> None:
@@ -720,6 +726,63 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                     "timelineEnabled": "yes",
                     "groupIds": [1],
                     "workTypeIds": [10],
+                }
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
+
+    def test_metadata_upsert_epic_endpoint_rejects_non_string_timeline_start_date(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/epics",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "epicKey": "CEGBUPOL-4482",
+                    "successCriteria": ["Zero blocker defects"],
+                    "timelineEnabled": True,
+                    "timelineStartDate": 20260401,
+                    "targetCompletionDate": "2026-04-15",
+                    "groupIds": [1],
+                    "workTypeIds": [10],
+                }
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
+
+    def test_metadata_upsert_epic_endpoint_rejects_multiple_groups(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/epics",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "epicKey": "CEGBUPOL-4482",
+                    "successCriteria": ["Zero blocker defects"],
+                    "groupIds": [1, 2],
+                    "workTypeIds": [10],
+                }
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
+
+    def test_metadata_upsert_epic_endpoint_rejects_multiple_work_types(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/epics",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "epicKey": "CEGBUPOL-4482",
+                    "successCriteria": ["Zero blocker defects"],
+                    "groupIds": [1],
+                    "workTypeIds": [10, 11],
                 }
             ).encode("utf-8"),
         )
@@ -750,6 +813,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-4482")
         self.assertEqual(body["epics"][0]["epicTitle"], "Enable offline initiative scoring")
         self.assertFalse(body["epics"][0]["timelineEnabled"])
+        self.assertIsNone(body["epics"][0]["timelineStartDate"])
         self.assertIsNone(body["epics"][0]["targetCompletionDate"])
 
     def test_metadata_search_epic_candidates_endpoint(self) -> None:
@@ -772,6 +836,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["epics"][0]["workTypes"][0]["name"], "Feature")
         self.assertEqual(body["epics"][0]["successCriteria"][0], "Zero blocker defects")
         self.assertTrue(body["epics"][0]["timelineEnabled"])
+        self.assertEqual(body["epics"][0]["timelineStartDate"], "2026-04-01")
         self.assertEqual(body["epics"][0]["targetCompletionDate"], "2026-04-15")
         self.assertEqual(body["epics"][0]["completedLastWeek"], 2)
         self.assertEqual(body["epics"][0]["deltaPercent"], 20.0)

@@ -407,15 +407,30 @@ def build_handler(
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "groupIds must be a list of integers."}))
                     return
+                if isinstance(group_ids_raw, list) and len(group_ids_raw) > 1:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "Only one group can be configured per epic."}))
+                    return
                 work_type_ids_raw = body_payload.get("workTypeIds")
                 if work_type_ids_raw is not None and not isinstance(work_type_ids_raw, list):
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "workTypeIds must be a list of integers."}))
                     return
+                if isinstance(work_type_ids_raw, list) and len(work_type_ids_raw) > 1:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "Only one work type can be configured per epic."}))
+                    return
                 timeline_enabled_raw = body_payload.get("timelineEnabled")
                 if timeline_enabled_raw is not None and not isinstance(timeline_enabled_raw, bool):
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "timelineEnabled must be a boolean."}))
+                    return
+                timeline_start_date_raw = body_payload.get("timelineStartDate")
+                if timeline_start_date_raw is not None and not isinstance(timeline_start_date_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(
+                        _json_bytes({"error": "bad_request", "detail": "timelineStartDate must be a string date."})
+                    )
                     return
                 target_completion_date_raw = body_payload.get("targetCompletionDate")
                 if target_completion_date_raw is not None and not isinstance(target_completion_date_raw, str):
@@ -432,6 +447,7 @@ def build_handler(
                         group_ids=group_ids_raw,
                         work_type_ids=work_type_ids_raw,
                         timeline_enabled=timeline_enabled_raw,
+                        timeline_start_date=timeline_start_date_raw,
                         target_completion_date=target_completion_date_raw,
                     )
                 except ValueError as exc:

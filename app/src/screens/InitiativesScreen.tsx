@@ -82,6 +82,7 @@ export function InitiativesScreen() {
   const [selectedEpicCandidate, setSelectedEpicCandidate] = useState<EpicCandidate | null>(null);
   const [configureSuccessCriteriaText, setConfigureSuccessCriteriaText] = useState("");
   const [configureTimelineEnabled, setConfigureTimelineEnabled] = useState(false);
+  const [configureTimelineStartDate, setConfigureTimelineStartDate] = useState("");
   const [configureTargetCompletionDate, setConfigureTargetCompletionDate] = useState("");
   const [configureSelectedGroupIds, setConfigureSelectedGroupIds] = useState<number[]>([]);
   const [configureSelectedWorkTypeIds, setConfigureSelectedWorkTypeIds] = useState<number[]>([]);
@@ -93,6 +94,7 @@ export function InitiativesScreen() {
   const [editingEpic, setEditingEpic] = useState<SummaryRow | null>(null);
   const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
   const [editTimelineEnabled, setEditTimelineEnabled] = useState(false);
+  const [editTimelineStartDate, setEditTimelineStartDate] = useState("");
   const [editTargetCompletionDate, setEditTargetCompletionDate] = useState("");
   const [editSelectedGroupIds, setEditSelectedGroupIds] = useState<number[]>([]);
   const [editSelectedWorkTypeIds, setEditSelectedWorkTypeIds] = useState<number[]>([]);
@@ -337,11 +339,11 @@ export function InitiativesScreen() {
     });
   }, []);
 
-  const toggleSelection = useCallback((current: number[], id: number): number[] => {
-    if (current.includes(id)) {
-      return current.filter((value) => value !== id);
+  const toggleSingleSelection = useCallback((current: number[], id: number): number[] => {
+    if (current[0] === id) {
+      return [];
     }
-    return [...current, id];
+    return [id];
   }, []);
 
   const loadEpicCandidates = useCallback(async (query: string) => {
@@ -382,6 +384,7 @@ export function InitiativesScreen() {
     setSelectedEpicCandidate(null);
     setConfigureSuccessCriteriaText("");
     setConfigureTimelineEnabled(false);
+    setConfigureTimelineStartDate("");
     setConfigureTargetCompletionDate("");
     setConfigureSelectedGroupIds([]);
     setConfigureSelectedWorkTypeIds([]);
@@ -402,9 +405,10 @@ export function InitiativesScreen() {
     setEditingEpic(entry);
     setEditSuccessCriteriaText(entry.successCriteria.join("\n"));
     setEditTimelineEnabled(Boolean(entry.timelineEnabled));
+    setEditTimelineStartDate(normalizeDateInputValue(entry.timelineStartDate));
     setEditTargetCompletionDate(normalizeDateInputValue(entry.targetCompletionDate));
-    setEditSelectedGroupIds(entry.groups.map((group) => group.id));
-    setEditSelectedWorkTypeIds(entry.workTypes.map((workType) => workType.id));
+    setEditSelectedGroupIds(entry.groups.length > 0 ? [entry.groups[0].id] : []);
+    setEditSelectedWorkTypeIds(entry.workTypes.length > 0 ? [entry.workTypes[0].id] : []);
     setEditMetaError(null);
     setIsEpicEditOpen(true);
   }, []);
@@ -427,6 +431,15 @@ export function InitiativesScreen() {
       setConfigureMetaError("Target completion date is required when timeline is enabled.");
       return;
     }
+    if (
+      configureTimelineEnabled
+      && configureTimelineStartDate.trim()
+      && configureTargetCompletionDate.trim()
+      && configureTimelineStartDate.trim() > configureTargetCompletionDate.trim()
+    ) {
+      setConfigureMetaError("Timeline start date cannot be after target completion date.");
+      return;
+    }
     const criteria = configureSuccessCriteriaText
       .split("\n")
       .map((line) => line.trim())
@@ -443,6 +456,7 @@ export function InitiativesScreen() {
         groupIds: configureSelectedGroupIds,
         workTypeIds: configureSelectedWorkTypeIds,
         timelineEnabled: configureTimelineEnabled,
+        timelineStartDate: configureTimelineEnabled ? configureTimelineStartDate.trim() || null : null,
         targetCompletionDate: configureTimelineEnabled ? configureTargetCompletionDate.trim() : null,
       });
       await loadEpicSummary();
@@ -458,6 +472,7 @@ export function InitiativesScreen() {
     configureSelectedGroupIds,
     configureSelectedWorkTypeIds,
     configureSuccessCriteriaText,
+    configureTimelineStartDate,
     configureTargetCompletionDate,
     configureTimelineEnabled,
     loadEpicSummary,
@@ -476,6 +491,15 @@ export function InitiativesScreen() {
       setEditMetaError("Target completion date is required when timeline is enabled.");
       return;
     }
+    if (
+      editTimelineEnabled
+      && editTimelineStartDate.trim()
+      && editTargetCompletionDate.trim()
+      && editTimelineStartDate.trim() > editTargetCompletionDate.trim()
+    ) {
+      setEditMetaError("Timeline start date cannot be after target completion date.");
+      return;
+    }
 
     setEditMetaSaving(true);
     setEditMetaError(null);
@@ -488,6 +512,7 @@ export function InitiativesScreen() {
         groupIds: editSelectedGroupIds,
         workTypeIds: editSelectedWorkTypeIds,
         timelineEnabled: editTimelineEnabled,
+        timelineStartDate: editTimelineEnabled ? editTimelineStartDate.trim() || null : null,
         targetCompletionDate: editTimelineEnabled ? editTargetCompletionDate.trim() : null,
       });
       await loadEpicSummary();
@@ -504,6 +529,7 @@ export function InitiativesScreen() {
     editSelectedGroupIds,
     editSelectedWorkTypeIds,
     editSuccessCriteriaText,
+    editTimelineStartDate,
     editTargetCompletionDate,
     editTimelineEnabled,
     editingEpic,
@@ -1029,15 +1055,6 @@ export function InitiativesScreen() {
               </p>
             ) : null}
 
-            <label className="epic-meta-field epic-meta-field-spaced">
-              <span>Success Criteria Checklist (one per line)</span>
-              <textarea
-                value={configureSuccessCriteriaText}
-                onChange={(event) => setConfigureSuccessCriteriaText(event.target.value)}
-                rows={6}
-              />
-            </label>
-
             <div className="epic-meta-timeline-row">
               <label className="epic-meta-checkbox">
                 <input
@@ -1047,11 +1064,21 @@ export function InitiativesScreen() {
                     const checked = event.target.checked;
                     setConfigureTimelineEnabled(checked);
                     if (!checked) {
+                      setConfigureTimelineStartDate("");
                       setConfigureTargetCompletionDate("");
                     }
                   }}
                 />
-                <span>Enable timeline target date</span>
+                <span>Enable timeline dates</span>
+              </label>
+              <label className="epic-meta-field">
+                <span>Timeline Start Date</span>
+                <input
+                  type="date"
+                  value={configureTimelineStartDate}
+                  onChange={(event) => setConfigureTimelineStartDate(event.target.value)}
+                  disabled={!configureTimelineEnabled}
+                />
               </label>
               <label className="epic-meta-field">
                 <span>Target Completion Date</span>
@@ -1066,14 +1093,16 @@ export function InitiativesScreen() {
 
             <div className="epic-meta-selection-grid">
               <div className="epic-meta-select-card">
-                <h4>Epic Groups</h4>
+                <h4>Epic Group (choose one)</h4>
                 {epicLookup.groups.length === 0 ? <p>No groups configured yet.</p> : null}
                 {epicLookup.groups.map((group) => (
                   <label key={group.id} className="epic-meta-checkbox">
                     <input
                       type="checkbox"
                       checked={configureSelectedGroupIds.includes(group.id)}
-                      onChange={() => setConfigureSelectedGroupIds((current) => toggleSelection(current, group.id))}
+                      onChange={() =>
+                        setConfigureSelectedGroupIds((current) => toggleSingleSelection(current, group.id))
+                      }
                     />
                     <span>{group.name}</span>
                   </label>
@@ -1081,20 +1110,31 @@ export function InitiativesScreen() {
               </div>
 
               <div className="epic-meta-select-card">
-                <h4>Work Types</h4>
+                <h4>Work Type (choose one)</h4>
                 {epicLookup.workTypes.length === 0 ? <p>No work types configured yet.</p> : null}
                 {epicLookup.workTypes.map((workType) => (
                   <label key={workType.id} className="epic-meta-checkbox">
                     <input
                       type="checkbox"
                       checked={configureSelectedWorkTypeIds.includes(workType.id)}
-                      onChange={() => setConfigureSelectedWorkTypeIds((current) => toggleSelection(current, workType.id))}
+                      onChange={() =>
+                        setConfigureSelectedWorkTypeIds((current) => toggleSingleSelection(current, workType.id))
+                      }
                     />
                     <span>{workType.name}</span>
                   </label>
                 ))}
               </div>
             </div>
+
+            <label className="epic-meta-field epic-meta-field-spaced">
+              <span>Success Criteria Checklist (one per line)</span>
+              <textarea
+                value={configureSuccessCriteriaText}
+                onChange={(event) => setConfigureSuccessCriteriaText(event.target.value)}
+                rows={6}
+              />
+            </label>
 
             {configureMetaError ? <p className="sync-history-error">{configureMetaError}</p> : null}
 
@@ -1148,15 +1188,6 @@ export function InitiativesScreen() {
               {editingEpic.epicName ? ` (${editingEpic.epicName})` : ""}
             </p>
 
-            <label className="epic-meta-field epic-meta-field-spaced">
-              <span>Success Criteria Checklist (one per line)</span>
-              <textarea
-                value={editSuccessCriteriaText}
-                onChange={(event) => setEditSuccessCriteriaText(event.target.value)}
-                rows={6}
-              />
-            </label>
-
             <div className="epic-meta-timeline-row">
               <label className="epic-meta-checkbox">
                 <input
@@ -1166,11 +1197,21 @@ export function InitiativesScreen() {
                     const checked = event.target.checked;
                     setEditTimelineEnabled(checked);
                     if (!checked) {
+                      setEditTimelineStartDate("");
                       setEditTargetCompletionDate("");
                     }
                   }}
                 />
-                <span>Enable timeline target date</span>
+                <span>Enable timeline dates</span>
+              </label>
+              <label className="epic-meta-field">
+                <span>Timeline Start Date</span>
+                <input
+                  type="date"
+                  value={editTimelineStartDate}
+                  onChange={(event) => setEditTimelineStartDate(event.target.value)}
+                  disabled={!editTimelineEnabled}
+                />
               </label>
               <label className="epic-meta-field">
                 <span>Target Completion Date</span>
@@ -1185,14 +1226,16 @@ export function InitiativesScreen() {
 
             <div className="epic-meta-selection-grid">
               <div className="epic-meta-select-card">
-                <h4>Epic Groups</h4>
+                <h4>Epic Group (choose one)</h4>
                 {epicLookup.groups.length === 0 ? <p>No groups configured yet.</p> : null}
                 {epicLookup.groups.map((group) => (
                   <label key={group.id} className="epic-meta-checkbox">
                     <input
                       type="checkbox"
                       checked={editSelectedGroupIds.includes(group.id)}
-                      onChange={() => setEditSelectedGroupIds((current) => toggleSelection(current, group.id))}
+                      onChange={() =>
+                        setEditSelectedGroupIds((current) => toggleSingleSelection(current, group.id))
+                      }
                     />
                     <span>{group.name}</span>
                   </label>
@@ -1200,20 +1243,31 @@ export function InitiativesScreen() {
               </div>
 
               <div className="epic-meta-select-card">
-                <h4>Work Types</h4>
+                <h4>Work Type (choose one)</h4>
                 {epicLookup.workTypes.length === 0 ? <p>No work types configured yet.</p> : null}
                 {epicLookup.workTypes.map((workType) => (
                   <label key={workType.id} className="epic-meta-checkbox">
                     <input
                       type="checkbox"
                       checked={editSelectedWorkTypeIds.includes(workType.id)}
-                      onChange={() => setEditSelectedWorkTypeIds((current) => toggleSelection(current, workType.id))}
+                      onChange={() =>
+                        setEditSelectedWorkTypeIds((current) => toggleSingleSelection(current, workType.id))
+                      }
                     />
                     <span>{workType.name}</span>
                   </label>
                 ))}
               </div>
             </div>
+
+            <label className="epic-meta-field epic-meta-field-spaced">
+              <span>Success Criteria Checklist (one per line)</span>
+              <textarea
+                value={editSuccessCriteriaText}
+                onChange={(event) => setEditSuccessCriteriaText(event.target.value)}
+                rows={6}
+              />
+            </label>
 
             {editMetaError ? <p className="sync-history-error">{editMetaError}</p> : null}
 

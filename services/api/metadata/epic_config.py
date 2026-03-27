@@ -43,6 +43,7 @@ def _ensure_metadata_schema(conn: sqlite3.Connection) -> None:
           epic_name TEXT,
           success_criteria_json TEXT NOT NULL DEFAULT '[]',
           timeline_enabled INTEGER NOT NULL DEFAULT 0,
+          timeline_start_date TEXT,
           target_completion_date TEXT,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -77,6 +78,13 @@ def _ensure_metadata_schema(conn: sqlite3.Connection) -> None:
             """
             ALTER TABLE epic_metadata
             ADD COLUMN timeline_enabled INTEGER NOT NULL DEFAULT 0
+            """
+        )
+    if not _column_exists(conn, "epic_metadata", "timeline_start_date"):
+        conn.execute(
+            """
+            ALTER TABLE epic_metadata
+            ADD COLUMN timeline_start_date TEXT
             """
         )
     if not _column_exists(conn, "epic_metadata", "target_completion_date"):
@@ -156,16 +164,14 @@ def _normalize_timeline_enabled(value: bool | None) -> bool:
     return value
 
 
-def _normalize_target_completion_date(value: str | None, *, timeline_enabled: bool) -> str | None:
+def _normalize_optional_iso_date(value: str | None, *, field_name: str) -> str | None:
     if value is None:
-        if timeline_enabled:
-            raise ValueError("targetCompletionDate is required when timelineEnabled is true.")
         return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string date.")
 
     candidate = value.strip()
     if not candidate:
-        if timeline_enabled:
-            raise ValueError("targetCompletionDate is required when timelineEnabled is true.")
         return None
 
     parsed_date: date | None = None
@@ -176,16 +182,30 @@ def _normalize_target_completion_date(value: str | None, *, timeline_enabled: bo
             normalized = f"{candidate[:-1]}+00:00" if candidate.endswith("Z") else candidate
             parsed_date = datetime.fromisoformat(normalized).date()
     except ValueError as exc:
-        raise ValueError("targetCompletionDate must be a valid ISO date (YYYY-MM-DD).") from exc
+        raise ValueError(f"{field_name} must be a valid ISO date (YYYY-MM-DD).") from exc
 
     if parsed_date is None:
-        if timeline_enabled:
-            raise ValueError("targetCompletionDate is required when timelineEnabled is true.")
         return None
     return parsed_date.isoformat()
 
 
-def _normalize_int_ids(values: list[int] | None, field_name: str) -> list[int]:
+def _normalize_timeline_start_date(value: str | None) -> str | None:
+    return _normalize_optional_iso_date(value, field_name="timelineStartDate")
+
+
+def _normalize_target_completion_date(value: str | None, *, timeline_enabled: bool) -> str | None:
+    normalized = _normalize_optional_iso_date(value, field_name="targetCompletionDate")
+    if timeline_enabled and normalized is None:
+        raise ValueError("targetCompletionDate is required when timelineEnabled is true.")
+    return normalized
+
+
+def _normalize_int_ids(
+    values: list[int] | None,
+    field_name: str,
+    *,
+    max_items: int | None = None,
+) -> list[int]:
     if not values:
         return []
     deduped: list[int] = []
@@ -201,6 +221,8 @@ def _normalize_int_ids(values: list[int] | None, field_name: str) -> list[int]:
             continue
         seen.add(value)
         deduped.append(value)
+    if max_items is not None and len(deduped) > max_items:
+        raise ValueError(f"{field_name} can contain at most {max_items} id.")
     return deduped
 
 
@@ -508,6 +530,7 @@ def _read_epic_metadata_entry(conn: sqlite3.Connection, epic_key: str) -> dict[s
           epic_name,
           success_criteria_json,
           timeline_enabled,
+          timeline_start_date,
           target_completion_date,
           updated_at
         FROM epic_metadata
@@ -564,6 +587,11 @@ def _read_epic_metadata_entry(conn: sqlite3.Connection, epic_key: str) -> dict[s
         "epicTitle": epic_title,
         "successCriteria": success_criteria,
         "timelineEnabled": bool(int(epic_row["timeline_enabled"] or 0)),
+        "timelineStartDate": (
+            str(epic_row["timeline_start_date"]).strip()
+            if epic_row["timeline_start_date"] is not None and str(epic_row["timeline_start_date"]).strip()
+            else None
+        ),
         "targetCompletionDate": (
             str(epic_row["target_completion_date"]).strip()
             if epic_row["target_completion_date"] is not None and str(epic_row["target_completion_date"]).strip()
@@ -714,6 +742,11 @@ def get_configured_epic_summary(
                 else []
             )
             timeline_enabled = bool(metadata_entry.get("timelineEnabled")) if metadata_entry else False
+            timeline_start_date = (
+                str(metadata_entry["timelineStartDate"]).strip()
+                if metadata_entry and metadata_entry.get("timelineStartDate")
+                else None
+            )
             target_completion_date = (
                 str(metadata_entry["targetCompletionDate"]).strip()
                 if metadata_entry and metadata_entry.get("targetCompletionDate")
@@ -734,6 +767,7 @@ def get_configured_epic_summary(
                     "workTypes": work_types,
                     "successCriteria": success_criteria,
                     "timelineEnabled": timeline_enabled,
+                    "timelineStartDate": timeline_start_date,
                     "targetCompletionDate": target_completion_date,
                     "ragScore": None,
                     "insightComment": None,
@@ -752,20 +786,29 @@ def upsert_epic_metadata(
     group_ids: list[int] | None,
     work_type_ids: list[int] | None,
     timeline_enabled: bool | None = None,
+    timeline_start_date: str | None = None,
     target_completion_date: str | None = None,
     db_path: str | None = None,
 ) -> dict[str, Any]:
     normalized_key = _normalize_epic_key(epic_key)
     normalized_criteria = _normalize_criteria(success_criteria)
-    normalized_group_ids = _normalize_int_ids(group_ids, "groupIds")
-    normalized_work_type_ids = _normalize_int_ids(work_type_ids, "workTypeIds")
+    normalized_group_ids = _normalize_int_ids(group_ids, "groupIds", max_items=1)
+    normalized_work_type_ids = _normalize_int_ids(work_type_ids, "workTypeIds", max_items=1)
     normalized_timeline_enabled = _normalize_timeline_enabled(timeline_enabled)
+    normalized_timeline_start_date = _normalize_timeline_start_date(timeline_start_date)
     normalized_target_completion_date = _normalize_target_completion_date(
         target_completion_date,
         timeline_enabled=normalized_timeline_enabled,
     )
     if not normalized_timeline_enabled:
+        normalized_timeline_start_date = None
         normalized_target_completion_date = None
+    if (
+        normalized_timeline_start_date is not None
+        and normalized_target_completion_date is not None
+        and normalized_timeline_start_date > normalized_target_completion_date
+    ):
+        raise ValueError("timelineStartDate cannot be after targetCompletionDate.")
 
     resolved_db_path = db_path or _resolve_db_path()
     conn = _connect(resolved_db_path)
@@ -784,14 +827,16 @@ def upsert_epic_metadata(
               epic_name,
               success_criteria_json,
               timeline_enabled,
+              timeline_start_date,
               target_completion_date,
               updated_at
             )
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(epic_key) DO UPDATE SET
               epic_name = COALESCE(excluded.epic_name, epic_metadata.epic_name),
               success_criteria_json = excluded.success_criteria_json,
               timeline_enabled = excluded.timeline_enabled,
+              timeline_start_date = excluded.timeline_start_date,
               target_completion_date = excluded.target_completion_date,
               updated_at = CURRENT_TIMESTAMP
             """,
@@ -800,6 +845,7 @@ def upsert_epic_metadata(
                 epic_name,
                 json.dumps(normalized_criteria, separators=(",", ":"), ensure_ascii=False),
                 1 if normalized_timeline_enabled else 0,
+                normalized_timeline_start_date,
                 normalized_target_completion_date,
             ),
         )

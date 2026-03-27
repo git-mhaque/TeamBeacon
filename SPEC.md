@@ -86,9 +86,10 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - `epicKey`
   - `successCriteria[]`
   - `timelineEnabled` (boolean)
+  - `timelineStartDate` (optional ISO date)
   - `targetCompletionDate` (ISO date, required when `timelineEnabled=true`)
-  - `groupIds[]`
-  - `workTypeIds[]`
+  - `groupIds[]` (at most one value)
+  - `workTypeIds[]` (at most one value)
 - Persisted storage:
   - `epic_groups`
   - `work_types`

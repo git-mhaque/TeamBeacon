@@ -89,6 +89,7 @@ export type EpicMetadataEntry = {
   epicTitle?: string | null;
   successCriteria: string[];
   timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
   targetCompletionDate?: string | null;
   groupIds: number[];
   groups: EpicLookupItem[];
@@ -114,6 +115,7 @@ export type InitiativeEpicSummary = {
   workTypes: EpicLookupItem[];
   successCriteria: string[];
   timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
   targetCompletionDate?: string | null;
   ragScore?: string | null;
   insightComment?: string | null;
@@ -451,6 +453,7 @@ export async function upsertEpicMetadata(payload: {
   groupIds: number[];
   workTypeIds: number[];
   timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
   targetCompletionDate?: string | null;
 }): Promise<EpicMetadataEntry> {
   const response = await fetch("/api/metadata/epics", {

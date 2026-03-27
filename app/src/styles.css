@@ -899,7 +899,7 @@ body {
 
 .epic-meta-timeline-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px) minmax(0, 220px);
   gap: 0.62rem;
   align-items: end;
   margin-bottom: 0.5rem;
