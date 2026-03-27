@@ -558,7 +558,7 @@ export function ExecutiveReportScreen() {
           <div className="executive-actions no-print">
             <StatusPill tone={reportTone} text={metrics.redCount > 0 ? "Review Risks" : "Ready to Export"} />
             <button className="mini-sync-btn" type="button" onClick={exportReportPdf} disabled={isExportingPdf}>
-              {isExportingPdf ? "Preparing..." : "Export PDF (A4)"}
+              {isExportingPdf ? "Preparing..." : "Print Report"}
             </button>
           </div>
         )}
