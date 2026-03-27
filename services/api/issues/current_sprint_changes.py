@@ -70,6 +70,7 @@ def _build_issue_cards(
     summary_by_issue_key: dict[str, str],
     story_points_by_issue_key: dict[str, float],
     epic_by_issue_key: dict[str, dict[str, str | None]],
+    status_by_issue_key: dict[str, dict[str, str | None]],
     jira_base_url: str | None,
     override_by_issue_key: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
@@ -87,6 +88,19 @@ def _build_issue_cards(
         epic_context = epic_by_issue_key.get(issue_key, {})
         epic_key = epic_context.get("epicKey")
         epic_name = override.get("epicName") or epic_context.get("epicName")
+        status_context = status_by_issue_key.get(issue_key, {})
+        status_override = override.get("status")
+        status = (
+            status_override.strip()
+            if isinstance(status_override, str) and status_override.strip()
+            else status_context.get("status")
+        )
+        status_category_override = override.get("statusCategory")
+        status_category = (
+            status_category_override.strip()
+            if isinstance(status_category_override, str) and status_category_override.strip()
+            else status_context.get("statusCategory")
+        )
         issue_url = override.get("issueUrl") or (f"{jira_base_url}/browse/{issue_key}" if jira_base_url else None)
         epic_url = override.get("epicUrl") or (
             f"{jira_base_url}/browse/{epic_key}" if jira_base_url and isinstance(epic_key, str) and epic_key else None
@@ -99,6 +113,8 @@ def _build_issue_cards(
                 "epicName": epic_name,
                 "epicUrl": epic_url,
                 "storyPoints": story_points,
+                "status": status,
+                "statusCategory": status_category,
             }
         )
     return cards
@@ -198,11 +214,19 @@ def get_current_sprint_changes(
                 issue_url_raw = issue.get("issueUrl")
                 epic_name_raw = issue.get("epicName")
                 epic_url_raw = issue.get("epicUrl")
+                status_raw = issue.get("status")
+                status_category_raw = issue.get("statusCategory")
                 blocked_overrides[normalized_issue_key] = {
                     "summary": summary_raw if isinstance(summary_raw, str) and summary_raw.strip() else None,
                     "issueUrl": issue_url_raw if isinstance(issue_url_raw, str) and issue_url_raw.strip() else None,
                     "epicName": epic_name_raw if isinstance(epic_name_raw, str) and epic_name_raw.strip() else None,
                     "epicUrl": epic_url_raw if isinstance(epic_url_raw, str) and epic_url_raw.strip() else None,
+                    "status": status_raw if isinstance(status_raw, str) and status_raw.strip() else None,
+                    "statusCategory": (
+                        status_category_raw
+                        if isinstance(status_category_raw, str) and status_category_raw.strip()
+                        else None
+                    ),
                 }
                 story_points = _coerce_story_points(issue.get("storyPoints"))
                 if story_points is not None:
@@ -212,6 +236,7 @@ def get_current_sprint_changes(
     summary_by_issue_key: dict[str, str] = {}
     story_points_by_issue_key: dict[str, float] = {}
     epic_by_issue_key: dict[str, dict[str, str | None]] = {}
+    status_by_issue_key: dict[str, dict[str, str | None]] = {}
     issue_keys_for_summary = sorted(added_issue_keys | removed_issue_keys | blocked_issue_keys)
     if issue_keys_for_summary:
         placeholders = ",".join("?" for _ in issue_keys_for_summary)
@@ -221,7 +246,14 @@ def get_current_sprint_changes(
             _ensure_schema(conn)
             rows = conn.execute(
                 f"""
-                SELECT i.issue_key, i.summary, i.story_points, i.epic_key, e.summary AS epic_summary
+                SELECT
+                  i.issue_key,
+                  i.summary,
+                  i.story_points,
+                  i.epic_key,
+                  e.summary AS epic_summary,
+                  i.status_name,
+                  i.status_category
                 FROM issues i
                 LEFT JOIN issues e ON e.issue_key = i.epic_key
                 WHERE i.issue_key IN ({placeholders})
@@ -252,6 +284,18 @@ def get_current_sprint_changes(
             for row in rows
             if row["issue_key"] is not None
         }
+        status_by_issue_key = {
+            str(row["issue_key"]): {
+                "status": str(row["status_name"]).strip()
+                if row["status_name"] is not None and str(row["status_name"]).strip()
+                else None,
+                "statusCategory": str(row["status_category"]).strip()
+                if row["status_category"] is not None and str(row["status_category"]).strip()
+                else None,
+            }
+            for row in rows
+            if row["issue_key"] is not None
+        }
 
     def _sum_story_points(issue_keys: set[str]) -> float:
         total = 0.0
@@ -277,6 +321,7 @@ def get_current_sprint_changes(
                     summary_by_issue_key,
                     story_points_by_issue_key,
                     epic_by_issue_key,
+                    status_by_issue_key,
                     jira_base_url,
                 ),
             },
@@ -289,6 +334,7 @@ def get_current_sprint_changes(
                     summary_by_issue_key,
                     story_points_by_issue_key,
                     epic_by_issue_key,
+                    status_by_issue_key,
                     jira_base_url,
                 ),
             },
@@ -301,6 +347,7 @@ def get_current_sprint_changes(
                     summary_by_issue_key,
                     story_points_by_issue_key,
                     epic_by_issue_key,
+                    status_by_issue_key,
                     jira_base_url,
                     blocked_overrides,
                 ),

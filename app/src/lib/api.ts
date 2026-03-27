@@ -146,6 +146,8 @@ export type CurrentSprintChangeIssue = {
   epicName?: string | null;
   epicUrl?: string | null;
   storyPoints?: number | null;
+  status?: string | null;
+  statusCategory?: string | null;
 };
 
 export type CurrentSprintChangesResponse = {

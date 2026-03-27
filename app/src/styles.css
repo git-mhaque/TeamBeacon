@@ -453,16 +453,36 @@ body {
   font-size: 0.84rem;
 }
 
-.ticket-header {
+.ticket-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.ticket-key-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 0.35rem;
-  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ticket-link {
   display: inline-block;
+}
+
+.ticket-status-corner {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.ticket-info-row {
+  margin-top: 0.18rem;
+  color: #24434f;
+  min-width: 0;
 }
 
 .ticket-pill-row {
@@ -475,6 +495,7 @@ body {
 
 .ticket-info {
   color: #24434f;
+  min-width: 0;
 }
 
 .ticket-summary {

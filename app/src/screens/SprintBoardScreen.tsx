@@ -38,6 +38,10 @@ const EMPTY_CHANGES: CurrentSprintChangesResponse["changes"] = {
 };
 
 type Tone = "neutral" | "good" | "warn" | "risk";
+type StatusInfo = {
+  status?: string | null;
+  statusCategory?: string | null;
+};
 
 function formatStoryPoints(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "-";
@@ -55,9 +59,9 @@ function formatEpicText(epicName: string | null | undefined): string {
   return "-";
 }
 
-function resolveStatusTone(issue: CurrentSprintWorkIssue): Tone {
+function resolveStatusTone(issue: StatusInfo): Tone {
   const category = issue.statusCategory?.toLowerCase().trim() ?? "";
-  const status = issue.status.toLowerCase().trim();
+  const status = issue.status?.toLowerCase().trim() ?? "";
   if (category === "done" || ["done", "closed", "resolved", "complete", "completed"].includes(status)) {
     return "good";
   }
@@ -87,19 +91,21 @@ function WorkColumn({
       {!loading
         ? items.map((item) => (
             <div key={item.issueKey} className="ticket">
-              <div className="ticket-header">
-                {item.issueUrl ? (
-                  <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+              <div className="ticket-top-row">
+                <div className="ticket-key-row">
+                  {item.issueUrl ? (
+                    <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+                      <strong>{item.issueKey}</strong>
+                    </a>
+                  ) : (
                     <strong>{item.issueKey}</strong>
-                  </a>
-                ) : (
-                  <strong>{item.issueKey}</strong>
-                )}
-                <span className="ticket-info">{item.summary}</span>
+                  )}
+                </div>
+                <div className="ticket-status-corner">
+                  <StatusPill tone={resolveStatusTone(item)} text={item.status} />
+                </div>
               </div>
-              <div className="ticket-pill-row">
-                <StatusPill tone={resolveStatusTone(item)} text={item.status} />
-              </div>
+              <div className="ticket-info-row">{item.summary}</div>
               <small>
                 Epic:{" "}
                 {item.epicName && item.epicUrl ? (
@@ -138,16 +144,23 @@ function SprintChangeColumn({
       {!loading
         ? items.map((item) => (
             <div key={item.issueKey} className="ticket">
-              <div className="ticket-header">
-                {item.issueUrl ? (
-                  <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+              <div className="ticket-top-row">
+                <div className="ticket-key-row">
+                  {item.issueUrl ? (
+                    <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+                      <strong>{item.issueKey}</strong>
+                    </a>
+                  ) : (
                     <strong>{item.issueKey}</strong>
-                  </a>
-                ) : (
-                  <strong>{item.issueKey}</strong>
-                )}
-                <span className="ticket-info">{item.summary}</span>
+                  )}
+                </div>
+                {item.status ? (
+                  <div className="ticket-status-corner">
+                    <StatusPill tone={resolveStatusTone(item)} text={item.status} />
+                  </div>
+                ) : null}
               </div>
+              <div className="ticket-info-row">{item.summary}</div>
               <small>
                 Epic:{" "}
                 {item.epicName && item.epicUrl ? (

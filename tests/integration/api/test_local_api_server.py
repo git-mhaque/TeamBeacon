@@ -220,6 +220,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                                 "epicName": "Domain Support Q4",
                                 "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
                                 "storyPoints": 2.0,
+                                "status": "In Progress",
+                                "statusCategory": "In Progress",
                             },
                             {
                                 "issueKey": "CEGBUPOL-6102",
@@ -228,6 +230,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                                 "epicName": "Domain Support Q4",
                                 "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
                                 "storyPoints": 9.0,
+                                "status": "To Do",
+                                "statusCategory": "To Do",
                             },
                         ],
                     },
@@ -243,6 +247,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                                 "epicName": "Domain Support Q4",
                                 "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
                                 "storyPoints": 3.0,
+                                "status": "Done",
+                                "statusCategory": "Done",
                             }
                         ],
                     },
@@ -258,6 +264,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                                 "epicName": "Domain Support Q4",
                                 "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
                                 "storyPoints": 5.0,
+                                "status": "Blocked",
+                                "statusCategory": "In Progress",
                             },
                             {
                                 "issueKey": "CEGBUPOL-6105",
@@ -266,6 +274,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                                 "epicName": "Domain Support Q4",
                                 "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
                                 "storyPoints": 3.0,
+                                "status": "In Progress",
+                                "statusCategory": "Blocked",
                             },
                         ],
                     },
@@ -556,18 +566,23 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["summary"], "Added card 1")
         self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["epicName"], "Domain Support Q4")
         self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["storyPoints"], 2.0)
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["status"], "In Progress")
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["statusCategory"], "In Progress")
         self.assertEqual(body["changes"]["removedAfterStart"]["count"], 1)
         self.assertEqual(body["changes"]["removedAfterStart"]["storyPointsTotal"], 3.0)
         self.assertEqual(body["changes"]["removedAfterStart"]["issueKeys"], ["CEGBUPOL-6103"])
         self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["issueKey"], "CEGBUPOL-6103")
         self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["epicName"], "Domain Support Q4")
         self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["storyPoints"], 3.0)
+        self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["status"], "Done")
         self.assertEqual(body["changes"]["blockedCards"]["count"], 2)
         self.assertEqual(body["changes"]["blockedCards"]["storyPointsTotal"], 8.0)
         self.assertEqual(body["changes"]["blockedCards"]["issueKeys"], ["CEGBUPOL-6104", "CEGBUPOL-6105"])
         self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["issueKey"], "CEGBUPOL-6104")
         self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["epicName"], "Domain Support Q4")
         self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["storyPoints"], 5.0)
+        self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["status"], "Blocked")
+        self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["statusCategory"], "In Progress")
         self.assertEqual(len(self.current_sprint_changes_calls), 1)
 
     def test_metadata_lookup_endpoint(self) -> None:
