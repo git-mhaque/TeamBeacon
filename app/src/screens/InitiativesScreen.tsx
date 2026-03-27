@@ -24,6 +24,7 @@ type SummaryRow = InitiativeEpicSummary & {
   groupText: string;
   typeText: string;
   ragLabel: "Red" | "Amber" | "Green";
+  ragReason: string;
   successCriteriaTooltip: string;
   completedLastWeekValue: number;
   deltaPercentValue: number;
@@ -35,6 +36,116 @@ function ragFromCompletion(percent: number): "Red" | "Amber" | "Green" {
   if (percent < 33) return "Red";
   if (percent < 66) return "Amber";
   return "Green";
+}
+
+type RagEvaluation = {
+  label: "Red" | "Amber" | "Green";
+  reason: string;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const candidate = value.trim().slice(0, 10);
+  const parts = candidate.split("-");
+  if (parts.length !== 3) {
+    return null;
+  }
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return Date.UTC(year, month - 1, day);
+}
+
+function toIsoFromUtcDay(utcDay: number): string {
+  return new Date(utcDay).toISOString().slice(0, 10);
+}
+
+function daysBetweenUtc(startUtcDay: number, endUtcDay: number): number {
+  return Math.floor((endUtcDay - startUtcDay) / DAY_MS);
+}
+
+function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
+  const completion = Math.max(0, Math.min(100, entry.completionPercent));
+  const fallback = ragFromCompletion(completion);
+  if (!entry.timelineEnabled) {
+    return {
+      label: fallback,
+      reason: `Timeline not enabled. RAG from completion (${completion.toFixed(1)}%).`,
+    };
+  }
+
+  const todayUtcDay = parseIsoDateToUtcDay(new Date().toISOString());
+  const targetUtcDay = parseIsoDateToUtcDay(entry.targetCompletionDate);
+  const startUtcDay = parseIsoDateToUtcDay(entry.timelineStartDate);
+  if (todayUtcDay === null || targetUtcDay === null) {
+    return {
+      label: fallback,
+      reason: `Timeline metadata incomplete. Fallback to completion (${completion.toFixed(1)}%).`,
+    };
+  }
+
+  if (completion >= 100) {
+    return {
+      label: "Green",
+      reason: `Complete (${completion.toFixed(1)}%). Target date ${toIsoFromUtcDay(targetUtcDay)}.`,
+    };
+  }
+
+  if (todayUtcDay > targetUtcDay) {
+    const overdueDays = daysBetweenUtc(targetUtcDay, todayUtcDay);
+    return {
+      label: "Red",
+      reason: `Overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"} (target ${toIsoFromUtcDay(targetUtcDay)}). Completion ${completion.toFixed(1)}%.`,
+    };
+  }
+
+  if (startUtcDay !== null && startUtcDay <= targetUtcDay) {
+    const totalDays = Math.max(1, daysBetweenUtc(startUtcDay, targetUtcDay) + 1);
+    const elapsedDays = Math.min(totalDays, Math.max(0, daysBetweenUtc(startUtcDay, todayUtcDay) + 1));
+    const expectedCompletion = (elapsedDays / totalDays) * 100;
+    const variance = completion - expectedCompletion;
+    if (variance >= -10) {
+      return {
+        label: "Green",
+        reason: `On track: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+      };
+    }
+    if (variance >= -25) {
+      return {
+        label: "Amber",
+        reason: `Slightly behind: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+      };
+    }
+    return {
+      label: "Red",
+      reason: `Behind plan: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+    };
+  }
+
+  const daysRemaining = daysBetweenUtc(todayUtcDay, targetUtcDay);
+  if (daysRemaining <= 7 && completion < 80) {
+    return {
+      label: "Red",
+      reason: `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} to target (${toIsoFromUtcDay(targetUtcDay)}) with completion ${completion.toFixed(1)}%.`,
+    };
+  }
+  if (daysRemaining <= 14 && completion < 60) {
+    return {
+      label: "Amber",
+      reason: `${daysRemaining} days to target (${toIsoFromUtcDay(targetUtcDay)}); completion ${completion.toFixed(1)}% is at risk.`,
+    };
+  }
+  return {
+    label: fallback,
+    reason: `Timeline start date not set. Fallback to completion (${completion.toFixed(1)}%) with target ${toIsoFromUtcDay(targetUtcDay)}.`,
+  };
 }
 
 function ragRank(label: "Red" | "Amber" | "Green"): number {
@@ -165,7 +276,8 @@ export function InitiativesScreen() {
       const typeNames = entry.workTypes.map((workType) => workType.name);
       const groupText = groupNames.join(", ");
       const typeText = typeNames.join(", ");
-      const ragLabel = ragFromCompletion(entry.completionPercent);
+      const ragEvaluation = evaluateInitiativeRag(entry);
+      const ragLabel = ragEvaluation.label;
       const completedLastWeekValue = Math.max(0, entry.completedLastWeek ?? 0);
       const deltaPercentCandidate =
         typeof entry.deltaPercent === "number"
@@ -179,7 +291,10 @@ export function InitiativesScreen() {
         : "No success criteria configured.";
       const deltaTooltip =
         `${completedLastWeekValue} completed in last 7 days out of ${entry.totalCards} total cards.`;
-      const insightTooltip = entry.insightComment?.trim() || "Insight pending LLM output.";
+      const insightText = entry.insightComment?.trim();
+      const insightTooltip = insightText
+        ? `${ragEvaluation.reason}\n\nInsight: ${insightText}`
+        : ragEvaluation.reason;
       return {
         ...entry,
         groupNames,
@@ -187,6 +302,7 @@ export function InitiativesScreen() {
         groupText,
         typeText,
         ragLabel,
+        ragReason: ragEvaluation.reason,
         successCriteriaTooltip,
         completedLastWeekValue,
         deltaPercentValue,
@@ -796,75 +912,92 @@ export function InitiativesScreen() {
               </tr>
             </thead>
             <tbody>
-              {sortedEpicSummary.map((entry) => (
-                <tr key={entry.epicKey}>
-                  <td>
-                    {jiraBaseUrl ? (
-                      <a
-                        className="external-link"
-                        href={`${jiraBaseUrl}/browse/${entry.epicKey}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {entry.epicKey}
-                      </a>
-                    ) : (
-                      entry.epicKey
-                    )}
-                  </td>
-                  {showGroupColumn ? <td className="initiative-summary-group-cell">{entry.groupText || "-"}</td> : null}
-                  {showTypeColumn ? <td className="initiative-summary-type-cell">{entry.typeText || "-"}</td> : null}
-                  <td className="initiative-summary-name-cell">{entry.epicName || "-"}</td>
-                  <td className="initiative-summary-progress-cell">
-                    <InitiativeSummaryProgress
-                      completionPercent={entry.completionPercent}
-                      completedCards={entry.completedCards}
-                      totalCards={entry.totalCards}
-                      title={entry.successCriteriaTooltip}
-                    />
-                  </td>
-                  {showDeltaColumn ? (
-                    <td className="initiative-summary-delta-cell" title={entry.deltaTooltip}>
-                      {entry.deltaPercentValue.toFixed(1).replace(/\.0$/, "")}%
+              {sortedEpicSummary.map((entry) => {
+                const timelineIconTitle = entry.timelineEnabled
+                  ? `Timeline configured: ${entry.timelineStartDate ?? "?"} -> ${entry.targetCompletionDate ?? "?"}`
+                  : "";
+                return (
+                  <tr key={entry.epicKey}>
+                    <td>
+                      {jiraBaseUrl ? (
+                        <a
+                          className="external-link"
+                          href={`${jiraBaseUrl}/browse/${entry.epicKey}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {entry.epicKey}
+                        </a>
+                      ) : (
+                        entry.epicKey
+                      )}
                     </td>
-                  ) : null}
-                  {showRagColumn ? (
-                    <td title={entry.insightTooltip}>
-                      <span className={`rag-indicator rag-${entry.ragLabel.toLowerCase()}`}>
-                        <span className="rag-dot rag-dot-large" />
+                    {showGroupColumn ? <td className="initiative-summary-group-cell">{entry.groupText || "-"}</td> : null}
+                    {showTypeColumn ? <td className="initiative-summary-type-cell">{entry.typeText || "-"}</td> : null}
+                    <td className="initiative-summary-name-cell">
+                      <span className="initiative-summary-name-wrap">
+                        <span>{entry.epicName || "-"}</span>
+                        {entry.timelineEnabled ? (
+                          <span className="initiative-timeline-icon" title={timelineIconTitle} aria-label={timelineIconTitle}>
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                              <circle cx="10" cy="10" r="7.2" />
+                              <path d="M10 6.2v4.2l2.8 2" />
+                            </svg>
+                          </span>
+                        ) : null}
                       </span>
                     </td>
-                  ) : null}
-                  <td>
-                    <div className="initiative-actions">
-                      <button
-                        className="initiative-icon-btn"
-                        onClick={() => openEpicEditOverlay(entry)}
-                        type="button"
-                        aria-label={`Edit ${entry.epicKey}`}
-                        title="Edit"
-                        disabled={removingEpicKey === entry.epicKey}
-                      >
-                        <svg viewBox="0 0 20 20" aria-hidden="true">
-                          <path d="M14.7 2.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4l-9.6 9.6-3.5.4.4-3.5zM3 17h14v1.5H3z" />
-                        </svg>
-                      </button>
-                      <button
-                        className="initiative-icon-btn initiative-icon-btn-danger"
-                        onClick={() => openRemoveEpicOverlay(entry)}
-                        type="button"
-                        aria-label={removingEpicKey === entry.epicKey ? `Removing ${entry.epicKey}` : `Remove ${entry.epicKey}`}
-                        title={removingEpicKey === entry.epicKey ? "Removing..." : "Remove"}
-                        disabled={removingEpicKey === entry.epicKey}
-                      >
-                        <svg viewBox="0 0 20 20" aria-hidden="true">
-                          <path d="M7 2h6l.8 1.5H17V5H3V3.5h3.2zM5 6.5h10l-.7 10.2a1.5 1.5 0 0 1-1.5 1.3H7.2a1.5 1.5 0 0 1-1.5-1.3zM8.2 8v8.2h1.4V8zm3.2 0v8.2h1.4V8z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    <td className="initiative-summary-progress-cell">
+                      <InitiativeSummaryProgress
+                        completionPercent={entry.completionPercent}
+                        completedCards={entry.completedCards}
+                        totalCards={entry.totalCards}
+                        title={entry.successCriteriaTooltip}
+                      />
+                    </td>
+                    {showDeltaColumn ? (
+                      <td className="initiative-summary-delta-cell" title={entry.deltaTooltip}>
+                        {entry.deltaPercentValue.toFixed(1).replace(/\.0$/, "")}%
+                      </td>
+                    ) : null}
+                    {showRagColumn ? (
+                      <td title={entry.insightTooltip}>
+                        <span className={`rag-indicator rag-${entry.ragLabel.toLowerCase()}`}>
+                          <span className="rag-dot rag-dot-large" />
+                        </span>
+                      </td>
+                    ) : null}
+                    <td>
+                      <div className="initiative-actions">
+                        <button
+                          className="initiative-icon-btn"
+                          onClick={() => openEpicEditOverlay(entry)}
+                          type="button"
+                          aria-label={`Edit ${entry.epicKey}`}
+                          title="Edit"
+                          disabled={removingEpicKey === entry.epicKey}
+                        >
+                          <svg viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M14.7 2.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4l-9.6 9.6-3.5.4.4-3.5zM3 17h14v1.5H3z" />
+                          </svg>
+                        </button>
+                        <button
+                          className="initiative-icon-btn initiative-icon-btn-danger"
+                          onClick={() => openRemoveEpicOverlay(entry)}
+                          type="button"
+                          aria-label={removingEpicKey === entry.epicKey ? `Removing ${entry.epicKey}` : `Remove ${entry.epicKey}`}
+                          title={removingEpicKey === entry.epicKey ? "Removing..." : "Remove"}
+                          disabled={removingEpicKey === entry.epicKey}
+                        >
+                          <svg viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M7 2h6l.8 1.5H17V5H3V3.5h3.2zM5 6.5h10l-.7 10.2a1.5 1.5 0 0 1-1.5 1.3H7.2a1.5 1.5 0 0 1-1.5-1.3zM8.2 8v8.2h1.4V8zm3.2 0v8.2h1.4V8z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!loading && sortedEpicSummary.length === 0 ? (
                 <tr>
                   <td

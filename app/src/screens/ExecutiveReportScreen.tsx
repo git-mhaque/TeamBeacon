@@ -14,6 +14,7 @@ type ExecutiveRow = InitiativeEpicSummary & {
   groupText: string;
   typeText: string;
   rag: RagLabel;
+  ragTooltip: string;
   completedLastWeekValue: number;
   deltaPercentValue: number;
 };
@@ -26,10 +27,114 @@ function ragFromCompletion(percent: number): RagLabel {
   return "Green";
 }
 
-function toneForRag(rag: RagLabel): "risk" | "warn" | "good" {
-  if (rag === "Red") return "risk";
-  if (rag === "Amber") return "warn";
-  return "good";
+type RagEvaluation = {
+  label: RagLabel;
+  reason: string;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const candidate = value.trim().slice(0, 10);
+  const parts = candidate.split("-");
+  if (parts.length !== 3) {
+    return null;
+  }
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return Date.UTC(year, month - 1, day);
+}
+
+function toIsoFromUtcDay(utcDay: number): string {
+  return new Date(utcDay).toISOString().slice(0, 10);
+}
+
+function daysBetweenUtc(startUtcDay: number, endUtcDay: number): number {
+  return Math.floor((endUtcDay - startUtcDay) / DAY_MS);
+}
+
+function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
+  const completion = Math.max(0, Math.min(100, entry.completionPercent));
+  const fallback = ragFromCompletion(completion);
+  if (!entry.timelineEnabled) {
+    return {
+      label: fallback,
+      reason: `Timeline not enabled. RAG from completion (${completion.toFixed(1)}%).`,
+    };
+  }
+
+  const todayUtcDay = parseIsoDateToUtcDay(new Date().toISOString());
+  const targetUtcDay = parseIsoDateToUtcDay(entry.targetCompletionDate);
+  const startUtcDay = parseIsoDateToUtcDay(entry.timelineStartDate);
+  if (todayUtcDay === null || targetUtcDay === null) {
+    return {
+      label: fallback,
+      reason: `Timeline metadata incomplete. Fallback to completion (${completion.toFixed(1)}%).`,
+    };
+  }
+
+  if (completion >= 100) {
+    return {
+      label: "Green",
+      reason: `Complete (${completion.toFixed(1)}%). Target date ${toIsoFromUtcDay(targetUtcDay)}.`,
+    };
+  }
+
+  if (todayUtcDay > targetUtcDay) {
+    const overdueDays = daysBetweenUtc(targetUtcDay, todayUtcDay);
+    return {
+      label: "Red",
+      reason: `Overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"} (target ${toIsoFromUtcDay(targetUtcDay)}). Completion ${completion.toFixed(1)}%.`,
+    };
+  }
+
+  if (startUtcDay !== null && startUtcDay <= targetUtcDay) {
+    const totalDays = Math.max(1, daysBetweenUtc(startUtcDay, targetUtcDay) + 1);
+    const elapsedDays = Math.min(totalDays, Math.max(0, daysBetweenUtc(startUtcDay, todayUtcDay) + 1));
+    const expectedCompletion = (elapsedDays / totalDays) * 100;
+    const variance = completion - expectedCompletion;
+    if (variance >= -10) {
+      return {
+        label: "Green",
+        reason: `On track: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+      };
+    }
+    if (variance >= -25) {
+      return {
+        label: "Amber",
+        reason: `Slightly behind: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+      };
+    }
+    return {
+      label: "Red",
+      reason: `Behind plan: ${completion.toFixed(1)}% vs expected ${expectedCompletion.toFixed(1)}% by now (target ${toIsoFromUtcDay(targetUtcDay)}).`,
+    };
+  }
+
+  const daysRemaining = daysBetweenUtc(todayUtcDay, targetUtcDay);
+  if (daysRemaining <= 7 && completion < 80) {
+    return {
+      label: "Red",
+      reason: `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} to target (${toIsoFromUtcDay(targetUtcDay)}) with completion ${completion.toFixed(1)}%.`,
+    };
+  }
+  if (daysRemaining <= 14 && completion < 60) {
+    return {
+      label: "Amber",
+      reason: `${daysRemaining} days to target (${toIsoFromUtcDay(targetUtcDay)}); completion ${completion.toFixed(1)}% is at risk.`,
+    };
+  }
+  return {
+    label: fallback,
+    reason: `Timeline start date not set. Fallback to completion (${completion.toFixed(1)}%) with target ${toIsoFromUtcDay(targetUtcDay)}.`,
+  };
 }
 
 function formatPercent(value: number): string {
@@ -81,11 +186,17 @@ export function ExecutiveReportScreen() {
               ? (completedLastWeekValue / entry.totalCards) * 100
               : 0;
         const deltaPercentValue = Math.max(0, Math.round(deltaCandidate * 10) / 10);
+        const ragEvaluation = evaluateInitiativeRag(entry);
+        const insightText = entry.insightComment?.trim();
+        const ragTooltip = insightText
+          ? `${ragEvaluation.reason}\n\nInsight: ${insightText}`
+          : ragEvaluation.reason;
         return {
           ...entry,
           groupText: groupText || "Unassigned",
           typeText: typeText || "Unassigned",
-          rag: ragFromCompletion(entry.completionPercent),
+          rag: ragEvaluation.label,
+          ragTooltip,
           completedLastWeekValue,
           deltaPercentValue,
         };
@@ -509,40 +620,57 @@ export function ExecutiveReportScreen() {
               </tr>
             </thead>
             <tbody>
-              {visibleInitiativeRows.map((row) => (
-                <tr key={row.epicKey}>
-                  <td className="initiative-group-cell">{row.groupText}</td>
-                  <td className="initiative-name-cell">
-                    {jiraBaseUrl ? (
-                      <a
-                        className="external-link"
-                        href={`${jiraBaseUrl}/browse/${row.epicKey}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {row.epicName || row.epicKey}
-                      </a>
-                    ) : (
-                      row.epicName || row.epicKey
-                    )}
-                  </td>
-                  <td className="initiative-type-cell">{row.typeText}</td>
-                  <td className="initiative-delta-cell">
-                    {row.completedLastWeekValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
-                  </td>
-                  <td className="initiative-progress-cell">
-                    <div className="initiative-progress-content">
-                      <span className="initiative-progress-track">
-                        <span className="initiative-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
+              {visibleInitiativeRows.map((row) => {
+                const timelineIconTitle = row.timelineEnabled
+                  ? `Timeline configured: ${row.timelineStartDate ?? "?"} -> ${row.targetCompletionDate ?? "?"}`
+                  : "";
+                return (
+                  <tr key={row.epicKey}>
+                    <td className="initiative-group-cell">{row.groupText}</td>
+                    <td className="initiative-name-cell">
+                      <span className="initiative-summary-name-wrap">
+                        {jiraBaseUrl ? (
+                          <a
+                            className="external-link"
+                            href={`${jiraBaseUrl}/browse/${row.epicKey}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {row.epicName || row.epicKey}
+                          </a>
+                        ) : (
+                          <span>{row.epicName || row.epicKey}</span>
+                        )}
+                        {row.timelineEnabled ? (
+                          <span className="initiative-timeline-icon" title={timelineIconTitle} aria-label={timelineIconTitle}>
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                              <circle cx="10" cy="10" r="7.2" />
+                              <path d="M10 6.2v4.2l2.8 2" />
+                            </svg>
+                          </span>
+                        ) : null}
                       </span>
-                      <span className="initiative-progress-label">{formatPercent(row.completionPercent)}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <StatusPill tone={toneForRag(row.rag)} text={row.rag} />
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="initiative-type-cell">{row.typeText}</td>
+                    <td className="initiative-delta-cell">
+                      {row.completedLastWeekValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
+                    </td>
+                    <td className="initiative-progress-cell">
+                      <div className="initiative-progress-content">
+                        <span className="initiative-progress-track">
+                          <span className="initiative-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
+                        </span>
+                        <span className="initiative-progress-label">{formatPercent(row.completionPercent)}</span>
+                      </div>
+                    </td>
+                    <td title={row.ragTooltip}>
+                      <span className={`rag-indicator rag-${row.rag.toLowerCase()}`}>
+                        <span className="rag-dot rag-dot-large" />
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {!loading && visibleInitiativeRows.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
@@ -573,7 +701,7 @@ export function ExecutiveReportScreen() {
           <MetricCard
             label="Initiative RAG"
             value={loading ? "..." : `${metrics.greenCount}G / ${metrics.amberCount}A / ${metrics.redCount}R`}
-            hint="Derived from epic completion."
+            hint="Derived from timeline-aware epic risk signals."
             tone={metrics.redCount > 0 ? "warn" : "good"}
           />
           <MetricCard
