@@ -804,22 +804,18 @@ export function ExecutiveReportScreen() {
               />
             </label>
 
-            <div className="sync-options-footer initiative-config-actions-top">
-              <button
-                className="mini-sync-btn"
-                type="button"
-                onClick={() => setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey))}
-              >
-                Select All
-              </button>
-              <button className="mini-sync-btn" type="button" onClick={() => setInitiativeConfigDraftKeys([])}>
-                Clear All
-              </button>
-            </div>
-
             <div className="initiative-config-columns">
               <section className="initiative-config-column">
-                <h4>Available Epics</h4>
+                <div className="initiative-config-column-head">
+                  <h4>Available Epics ({availableInitiativeConfigRows.length})</h4>
+                  <button
+                    className="mini-sync-btn"
+                    type="button"
+                    onClick={() => setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey))}
+                  >
+                    Select All
+                  </button>
+                </div>
                 <p>Double-click to select.</p>
                 <div className="initiative-config-card-list">
                   {availableInitiativeConfigRows.map((row) => (
@@ -842,7 +838,12 @@ export function ExecutiveReportScreen() {
               </section>
 
               <section className="initiative-config-column">
-                <h4>Selected Epics</h4>
+                <div className="initiative-config-column-head">
+                  <h4>Selected Epics ({selectedInitiativeConfigRows.length})</h4>
+                  <button className="mini-sync-btn" type="button" onClick={() => setInitiativeConfigDraftKeys([])}>
+                    Clear All
+                  </button>
+                </div>
                 <p>Double-click to remove. Drag to reorder.</p>
                 <div className="initiative-config-card-list">
                   {selectedInitiativeConfigRows.map((row) => (

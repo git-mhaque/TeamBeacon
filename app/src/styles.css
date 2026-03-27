@@ -644,10 +644,6 @@ body {
   background: #fff;
 }
 
-.initiative-config-actions-top {
-  margin-top: 0.6rem;
-}
-
 .initiative-config-top-actions {
   margin-top: 0;
   flex-shrink: 0;
@@ -669,6 +665,13 @@ body {
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 0.24rem;
+}
+
+.initiative-config-column-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
 }
 
 .initiative-config-column h4 {
