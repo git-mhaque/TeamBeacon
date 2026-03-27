@@ -648,17 +648,13 @@ export function ExecutiveReportScreen() {
       </Panel>
 
       <Panel
-        title="Weekly Progress by Initiative"
-        subtitle="Configured epics with group/type context and weekly deltas."
+        title="Weekly Progress for Key Initiatives"
         action={
-          <button className="mini-sync-btn" type="button" onClick={openInitiativeConfig}>
+          <button className="mini-sync-btn no-print" type="button" onClick={openInitiativeConfig}>
             Configure
           </button>
         }
       >
-        <p className="initiative-selection-summary">
-          Showing {visibleInitiativeRows.length} of {initiativeRows.length} configured epics.
-        </p>
         <div className="initiative-summary-table-wrap">
           <table className="sync-history-table">
             <thead>
