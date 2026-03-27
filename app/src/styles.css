@@ -1369,6 +1369,12 @@ body {
   color: #1f3740;
 }
 
+.executive-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .epic-autocomplete {
   position: relative;
 }
@@ -1519,5 +1525,100 @@ body {
 
   .epic-edit-dialog {
     width: min(620px, 95vw);
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  :root {
+    --bg: #fff;
+    --bg-accent: #fff;
+    --surface: #fff;
+    --surface-alt: #fff;
+    --line: #d6dde2;
+  }
+
+  body {
+    margin: 0;
+    background: #fff !important;
+    color: #101f26;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print,
+  .sidebar,
+  .topbar,
+  .sync-options-overlay,
+  .epic-edit-overlay,
+  .sync-history-overlay {
+    display: none !important;
+  }
+
+  .app-frame {
+    display: block;
+    min-height: auto;
+    padding: 0;
+    gap: 0;
+  }
+
+  .main-pane {
+    background: #fff !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .screen-body {
+    padding-top: 0 !important;
+  }
+
+  .screen-grid {
+    gap: 5mm;
+  }
+
+  .panel {
+    border: 1px solid #d6dde2 !important;
+    box-shadow: none !important;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .panel-header {
+    margin-bottom: 2.5mm;
+  }
+
+  .metrics-grid.four-up,
+  .metrics-grid.three-up {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sync-history-table-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .sync-history-table {
+    font-size: 9.5pt;
+  }
+
+  .sync-history-table th,
+  .sync-history-table td {
+    padding: 1.8mm 2.2mm;
+  }
+
+  .sync-history-table tr {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  a.external-link {
+    color: #1f3740;
+    text-decoration: none;
   }
 }

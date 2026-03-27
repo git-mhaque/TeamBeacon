@@ -145,6 +145,7 @@ export function ExecutiveReportScreen() {
   const [rows, setRows] = useState<ExecutiveRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
   const [selectedInitiativeEpicKeys, setSelectedInitiativeEpicKeys] = useState<string[]>([]);
   const [initiativeConfigOpen, setInitiativeConfigOpen] = useState(false);
@@ -522,12 +523,38 @@ export function ExecutiveReportScreen() {
     closeInitiativeConfig();
   }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
 
+  const exportReportPdf = useCallback(() => {
+    if (typeof window === "undefined") return;
+    setIsExportingPdf(true);
+    const body = document.body;
+    body.classList.add("executive-print-mode");
+    const previousTitle = document.title;
+    const printDate = new Date().toISOString().slice(0, 10);
+    document.title = `TeamBeacon-Executive-Report-${printDate}`;
+
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => {
+        body.classList.remove("executive-print-mode");
+        document.title = previousTitle;
+        setIsExportingPdf(false);
+      }, 250);
+    }, 120);
+  }, []);
+
   return (
     <div className="screen-grid">
       <Panel
         title="Executive Summary Draft"
         subtitle="Generated from configured epics, group/type dimensions, and last-7-day movement."
-        action={<StatusPill tone={reportTone} text={metrics.redCount > 0 ? "Review Risks" : "Ready to Export"} />}
+        action={(
+          <div className="executive-actions no-print">
+            <StatusPill tone={reportTone} text={metrics.redCount > 0 ? "Review Risks" : "Ready to Export"} />
+            <button className="mini-sync-btn" type="button" onClick={exportReportPdf} disabled={isExportingPdf}>
+              {isExportingPdf ? "Preparing..." : "Export PDF (A4)"}
+            </button>
+          </div>
+        )}
       >
         <p className="summary">{loading ? "Generating executive summary..." : executiveSummary}</p>
         {error ? <p className="sync-history-error">Executive report error: {error}</p> : null}
