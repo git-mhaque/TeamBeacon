@@ -15,6 +15,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.sync_start_calls: list[tuple[str | None, str | None]] = []
         self.issue_search_calls: list[dict[str, object]] = []
         self.current_sprint_calls: list[bool] = []
+        self.current_sprint_changes_calls: list[bool] = []
         self.current_sprint_work_calls: list[bool] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
@@ -193,6 +194,85 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
+        def fake_current_sprint_changes():
+            self.current_sprint_changes_calls.append(True)
+            return {
+                "source": "local",
+                "sprint": {
+                    "id": 55421,
+                    "boardId": 27193,
+                    "name": "CEGBU Polaris Sprint 45",
+                    "state": "active",
+                    "startDate": "2026-03-20T00:00:00+00:00",
+                    "endDate": "2026-03-31T00:00:00+00:00",
+                    "remainingDays": 5,
+                },
+                "changes": {
+                    "addedAfterStart": {
+                        "count": 4,
+                        "storyPointsTotal": 11.0,
+                        "issueKeys": ["CEGBUPOL-6101", "CEGBUPOL-6102"],
+                        "issueCards": [
+                            {
+                                "issueKey": "CEGBUPOL-6101",
+                                "summary": "Added card 1",
+                                "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6101",
+                                "epicName": "Domain Support Q4",
+                                "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
+                                "storyPoints": 2.0,
+                            },
+                            {
+                                "issueKey": "CEGBUPOL-6102",
+                                "summary": "Added card 2",
+                                "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6102",
+                                "epicName": "Domain Support Q4",
+                                "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
+                                "storyPoints": 9.0,
+                            },
+                        ],
+                    },
+                    "removedAfterStart": {
+                        "count": 1,
+                        "storyPointsTotal": 3.0,
+                        "issueKeys": ["CEGBUPOL-6103"],
+                        "issueCards": [
+                            {
+                                "issueKey": "CEGBUPOL-6103",
+                                "summary": "Removed card",
+                                "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6103",
+                                "epicName": "Domain Support Q4",
+                                "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
+                                "storyPoints": 3.0,
+                            }
+                        ],
+                    },
+                    "blockedCards": {
+                        "count": 2,
+                        "storyPointsTotal": 8.0,
+                        "issueKeys": ["CEGBUPOL-6104", "CEGBUPOL-6105"],
+                        "issueCards": [
+                            {
+                                "issueKey": "CEGBUPOL-6104",
+                                "summary": "Blocked card 1",
+                                "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6104",
+                                "epicName": "Domain Support Q4",
+                                "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
+                                "storyPoints": 5.0,
+                            },
+                            {
+                                "issueKey": "CEGBUPOL-6105",
+                                "summary": "Blocked card 2",
+                                "issueUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-6105",
+                                "epicName": "Domain Support Q4",
+                                "epicUrl": "https://gbujira.oraclecorp.com/browse/CEGBUPOL-3553",
+                                "storyPoints": 3.0,
+                            },
+                        ],
+                    },
+                },
+                "error": None,
+            }
+
         def fake_metadata_lookup():
             return {
                 "groups": [{"id": 1, "name": "Platform"}],
@@ -304,6 +384,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             jira_sync_history_provider=fake_sync_history,
             issue_search_provider=fake_issue_search,
             current_sprint_provider=fake_current_sprint,
+            current_sprint_changes_provider=fake_current_sprint_changes,
             current_sprint_work_provider=fake_current_sprint_work,
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
@@ -460,6 +541,34 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["work"]["planned"][0]["storyPoints"], 3.0)
         self.assertEqual(body["work"]["planned"][0]["epicName"], "Platform Reliability Epic")
         self.assertEqual(len(self.current_sprint_work_calls), 1)
+
+    def test_current_sprint_changes_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/sprints/current/changes", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["sprint"]["id"], 55421)
+        self.assertEqual(body["changes"]["addedAfterStart"]["count"], 4)
+        self.assertEqual(body["changes"]["addedAfterStart"]["storyPointsTotal"], 11.0)
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueKeys"], ["CEGBUPOL-6101", "CEGBUPOL-6102"])
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["issueKey"], "CEGBUPOL-6101")
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["summary"], "Added card 1")
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["epicName"], "Domain Support Q4")
+        self.assertEqual(body["changes"]["addedAfterStart"]["issueCards"][0]["storyPoints"], 2.0)
+        self.assertEqual(body["changes"]["removedAfterStart"]["count"], 1)
+        self.assertEqual(body["changes"]["removedAfterStart"]["storyPointsTotal"], 3.0)
+        self.assertEqual(body["changes"]["removedAfterStart"]["issueKeys"], ["CEGBUPOL-6103"])
+        self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["issueKey"], "CEGBUPOL-6103")
+        self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["epicName"], "Domain Support Q4")
+        self.assertEqual(body["changes"]["removedAfterStart"]["issueCards"][0]["storyPoints"], 3.0)
+        self.assertEqual(body["changes"]["blockedCards"]["count"], 2)
+        self.assertEqual(body["changes"]["blockedCards"]["storyPointsTotal"], 8.0)
+        self.assertEqual(body["changes"]["blockedCards"]["issueKeys"], ["CEGBUPOL-6104", "CEGBUPOL-6105"])
+        self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["issueKey"], "CEGBUPOL-6104")
+        self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["epicName"], "Domain Support Q4")
+        self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["storyPoints"], 5.0)
+        self.assertEqual(len(self.current_sprint_changes_calls), 1)
 
     def test_metadata_lookup_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310

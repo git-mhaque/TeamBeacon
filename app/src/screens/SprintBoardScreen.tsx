@@ -3,9 +3,12 @@ import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
 import {
+  CurrentSprintChangeIssue,
   CurrentSprint,
+  CurrentSprintChangesResponse,
   CurrentSprintWorkIssue,
   CurrentSprintWorkResponse,
+  fetchCurrentSprintChanges,
   fetchCurrentSprint,
   fetchCurrentSprintWork
 } from "../lib/api";
@@ -28,6 +31,12 @@ const EMPTY_WORK: CurrentSprintWorkResponse["work"] = {
   }
 };
 
+const EMPTY_CHANGES: CurrentSprintChangesResponse["changes"] = {
+  addedAfterStart: { count: 0, storyPointsTotal: 0, issueKeys: [], issueCards: [] },
+  removedAfterStart: { count: 0, storyPointsTotal: 0, issueKeys: [], issueCards: [] },
+  blockedCards: { count: 0, storyPointsTotal: 0, issueKeys: [], issueCards: [] }
+};
+
 type Tone = "neutral" | "good" | "warn" | "risk";
 
 function formatStoryPoints(value: number | null | undefined): string {
@@ -38,6 +47,11 @@ function formatStoryPoints(value: number | null | undefined): string {
 
 function formatEpicName(issue: CurrentSprintWorkIssue): string {
   if (issue.epicName) return issue.epicName;
+  return "-";
+}
+
+function formatEpicText(epicName: string | null | undefined): string {
+  if (epicName) return epicName;
   return "-";
 }
 
@@ -105,6 +119,54 @@ function WorkColumn({
   );
 }
 
+function SprintChangeColumn({
+  title,
+  items,
+  loading,
+  emptyLabel
+}: {
+  title: string;
+  items: CurrentSprintChangeIssue[];
+  loading: boolean;
+  emptyLabel: string;
+}) {
+  return (
+    <article className="work-column">
+      <h4>{title}</h4>
+      {loading ? <p className="ticket">Loading...</p> : null}
+      {!loading && items.length === 0 ? <p className="ticket">{emptyLabel}</p> : null}
+      {!loading
+        ? items.map((item) => (
+            <div key={item.issueKey} className="ticket">
+              <div className="ticket-header">
+                {item.issueUrl ? (
+                  <a className="external-link ticket-link" href={item.issueUrl} target="_blank" rel="noopener noreferrer">
+                    <strong>{item.issueKey}</strong>
+                  </a>
+                ) : (
+                  <strong>{item.issueKey}</strong>
+                )}
+                <span className="ticket-info">{item.summary}</span>
+              </div>
+              <small>
+                Epic:{" "}
+                {item.epicName && item.epicUrl ? (
+                  <a className="external-link" href={item.epicUrl} target="_blank" rel="noopener noreferrer">
+                    {formatEpicText(item.epicName)}
+                  </a>
+                ) : (
+                  formatEpicText(item.epicName)
+                )}
+              </small>
+              <br />
+              <small>Story Points: {formatStoryPoints(item.storyPoints)}</small>
+            </div>
+          ))
+        : null}
+    </article>
+  );
+}
+
 function formatDate(value: string | null | undefined): string {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -116,6 +178,9 @@ export function SprintBoardScreen() {
   const [sprint, setSprint] = useState<CurrentSprint | null>(null);
   const [sprintLoading, setSprintLoading] = useState(true);
   const [sprintError, setSprintError] = useState<string | null>(null);
+  const [changes, setChanges] = useState<CurrentSprintChangesResponse["changes"]>(EMPTY_CHANGES);
+  const [changesLoading, setChangesLoading] = useState(true);
+  const [changesError, setChangesError] = useState<string | null>(null);
   const [work, setWork] = useState<CurrentSprintWorkResponse["work"]>(EMPTY_WORK);
   const [workLoading, setWorkLoading] = useState(true);
   const [workError, setWorkError] = useState<string | null>(null);
@@ -138,6 +203,24 @@ export function SprintBoardScreen() {
     }
   }, []);
 
+  const loadCurrentSprintChanges = useCallback(async () => {
+    setChangesLoading(true);
+    setChangesError(null);
+    try {
+      const payload = await fetchCurrentSprintChanges();
+      setChanges(payload.changes);
+      if (payload.error) {
+        setChangesError(payload.error);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown current sprint changes request failure.";
+      setChangesError(message);
+      setChanges(EMPTY_CHANGES);
+    } finally {
+      setChangesLoading(false);
+    }
+  }, []);
+
   const loadCurrentSprintWork = useCallback(async () => {
     setWorkLoading(true);
     setWorkError(null);
@@ -157,8 +240,8 @@ export function SprintBoardScreen() {
   }, []);
 
   const refreshSprintPanels = useCallback(async () => {
-    await Promise.all([loadCurrentSprint(), loadCurrentSprintWork()]);
-  }, [loadCurrentSprint, loadCurrentSprintWork]);
+    await Promise.all([loadCurrentSprint(), loadCurrentSprintChanges(), loadCurrentSprintWork()]);
+  }, [loadCurrentSprint, loadCurrentSprintChanges, loadCurrentSprintWork]);
 
   useEffect(() => {
     refreshSprintPanels().catch(() => {
@@ -181,7 +264,7 @@ export function SprintBoardScreen() {
         subtitle="Active sprint metadata from local synced JIRA data."
         action={
           <button className="mini-sync-btn" onClick={refreshSprintPanels} type="button">
-            {sprintLoading || workLoading ? "Loading..." : "Refresh"}
+            {sprintLoading || changesLoading || workLoading ? "Loading..." : "Refresh"}
           </button>
         }
       >
@@ -210,6 +293,33 @@ export function SprintBoardScreen() {
           />
         </div>
         {sprintError && !sprintLoading ? <p className="sync-history-error">Current sprint status: {sprintError}</p> : null}
+      </Panel>
+
+      <Panel
+        title="Sprint Scope Changes & Blockers"
+        subtitle="Scope volatility and blocked cards observed after sprint start."
+      >
+        <div className="kanban-grid sprint-changes-grid">
+          <SprintChangeColumn
+            title={`Added (${changes.addedAfterStart.count} | ${formatStoryPoints(changes.addedAfterStart.storyPointsTotal)} SP)`}
+            items={changes.addedAfterStart.issueCards}
+            loading={changesLoading}
+            emptyLabel="No cards added after sprint start."
+          />
+          <SprintChangeColumn
+            title={`Removed (${changes.removedAfterStart.count} | ${formatStoryPoints(changes.removedAfterStart.storyPointsTotal)} SP)`}
+            items={changes.removedAfterStart.issueCards}
+            loading={changesLoading}
+            emptyLabel="No cards removed after sprint start."
+          />
+          <SprintChangeColumn
+            title={`Blocked (${changes.blockedCards.count} | ${formatStoryPoints(changes.blockedCards.storyPointsTotal)} SP)`}
+            items={changes.blockedCards.issueCards}
+            loading={changesLoading}
+            emptyLabel="No blocked cards in current sprint."
+          />
+        </div>
+        {changesError && !changesLoading ? <p className="sync-history-error">Current sprint changes: {changesError}</p> : null}
       </Panel>
 
       <Panel

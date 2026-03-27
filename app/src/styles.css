@@ -428,6 +428,10 @@ body {
   gap: 0.6rem;
 }
 
+.sprint-changes-grid {
+  margin-top: 0.6rem;
+}
+
 .work-column {
   border: 1px solid var(--line);
   border-radius: 0.78rem;

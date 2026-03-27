@@ -132,6 +132,33 @@ export type CurrentSprintResponse = {
   error?: string | null;
 };
 
+export type CurrentSprintChangeGroup = {
+  count: number;
+  storyPointsTotal: number;
+  issueKeys: string[];
+  issueCards: CurrentSprintChangeIssue[];
+};
+
+export type CurrentSprintChangeIssue = {
+  issueKey: string;
+  summary: string;
+  issueUrl?: string | null;
+  epicName?: string | null;
+  epicUrl?: string | null;
+  storyPoints?: number | null;
+};
+
+export type CurrentSprintChangesResponse = {
+  source: "local";
+  sprint: CurrentSprint | null;
+  changes: {
+    addedAfterStart: CurrentSprintChangeGroup;
+    removedAfterStart: CurrentSprintChangeGroup;
+    blockedCards: CurrentSprintChangeGroup;
+  };
+  error?: string | null;
+};
+
 export type CurrentSprintWorkIssue = {
   issueKey: string;
   summary: string;
@@ -251,6 +278,17 @@ export async function fetchCurrentSprintWork(): Promise<CurrentSprintWorkRespons
     throw new Error(`Current sprint work request failed (${response.status})`);
   }
   return (await response.json()) as CurrentSprintWorkResponse;
+}
+
+export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesResponse> {
+  const response = await fetch("/api/sprints/current/changes", {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Current sprint changes request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintChangesResponse;
 }
 
 export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {

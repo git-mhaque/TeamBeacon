@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
 from services.api.issues.current_sprint import get_current_sprint
+from services.api.issues.current_sprint_changes import get_current_sprint_changes
 from services.api.issues.current_sprint_work import get_current_sprint_work
 from services.api.issues.query import search_synced_issues
 from services.api.integrations.jira_status import get_jira_status
@@ -37,6 +38,7 @@ HistoryProvider = Callable[[int], dict[str, Any]]
 IssueSearchProvider = Callable[..., dict[str, Any]]
 CurrentSprintProvider = Callable[..., dict[str, Any]]
 CurrentSprintWorkProvider = Callable[..., dict[str, Any]]
+CurrentSprintChangesProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
 MetadataCreateProvider = Callable[[str], dict[str, Any]]
 MetadataUpdateProvider = Callable[[int, str], dict[str, Any]]
@@ -60,6 +62,7 @@ def build_handler(
     issue_search_provider: IssueSearchProvider = search_synced_issues,
     current_sprint_provider: CurrentSprintProvider = get_current_sprint,
     current_sprint_work_provider: CurrentSprintWorkProvider = get_current_sprint_work,
+    current_sprint_changes_provider: CurrentSprintChangesProvider = get_current_sprint_changes,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
@@ -159,6 +162,12 @@ def build_handler(
 
             if path == "/api/sprints/current/work":
                 payload = current_sprint_work_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/sprints/current/changes":
+                payload = current_sprint_changes_provider()
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
