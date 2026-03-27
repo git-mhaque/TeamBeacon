@@ -1323,6 +1323,35 @@ body {
   background: #1f8f63;
 }
 
+.initiative-rag-breakdown {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.initiative-rag-text {
+  font-weight: 700;
+}
+
+.initiative-rag-red {
+  color: #c2372e;
+}
+
+.initiative-rag-amber {
+  color: #b77700;
+}
+
+.initiative-rag-green {
+  color: #1f8f63;
+}
+
+.initiative-rag-separator {
+  color: #5f727c;
+}
+
 .executive-mini-table h4 {
   margin: 0 0 0.42rem;
   font-size: 0.9rem;

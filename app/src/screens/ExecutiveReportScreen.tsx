@@ -438,6 +438,24 @@ export function ExecutiveReportScreen() {
     return orderedRows;
   }, [initiativeRows, selectedInitiativeEpicKeys]);
 
+  const visibleInitiativeSignals = useMemo(() => {
+    const totalEpics = visibleInitiativeRows.length;
+    const totalCompletedLastWeek = visibleInitiativeRows.reduce(
+      (sum, row) => sum + row.completedLastWeekValue,
+      0,
+    );
+    const redCount = visibleInitiativeRows.filter((row) => row.rag === "Red").length;
+    const amberCount = visibleInitiativeRows.filter((row) => row.rag === "Amber").length;
+    const greenCount = visibleInitiativeRows.filter((row) => row.rag === "Green").length;
+    return {
+      totalEpics,
+      totalCompletedLastWeek,
+      redCount,
+      amberCount,
+      greenCount,
+    };
+  }, [visibleInitiativeRows]);
+
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
     if (!query) return initiativeRows;
@@ -688,21 +706,31 @@ export function ExecutiveReportScreen() {
       <Panel title="Report Signals" subtitle="High-level confidence snapshot for final review.">
         <div className="metrics-grid four-up">
           <MetricCard
-            label="Configured Epics"
-            value={loading ? "..." : metrics.totalEpics}
-            hint="Executive report scope."
+            label="Ongoing Initiatives"
+            value={loading ? "..." : visibleInitiativeSignals.totalEpics}
+            hint="Selected for Weekly Progress by Initiative."
           />
           <MetricCard
             label="Weekly Progress"
-            value={loading ? "..." : `${metrics.totalCompletedLastWeek} cards`}
-            hint={loading ? "..." : `${formatPercent(metrics.avgDelta)} of scoped cards`}
-            tone={metrics.totalCompletedLastWeek > 0 ? "good" : "warn"}
+            value={loading ? "..." : `${visibleInitiativeSignals.totalCompletedLastWeek} cards`}
+            hint="Completed in last 7 days."
+            tone={visibleInitiativeSignals.totalCompletedLastWeek > 0 ? "good" : "warn"}
           />
           <MetricCard
             label="Initiative RAG"
-            value={loading ? "..." : `${metrics.greenCount}G / ${metrics.amberCount}A / ${metrics.redCount}R`}
-            hint="Derived from timeline-aware epic risk signals."
-            tone={metrics.redCount > 0 ? "warn" : "good"}
+            value={
+              loading ? "..." : (
+                <span className="initiative-rag-breakdown">
+                  <span className="initiative-rag-text initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
+                  <span className="initiative-rag-separator">|</span>
+                  <span className="initiative-rag-text initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
+                  <span className="initiative-rag-separator">|</span>
+                  <span className="initiative-rag-text initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
+                </span>
+              )
+            }
+            hint="For selected initiatives."
+            tone="neutral"
           />
           <MetricCard
             label="Export Bundle"
