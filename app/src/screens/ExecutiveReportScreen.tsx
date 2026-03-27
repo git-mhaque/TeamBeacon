@@ -480,6 +480,11 @@ export function ExecutiveReportScreen() {
     return selectedRows;
   }, [initiativeConfigDraftKeys, initiativeRows]);
 
+  const availableInitiativeConfigRows = useMemo(() => {
+    const selected = new Set(initiativeConfigDraftKeys);
+    return initiativeConfigRows.filter((row) => !selected.has(row.epicKey));
+  }, [initiativeConfigDraftKeys, initiativeConfigRows]);
+
   const openInitiativeConfig = useCallback(() => {
     setInitiativeConfigDraftKeys(selectedInitiativeEpicKeys);
     setInitiativeConfigQuery("");
@@ -493,13 +498,15 @@ export function ExecutiveReportScreen() {
     setInitiativeConfigDraggingKey(null);
   }, []);
 
-  const toggleInitiativeDraftKey = useCallback((epicKey: string) => {
+  const addInitiativeDraftKey = useCallback((epicKey: string) => {
     setInitiativeConfigDraftKeys((previous) => {
-      if (previous.includes(epicKey)) {
-        return previous.filter((key) => key !== epicKey);
-      }
+      if (previous.includes(epicKey)) return previous;
       return [...previous, epicKey];
     });
+  }, []);
+
+  const removeInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftKeys((previous) => previous.filter((key) => key !== epicKey));
   }, []);
 
   const moveInitiativeDraftKey = useCallback((sourceKey: string, targetKey: string) => {
@@ -776,7 +783,7 @@ export function ExecutiveReportScreen() {
             <p>Select which configured epics appear in Weekly Progress by Initiative.</p>
 
             <label className="initiative-config-search">
-              <span>Search epics</span>
+              <span>Search</span>
               <input
                 type="text"
                 value={initiativeConfigQuery}
@@ -798,63 +805,70 @@ export function ExecutiveReportScreen() {
               </button>
             </div>
 
-            <div className="initiative-config-order-panel">
-              <h4>Selected Epic Order</h4>
-              <p>Drag selected epics to control table order.</p>
-              <div className="initiative-config-order-list">
-                {selectedInitiativeConfigRows.map((row) => (
-                  <div
-                    key={row.epicKey}
-                    className={`initiative-config-order-item ${
-                      initiativeConfigDraggingKey === row.epicKey ? "dragging" : ""
-                    }`}
-                    draggable
-                    onDragStart={() => setInitiativeConfigDraggingKey(row.epicKey)}
-                    onDragEnd={() => setInitiativeConfigDraggingKey(null)}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      if (!initiativeConfigDraggingKey) return;
-                      moveInitiativeDraftKey(initiativeConfigDraggingKey, row.epicKey);
-                      setInitiativeConfigDraggingKey(null);
-                    }}
-                  >
-                    <span className="initiative-drag-handle" aria-hidden="true">
-                      ::
-                    </span>
-                    <span className="initiative-config-order-label">{row.groupText} | {row.epicName || row.epicKey}</span>
-                  </div>
-                ))}
-                {selectedInitiativeConfigRows.length === 0 ? (
-                  <p className="sync-options-note">No epics selected yet.</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="sync-options-list initiative-config-list">
-              {initiativeConfigRows.map((row) => {
-                const checked = initiativeConfigDraftKeys.includes(row.epicKey);
-                return (
-                  <label key={row.epicKey} className={`sync-option ${checked ? "selected" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleInitiativeDraftKey(row.epicKey)}
-                    />
-                    <span>
-                      <span className="sync-option-title">{row.epicName || row.epicKey}</span>
-                      <span className="sync-option-desc">
-                        {row.epicKey} | {row.groupText} | {row.typeText}
+            <div className="initiative-config-columns">
+              <section className="initiative-config-column">
+                <h4>Available Epics</h4>
+                <p>Double-click to select.</p>
+                <div className="initiative-config-card-list">
+                  {availableInitiativeConfigRows.map((row) => (
+                    <button
+                      key={row.epicKey}
+                      className="initiative-config-card"
+                      type="button"
+                      onDoubleClick={() => addInitiativeDraftKey(row.epicKey)}
+                    >
+                      <span className="initiative-config-card-meta">
+                        {row.groupText} | {row.typeText} | {row.epicKey}
                       </span>
-                    </span>
-                  </label>
-                );
-              })}
-              {initiativeConfigRows.length === 0 ? (
-                <p className="sync-options-note">No epics match the current search.</p>
-              ) : null}
+                      <span className="initiative-config-card-title">{row.epicName || row.epicKey}</span>
+                    </button>
+                  ))}
+                  {availableInitiativeConfigRows.length === 0 ? (
+                    <p className="sync-options-note">No epics match the current search.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="initiative-config-column">
+                <h4>Selected Epics</h4>
+                <p>Double-click to remove. Drag to reorder.</p>
+                <div className="initiative-config-card-list">
+                  {selectedInitiativeConfigRows.map((row) => (
+                    <div
+                      key={row.epicKey}
+                      className={`initiative-config-order-item ${
+                        initiativeConfigDraggingKey === row.epicKey ? "dragging" : ""
+                      }`}
+                      draggable
+                      onDoubleClick={() => removeInitiativeDraftKey(row.epicKey)}
+                      onDragStart={() => setInitiativeConfigDraggingKey(row.epicKey)}
+                      onDragEnd={() => setInitiativeConfigDraggingKey(null)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (!initiativeConfigDraggingKey) return;
+                        moveInitiativeDraftKey(initiativeConfigDraggingKey, row.epicKey);
+                        setInitiativeConfigDraggingKey(null);
+                      }}
+                    >
+                      <span className="initiative-drag-handle" aria-hidden="true">
+                        ::
+                      </span>
+                      <span className="initiative-config-order-label">
+                        <span className="initiative-config-card-meta">
+                          {row.groupText} | {row.typeText} | {row.epicKey}
+                        </span>
+                        <span className="initiative-config-card-title">{row.epicName || row.epicKey}</span>
+                      </span>
+                    </div>
+                  ))}
+                  {selectedInitiativeConfigRows.length === 0 ? (
+                    <p className="sync-options-note">No epics selected yet.</p>
+                  ) : null}
+                </div>
+              </section>
             </div>
 
             <div className="sync-options-footer">

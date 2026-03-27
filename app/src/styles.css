@@ -615,7 +615,7 @@ body {
 }
 
 .initiative-config-dialog {
-  width: min(760px, 94vw);
+  width: min(1120px, 96vw);
   max-height: 86vh;
   overflow: auto;
 }
@@ -642,49 +642,88 @@ body {
   margin-top: 0.6rem;
 }
 
-.initiative-config-list {
-  max-height: 24rem;
-  overflow: auto;
+.initiative-config-columns {
+  margin-top: 0.72rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.68rem;
 }
 
-.initiative-config-order-panel {
-  margin-top: 0.68rem;
+.initiative-config-column {
   border: 1px solid var(--line);
-  border-radius: 0.68rem;
-  padding: 0.62rem;
+  border-radius: 0.72rem;
   background: #f7fbfe;
+  padding: 0.62rem;
+  min-height: 24rem;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.24rem;
 }
 
-.initiative-config-order-panel h4 {
+.initiative-config-column h4 {
   margin: 0;
   font-size: 0.88rem;
   color: #1f3740;
 }
 
-.initiative-config-order-panel p {
-  margin: 0.3rem 0 0;
+.initiative-config-column p {
+  margin: 0;
   color: var(--muted);
   font-size: 0.78rem;
 }
 
-.initiative-config-order-list {
-  margin-top: 0.52rem;
+.initiative-config-card-list {
+  margin-top: 0.38rem;
   display: grid;
-  gap: 0.28rem;
-  max-height: 11.5rem;
+  gap: 0.3rem;
+  max-height: 55vh;
   overflow: auto;
+  align-content: start;
+}
+
+.initiative-config-card {
+  text-align: left;
+  border: 1px solid #d2e1e8;
+  border-radius: 0.56rem;
+  padding: 0.44rem 0.5rem;
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.initiative-config-card:hover {
+  border-color: #9dbdcb;
+  background: #f5fbff;
+}
+
+.initiative-config-card-meta {
+  display: block;
+  color: #4d6d7b;
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.initiative-config-card-title {
+  display: block;
+  color: #1e3a46;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  font-weight: 700;
 }
 
 .initiative-config-order-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.44rem;
   border: 1px solid #d2e1e8;
   border-radius: 0.56rem;
-  padding: 0.36rem 0.45rem;
+  padding: 0.44rem 0.5rem;
   background: #fff;
   cursor: grab;
   user-select: none;
+  width: 100%;
+  text-align: left;
 }
 
 .initiative-config-order-item.dragging {
@@ -699,8 +738,17 @@ body {
 }
 
 .initiative-config-order-label {
-  color: #223f4b;
-  font-size: 0.8rem;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.initiative-config-order-item .initiative-config-card-meta {
+  font-size: 0.74rem;
+}
+
+.initiative-config-order-item .initiative-config-card-title {
+  font-size: 0.84rem;
 }
 
 .sync-history-overlay {
@@ -1499,6 +1547,7 @@ body {
   .metrics-grid.three-up,
   .metrics-grid.four-up,
   .epic-meta-lookup-grid,
+  .initiative-config-columns,
   .epic-meta-timeline-row,
   .epic-meta-selection-grid,
   .kanban-grid {
