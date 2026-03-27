@@ -590,63 +590,6 @@ export function ExecutiveReportScreen() {
         </div>
       </Panel>
 
-      <Panel title="Group and Type Weekly Progress" subtitle="Momentum view across epic groups and work types.">
-        <div className="metrics-grid two-up">
-          <div className="executive-mini-table">
-            <h4>Groups</h4>
-            <table className="sync-history-table">
-              <thead>
-                <tr>
-                  <th>Group</th>
-                  <th>Weekly</th>
-                  <th>Completion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupProgress.slice(0, 6).map((row) => (
-                  <tr key={row.name}>
-                    <td>{row.name}</td>
-                    <td>{row.completedLastWeek}/{row.cards}</td>
-                    <td>{formatPercent(row.completionPercent)}</td>
-                  </tr>
-                ))}
-                {!loading && groupProgress.length === 0 ? (
-                  <tr>
-                    <td colSpan={3}>No group-tagged epics yet.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          <div className="executive-mini-table">
-            <h4>Types</h4>
-            <table className="sync-history-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Weekly</th>
-                  <th>Completion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {typeProgress.slice(0, 6).map((row) => (
-                  <tr key={row.name}>
-                    <td>{row.name}</td>
-                    <td>{row.completedLastWeek}/{row.cards}</td>
-                    <td>{formatPercent(row.completionPercent)}</td>
-                  </tr>
-                ))}
-                {!loading && typeProgress.length === 0 ? (
-                  <tr>
-                    <td colSpan={3}>No type-tagged epics yet.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Panel>
-
       <Panel
         title="Weekly Progress for Key Initiatives"
         action={
@@ -760,6 +703,79 @@ export function ExecutiveReportScreen() {
             hint="For selected initiatives."
             tone="neutral"
           />
+        </div>
+      </Panel>
+
+      <Panel title="Weekly Work Distribution by Group and Type" subtitle="Share of weekly completed cards across groups and types.">
+        <div className="metrics-grid two-up">
+          <div className="executive-mini-table">
+            <h4>Groups</h4>
+            <table className="sync-history-table">
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>Weekly Completed</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...groupProgress]
+                  .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
+                  .map((row) => (
+                  <tr key={row.name}>
+                    <td>{row.name}</td>
+                    <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
+                    <td>
+                      {formatPercent(
+                        metrics.totalCompletedLastWeek > 0
+                          ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
+                          : 0,
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {!loading && groupProgress.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>No group-tagged epics yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <div className="executive-mini-table">
+            <h4>Types</h4>
+            <table className="sync-history-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Weekly Completed</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...typeProgress]
+                  .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
+                  .map((row) => (
+                  <tr key={row.name}>
+                    <td>{row.name}</td>
+                    <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
+                    <td>
+                      {formatPercent(
+                        metrics.totalCompletedLastWeek > 0
+                          ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
+                          : 0,
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {!loading && typeProgress.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>No type-tagged epics yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </Panel>
 
