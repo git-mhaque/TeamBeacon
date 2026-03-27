@@ -661,7 +661,6 @@ export function ExecutiveReportScreen() {
               <tr>
                 <th>Group</th>
                 <th>Epic</th>
-                <th>Type</th>
                 <th>Weekly Progress</th>
                 <th>Overall Progress</th>
                 <th>RAG</th>
@@ -699,7 +698,6 @@ export function ExecutiveReportScreen() {
                         ) : null}
                       </span>
                     </td>
-                    <td className="initiative-type-cell">{row.typeText}</td>
                     <td className="initiative-delta-cell">
                       {row.completedLastWeekValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
                     </td>
@@ -721,7 +719,7 @@ export function ExecutiveReportScreen() {
               })}
               {!loading && visibleInitiativeRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={5}>
                     {initiativeRows.length > 0
                       ? "No epics selected. Use Configure to include epics in this section."
                       : "No configured epic data available yet."}
