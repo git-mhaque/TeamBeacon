@@ -43,6 +43,16 @@ function ragRank(label: "Red" | "Amber" | "Green"): number {
   return 3;
 }
 
+function normalizeDateInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const candidate = value.trim();
+  if (!candidate) return "";
+  if (candidate.length >= 10) {
+    return candidate.slice(0, 10);
+  }
+  return "";
+}
+
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
@@ -71,6 +81,8 @@ export function InitiativesScreen() {
   const [epicCandidates, setEpicCandidates] = useState<EpicCandidate[]>([]);
   const [selectedEpicCandidate, setSelectedEpicCandidate] = useState<EpicCandidate | null>(null);
   const [configureSuccessCriteriaText, setConfigureSuccessCriteriaText] = useState("");
+  const [configureTimelineEnabled, setConfigureTimelineEnabled] = useState(false);
+  const [configureTargetCompletionDate, setConfigureTargetCompletionDate] = useState("");
   const [configureSelectedGroupIds, setConfigureSelectedGroupIds] = useState<number[]>([]);
   const [configureSelectedWorkTypeIds, setConfigureSelectedWorkTypeIds] = useState<number[]>([]);
   const [isEpicEditOpen, setIsEpicEditOpen] = useState(false);
@@ -80,6 +92,8 @@ export function InitiativesScreen() {
   const [pendingRemoveEpic, setPendingRemoveEpic] = useState<SummaryRow | null>(null);
   const [editingEpic, setEditingEpic] = useState<SummaryRow | null>(null);
   const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
+  const [editTimelineEnabled, setEditTimelineEnabled] = useState(false);
+  const [editTargetCompletionDate, setEditTargetCompletionDate] = useState("");
   const [editSelectedGroupIds, setEditSelectedGroupIds] = useState<number[]>([]);
   const [editSelectedWorkTypeIds, setEditSelectedWorkTypeIds] = useState<number[]>([]);
   const groupFilterRef = useRef<HTMLDivElement | null>(null);
@@ -367,6 +381,8 @@ export function InitiativesScreen() {
     setEpicCandidatesError(null);
     setSelectedEpicCandidate(null);
     setConfigureSuccessCriteriaText("");
+    setConfigureTimelineEnabled(false);
+    setConfigureTargetCompletionDate("");
     setConfigureSelectedGroupIds([]);
     setConfigureSelectedWorkTypeIds([]);
     setIsEpicConfigureOpen(true);
@@ -385,6 +401,8 @@ export function InitiativesScreen() {
     setEpicMetaSuccess(null);
     setEditingEpic(entry);
     setEditSuccessCriteriaText(entry.successCriteria.join("\n"));
+    setEditTimelineEnabled(Boolean(entry.timelineEnabled));
+    setEditTargetCompletionDate(normalizeDateInputValue(entry.targetCompletionDate));
     setEditSelectedGroupIds(entry.groups.map((group) => group.id));
     setEditSelectedWorkTypeIds(entry.workTypes.map((workType) => workType.id));
     setEditMetaError(null);
@@ -405,6 +423,10 @@ export function InitiativesScreen() {
       setConfigureMetaError("Please select an epic to configure.");
       return;
     }
+    if (configureTimelineEnabled && !configureTargetCompletionDate.trim()) {
+      setConfigureMetaError("Target completion date is required when timeline is enabled.");
+      return;
+    }
     const criteria = configureSuccessCriteriaText
       .split("\n")
       .map((line) => line.trim())
@@ -420,6 +442,8 @@ export function InitiativesScreen() {
         successCriteria: criteria,
         groupIds: configureSelectedGroupIds,
         workTypeIds: configureSelectedWorkTypeIds,
+        timelineEnabled: configureTimelineEnabled,
+        targetCompletionDate: configureTimelineEnabled ? configureTargetCompletionDate.trim() : null,
       });
       await loadEpicSummary();
       setEpicMetaSuccess(`Epic metadata saved for ${selectedEpicCandidate.epicKey}.`);
@@ -434,6 +458,8 @@ export function InitiativesScreen() {
     configureSelectedGroupIds,
     configureSelectedWorkTypeIds,
     configureSuccessCriteriaText,
+    configureTargetCompletionDate,
+    configureTimelineEnabled,
     loadEpicSummary,
     selectedEpicCandidate,
   ]);
@@ -446,6 +472,10 @@ export function InitiativesScreen() {
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
+    if (editTimelineEnabled && !editTargetCompletionDate.trim()) {
+      setEditMetaError("Target completion date is required when timeline is enabled.");
+      return;
+    }
 
     setEditMetaSaving(true);
     setEditMetaError(null);
@@ -457,6 +487,8 @@ export function InitiativesScreen() {
         successCriteria: criteria,
         groupIds: editSelectedGroupIds,
         workTypeIds: editSelectedWorkTypeIds,
+        timelineEnabled: editTimelineEnabled,
+        targetCompletionDate: editTimelineEnabled ? editTargetCompletionDate.trim() : null,
       });
       await loadEpicSummary();
       setEpicMetaSuccess(`Epic metadata updated for ${editingEpic.epicKey}.`);
@@ -472,6 +504,8 @@ export function InitiativesScreen() {
     editSelectedGroupIds,
     editSelectedWorkTypeIds,
     editSuccessCriteriaText,
+    editTargetCompletionDate,
+    editTimelineEnabled,
     editingEpic,
     loadEpicSummary,
   ]);
@@ -1004,6 +1038,32 @@ export function InitiativesScreen() {
               />
             </label>
 
+            <div className="epic-meta-timeline-row">
+              <label className="epic-meta-checkbox">
+                <input
+                  type="checkbox"
+                  checked={configureTimelineEnabled}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setConfigureTimelineEnabled(checked);
+                    if (!checked) {
+                      setConfigureTargetCompletionDate("");
+                    }
+                  }}
+                />
+                <span>Enable timeline target date</span>
+              </label>
+              <label className="epic-meta-field">
+                <span>Target Completion Date</span>
+                <input
+                  type="date"
+                  value={configureTargetCompletionDate}
+                  onChange={(event) => setConfigureTargetCompletionDate(event.target.value)}
+                  disabled={!configureTimelineEnabled}
+                />
+              </label>
+            </div>
+
             <div className="epic-meta-selection-grid">
               <div className="epic-meta-select-card">
                 <h4>Epic Groups</h4>
@@ -1096,6 +1156,32 @@ export function InitiativesScreen() {
                 rows={6}
               />
             </label>
+
+            <div className="epic-meta-timeline-row">
+              <label className="epic-meta-checkbox">
+                <input
+                  type="checkbox"
+                  checked={editTimelineEnabled}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setEditTimelineEnabled(checked);
+                    if (!checked) {
+                      setEditTargetCompletionDate("");
+                    }
+                  }}
+                />
+                <span>Enable timeline target date</span>
+              </label>
+              <label className="epic-meta-field">
+                <span>Target Completion Date</span>
+                <input
+                  type="date"
+                  value={editTargetCompletionDate}
+                  onChange={(event) => setEditTargetCompletionDate(event.target.value)}
+                  disabled={!editTimelineEnabled}
+                />
+              </label>
+            </div>
 
             <div className="epic-meta-selection-grid">
               <div className="epic-meta-select-card">

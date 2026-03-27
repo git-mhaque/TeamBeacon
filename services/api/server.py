@@ -412,6 +412,18 @@ def build_handler(
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "workTypeIds must be a list of integers."}))
                     return
+                timeline_enabled_raw = body_payload.get("timelineEnabled")
+                if timeline_enabled_raw is not None and not isinstance(timeline_enabled_raw, bool):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "timelineEnabled must be a boolean."}))
+                    return
+                target_completion_date_raw = body_payload.get("targetCompletionDate")
+                if target_completion_date_raw is not None and not isinstance(target_completion_date_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(
+                        _json_bytes({"error": "bad_request", "detail": "targetCompletionDate must be a string date."})
+                    )
+                    return
 
                 try:
                     payload = metadata_upsert_epic_provider(
@@ -419,6 +431,8 @@ def build_handler(
                         success_criteria=success_criteria_raw,
                         group_ids=group_ids_raw,
                         work_type_ids=work_type_ids_raw,
+                        timeline_enabled=timeline_enabled_raw,
+                        target_completion_date=target_completion_date_raw,
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)

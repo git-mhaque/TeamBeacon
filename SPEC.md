@@ -78,13 +78,15 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - “Worked by user X” matches issue assignee, reporter, or any changelog author on that issue.
 
 ## 6.2 Epic Metadata Configuration (Current Behavior)
-- Epic metadata is managed from Integrations & Field Mapping.
+- Epic metadata is managed from Initiative Insights (Configure/Edit Epic flow).
 - Lookup/reference data:
   - `epic groups` can be added and reused.
   - `work types` can be added and reused.
 - Per-epic configuration payload:
   - `epicKey`
   - `successCriteria[]`
+  - `timelineEnabled` (boolean)
+  - `targetCompletionDate` (ISO date, required when `timelineEnabled=true`)
   - `groupIds[]`
   - `workTypeIds[]`
 - Persisted storage:

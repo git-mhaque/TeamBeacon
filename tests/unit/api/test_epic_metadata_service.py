@@ -66,6 +66,8 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertIn("epicTitle", upserted)
             self.assertEqual(upserted["epicTitle"], "Unified Engineering Pulse")
             self.assertEqual(len(upserted["successCriteria"]), 2)
+            self.assertFalse(upserted["timelineEnabled"])
+            self.assertIsNone(upserted["targetCompletionDate"])
             self.assertEqual(upserted["groupIds"], [group["id"]])
             self.assertEqual(upserted["workTypeIds"], [work_type["id"]])
 
@@ -73,6 +75,105 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(len(read_payload["epics"]), 1)
             self.assertEqual(read_payload["epics"][0]["epicKey"], "CEGBUPOL-4482")
             self.assertEqual(read_payload["epics"][0]["epicTitle"], "Unified Engineering Pulse")
+            self.assertFalse(read_payload["epics"][0]["timelineEnabled"])
+            self.assertIsNone(read_payload["epics"][0]["targetCompletionDate"])
+
+    def test_upsert_epic_metadata_persists_timeline_date(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS issues (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      issue_key TEXT NOT NULL UNIQUE,
+                      issue_id TEXT NOT NULL,
+                      project_key TEXT,
+                      issue_type TEXT,
+                      summary TEXT NOT NULL,
+                      status_name TEXT NOT NULL,
+                      status_category TEXT,
+                      priority TEXT,
+                      assignee_account_id TEXT,
+                      reporter_account_id TEXT,
+                      story_points REAL,
+                      sprint_external_id INTEGER,
+                      epic_key TEXT,
+                      parent_issue_key TEXT,
+                      labels_json TEXT NOT NULL DEFAULT '[]',
+                      components_json TEXT NOT NULL DEFAULT '[]',
+                      created_at_source TEXT,
+                      updated_at_source TEXT,
+                      resolved_at_source TEXT,
+                      raw_json TEXT NOT NULL DEFAULT '{}',
+                      synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (issue_key, issue_id, summary, status_name)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("CEGBUPOL-3553", "3553", "Domain Support Q4", "To Do"),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            upserted = upsert_epic_metadata(
+                epic_key="CEGBUPOL-3553",
+                success_criteria=["Complete domain support cards"],
+                timeline_enabled=True,
+                target_completion_date="2026-05-15",
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+            self.assertTrue(upserted["timelineEnabled"])
+            self.assertEqual(upserted["targetCompletionDate"], "2026-05-15")
+
+            payload = get_configured_epic_summary(limit=10, db_path=db_path)
+            self.assertEqual(len(payload["epics"]), 1)
+            self.assertTrue(payload["epics"][0]["timelineEnabled"])
+            self.assertEqual(payload["epics"][0]["targetCompletionDate"], "2026-05-15")
+
+            updated = upsert_epic_metadata(
+                epic_key="CEGBUPOL-3553",
+                success_criteria=["Complete domain support cards"],
+                timeline_enabled=False,
+                target_completion_date=None,
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+            self.assertFalse(updated["timelineEnabled"])
+            self.assertIsNone(updated["targetCompletionDate"])
+
+    def test_upsert_timeline_rejects_missing_or_invalid_target_completion_date(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            with self.assertRaisesRegex(ValueError, "required when timelineEnabled is true"):
+                upsert_epic_metadata(
+                    epic_key="CEGBUPOL-3553",
+                    success_criteria=["A"],
+                    timeline_enabled=True,
+                    target_completion_date=None,
+                    group_ids=[],
+                    work_type_ids=[],
+                    db_path=db_path,
+                )
+            with self.assertRaisesRegex(ValueError, "valid ISO date"):
+                upsert_epic_metadata(
+                    epic_key="CEGBUPOL-3553",
+                    success_criteria=["A"],
+                    timeline_enabled=True,
+                    target_completion_date="2026-99-99",
+                    group_ids=[],
+                    work_type_ids=[],
+                    db_path=db_path,
+                )
 
     def test_upsert_rejects_unknown_lookup_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

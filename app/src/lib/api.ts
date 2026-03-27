@@ -88,6 +88,8 @@ export type EpicMetadataEntry = {
   epicKey: string;
   epicTitle?: string | null;
   successCriteria: string[];
+  timelineEnabled?: boolean;
+  targetCompletionDate?: string | null;
   groupIds: number[];
   groups: EpicLookupItem[];
   workTypeIds: number[];
@@ -111,6 +113,8 @@ export type InitiativeEpicSummary = {
   groups: EpicLookupItem[];
   workTypes: EpicLookupItem[];
   successCriteria: string[];
+  timelineEnabled?: boolean;
+  targetCompletionDate?: string | null;
   ragScore?: string | null;
   insightComment?: string | null;
   updatedAt?: string | null;
@@ -446,6 +450,8 @@ export async function upsertEpicMetadata(payload: {
   successCriteria: string[];
   groupIds: number[];
   workTypeIds: number[];
+  timelineEnabled?: boolean;
+  targetCompletionDate?: string | null;
 }): Promise<EpicMetadataEntry> {
   const response = await fetch("/api/metadata/epics", {
     method: "POST",
