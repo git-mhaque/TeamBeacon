@@ -111,6 +111,8 @@ export type InitiativeEpicSummary = {
   completionPercent: number;
   completedLastWeek?: number;
   deltaPercent?: number;
+  completedInPeriod?: number;
+  deltaPercentInPeriod?: number;
   groups: EpicLookupItem[];
   workTypes: EpicLookupItem[];
   successCriteria: string[];
@@ -120,6 +122,13 @@ export type InitiativeEpicSummary = {
   ragScore?: string | null;
   insightComment?: string | null;
   updatedAt?: string | null;
+};
+
+export type EpicSummaryReportingPeriod = {
+  startDate: string;
+  endDate: string;
+  days: number;
+  timezone: string;
 };
 
 export type CurrentSprint = {
@@ -435,15 +444,40 @@ export async function fetchEpicCandidates(query: string, limit = 20): Promise<Ep
   return payload.epics ?? [];
 }
 
-export async function fetchConfiguredEpicSummary(limit = 50): Promise<InitiativeEpicSummary[]> {
-  const response = await fetch(`/api/metadata/epics/summary?limit=${encodeURIComponent(String(limit))}`, {
+export async function fetchConfiguredEpicSummary(
+  limit = 50,
+  options?: {
+    periodStart?: string | null;
+    periodEnd?: string | null;
+    timezone?: string | null;
+  },
+): Promise<InitiativeEpicSummary[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (options?.periodStart) {
+    params.set("periodStart", options.periodStart);
+  }
+  if (options?.periodEnd) {
+    params.set("periodEnd", options.periodEnd);
+  }
+  if (options?.timezone) {
+    params.set("timezone", options.timezone);
+  }
+  const response = await fetch(`/api/metadata/epics/summary?${params.toString()}`, {
     method: "GET",
     headers: { Accept: "application/json" }
   });
   if (!response.ok) {
+    if (response.status === 400) {
+      const payload = (await response.json()) as { detail?: string };
+      throw new Error(payload.detail ?? "Invalid configured epic summary request.");
+    }
     throw new Error(`Configured epic summary request failed (${response.status})`);
   }
-  const payload = (await response.json()) as { epics?: InitiativeEpicSummary[] };
+  const payload = (await response.json()) as {
+    epics?: InitiativeEpicSummary[];
+    reportingPeriod?: EpicSummaryReportingPeriod;
+  };
   return payload.epics ?? [];
 }
 

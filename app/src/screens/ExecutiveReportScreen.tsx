@@ -20,6 +20,101 @@ type ExecutiveRow = InitiativeEpicSummary & {
 };
 
 const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
+const REPORTING_PERIOD_SELECTION_KEY = "teambeacon.executive.reporting.period";
+type ReportingPreset = "last_7_days" | "last_14_days" | "last_30_days" | "custom";
+type ReportingRange = {
+  startDate: string;
+  endDate: string;
+};
+type PersistedReportingSelection = {
+  preset: ReportingPreset;
+  startDate: string;
+  endDate: string;
+};
+
+function isReportingPreset(value: unknown): value is ReportingPreset {
+  return value === "last_7_days" || value === "last_14_days" || value === "last_30_days" || value === "custom";
+}
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && parseIsoDateToUtcDay(value) !== null;
+}
+
+function readPersistedReportingSelection(defaultRange: ReportingRange): PersistedReportingSelection {
+  const fallback: PersistedReportingSelection = {
+    preset: "last_7_days",
+    startDate: defaultRange.startDate,
+    endDate: defaultRange.endDate,
+  };
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  try {
+    const raw = window.localStorage.getItem(REPORTING_PERIOD_SELECTION_KEY);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw) as Partial<PersistedReportingSelection>;
+    if (!isReportingPreset(parsed.preset) || !isIsoDate(parsed.startDate) || !isIsoDate(parsed.endDate)) {
+      return fallback;
+    }
+    const startUtc = parseIsoDateToUtcDay(parsed.startDate);
+    const endUtc = parseIsoDateToUtcDay(parsed.endDate);
+    if (startUtc === null || endUtc === null || startUtc > endUtc) {
+      return fallback;
+    }
+    return {
+      preset: parsed.preset,
+      startDate: parsed.startDate,
+      endDate: parsed.endDate,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function formatLocalIsoDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildRelativeRange(days: number): ReportingRange {
+  const safeDays = Math.max(1, Math.floor(days));
+  const endDate = new Date();
+  endDate.setHours(0, 0, 0, 0);
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - (safeDays - 1));
+  return {
+    startDate: formatLocalIsoDate(startDate),
+    endDate: formatLocalIsoDate(endDate),
+  };
+}
+
+function formatReportingPeriodLabel(startDate: string, endDate: string): string {
+  const startDay = parseIsoDateToUtcDay(startDate);
+  const endDay = parseIsoDateToUtcDay(endDate);
+  if (startDay === null || endDay === null) {
+    return `${startDate} - ${endDate}`;
+  }
+  const start = new Date(startDay);
+  const end = new Date(endDay);
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+  const startText = start.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+    timeZone: "UTC",
+  });
+  const endText = end.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `${startText} - ${endText}`;
+}
 
 function ragFromCompletion(percent: number): RagLabel {
   if (percent < 33) return "Red";
@@ -142,6 +237,15 @@ function formatPercent(value: number): string {
 }
 
 export function ExecutiveReportScreen() {
+  const initialRange = useMemo(() => buildRelativeRange(7), []);
+  const initialReportingSelection = useMemo(
+    () => readPersistedReportingSelection(initialRange),
+    [initialRange],
+  );
+  const browserTimezone = useMemo(() => {
+    if (typeof window === "undefined") return "UTC";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  }, []);
   const [rows, setRows] = useState<ExecutiveRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +256,14 @@ export function ExecutiveReportScreen() {
   const [initiativeConfigDraftKeys, setInitiativeConfigDraftKeys] = useState<string[]>([]);
   const [initiativeConfigQuery, setInitiativeConfigQuery] = useState("");
   const [initiativeConfigDraggingKey, setInitiativeConfigDraggingKey] = useState<string | null>(null);
+  const [reportingPreset, setReportingPreset] = useState<ReportingPreset>(initialReportingSelection.preset);
+  const [reportingStartDraft, setReportingStartDraft] = useState(initialReportingSelection.startDate);
+  const [reportingEndDraft, setReportingEndDraft] = useState(initialReportingSelection.endDate);
+  const [reportingRange, setReportingRange] = useState<ReportingRange>({
+    startDate: initialReportingSelection.startDate,
+    endDate: initialReportingSelection.endDate,
+  });
+  const [reportingValidationError, setReportingValidationError] = useState<string | null>(null);
   const hasInitializedInitiativeSelection = useRef(false);
 
   const persistInitiativeSelection = useCallback((keys: string[]) => {
@@ -163,12 +275,16 @@ export function ExecutiveReportScreen() {
     }
   }, []);
 
-  const loadExecutiveData = useCallback(async () => {
+  const loadExecutiveData = useCallback(async (range: ReportingRange) => {
     setLoading(true);
     setError(null);
     try {
       const [summaryResult, jiraStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary(200),
+        fetchConfiguredEpicSummary(200, {
+          periodStart: range.startDate,
+          periodEnd: range.endDate,
+          timezone: browserTimezone,
+        }),
         fetchJiraIntegrationStatus(),
       ]);
 
@@ -179,10 +295,15 @@ export function ExecutiveReportScreen() {
       const mappedRows: ExecutiveRow[] = summaryResult.value.map((entry) => {
         const groupText = entry.groups.map((group) => group.name).join(", ");
         const typeText = entry.workTypes.map((type) => type.name).join(", ");
-        const completedLastWeekValue = Math.max(0, entry.completedLastWeek ?? 0);
+        const completedLastWeekValue = Math.max(
+          0,
+          entry.completedInPeriod ?? entry.completedLastWeek ?? 0,
+        );
         const deltaCandidate =
-          typeof entry.deltaPercent === "number"
-            ? entry.deltaPercent
+          typeof entry.deltaPercentInPeriod === "number"
+            ? entry.deltaPercentInPeriod
+            : typeof entry.deltaPercent === "number"
+              ? entry.deltaPercent
             : entry.totalCards > 0
               ? (completedLastWeekValue / entry.totalCards) * 100
               : 0;
@@ -231,13 +352,79 @@ export function ExecutiveReportScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [browserTimezone]);
 
   useEffect(() => {
-    loadExecutiveData().catch(() => {
+    loadExecutiveData(reportingRange).catch(() => {
       // loadExecutiveData already updates local state.
     });
-  }, [loadExecutiveData]);
+  }, [loadExecutiveData, reportingRange]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const payload: PersistedReportingSelection = {
+        preset: reportingPreset,
+        startDate: reportingRange.startDate,
+        endDate: reportingRange.endDate,
+      };
+      window.localStorage.setItem(REPORTING_PERIOD_SELECTION_KEY, JSON.stringify(payload));
+    } catch {
+      // Reporting period persistence is best-effort only.
+    }
+  }, [reportingPreset, reportingRange.endDate, reportingRange.startDate]);
+
+  const reportingPeriodLabel = useMemo(
+    () => formatReportingPeriodLabel(reportingRange.startDate, reportingRange.endDate),
+    [reportingRange.endDate, reportingRange.startDate],
+  );
+
+  const reportingPeriodDays = useMemo(() => {
+    const startUtc = parseIsoDateToUtcDay(reportingRange.startDate);
+    const endUtc = parseIsoDateToUtcDay(reportingRange.endDate);
+    if (startUtc === null || endUtc === null || endUtc < startUtc) {
+      return 7;
+    }
+    return Math.max(1, daysBetweenUtc(startUtc, endUtc) + 1);
+  }, [reportingRange.endDate, reportingRange.startDate]);
+
+  const applyCustomReportingRange = useCallback(() => {
+    if (!reportingStartDraft || !reportingEndDraft) {
+      setReportingValidationError("Start and end date are required.");
+      return;
+    }
+    const startUtc = parseIsoDateToUtcDay(reportingStartDraft);
+    const endUtc = parseIsoDateToUtcDay(reportingEndDraft);
+    if (startUtc === null || endUtc === null) {
+      setReportingValidationError("Invalid reporting period date format.");
+      return;
+    }
+    if (startUtc > endUtc) {
+      setReportingValidationError("Start date cannot be after end date.");
+      return;
+    }
+    setReportingValidationError(null);
+    setReportingRange({
+      startDate: reportingStartDraft,
+      endDate: reportingEndDraft,
+    });
+  }, [reportingEndDraft, reportingStartDraft]);
+
+  const onReportingPresetChange = useCallback((preset: ReportingPreset) => {
+    setReportingPreset(preset);
+    setReportingValidationError(null);
+    if (preset === "custom") {
+      return;
+    }
+    const nextRange = preset === "last_14_days"
+      ? buildRelativeRange(14)
+      : preset === "last_30_days"
+        ? buildRelativeRange(30)
+        : buildRelativeRange(7);
+    setReportingStartDraft(nextRange.startDate);
+    setReportingEndDraft(nextRange.endDate);
+    setReportingRange(nextRange);
+  }, []);
 
   const metrics = useMemo(() => {
     const totalEpics = rows.length;
@@ -307,19 +494,24 @@ export function ExecutiveReportScreen() {
 
   const wins = useMemo(() => {
     const items: string[] = [];
+    const completedThreshold = Math.max(1, Math.round((reportingPeriodDays * 3) / 7));
     for (const row of rows) {
-      if (row.completedLastWeekValue >= 3 || row.deltaPercentValue >= 12 || (row.rag === "Green" && row.deltaPercentValue > 0)) {
+      if (
+        row.completedLastWeekValue >= completedThreshold
+        || row.deltaPercentValue >= 12
+        || (row.rag === "Green" && row.deltaPercentValue > 0)
+      ) {
         items.push(
-          `${row.epicName || row.epicKey}: +${formatPercent(row.deltaPercentValue)} weekly movement (${row.completedLastWeekValue}/${row.totalCards} cards), ${row.groupText} / ${row.typeText}.`,
+          `${row.epicName || row.epicKey}: +${formatPercent(row.deltaPercentValue)} period movement (${row.completedLastWeekValue}/${row.totalCards} cards), ${row.groupText} / ${row.typeText}.`,
         );
       }
       if (items.length >= 4) break;
     }
     if (items.length === 0 && rows.length > 0) {
-      items.push("Steady delivery across configured epics with no major slippage this week.");
+      items.push("Steady delivery across configured epics with no major slippage in the selected reporting period.");
     }
     return items;
-  }, [rows]);
+  }, [reportingPeriodDays, rows]);
 
   const risks = useMemo(() => {
     const items: string[] = [];
@@ -330,7 +522,7 @@ export function ExecutiveReportScreen() {
         );
       } else if (row.totalCards > 0 && row.completedLastWeekValue === 0) {
         items.push(
-          `${row.epicName || row.epicKey}: no completed cards in the last 7 days (${row.groupText} / ${row.typeText}).`,
+          `${row.epicName || row.epicKey}: no completed cards in the selected reporting period (${row.groupText} / ${row.typeText}).`,
         );
       } else if (row.successCriteria.length === 0) {
         items.push(`${row.epicName || row.epicKey}: success criteria not configured; outcome quality risk remains.`);
@@ -338,7 +530,7 @@ export function ExecutiveReportScreen() {
       if (items.length >= 4) break;
     }
     if (items.length === 0 && rows.length > 0) {
-      items.push("No major initiative risks flagged from this week's configured epic signals.");
+      items.push("No major initiative risks flagged from configured epic signals in the selected reporting period.");
     }
     return items;
   }, [rows]);
@@ -352,13 +544,13 @@ export function ExecutiveReportScreen() {
     const topType = typeProgress[0];
     return (
       `Tracking ${metrics.totalEpics} configured epics across ${metrics.totalCards} scoped cards. ` +
-      `${metrics.totalCompletedLastWeek} cards were completed in the last 7 days (${formatPercent(metrics.avgDelta)} weekly progress), ` +
+      `${metrics.totalCompletedLastWeek} cards were completed in ${reportingPeriodLabel} (${formatPercent(metrics.avgDelta)} period progress), ` +
       `with average completion at ${formatPercent(metrics.avgCompletion)}. ` +
       `RAG distribution is ${metrics.greenCount} Green, ${metrics.amberCount} Amber, ${metrics.redCount} Red. ` +
       `Top momentum epic: ${topEpic.epicName || topEpic.epicKey} (+${formatPercent(topEpic.deltaPercentValue)}). ` +
-      `Top group/type contributors this week: ${topGroup?.name ?? "n/a"} and ${topType?.name ?? "n/a"}.`
+      `Top group/type contributors in this period: ${topGroup?.name ?? "n/a"} and ${topType?.name ?? "n/a"}.`
     );
-  }, [groupProgress, metrics, rows, typeProgress]);
+  }, [groupProgress, metrics, reportingPeriodLabel, rows, typeProgress]);
 
   const reportTone = metrics.redCount > 0 ? "warn" : "good";
   const initiativeRows = useMemo(() => {
@@ -536,8 +728,7 @@ export function ExecutiveReportScreen() {
     const body = document.body;
     body.classList.add("executive-print-mode");
     const previousTitle = document.title;
-    const printDate = new Date().toISOString().slice(0, 10);
-    document.title = `TeamBeacon-Executive-Report-${printDate}`;
+    document.title = `TeamBeacon-Executive-Report-${reportingRange.startDate}_to_${reportingRange.endDate}`;
 
     window.setTimeout(() => {
       window.print();
@@ -547,13 +738,13 @@ export function ExecutiveReportScreen() {
         setIsExportingPdf(false);
       }, 250);
     }, 120);
-  }, []);
+  }, [reportingRange.endDate, reportingRange.startDate]);
 
   return (
     <div className="screen-grid">
       <Panel
         title="Executive Summary Draft"
-        subtitle="Generated from configured epics, group/type dimensions, and last-7-day movement."
+        subtitle="Generated from configured epics, group/type dimensions, and selected reporting period movement."
         action={(
           <div className="executive-actions no-print">
             <StatusPill tone={reportTone} text={metrics.redCount > 0 ? "Review Risks" : "Ready to Export"} />
@@ -563,6 +754,47 @@ export function ExecutiveReportScreen() {
           </div>
         )}
       >
+        <div className="executive-period-toolbar no-print">
+          <label className="executive-period-field">
+            <span>Reporting Period</span>
+            <select
+              value={reportingPreset}
+              onChange={(event) => onReportingPresetChange(event.target.value as ReportingPreset)}
+            >
+              <option value="last_7_days">Last 7 Days</option>
+              <option value="last_14_days">Last 14 Days</option>
+              <option value="last_30_days">Last 30 Days</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          {reportingPreset === "custom" ? (
+            <div className="executive-period-custom">
+              <label className="executive-period-field">
+                <span>Start</span>
+                <input
+                  type="date"
+                  value={reportingStartDraft}
+                  onChange={(event) => setReportingStartDraft(event.target.value)}
+                />
+              </label>
+              <label className="executive-period-field">
+                <span>End</span>
+                <input
+                  type="date"
+                  value={reportingEndDraft}
+                  onChange={(event) => setReportingEndDraft(event.target.value)}
+                />
+              </label>
+              <button className="mini-sync-btn" type="button" onClick={applyCustomReportingRange}>
+                Apply
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <p className="executive-period-summary">
+          Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {browserTimezone})
+        </p>
+        {reportingValidationError ? <p className="sync-history-error">{reportingValidationError}</p> : null}
         <p className="summary">{loading ? "Generating executive summary..." : executiveSummary}</p>
         {error ? <p className="sync-history-error">Executive report error: {error}</p> : null}
       </Panel>
@@ -604,7 +836,7 @@ export function ExecutiveReportScreen() {
               <tr>
                 <th>Group</th>
                 <th>Epic</th>
-                <th>Weekly Progress</th>
+                <th>Period Progress</th>
                 <th>Overall Progress</th>
                 <th>RAG</th>
               </tr>
@@ -679,12 +911,12 @@ export function ExecutiveReportScreen() {
           <MetricCard
             label="Ongoing Initiatives"
             value={loading ? "..." : visibleInitiativeSignals.totalEpics}
-            hint="Selected for Weekly Progress by Initiative."
+            hint="Selected for Weekly Progress for Key Initiatives."
           />
           <MetricCard
-            label="Weekly Progress"
+            label="Period Progress"
             value={loading ? "..." : `${visibleInitiativeSignals.totalCompletedLastWeek} cards`}
-            hint="Completed in last 7 days."
+            hint="Completed in the selected reporting period."
             tone={visibleInitiativeSignals.totalCompletedLastWeek > 0 ? "good" : "warn"}
           />
           <MetricCard
@@ -706,7 +938,7 @@ export function ExecutiveReportScreen() {
         </div>
       </Panel>
 
-      <Panel title="Weekly Work Distribution by Group and Type" subtitle="Share of weekly completed cards across groups and types.">
+      <Panel title="Work Distribution by Group and Type" subtitle="Share of completed cards in the selected reporting period.">
         <div className="metrics-grid two-up">
           <div className="executive-mini-table">
             <h4>Groups</h4>
@@ -714,7 +946,7 @@ export function ExecutiveReportScreen() {
               <thead>
                 <tr>
                   <th>Group</th>
-                  <th>Weekly Completed</th>
+                  <th>Completed in Period</th>
                   <th>%</th>
                 </tr>
               </thead>
@@ -748,7 +980,7 @@ export function ExecutiveReportScreen() {
               <thead>
                 <tr>
                   <th>Type</th>
-                  <th>Weekly Completed</th>
+                  <th>Completed in Period</th>
                   <th>%</th>
                 </tr>
               </thead>
@@ -786,7 +1018,7 @@ export function ExecutiveReportScreen() {
             <div className="initiative-config-header">
               <div>
                 <h3>Configure Initiative Epics</h3>
-                <p>Select which configured epics appear in Weekly Progress by Initiative.</p>
+                <p>Select which configured epics appear in Weekly Progress for Key Initiatives.</p>
               </div>
               <div className="sync-options-footer initiative-config-top-actions">
                 <button className="mini-sync-btn" type="button" onClick={closeInitiativeConfig}>

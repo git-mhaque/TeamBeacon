@@ -26,7 +26,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_upsert_calls: list[dict[str, object]] = []
         self.epic_delete_calls: list[str] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
-        self.epic_summary_calls: list[int] = []
+        self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
 
         def fake_status():
             return {
@@ -346,8 +346,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ]
             }
 
-        def fake_epic_summary(limit=50):  # noqa: ANN001
-            self.epic_summary_calls.append(limit)
+        def fake_epic_summary(limit=50, period_start=None, period_end=None, timezone_name=None):  # noqa: ANN001
+            self.epic_summary_calls.append((limit, period_start, period_end, timezone_name))
             return {
                 "epics": [
                     {
@@ -356,7 +356,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "completedCards": 8,
                         "totalCards": 10,
                         "completionPercent": 80.0,
+                        "completedInPeriod": 2,
                         "completedLastWeek": 2,
+                        "deltaPercentInPeriod": 20.0,
                         "deltaPercent": 20.0,
                         "groups": [{"id": 1, "name": "Platform"}],
                         "workTypes": [{"id": 10, "name": "Feature"}],
@@ -369,6 +371,13 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "updatedAt": "2026-03-25T00:00:00+00:00",
                     }
                 ]
+                ,
+                "reportingPeriod": {
+                    "startDate": "2026-03-01",
+                    "endDate": "2026-03-30",
+                    "days": 30,
+                    "timezone": "Australia/Melbourne",
+                },
             }
 
         def fake_upsert_epic(**kwargs):  # noqa: ANN003
@@ -826,7 +835,10 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.epic_candidate_calls[-1], ("pulse", 12))
 
     def test_metadata_epic_summary_endpoint(self) -> None:
-        with urlopen(f"{self.base_url}/api/metadata/epics/summary?limit=30", timeout=5) as response:  # noqa: S310
+        with urlopen(  # noqa: S310
+            f"{self.base_url}/api/metadata/epics/summary?limit=30&periodStart=2026-03-01&periodEnd=2026-03-30&timezone=Australia%2FMelbourne",
+            timeout=5,
+        ) as response:
             self.assertEqual(response.status, 200)
             body = json.loads(response.read().decode("utf-8"))
         self.assertEqual(len(body["epics"]), 1)
@@ -838,10 +850,18 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertTrue(body["epics"][0]["timelineEnabled"])
         self.assertEqual(body["epics"][0]["timelineStartDate"], "2026-04-01")
         self.assertEqual(body["epics"][0]["targetCompletionDate"], "2026-04-15")
+        self.assertEqual(body["epics"][0]["completedInPeriod"], 2)
         self.assertEqual(body["epics"][0]["completedLastWeek"], 2)
+        self.assertEqual(body["epics"][0]["deltaPercentInPeriod"], 20.0)
         self.assertEqual(body["epics"][0]["deltaPercent"], 20.0)
+        self.assertEqual(body["reportingPeriod"]["startDate"], "2026-03-01")
+        self.assertEqual(body["reportingPeriod"]["endDate"], "2026-03-30")
+        self.assertEqual(body["reportingPeriod"]["timezone"], "Australia/Melbourne")
         self.assertIsNone(body["epics"][0]["ragScore"])
-        self.assertEqual(self.epic_summary_calls[-1], 30)
+        self.assertEqual(
+            self.epic_summary_calls[-1],
+            (30, "2026-03-01", "2026-03-30", "Australia/Melbourne"),
+        )
 
 
 if __name__ == "__main__":

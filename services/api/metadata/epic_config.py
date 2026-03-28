@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import json
 import sqlite3
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 
@@ -198,6 +199,94 @@ def _normalize_target_completion_date(value: str | None, *, timeline_enabled: bo
     if timeline_enabled and normalized is None:
         raise ValueError("targetCompletionDate is required when timelineEnabled is true.")
     return normalized
+
+
+def _resolve_reporting_timezone(timezone_name: str | None) -> tuple[str, ZoneInfo]:
+    candidate = (timezone_name or "").strip()
+    if not candidate:
+        candidate = "UTC"
+    try:
+        return candidate, ZoneInfo(candidate)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(
+            "timezone must be a valid IANA timezone (for example: Australia/Melbourne)."
+        ) from exc
+
+
+def _resolve_reporting_period(
+    *,
+    period_start: str | None,
+    period_end: str | None,
+    timezone_name: str | None,
+) -> tuple[date, date, str, ZoneInfo]:
+    resolved_timezone_name, resolved_timezone = _resolve_reporting_timezone(timezone_name)
+    normalized_start = _normalize_optional_iso_date(period_start, field_name="periodStart")
+    normalized_end = _normalize_optional_iso_date(period_end, field_name="periodEnd")
+
+    if (normalized_start is None) != (normalized_end is None):
+        raise ValueError("periodStart and periodEnd must both be provided when setting a reporting period.")
+
+    if normalized_start is None or normalized_end is None:
+        period_end_date = datetime.now(resolved_timezone).date()
+        period_start_date = period_end_date - timedelta(days=6)
+        return period_start_date, period_end_date, resolved_timezone_name, resolved_timezone
+
+    period_start_date = date.fromisoformat(normalized_start)
+    period_end_date = date.fromisoformat(normalized_end)
+    if period_start_date > period_end_date:
+        raise ValueError("periodStart cannot be after periodEnd.")
+    return period_start_date, period_end_date, resolved_timezone_name, resolved_timezone
+
+
+def _parse_source_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    candidate = str(value).strip()
+    if not candidate:
+        return None
+
+    normalized = f"{candidate[:-1]}+00:00" if candidate.endswith("Z") else candidate
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        parsed = None
+        for pattern in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+            try:
+                parsed = datetime.strptime(candidate, pattern)
+                break
+            except ValueError:
+                continue
+        if parsed is None:
+            return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _is_done_issue(row: sqlite3.Row) -> bool:
+    status_category = str(row["status_category"] or "").strip().lower()
+    status_name = str(row["status_name"] or "").strip().lower()
+    return (
+        status_category == "done"
+        or status_name in {"done", "closed", "resolved"}
+        or row["resolved_at_source"] is not None
+    )
+
+
+def _is_completed_in_period(
+    row: sqlite3.Row,
+    *,
+    period_start_date: date,
+    period_end_date: date,
+    reporting_timezone: ZoneInfo,
+) -> bool:
+    timestamp_raw = row["resolved_at_source"] or row["updated_at_source"] or row["synced_at"]
+    event_at = _parse_source_datetime(timestamp_raw)
+    if event_at is None:
+        return False
+    local_event_date = event_at.astimezone(reporting_timezone).date()
+    return period_start_date <= local_event_date <= period_end_date
 
 
 def _normalize_int_ids(
@@ -640,42 +729,22 @@ def get_epic_metadata(
     return {"epics": entries}
 
 
-def _read_epic_completion_metrics(conn: sqlite3.Connection, epic_key: str) -> tuple[int, int, int]:
-    row = conn.execute(
+def _read_epic_completion_metrics(
+    conn: sqlite3.Connection,
+    epic_key: str,
+    *,
+    period_start_date: date,
+    period_end_date: date,
+    reporting_timezone: ZoneInfo,
+) -> tuple[int, int, int]:
+    rows = conn.execute(
         """
         SELECT
-          COUNT(*) AS total_cards,
-          SUM(
-            CASE
-              WHEN (
-                LOWER(COALESCE(i.status_category, '')) = 'done'
-                OR LOWER(COALESCE(i.status_name, '')) IN ('done', 'closed', 'resolved')
-                OR i.resolved_at_source IS NOT NULL
-              ) THEN 1
-              ELSE 0
-            END
-          ) AS completed_cards,
-          SUM(
-            CASE
-              WHEN (
-                LOWER(COALESCE(i.status_category, '')) = 'done'
-                OR LOWER(COALESCE(i.status_name, '')) IN ('done', 'closed', 'resolved')
-                OR i.resolved_at_source IS NOT NULL
-              )
-              AND (
-                (
-                  i.resolved_at_source IS NOT NULL
-                  AND datetime(i.resolved_at_source) >= datetime('now', '-7 days')
-                )
-                OR (
-                  i.resolved_at_source IS NULL
-                  AND datetime(COALESCE(i.updated_at_source, i.synced_at)) >= datetime('now', '-7 days')
-                )
-              )
-              THEN 1
-              ELSE 0
-            END
-          ) AS completed_last_week
+          i.status_name,
+          i.status_category,
+          i.resolved_at_source,
+          i.updated_at_source,
+          i.synced_at
         FROM issues i
         WHERE i.issue_key <> ?
           AND LOWER(COALESCE(i.issue_type, '')) <> 'epic'
@@ -691,22 +760,46 @@ def _read_epic_completion_metrics(conn: sqlite3.Connection, epic_key: str) -> tu
           )
         """,
         (epic_key, epic_key, epic_key, epic_key),
-    ).fetchone()
-    if row is None:
-        return (0, 0, 0)
-    total_cards = int(row["total_cards"] or 0)
-    completed_cards = int(row["completed_cards"] or 0)
-    completed_last_week = int(row["completed_last_week"] or 0)
-    return (total_cards, completed_cards, completed_last_week)
+    ).fetchall()
+    total_cards = len(rows)
+    completed_cards = 0
+    completed_in_period = 0
+    for row in rows:
+        if not _is_done_issue(row):
+            continue
+        completed_cards += 1
+        if _is_completed_in_period(
+            row,
+            period_start_date=period_start_date,
+            period_end_date=period_end_date,
+            reporting_timezone=reporting_timezone,
+        ):
+            completed_in_period += 1
+
+    return (total_cards, completed_cards, completed_in_period)
 
 
 def get_configured_epic_summary(
     *,
     limit: int = 50,
+    period_start: str | None = None,
+    period_end: str | None = None,
+    timezone_name: str | None = None,
     db_path: str | None = None,
 ) -> dict[str, Any]:
     resolved_db_path = db_path or _resolve_db_path()
     safe_limit = max(1, min(int(limit), 200))
+    (
+        period_start_date,
+        period_end_date,
+        resolved_timezone_name,
+        resolved_timezone,
+    ) = _resolve_reporting_period(
+        period_start=period_start,
+        period_end=period_end,
+        timezone_name=timezone_name,
+    )
+
     conn = _connect(resolved_db_path)
     try:
         _ensure_metadata_schema(conn)
@@ -733,9 +826,15 @@ def get_configured_epic_summary(
             if metadata_entry and metadata_entry.get("epicTitle"):
                 epic_name_raw = metadata_entry.get("epicTitle")
             epic_name = str(epic_name_raw).strip() if epic_name_raw is not None else ""
-            total_cards, completed_cards, completed_last_week = _read_epic_completion_metrics(conn, epic_key)
+            total_cards, completed_cards, completed_in_period = _read_epic_completion_metrics(
+                conn,
+                epic_key,
+                period_start_date=period_start_date,
+                period_end_date=period_end_date,
+                reporting_timezone=resolved_timezone,
+            )
             completion_percent = round((completed_cards / total_cards) * 100, 1) if total_cards > 0 else 0.0
-            delta_percent = round((completed_last_week / total_cards) * 100, 1) if total_cards > 0 else 0.0
+            delta_percent = round((completed_in_period / total_cards) * 100, 1) if total_cards > 0 else 0.0
             success_criteria = (
                 [str(item) for item in metadata_entry.get("successCriteria", []) if isinstance(item, str)]
                 if metadata_entry
@@ -761,8 +860,10 @@ def get_configured_epic_summary(
                     "completedCards": completed_cards,
                     "totalCards": total_cards,
                     "completionPercent": completion_percent,
-                    "completedLastWeek": completed_last_week,
+                    "completedLastWeek": completed_in_period,
                     "deltaPercent": delta_percent,
+                    "completedInPeriod": completed_in_period,
+                    "deltaPercentInPeriod": delta_percent,
                     "groups": groups,
                     "workTypes": work_types,
                     "successCriteria": success_criteria,
@@ -776,7 +877,15 @@ def get_configured_epic_summary(
             )
     finally:
         conn.close()
-    return {"epics": epics}
+    return {
+        "epics": epics,
+        "reportingPeriod": {
+            "startDate": period_start_date.isoformat(),
+            "endDate": period_end_date.isoformat(),
+            "days": (period_end_date - period_start_date).days + 1,
+            "timezone": resolved_timezone_name,
+        },
+    }
 
 
 def upsert_epic_metadata(

@@ -54,9 +54,18 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
   - Optional query param: `epicKey=CEGBUPOL-4482`
 - `GET /api/metadata/epics/summary?limit=50`
   - Returns configured epics with completion metrics derived from local synced issue cards.
+  - Optional query params:
+    - `periodStart=2026-03-01`
+    - `periodEnd=2026-03-31`
+    - `timezone=Australia/Melbourne` (IANA timezone; defaults to `UTC`)
   - Includes:
-    - `completedLastWeek` (items completed in last 7 days)
-    - `deltaPercent` (`completedLastWeek / totalCards * 100`)
+    - `completedInPeriod` (items completed in inclusive reporting period)
+    - `deltaPercentInPeriod` (`completedInPeriod / totalCards * 100`)
+    - Backward-compatible aliases:
+      - `completedLastWeek` -> `completedInPeriod`
+      - `deltaPercent` -> `deltaPercentInPeriod`
+    - `reportingPeriod`:
+      - `startDate`, `endDate`, `days`, `timezone`
 - `GET /api/metadata/epics/candidates?q=<key-or-name>&limit=20`
   - Returns unconfigured epic candidates from local synced `issues` (issue type `Epic`).
 - `POST /api/metadata/epics`

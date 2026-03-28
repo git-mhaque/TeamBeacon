@@ -1437,6 +1437,44 @@ body {
   gap: 0.4rem;
 }
 
+.executive-period-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin-bottom: 0.48rem;
+}
+
+.executive-period-field {
+  display: grid;
+  gap: 0.22rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.executive-period-field select,
+.executive-period-field input {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.36rem 0.45rem;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  min-width: 10.5rem;
+}
+
+.executive-period-custom {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.executive-period-summary {
+  margin: 0 0 0.5rem;
+  color: #2b4551;
+  font-size: 0.8rem;
+}
+
 .epic-autocomplete {
   position: relative;
 }
@@ -1584,6 +1622,19 @@ body {
   .initiative-summary-toolbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .executive-period-toolbar,
+  .executive-period-custom {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .executive-period-field select,
+  .executive-period-field input {
+    min-width: 0;
+    width: 100%;
   }
 
   .initiative-config-header {

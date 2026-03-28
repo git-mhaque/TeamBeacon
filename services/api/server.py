@@ -199,7 +199,23 @@ def build_handler(
                     limit = int(limit_raw)
                 except ValueError:
                     limit = 50
-                payload = metadata_summary_provider(limit=limit)
+                period_start_raw = query.get("periodStart", [None])[0]
+                period_start = period_start_raw.strip() if isinstance(period_start_raw, str) else None
+                period_end_raw = query.get("periodEnd", [None])[0]
+                period_end = period_end_raw.strip() if isinstance(period_end_raw, str) else None
+                timezone_raw = query.get("timezone", [None])[0]
+                timezone_name = timezone_raw.strip() if isinstance(timezone_raw, str) else None
+                try:
+                    payload = metadata_summary_provider(
+                        limit=limit,
+                        period_start=period_start,
+                        period_end=period_end,
+                        timezone_name=timezone_name,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
