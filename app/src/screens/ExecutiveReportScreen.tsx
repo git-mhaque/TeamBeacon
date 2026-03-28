@@ -938,7 +938,7 @@ export function ExecutiveReportScreen() {
         </div>
       </Panel>
 
-      <Panel title="Work Distribution by Group and Type" subtitle="Share of completed cards in the selected reporting period.">
+      <Panel title="Effort Distribution by Group and Type" subtitle="Share of completed cards in the selected reporting period.">
         <div className="metrics-grid two-up">
           <div className="executive-mini-table">
             <h4>Groups</h4>
