@@ -1425,6 +1425,106 @@ body {
   padding: 0.4rem 0.46rem;
 }
 
+.executive-distribution-stack {
+  display: grid;
+  gap: 0.68rem;
+}
+
+.executive-distribution-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: start;
+}
+
+.executive-distribution-row + .executive-distribution-row {
+  border-top: 1px solid #dbe6ec;
+  padding-top: 0.72rem;
+}
+
+.executive-distribution-chart-panel {
+  border: 1px solid var(--line);
+  border-radius: 0.72rem;
+  background: #f7fbfe;
+  padding: 0.56rem;
+}
+
+.executive-distribution-chart-panel h4 {
+  margin: 0 0 0.42rem;
+  font-size: 0.9rem;
+  color: #1f3740;
+}
+
+.executive-distribution-wrap {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.executive-distribution-donut {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6e2e9;
+}
+
+.executive-distribution-donut::after {
+  content: "";
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e5edf1;
+}
+
+.executive-distribution-donut span {
+  position: absolute;
+  z-index: 1;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.executive-distribution-legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.2rem;
+  max-height: none;
+  overflow: visible;
+}
+
+.executive-distribution-legend li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.33rem;
+  font-size: 0.76rem;
+  color: #233f4b;
+}
+
+.executive-distribution-swatch {
+  width: 0.52rem;
+  height: 0.52rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.executive-distribution-row .executive-mini-table {
+  margin: 0;
+}
+
+.executive-distribution-row .executive-mini-table .sync-history-table {
+  border: 1px solid var(--line);
+  border-radius: 0.68rem;
+  overflow: hidden;
+}
+
 .executive-list-title {
   margin: 0 0 0.42rem;
   font-size: 0.9rem;
@@ -1622,6 +1722,24 @@ body {
   .initiative-summary-toolbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .executive-distribution-row {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-distribution-chart-panel {
+    width: 100%;
+  }
+
+  .executive-distribution-wrap {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .executive-distribution-legend {
+    width: 100%;
+    max-height: none;
   }
 
   .executive-period-toolbar,

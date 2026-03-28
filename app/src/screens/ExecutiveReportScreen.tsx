@@ -9,6 +9,12 @@ import {
 } from "../lib/api";
 
 type RagLabel = "Red" | "Amber" | "Green";
+type DistributionSlice = {
+  label: string;
+  value: number;
+  percent: number;
+  color: string;
+};
 
 type ExecutiveRow = InitiativeEpicSummary & {
   groupText: string;
@@ -234,6 +240,43 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
 
 function formatPercent(value: number): string {
   return `${value.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+const DISTRIBUTION_COLORS = [
+  "#1f8f63",
+  "#0f5570",
+  "#b77700",
+  "#c2372e",
+  "#6c4ba6",
+  "#1c6f9a",
+  "#8a4f00",
+  "#4a6b2d",
+];
+
+function buildDistributionSlices(
+  rows: Array<{ name: string; completedLastWeek: number }>,
+  totalCompleted: number,
+): DistributionSlice[] {
+  return rows.map((row, index) => ({
+    label: row.name,
+    value: row.completedLastWeek,
+    percent: totalCompleted > 0 ? (row.completedLastWeek / totalCompleted) * 100 : 0,
+    color: DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length],
+  }));
+}
+
+function buildDonutBackground(slices: DistributionSlice[]): string {
+  if (slices.length === 0) {
+    return "#e1ebf0";
+  }
+  let cursor = 0;
+  const stops = slices.map((slice) => {
+    const start = cursor;
+    const end = cursor + slice.percent;
+    cursor = end;
+    return `${slice.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
 }
 
 export function ExecutiveReportScreen() {
@@ -491,6 +534,26 @@ export function ExecutiveReportScreen() {
       }))
       .sort((left, right) => right.completedLastWeek - left.completedLastWeek);
   }, [rows]);
+
+  const sortedGroupProgress = useMemo(
+    () => [...groupProgress].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })),
+    [groupProgress],
+  );
+
+  const sortedTypeProgress = useMemo(
+    () => [...typeProgress].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })),
+    [typeProgress],
+  );
+
+  const groupDistributionSlices = useMemo(
+    () => buildDistributionSlices(sortedGroupProgress, metrics.totalCompletedLastWeek),
+    [metrics.totalCompletedLastWeek, sortedGroupProgress],
+  );
+
+  const typeDistributionSlices = useMemo(
+    () => buildDistributionSlices(sortedTypeProgress, metrics.totalCompletedLastWeek),
+    [metrics.totalCompletedLastWeek, sortedTypeProgress],
+  );
 
   const wins = useMemo(() => {
     const items: string[] = [];
@@ -823,7 +886,7 @@ export function ExecutiveReportScreen() {
       </Panel>
 
       <Panel
-        title="Weekly Progress for Key Initiatives"
+        title="Progress for Key Initiatives"
         action={
           <button className="mini-sync-btn no-print" type="button" onClick={openInitiativeConfig}>
             Configure
@@ -911,7 +974,7 @@ export function ExecutiveReportScreen() {
           <MetricCard
             label="Ongoing Initiatives"
             value={loading ? "..." : visibleInitiativeSignals.totalEpics}
-            hint="Selected for Weekly Progress for Key Initiatives."
+            hint="Selected for Progress for Key Initiatives."
           />
           <MetricCard
             label="Period Progress"
@@ -939,75 +1002,124 @@ export function ExecutiveReportScreen() {
       </Panel>
 
       <Panel title="Effort Distribution by Group and Type" subtitle="Share of completed cards in the selected reporting period.">
-        <div className="metrics-grid two-up">
-          <div className="executive-mini-table">
-            <h4>Groups</h4>
-            <table className="sync-history-table">
-              <thead>
-                <tr>
-                  <th>Group</th>
-                  <th>Completed in Period</th>
-                  <th>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...groupProgress]
-                  .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
-                  .map((row) => (
-                  <tr key={row.name}>
-                    <td>{row.name}</td>
-                    <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
-                    <td>
-                      {formatPercent(
-                        metrics.totalCompletedLastWeek > 0
-                          ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
-                          : 0,
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!loading && groupProgress.length === 0 ? (
+        <div className="executive-distribution-stack">
+          <section className="executive-distribution-row">
+            <div className="executive-distribution-chart-panel">
+              <h4>Groups</h4>
+              <div className="executive-distribution-wrap">
+                <div
+                  className="executive-distribution-donut"
+                  style={{ background: buildDonutBackground(groupDistributionSlices) }}
+                  aria-label="Group effort distribution chart"
+                >
+                  {metrics.totalCompletedLastWeek <= 0 ? <span>No data</span> : null}
+                </div>
+                <ul className="executive-distribution-legend">
+                  {groupDistributionSlices.map((slice) => (
+                    <li key={slice.label}>
+                      <span
+                        className="executive-distribution-swatch"
+                        style={{ backgroundColor: slice.color }}
+                        aria-hidden="true"
+                      />
+                      <span>{slice.label}</span>
+                      <span>{formatPercent(slice.percent)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="executive-mini-table">
+              <table className="sync-history-table">
+                <thead>
                   <tr>
-                    <td colSpan={3}>No group-tagged epics yet.</td>
+                    <th>Group</th>
+                    <th>Completed in Period</th>
+                    <th>%</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          <div className="executive-mini-table">
-            <h4>Types</h4>
-            <table className="sync-history-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Completed in Period</th>
-                  <th>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...typeProgress]
-                  .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
-                  .map((row) => (
-                  <tr key={row.name}>
-                    <td>{row.name}</td>
-                    <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
-                    <td>
-                      {formatPercent(
-                        metrics.totalCompletedLastWeek > 0
-                          ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
-                          : 0,
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!loading && typeProgress.length === 0 ? (
+                </thead>
+                <tbody>
+                  {sortedGroupProgress.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
+                      <td>
+                        {formatPercent(
+                          metrics.totalCompletedLastWeek > 0
+                            ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
+                            : 0,
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!loading && groupProgress.length === 0 ? (
+                    <tr>
+                      <td colSpan={3}>No group-tagged epics yet.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="executive-distribution-row">
+            <div className="executive-distribution-chart-panel">
+              <h4>Types</h4>
+              <div className="executive-distribution-wrap">
+                <div
+                  className="executive-distribution-donut"
+                  style={{ background: buildDonutBackground(typeDistributionSlices) }}
+                  aria-label="Type effort distribution chart"
+                >
+                  {metrics.totalCompletedLastWeek <= 0 ? <span>No data</span> : null}
+                </div>
+                <ul className="executive-distribution-legend">
+                  {typeDistributionSlices.map((slice) => (
+                    <li key={slice.label}>
+                      <span
+                        className="executive-distribution-swatch"
+                        style={{ backgroundColor: slice.color }}
+                        aria-hidden="true"
+                      />
+                      <span>{slice.label}</span>
+                      <span>{formatPercent(slice.percent)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="executive-mini-table">
+              <table className="sync-history-table">
+                <thead>
                   <tr>
-                    <td colSpan={3}>No type-tagged epics yet.</td>
+                    <th>Type</th>
+                    <th>Completed in Period</th>
+                    <th>%</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sortedTypeProgress.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td>{row.completedLastWeek}/{metrics.totalCompletedLastWeek}</td>
+                      <td>
+                        {formatPercent(
+                          metrics.totalCompletedLastWeek > 0
+                            ? (row.completedLastWeek / metrics.totalCompletedLastWeek) * 100
+                            : 0,
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!loading && typeProgress.length === 0 ? (
+                    <tr>
+                      <td colSpan={3}>No type-tagged epics yet.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </Panel>
 
@@ -1018,7 +1130,7 @@ export function ExecutiveReportScreen() {
             <div className="initiative-config-header">
               <div>
                 <h3>Configure Initiative Epics</h3>
-                <p>Select which configured epics appear in Weekly Progress for Key Initiatives.</p>
+                <p>Select which configured epics appear in Progress for Key Initiatives.</p>
               </div>
               <div className="sync-options-footer initiative-config-top-actions">
                 <button className="mini-sync-btn" type="button" onClick={closeInitiativeConfig}>
