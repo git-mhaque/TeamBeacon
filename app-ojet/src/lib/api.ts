@@ -39,6 +39,30 @@ export type EpicLookupItem = {
   name: string;
 };
 
+export type EpicLookupConfig = {
+  groups: EpicLookupItem[];
+  workTypes: EpicLookupItem[];
+};
+
+export type EpicCandidate = {
+  epicKey: string;
+  epicName: string;
+};
+
+export type EpicMetadataEntry = {
+  epicKey: string;
+  epicTitle?: string | null;
+  successCriteria: string[];
+  timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
+  targetCompletionDate?: string | null;
+  groupIds: number[];
+  groups: EpicLookupItem[];
+  workTypeIds: number[];
+  workTypes: EpicLookupItem[];
+  updatedAt?: string | null;
+};
+
 export type InitiativeEpicSummary = {
   epicKey: string;
   epicName: string;
@@ -226,6 +250,78 @@ export async function fetchConfiguredEpicSummary(
     throw await parseError(response, `Configured epic summary request failed (${response.status})`);
   }
   return (await response.json()) as ConfiguredEpicSummaryResponse;
+}
+
+export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic lookup request failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupConfig;
+}
+
+export async function fetchEpicCandidates(query: string, limit = 20): Promise<EpicCandidate[]> {
+  const params = new URLSearchParams();
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
+  params.set("limit", String(limit));
+  const response = await fetch(`${API_BASE}/api/metadata/epics/candidates?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic candidate request failed (${response.status})`);
+  }
+  const payload = (await response.json()) as { epics?: EpicCandidate[] };
+  return payload.epics ?? [];
+}
+
+export async function upsertEpicMetadata(payload: {
+  epicKey: string;
+  successCriteria: string[];
+  groupIds: number[];
+  workTypeIds: number[];
+  timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
+  targetCompletionDate?: string | null;
+}): Promise<EpicMetadataEntry> {
+  const response = await fetch(`${API_BASE}/api/metadata/epics`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic metadata save failed (${response.status})`);
+  }
+  return (await response.json()) as EpicMetadataEntry;
+}
+
+export async function deleteEpicMetadata(epicKey: string): Promise<{
+  epicKey: string;
+  deleted: boolean;
+  removedGroupMappings: number;
+  removedWorkTypeMappings: number;
+  removedMetadataRows: number;
+}> {
+  const response = await fetch(`${API_BASE}/api/metadata/epics/delete`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ epicKey }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic metadata delete failed (${response.status})`);
+  }
+  return (await response.json()) as {
+    epicKey: string;
+    deleted: boolean;
+    removedGroupMappings: number;
+    removedWorkTypeMappings: number;
+    removedMetadataRows: number;
+  };
 }
 
 export async function fetchCurrentSprint(): Promise<CurrentSprintResponse> {

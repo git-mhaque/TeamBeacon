@@ -2,9 +2,15 @@ import { h } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import {
   ConfiguredEpicSummaryResponse,
+  EpicCandidate,
+  EpicLookupConfig,
   InitiativeEpicSummary,
+  deleteEpicMetadata,
   fetchConfiguredEpicSummary,
+  fetchEpicCandidates,
+  fetchEpicLookupConfig,
   fetchJiraIntegrationStatus,
+  upsertEpicMetadata,
 } from "../../../lib/api";
 
 type RagLabel = "Red" | "Amber" | "Green";
@@ -159,18 +165,71 @@ function periodLabel(period: ConfiguredEpicSummaryResponse["reportingPeriod"]): 
   return `${start} - ${end} (${period.days} day${period.days === 1 ? "" : "s"}, ${period.timezone})`;
 }
 
+function normalizeDateInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const candidate = value.trim();
+  if (!candidate) return "";
+  if (candidate.length >= 10) {
+    return candidate.slice(0, 10);
+  }
+  return "";
+}
+
+function toSingleIdArray(raw: string): number[] {
+  if (!raw) return [];
+  const candidate = Number(raw);
+  if (!Number.isFinite(candidate) || candidate <= 0) {
+    return [];
+  }
+  return [candidate];
+}
+
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
+  const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [metaSuccess, setMetaSuccess] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ragFilter, setRagFilter] = useState<"all" | RagLabel>("all");
 
-  const refresh = useCallback(async () => {
+  const [isConfigureOpen, setIsConfigureOpen] = useState(false);
+  const [configureSaving, setConfigureSaving] = useState(false);
+  const [configureError, setConfigureError] = useState<string | null>(null);
+  const [configureSearchQuery, setConfigureSearchQuery] = useState("");
+  const [configureCandidates, setConfigureCandidates] = useState<EpicCandidate[]>([]);
+  const [configureCandidatesLoading, setConfigureCandidatesLoading] = useState(false);
+  const [configureCandidatesError, setConfigureCandidatesError] = useState<string | null>(null);
+  const [isConfigureSearchFocused, setIsConfigureSearchFocused] = useState(false);
+  const [selectedConfigureCandidate, setSelectedConfigureCandidate] = useState<EpicCandidate | null>(null);
+  const [configureSelectedGroupId, setConfigureSelectedGroupId] = useState("");
+  const [configureSelectedWorkTypeId, setConfigureSelectedWorkTypeId] = useState("");
+  const [configureSuccessCriteriaText, setConfigureSuccessCriteriaText] = useState("");
+  const [configureTimelineEnabled, setConfigureTimelineEnabled] = useState(false);
+  const [configureTimelineStartDate, setConfigureTimelineStartDate] = useState("");
+  const [configureTargetCompletionDate, setConfigureTargetCompletionDate] = useState("");
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editingEpic, setEditingEpic] = useState<SummaryRow | null>(null);
+  const [editSelectedGroupId, setEditSelectedGroupId] = useState("");
+  const [editSelectedWorkTypeId, setEditSelectedWorkTypeId] = useState("");
+  const [editSuccessCriteriaText, setEditSuccessCriteriaText] = useState("");
+  const [editTimelineEnabled, setEditTimelineEnabled] = useState(false);
+  const [editTimelineStartDate, setEditTimelineStartDate] = useState("");
+  const [editTargetCompletionDate, setEditTargetCompletionDate] = useState("");
+
+  const [pendingDeleteEpic, setPendingDeleteEpic] = useState<SummaryRow | null>(null);
+  const [deletingEpicKey, setDeletingEpicKey] = useState<string | null>(null);
+
+  const loadSummary = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -207,11 +266,56 @@ export function InitiativesScreen() {
     }
   }, []);
 
+  const loadLookup = useCallback(async () => {
+    try {
+      const lookup = await fetchEpicLookupConfig();
+      setEpicLookup(lookup);
+      setMetaError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown epic lookup request failure.";
+      setMetaError(message);
+      setEpicLookup({ groups: [], workTypes: [] });
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([loadSummary(), loadLookup()]);
+  }, [loadLookup, loadSummary]);
+
   useEffect(() => {
     refresh().catch(() => {
       // refresh already updates local state.
     });
   }, [refresh]);
+
+  const loadConfigureCandidates = useCallback(async (query: string) => {
+    setConfigureCandidatesLoading(true);
+    setConfigureCandidatesError(null);
+    try {
+      const candidates = await fetchEpicCandidates(query, 20);
+      setConfigureCandidates(candidates);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to search epic candidates.";
+      setConfigureCandidates([]);
+      setConfigureCandidatesError(message);
+    } finally {
+      setConfigureCandidatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isConfigureOpen || !isConfigureSearchFocused) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      loadConfigureCandidates(configureSearchQuery).catch(() => {
+        // loadConfigureCandidates already updates local state.
+      });
+    }, 200);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [configureSearchQuery, isConfigureOpen, isConfigureSearchFocused, loadConfigureCandidates]);
 
   const rows = useMemo<SummaryRow[]>(() => {
     return epicSummary.map((entry) => {
@@ -298,6 +402,195 @@ export function InitiativesScreen() {
     [rows],
   );
 
+  const openConfigureDialog = useCallback(() => {
+    setMetaError(null);
+    setMetaSuccess(null);
+    setConfigureError(null);
+    setConfigureSearchQuery("");
+    setConfigureCandidates([]);
+    setConfigureCandidatesError(null);
+    setIsConfigureSearchFocused(false);
+    setSelectedConfigureCandidate(null);
+    setConfigureSelectedGroupId("");
+    setConfigureSelectedWorkTypeId("");
+    setConfigureSuccessCriteriaText("");
+    setConfigureTimelineEnabled(false);
+    setConfigureTimelineStartDate("");
+    setConfigureTargetCompletionDate("");
+    setIsConfigureOpen(true);
+  }, []);
+
+  const closeConfigureDialog = useCallback(() => {
+    if (configureSaving) {
+      return;
+    }
+    setIsConfigureSearchFocused(false);
+    setIsConfigureOpen(false);
+  }, [configureSaving]);
+
+  const openEditDialog = useCallback((entry: SummaryRow) => {
+    setMetaError(null);
+    setMetaSuccess(null);
+    setEditError(null);
+    setEditingEpic(entry);
+    setEditSelectedGroupId(entry.groups[0] ? String(entry.groups[0].id) : "");
+    setEditSelectedWorkTypeId(entry.workTypes[0] ? String(entry.workTypes[0].id) : "");
+    setEditSuccessCriteriaText(entry.successCriteria.join("\n"));
+    setEditTimelineEnabled(Boolean(entry.timelineEnabled));
+    setEditTimelineStartDate(normalizeDateInputValue(entry.timelineStartDate));
+    setEditTargetCompletionDate(normalizeDateInputValue(entry.targetCompletionDate));
+    setIsEditOpen(true);
+  }, []);
+
+  const closeEditDialog = useCallback(() => {
+    if (editSaving) {
+      return;
+    }
+    setIsEditOpen(false);
+    setEditingEpic(null);
+  }, [editSaving]);
+
+  const saveConfiguredEpic = useCallback(async () => {
+    if (!selectedConfigureCandidate) {
+      setConfigureError("Please select an epic to configure.");
+      return;
+    }
+    if (configureTimelineEnabled && !configureTargetCompletionDate.trim()) {
+      setConfigureError("Target completion date is required when timeline is enabled.");
+      return;
+    }
+    if (
+      configureTimelineEnabled
+      && configureTimelineStartDate.trim()
+      && configureTargetCompletionDate.trim()
+      && configureTimelineStartDate.trim() > configureTargetCompletionDate.trim()
+    ) {
+      setConfigureError("Timeline start date cannot be after target completion date.");
+      return;
+    }
+
+    const criteria = configureSuccessCriteriaText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    setConfigureSaving(true);
+    setConfigureError(null);
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await upsertEpicMetadata({
+        epicKey: selectedConfigureCandidate.epicKey,
+        successCriteria: criteria,
+        groupIds: toSingleIdArray(configureSelectedGroupId),
+        workTypeIds: toSingleIdArray(configureSelectedWorkTypeId),
+        timelineEnabled: configureTimelineEnabled,
+        timelineStartDate: configureTimelineEnabled ? configureTimelineStartDate.trim() || null : null,
+        targetCompletionDate: configureTimelineEnabled ? configureTargetCompletionDate.trim() : null,
+      });
+      await loadSummary();
+      setMetaSuccess(`Epic metadata saved for ${selectedConfigureCandidate.epicKey}.`);
+      setIsConfigureOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save epic metadata.";
+      setConfigureError(message);
+    } finally {
+      setConfigureSaving(false);
+    }
+  }, [
+    configureSelectedGroupId,
+    configureSelectedWorkTypeId,
+    configureSuccessCriteriaText,
+    configureTargetCompletionDate,
+    configureTimelineEnabled,
+    configureTimelineStartDate,
+    loadSummary,
+    selectedConfigureCandidate,
+  ]);
+
+  const saveEditedEpic = useCallback(async () => {
+    if (!editingEpic) {
+      return;
+    }
+    if (editTimelineEnabled && !editTargetCompletionDate.trim()) {
+      setEditError("Target completion date is required when timeline is enabled.");
+      return;
+    }
+    if (
+      editTimelineEnabled
+      && editTimelineStartDate.trim()
+      && editTargetCompletionDate.trim()
+      && editTimelineStartDate.trim() > editTargetCompletionDate.trim()
+    ) {
+      setEditError("Timeline start date cannot be after target completion date.");
+      return;
+    }
+
+    const criteria = editSuccessCriteriaText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    setEditSaving(true);
+    setEditError(null);
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await upsertEpicMetadata({
+        epicKey: editingEpic.epicKey,
+        successCriteria: criteria,
+        groupIds: toSingleIdArray(editSelectedGroupId),
+        workTypeIds: toSingleIdArray(editSelectedWorkTypeId),
+        timelineEnabled: editTimelineEnabled,
+        timelineStartDate: editTimelineEnabled ? editTimelineStartDate.trim() || null : null,
+        targetCompletionDate: editTimelineEnabled ? editTargetCompletionDate.trim() : null,
+      });
+      await loadSummary();
+      setMetaSuccess(`Epic metadata updated for ${editingEpic.epicKey}.`);
+      setIsEditOpen(false);
+      setEditingEpic(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update epic metadata.";
+      setEditError(message);
+    } finally {
+      setEditSaving(false);
+    }
+  }, [
+    editSelectedGroupId,
+    editSelectedWorkTypeId,
+    editSuccessCriteriaText,
+    editTargetCompletionDate,
+    editTimelineEnabled,
+    editTimelineStartDate,
+    editingEpic,
+    loadSummary,
+  ]);
+
+  const confirmDeleteEpic = useCallback(async () => {
+    if (!pendingDeleteEpic) {
+      return;
+    }
+    const epicKey = pendingDeleteEpic.epicKey;
+    setDeletingEpicKey(epicKey);
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await deleteEpicMetadata(epicKey);
+      await loadSummary();
+      if (editingEpic?.epicKey === epicKey) {
+        setIsEditOpen(false);
+        setEditingEpic(null);
+      }
+      setPendingDeleteEpic(null);
+      setMetaSuccess(`Epic configuration removed for ${epicKey}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to remove epic configuration.";
+      setMetaError(message);
+    } finally {
+      setDeletingEpicKey(null);
+    }
+  }, [editingEpic?.epicKey, loadSummary, pendingDeleteEpic]);
+
   return (
     <div class="tb-screen-grid">
       <section class="tb-panel">
@@ -306,9 +599,14 @@ export function InitiativesScreen() {
             <h3>Configured Initiative Summary</h3>
             <p>Progress for configured epics sourced from local synced JIRA data.</p>
           </div>
-          <button type="button" class="tb-btn tb-btn-primary" onClick={() => refresh()}>
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
+          <div class="tb-btn-row">
+            <button type="button" class="tb-btn" onClick={openConfigureDialog}>
+              Configure Epic
+            </button>
+            <button type="button" class="tb-btn tb-btn-primary" onClick={() => refresh()}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </header>
 
         <div class="tb-metrics-grid tb-four-up">
@@ -336,6 +634,8 @@ export function InitiativesScreen() {
 
         <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod)}</p>
         {error && !loading ? <p class="tb-error-note">Initiative summary: {error}</p> : null}
+        {metaError ? <p class="tb-error-note">Epic metadata: {metaError}</p> : null}
+        {metaSuccess ? <p class="tb-success-note">{metaSuccess}</p> : null}
       </section>
 
       <section class="tb-panel">
@@ -410,18 +710,19 @@ export function InitiativesScreen() {
                 <th>Delta</th>
                 <th>RAG</th>
                 <th>Criteria / Insight</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} class="tb-initiative-empty">Loading configured initiatives...</td>
+                  <td colSpan={9} class="tb-initiative-empty">Loading configured initiatives...</td>
                 </tr>
               ) : null}
 
               {!loading && filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} class="tb-initiative-empty">No initiative rows match the active filters.</td>
+                  <td colSpan={9} class="tb-initiative-empty">No initiative rows match the active filters.</td>
                 </tr>
               ) : null}
 
@@ -475,6 +776,25 @@ export function InitiativesScreen() {
                             {row.insightComment?.trim() || row.ragReason}
                           </p>
                         </td>
+                        <td>
+                          <div class="tb-action-row">
+                            <button type="button" class="tb-btn tb-btn-sm" onClick={() => openEditDialog(row)}>
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              class="tb-btn tb-btn-sm tb-btn-danger"
+                              onClick={() => {
+                                setMetaError(null);
+                                setMetaSuccess(null);
+                                setPendingDeleteEpic(row);
+                              }}
+                              disabled={deletingEpicKey === row.epicKey}
+                            >
+                              {deletingEpicKey === row.epicKey ? "Removing..." : "Delete"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
@@ -483,6 +803,322 @@ export function InitiativesScreen() {
           </table>
         </div>
       </section>
+
+      {pendingDeleteEpic ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
+          <div
+            class="tb-modal-backdrop"
+            onClick={() => {
+              if (!deletingEpicKey) {
+                setPendingDeleteEpic(null);
+              }
+            }}
+          />
+          <div class="tb-modal">
+            <header class="tb-modal-head">
+              <h3>Remove Epic Configuration</h3>
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm"
+                onClick={() => setPendingDeleteEpic(null)}
+                disabled={Boolean(deletingEpicKey)}
+              >
+                Close
+              </button>
+            </header>
+            <p class="tb-muted-note">
+              Remove configuration for <strong>{pendingDeleteEpic.epicKey}</strong>
+              {pendingDeleteEpic.epicName ? ` (${pendingDeleteEpic.epicName})` : ""}?
+            </p>
+            <p class="tb-muted-note">
+              This removes success criteria, group mapping, and work type mapping for this epic.
+            </p>
+            <footer class="tb-modal-actions">
+              <button
+                type="button"
+                class="tb-btn"
+                onClick={() => setPendingDeleteEpic(null)}
+                disabled={Boolean(deletingEpicKey)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-danger"
+                onClick={() => confirmDeleteEpic()}
+                disabled={Boolean(deletingEpicKey)}
+              >
+                {deletingEpicKey ? "Removing..." : "Remove"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {isConfigureOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Epic Metadata">
+          <div class="tb-modal-backdrop" onClick={closeConfigureDialog} />
+          <div class="tb-modal tb-modal-wide">
+            <header class="tb-modal-head">
+              <h3>Configure Epic Metadata</h3>
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm"
+                onClick={closeConfigureDialog}
+                disabled={configureSaving}
+              >
+                Close
+              </button>
+            </header>
+
+            <label class="tb-modal-field tb-autocomplete">
+              <span>Search Unconfigured Epic</span>
+              <input
+                type="text"
+                value={configureSearchQuery}
+                onInput={(event) => setConfigureSearchQuery((event.currentTarget as HTMLInputElement).value)}
+                onFocus={() => setIsConfigureSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsConfigureSearchFocused(false);
+                  }, 120);
+                }}
+                placeholder="Epic key or name"
+              />
+              {isConfigureSearchFocused ? (
+                <div class="tb-candidate-list" role="listbox" aria-label="Epic candidates">
+                  {configureCandidatesError ? <p class="tb-error-note">{configureCandidatesError}</p> : null}
+                  {configureCandidatesLoading ? <p class="tb-muted-note">Searching epics...</p> : null}
+                  {!configureCandidatesLoading && !configureCandidatesError && configureCandidates.length === 0 ? (
+                    <p class="tb-muted-note">No unconfigured epics found.</p>
+                  ) : null}
+                  {!configureCandidatesLoading
+                    ? configureCandidates.map((candidate) => (
+                        <button
+                          key={candidate.epicKey}
+                          type="button"
+                          class={`tb-candidate-item${selectedConfigureCandidate?.epicKey === candidate.epicKey ? " is-selected" : ""}`}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            setSelectedConfigureCandidate(candidate);
+                            setConfigureSearchQuery(candidate.epicKey);
+                            setIsConfigureSearchFocused(false);
+                          }}
+                        >
+                          <strong>{candidate.epicKey}</strong>
+                          <small>{candidate.epicName || "No epic name"}</small>
+                        </button>
+                      ))
+                    : null}
+                </div>
+              ) : null}
+            </label>
+
+            {selectedConfigureCandidate ? (
+              <p class="tb-muted-note">
+                Selected epic: <strong>{selectedConfigureCandidate.epicKey}</strong>
+                {selectedConfigureCandidate.epicName ? ` (${selectedConfigureCandidate.epicName})` : ""}
+              </p>
+            ) : null}
+
+            <div class="tb-modal-two-up">
+              <label class="tb-modal-field">
+                <span>Epic Group (one)</span>
+                <select
+                  value={configureSelectedGroupId}
+                  onChange={(event) => setConfigureSelectedGroupId((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">None</option>
+                  {epicLookup.groups.map((group) => (
+                    <option key={group.id} value={String(group.id)}>{group.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label class="tb-modal-field">
+                <span>Work Type (one)</span>
+                <select
+                  value={configureSelectedWorkTypeId}
+                  onChange={(event) => setConfigureSelectedWorkTypeId((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">None</option>
+                  {epicLookup.workTypes.map((workType) => (
+                    <option key={workType.id} value={String(workType.id)}>{workType.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label class="tb-modal-check">
+              <input
+                type="checkbox"
+                checked={configureTimelineEnabled}
+                onChange={(event) => {
+                  const checked = (event.currentTarget as HTMLInputElement).checked;
+                  setConfigureTimelineEnabled(checked);
+                  if (!checked) {
+                    setConfigureTimelineStartDate("");
+                    setConfigureTargetCompletionDate("");
+                  }
+                }}
+              />
+              <span>Enable timeline dates</span>
+            </label>
+
+            <div class="tb-modal-two-up">
+              <label class="tb-modal-field">
+                <span>Timeline Start Date</span>
+                <input
+                  type="date"
+                  value={configureTimelineStartDate}
+                  onInput={(event) => setConfigureTimelineStartDate((event.currentTarget as HTMLInputElement).value)}
+                  disabled={!configureTimelineEnabled}
+                />
+              </label>
+
+              <label class="tb-modal-field">
+                <span>Target Completion Date</span>
+                <input
+                  type="date"
+                  value={configureTargetCompletionDate}
+                  onInput={(event) => setConfigureTargetCompletionDate((event.currentTarget as HTMLInputElement).value)}
+                  disabled={!configureTimelineEnabled}
+                />
+              </label>
+            </div>
+
+            <label class="tb-modal-field">
+              <span>Success Criteria (one per line)</span>
+              <textarea
+                rows={6}
+                value={configureSuccessCriteriaText}
+                onInput={(event) => setConfigureSuccessCriteriaText((event.currentTarget as HTMLTextAreaElement).value)}
+              />
+            </label>
+
+            {configureError ? <p class="tb-error-note">{configureError}</p> : null}
+
+            <footer class="tb-modal-actions">
+              <button type="button" class="tb-btn" onClick={closeConfigureDialog} disabled={configureSaving}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-primary"
+                onClick={() => saveConfiguredEpic()}
+                disabled={configureSaving || !selectedConfigureCandidate}
+              >
+                {configureSaving ? "Saving..." : "Save Epic Metadata"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {isEditOpen && editingEpic ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Edit Epic Metadata">
+          <div class="tb-modal-backdrop" onClick={closeEditDialog} />
+          <div class="tb-modal tb-modal-wide">
+            <header class="tb-modal-head">
+              <h3>Edit Epic Metadata</h3>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={closeEditDialog} disabled={editSaving}>
+                Close
+              </button>
+            </header>
+
+            <p class="tb-muted-note">
+              Epic: <strong>{editingEpic.epicKey}</strong>
+              {editingEpic.epicName ? ` (${editingEpic.epicName})` : ""}
+            </p>
+
+            <div class="tb-modal-two-up">
+              <label class="tb-modal-field">
+                <span>Epic Group (one)</span>
+                <select
+                  value={editSelectedGroupId}
+                  onChange={(event) => setEditSelectedGroupId((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">None</option>
+                  {epicLookup.groups.map((group) => (
+                    <option key={group.id} value={String(group.id)}>{group.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label class="tb-modal-field">
+                <span>Work Type (one)</span>
+                <select
+                  value={editSelectedWorkTypeId}
+                  onChange={(event) => setEditSelectedWorkTypeId((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">None</option>
+                  {epicLookup.workTypes.map((workType) => (
+                    <option key={workType.id} value={String(workType.id)}>{workType.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label class="tb-modal-check">
+              <input
+                type="checkbox"
+                checked={editTimelineEnabled}
+                onChange={(event) => {
+                  const checked = (event.currentTarget as HTMLInputElement).checked;
+                  setEditTimelineEnabled(checked);
+                  if (!checked) {
+                    setEditTimelineStartDate("");
+                    setEditTargetCompletionDate("");
+                  }
+                }}
+              />
+              <span>Enable timeline dates</span>
+            </label>
+
+            <div class="tb-modal-two-up">
+              <label class="tb-modal-field">
+                <span>Timeline Start Date</span>
+                <input
+                  type="date"
+                  value={editTimelineStartDate}
+                  onInput={(event) => setEditTimelineStartDate((event.currentTarget as HTMLInputElement).value)}
+                  disabled={!editTimelineEnabled}
+                />
+              </label>
+
+              <label class="tb-modal-field">
+                <span>Target Completion Date</span>
+                <input
+                  type="date"
+                  value={editTargetCompletionDate}
+                  onInput={(event) => setEditTargetCompletionDate((event.currentTarget as HTMLInputElement).value)}
+                  disabled={!editTimelineEnabled}
+                />
+              </label>
+            </div>
+
+            <label class="tb-modal-field">
+              <span>Success Criteria (one per line)</span>
+              <textarea
+                rows={6}
+                value={editSuccessCriteriaText}
+                onInput={(event) => setEditSuccessCriteriaText((event.currentTarget as HTMLTextAreaElement).value)}
+              />
+            </label>
+
+            {editError ? <p class="tb-error-note">{editError}</p> : null}
+
+            <footer class="tb-modal-actions">
+              <button type="button" class="tb-btn" onClick={closeEditDialog} disabled={editSaving}>
+                Cancel
+              </button>
+              <button type="button" class="tb-btn tb-btn-primary" onClick={() => saveEditedEpic()} disabled={editSaving}>
+                {editSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
