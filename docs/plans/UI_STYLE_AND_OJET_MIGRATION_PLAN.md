@@ -2,6 +2,14 @@
 
 Last updated: 2026-03-30
 
+## Implementation Status (2026-03-30)
+1. `app-ojet/` Oracle JET vDOM workspace has been scaffolded in-repo.
+2. TeamBeacon app shell and screen navigation are implemented in OJET baseline.
+3. Integrations screen is wired to live backend connectivity endpoints for JIRA and OCI GenAI.
+4. Team Insights and Individual Insights are migrated into the OJET workspace.
+5. Current Sprint Work is migrated with live sprint metadata, scope changes, and work columns.
+6. Remaining screens are scaffolded as placeholders for phased migration.
+
 ## 1. Scope and Goal
 This document captures:
 1. UI analysis of all current TeamBeacon screens.

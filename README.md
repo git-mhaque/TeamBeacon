@@ -9,11 +9,13 @@ TeamBeacon is a desktop engineering insights app that aggregates data from multi
 - UI mockups: [docs/design/teambeacon-mockups.html](docs/design/teambeacon-mockups.html)
 - Initial DB migration and connector stubs are in place.
 - React + Vite UI shell and Tauri desktop wrapper are scaffolded in `app/`.
+- Oracle JET migration workspace is scaffolded in `app-ojet/` with live Integrations connectivity checks.
 
 ## Repository Layout
 ```text
 TeamBeacon/
   app/                       # React + Vite UI shell
+  app-ojet/                  # Oracle JET migration workspace (vDOM)
   services/
     api/db/migrations/
     workers/
@@ -79,6 +81,38 @@ cat AGENTS.md
 ```bash
 open docs/design/teambeacon-mockups.html
 ```
+
+## OJET Migration Workspace (In Progress)
+Use this to continue frontend migration from React to Oracle JET:
+
+1. Ensure backend API is running on `127.0.0.1:8000`:
+```bash
+cd app
+npm run api:dev
+```
+2. Build OJET app:
+```bash
+cd app-ojet
+npm install
+npm run build
+```
+3. Serve OJET app on `http://127.0.0.1:5174`:
+```bash
+cd app-ojet
+npm run dev
+```
+
+Current migrated slice in `app-ojet`:
+1. TeamBeacon OJET shell + navigation for all screens.
+2. Integrations screen wired to:
+   - `GET /api/integrations/jira/status`
+   - `GET /api/integrations/oci-genai/status`
+3. Team Insights and Individual Insights migrated in OJET baseline.
+4. Current Sprint Work migrated with:
+   - `GET /api/sprints/current`
+   - `GET /api/sprints/current/work`
+   - `GET /api/sprints/current/changes`
+5. Remaining screens are scaffolded as migration placeholders.
 
 ## Planned Stack
 - Desktop app: Tauri + React
