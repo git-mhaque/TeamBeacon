@@ -327,6 +327,34 @@ body {
   font-size: 0.81rem;
 }
 
+.tb-overlay-toast-layer {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.tb-overlay-toast {
+  max-width: min(28rem, calc(100vw - 2rem));
+  border-radius: 0.72rem;
+  border: 1px solid #b8dfcc;
+  background: #eefbf4;
+  color: #0d7045;
+  box-shadow: 0 0.9rem 1.8rem rgba(14, 39, 30, 0.18);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0.52rem 0.7rem;
+  animation: tb-toast-rise 0.2s ease-out;
+}
+
+.tb-overlay-toast.is-success {
+  border-color: #b8dfcc;
+  background: #eefbf4;
+  color: #0d7045;
+}
+
 .tb-muted-note {
   margin: 0.2rem 0 0;
   color: var(--tb-muted);
@@ -660,6 +688,281 @@ body {
   gap: 0.32rem;
 }
 
+.tb-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.tb-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid #ccd7eb;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.14rem 0.44rem;
+  text-transform: uppercase;
+}
+
+.tb-status-pill.is-good {
+  border-color: #b8dfcc;
+  background: #eefbf4;
+  color: #0d7045;
+}
+
+.tb-status-pill.is-warn {
+  border-color: #e8d09a;
+  background: #fff7e8;
+  color: #8f5800;
+}
+
+.tb-status-pill.is-risk {
+  border-color: #edc0c5;
+  background: #fff1f2;
+  color: #ab2130;
+}
+
+.tb-status-pill.is-neutral {
+  border-color: #cfdbee;
+  background: #f3f7ff;
+  color: #3b5578;
+}
+
+.tb-inline-spinner {
+  width: 0.74rem;
+  height: 0.74rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: tb-spin 0.7s linear infinite;
+}
+
+.tb-sync-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.tb-sync-progress-track {
+  flex: 1;
+  height: 0.46rem;
+  min-width: 6rem;
+  border-radius: 999px;
+  border: 1px solid #ccdaf0;
+  background: #eaf2ff;
+  overflow: hidden;
+}
+
+.tb-sync-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f7bd8 0%, #0f60c9 100%);
+}
+
+.tb-sync-progress-percent {
+  color: #365985;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.tb-sync-progress-fallback,
+.tb-sync-progress-note {
+  color: var(--tb-muted);
+  font-size: 0.74rem;
+}
+
+.tb-external-link {
+  color: #1f4f95;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tb-external-link:hover {
+  color: #163d78;
+}
+
+.tb-integration-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.tb-integration-list li {
+  color: #223752;
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.tb-lookup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.58rem;
+}
+
+.tb-lookup-card {
+  border: 1px solid var(--tb-line);
+  border-radius: 0.82rem;
+  background: var(--tb-surface-alt);
+  padding: 0.68rem;
+  align-self: start;
+  display: grid;
+  gap: 0.48rem;
+}
+
+.tb-lookup-card h4 {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.tb-lookup-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.34rem;
+}
+
+.tb-lookup-add-row input,
+.tb-lookup-item-row input,
+.tb-sync-date-field input {
+  border: 1px solid #c9d7ed;
+  border-radius: 0.56rem;
+  background: #f8fbff;
+  color: #203959;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.42rem 0.54rem;
+}
+
+.tb-lookup-item-list {
+  display: grid;
+  gap: 0.34rem;
+}
+
+.tb-lookup-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.tb-modal-sync {
+  width: min(100%, 36rem);
+}
+
+.tb-modal-history {
+  width: min(100%, 72rem);
+}
+
+.tb-sync-option-list {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tb-sync-option {
+  border: 1px solid #ccd8ec;
+  border-radius: 0.64rem;
+  background: #fff;
+  color: #203959;
+  cursor: pointer;
+  display: grid;
+  gap: 0.3rem;
+  grid-template-columns: auto 1fr;
+  padding: 0.46rem 0.52rem;
+}
+
+.tb-sync-option.is-selected {
+  border-color: #6e99d5;
+  background: #edf4ff;
+}
+
+.tb-sync-option input {
+  margin: 0.1rem 0 0;
+}
+
+.tb-sync-option strong {
+  display: block;
+  font-size: 0.8rem;
+}
+
+.tb-sync-option small {
+  color: #4e6382;
+  display: block;
+  font-size: 0.74rem;
+  margin-top: 0.12rem;
+}
+
+.tb-sync-date-field {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.tb-sync-date-field span {
+  color: #2b4f81;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tb-sync-history-wrap {
+  border: 1px solid #d8e2f2;
+  border-radius: 0.78rem;
+  max-height: min(66vh, 34rem);
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.tb-sync-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tb-sync-history-table th,
+.tb-sync-history-table td {
+  border-bottom: 1px solid #d8e2f2;
+  font-size: 0.78rem;
+  padding: 0.44rem 0.5rem;
+  text-align: left;
+}
+
+.tb-sync-history-table th {
+  background: #f0f6ff;
+  color: #264977;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tb-sync-history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@keyframes tb-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tb-toast-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .tb-modal-layer {
   position: fixed;
   inset: 0;
@@ -817,6 +1120,10 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tb-lookup-grid {
+    grid-template-columns: 1fr;
+  }
+
   .tb-initiative-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -837,6 +1144,15 @@ body {
   .tb-four-up,
   .tb-three-up {
     grid-template-columns: 1fr;
+  }
+
+  .tb-lookup-item-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .tb-sync-progress-track {
+    min-width: 4.5rem;
   }
 
   .tb-kanban {
