@@ -6,10 +6,12 @@ This directory contains product, architecture, plan, and design artifacts for Te
 - [../SPEC.md](../SPEC.md): product requirements, MVP boundaries, and success metrics.
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): technical architecture and data flow.
 - [plans/PLAN.md](plans/PLAN.md): phased execution plan and delivery milestones.
+- [plans/UI_STYLE_AND_OJET_MIGRATION_PLAN.md](plans/UI_STYLE_AND_OJET_MIGRATION_PLAN.md): UI screen analysis, style enhancement plan, and OJET migration roadmap.
 - [design/README.md](design/README.md): design artifact guide.
 
 ## Design Artifacts
 - [design/teambeacon-mockups.html](design/teambeacon-mockups.html): current UI screen mockups for six core workflows.
+- [design/teambeacon-ojet-mockups.html](design/teambeacon-ojet-mockups.html): OJET-oriented UI mockups for migration target screens.
 
 ## Operations Runbooks
 - [ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): smoke test for OCI GenAI connectivity and chat execution.

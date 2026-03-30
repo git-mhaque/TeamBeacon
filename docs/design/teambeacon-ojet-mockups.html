@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TeamBeacon - OJET UI Mockups</title>
+    <style>
+      :root {
+        --bg: #f4f6fa;
+        --bg-accent: #eaf0fb;
+        --surface: #ffffff;
+        --surface-muted: #f9fbff;
+        --ink: #1c2434;
+        --muted: #5a6781;
+        --line: #d6dfef;
+        --brand: #0b5fcc;
+        --brand-strong: #084ca4;
+        --ok: #107d4f;
+        --warn: #b36a00;
+        --risk: #c21f2f;
+        --radius: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "Oracle Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background:
+          radial-gradient(1000px 460px at 12% -8%, #ffffff 0, transparent 78%),
+          linear-gradient(135deg, var(--bg) 0%, var(--bg-accent) 56%, #f8faff 100%);
+      }
+
+      .page {
+        padding: 22px 20px 34px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: linear-gradient(120deg, #ffffff 0%, #f7faff 100%);
+        box-shadow: 0 16px 32px rgba(13, 31, 66, 0.08);
+        padding: 20px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 27px;
+        letter-spacing: 0.2px;
+      }
+
+      .hero p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        max-width: 78ch;
+      }
+
+      .component-legend {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        border: 1px solid #bfd0ee;
+        background: #edf4ff;
+        color: #214d93;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .screen-list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .screen {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        overflow: hidden;
+        background: var(--surface);
+        box-shadow: 0 12px 28px rgba(13, 31, 66, 0.08);
+      }
+
+      .screen-head {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, #fdfefe 0%, #f4f8ff 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .screen-title {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: 0.2px;
+      }
+
+      .screen-badge {
+        border: 1px solid #9db5df;
+        border-radius: 999px;
+        background: #ecf3ff;
+        color: #214d93;
+        padding: 3px 9px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .viewport {
+        min-height: 420px;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+      }
+
+      .nav-rail {
+        border-right: 1px solid var(--line);
+        background: #f7faff;
+        padding: 12px;
+      }
+
+      .nav-rail h4 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--muted);
+      }
+
+      .nav-item {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        padding: 8px;
+        margin-bottom: 7px;
+        font-size: 12px;
+      }
+
+      .nav-item.active {
+        background: #edf4ff;
+        border-color: #9db5df;
+        color: #12396f;
+        font-weight: 600;
+      }
+
+      .main {
+        padding: 12px;
+        background: var(--surface-muted);
+      }
+
+      .section-grid {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        padding: 10px;
+      }
+
+      .card h3 {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .card p {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .metric {
+        margin-top: 7px;
+        font-size: 25px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .good {
+        color: var(--ok);
+      }
+
+      .warn {
+        color: var(--warn);
+      }
+
+      .risk {
+        color: var(--risk);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 8px;
+      }
+
+      .pill {
+        font-size: 11px;
+        border-radius: 999px;
+        border: 1px solid #cad6ea;
+        background: #f5f8ff;
+        color: #30476f;
+        padding: 3px 8px;
+      }
+
+      .track {
+        margin-top: 8px;
+        height: 9px;
+        border-radius: 999px;
+        border: 1px solid #ced8ec;
+        background: #e7eefb;
+        overflow: hidden;
+      }
+
+      .track > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #2b79d8 0%, #0d5fca 100%);
+      }
+
+      .table {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .table table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .table th,
+      .table td {
+        border-bottom: 1px solid #e1e8f5;
+        padding: 7px 8px;
+        text-align: left;
+      }
+
+      .table th {
+        background: #f2f6ff;
+        color: #2a4067;
+        font-weight: 600;
+      }
+
+      .kanban {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .column {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        padding: 8px;
+      }
+
+      .column h4 {
+        margin: 0 0 8px;
+        font-size: 12px;
+      }
+
+      .ticket {
+        border: 1px solid #d5def0;
+        border-radius: 9px;
+        background: #fbfcff;
+        padding: 7px;
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+
+      .summary-box {
+        border-left: 4px solid var(--brand);
+        border-radius: 10px;
+        background: #f5f9ff;
+        color: #24395a;
+        padding: 10px;
+        font-size: 12px;
+      }
+
+      .split {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .oj-note {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #3f5780;
+      }
+
+      .legend-row {
+        margin-top: 6px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 4px;
+      }
+
+      @media (max-width: 1100px) {
+        .viewport {
+          grid-template-columns: 1fr;
+        }
+
+        .nav-rail {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .nav-rail h4 {
+          width: 100%;
+        }
+
+        .nav-item {
+          margin-bottom: 0;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .cols-4,
+        .cols-3,
+        .cols-2,
+        .split,
+        .kanban {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>TeamBeacon OJET-Oriented Screen Mockups</h1>
+        <p>
+          Static HTML concept for a Redwood-style OJET migration. These screens model structure,
+          hierarchy, and component intent for the future OJET frontend.
+        </p>
+        <div class="component-legend">
+          <span class="tag">oj-c-navigation-list</span>
+          <span class="tag">oj-c-card</span>
+          <span class="tag">oj-c-message-banner</span>
+          <span class="tag">oj-c-dialog</span>
+          <span class="tag">oj-table / oj-data-grid</span>
+          <span class="tag">oj-c-input-text</span>
+          <span class="tag">oj-c-select-single</span>
+          <span class="tag">oj-c-progress-bar</span>
+          <span class="tag">oj-c-button</span>
+        </div>
+      </section>
+
+      <section class="screen-list">
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">1) Integrations &amp; Field Mapping (OJET draft)</h2>
+            <span class="screen-badge">Connections + Sync</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Sections</h4>
+              <div class="nav-item active">Source Connections</div>
+              <div class="nav-item">JIRA Diagnostics</div>
+              <div class="nav-item">Field Mapping</div>
+              <div class="nav-item">Epic Metadata</div>
+            </aside>
+            <div class="main">
+              <div class="section-grid cols-3">
+                <section class="card">
+                  <h3>JIRA Connection</h3>
+                  <div class="metric good">Connected</div>
+                  <p>2/2 connectivity checks passed.</p>
+                  <p>Last checked: 2026-03-30 21:18</p>
+                  <div class="track"><span style="width: 67%"></span></div>
+                  <p>Sync: 67% in progress</p>
+                </section>
+                <section class="card">
+                  <h3>OCI GenAI Connection</h3>
+                  <div class="metric good">Connected</div>
+                  <p>2/2 connectivity checks passed.</p>
+                  <p>Last checked: 2026-03-30 21:18</p>
+                  <div class="pill-row">
+                    <span class="pill">Model: cohere.command-r-08-2024</span>
+                    <span class="pill">Region: us-chicago-1</span>
+                  </div>
+                </section>
+                <section class="card">
+                  <h3>Confluence Connection</h3>
+                  <div class="metric warn">Pending</div>
+                  <p>Endpoint not configured in this build.</p>
+                  <div class="pill-row">
+                    <span class="pill">Space: ENGMGT</span>
+                  </div>
+                </section>
+              </div>
+
+              <div class="section-grid cols-2">
+                <section class="card">
+                  <h3>JIRA Sync History</h3>
+                  <div class="table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Mode</th>
+                          <th>Issues</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>Mar 30 21:14</td><td>Since Last</td><td>612</td><td>completed</td></tr>
+                        <tr><td>Mar 30 18:02</td><td>Full</td><td>3,144</td><td>completed</td></tr>
+                        <tr><td>Mar 29 09:42</td><td>Since Date</td><td>401</td><td>failed</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="oj-note">Target OJET controls: oj-table + oj-dialog + oj-c-button.</p>
+                </section>
+                <section class="card">
+                  <h3>Field Mapping Readiness</h3>
+                  <div class="pill-row">
+                    <span class="pill">Story Points: customfield_10004</span>
+                    <span class="pill">Epic Link: customfield_10902</span>
+                    <span class="pill">Sprint: auto-detected</span>
+                    <span class="pill">Cycle Start: pending</span>
+                  </div>
+                  <p>Reusable lookup config for epic groups and work types below this panel.</p>
+                </section>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">2) Initiative Insights (OJET draft)</h2>
+            <span class="screen-badge">Config + Filters + Table</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Views</h4>
+              <div class="nav-item active">Initiative Epics Summary</div>
+              <div class="nav-item">Initiative Health</div>
+              <div class="nav-item">Success Criteria</div>
+              <div class="nav-item">Generated Insight</div>
+            </aside>
+            <div class="main">
+              <div class="section-grid cols-4">
+                <section class="card">
+                  <h3>Configured Epics</h3>
+                  <div class="metric">18</div>
+                  <p>OJET: oj-c-badge</p>
+                </section>
+                <section class="card">
+                  <h3>RAG Risk Mix</h3>
+                  <div class="metric warn">3 Amber</div>
+                  <p>1 red, 3 amber, 14 green</p>
+                </section>
+                <section class="card">
+                  <h3>Completion</h3>
+                  <div class="metric">64%</div>
+                  <p>Across selected initiative epics</p>
+                </section>
+                <section class="card">
+                  <h3>Delta (Period)</h3>
+                  <div class="metric good">+8.7%</div>
+                  <p>Completed in selected period</p>
+                </section>
+              </div>
+
+              <section class="card">
+                <h3>Epic Summary Table</h3>
+                <div class="table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Epic Key</th>
+                        <th>Group</th>
+                        <th>Type</th>
+                        <th>Epic Name</th>
+                        <th>Completion</th>
+                        <th>Delta</th>
+                        <th>RAG</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>CEG-2101</td><td>Payments</td><td>Reliability</td><td>Payment Retry Hardening</td><td>72%</td><td>+11%</td><td>Amber</td></tr>
+                      <tr><td>CEG-2088</td><td>Platform</td><td>Automation</td><td>Release Guard Rails</td><td>81%</td><td>+7%</td><td>Green</td></tr>
+                      <tr><td>CEG-2163</td><td>Security</td><td>Backlog Burn</td><td>Critical Vuln Cleanup</td><td>44%</td><td>+5%</td><td>Red</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="oj-note">
+                  Target OJET controls: oj-table, oj-c-select-many for filters, oj-c-dialog for
+                  configure/edit/remove flows.
+                </p>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">3) Team Insights + 4) Individual Insights (OJET draft)</h2>
+            <span class="screen-badge">Metrics + Narrative</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Selection</h4>
+              <div class="nav-item active">Team: Platform</div>
+              <div class="nav-item">Window: Last 6 Sprints</div>
+              <div class="nav-item">Person: SE 1</div>
+            </aside>
+            <div class="main">
+              <div class="split">
+                <section class="card">
+                  <h3>Team Sprint Performance</h3>
+                  <div class="section-grid cols-2">
+                    <div>
+                      <div class="metric">83 SP</div>
+                      <p>Avg committed</p>
+                    </div>
+                    <div>
+                      <div class="metric good">74 SP</div>
+                      <p>Avg completed</p>
+                    </div>
+                  </div>
+                  <div class="track"><span style="width: 88%"></span></div>
+                  <div class="track"><span style="width: 91%"></span></div>
+                  <div class="track"><span style="width: 86%"></span></div>
+                </section>
+                <section class="card">
+                  <h3>Individual Activity</h3>
+                  <div class="section-grid cols-3">
+                    <div><div class="metric">11</div><p>Completed (7d)</p></div>
+                    <div><div class="metric">4</div><p>In progress</p></div>
+                    <div><div class="metric good">3.7d</div><p>Median cycle</p></div>
+                  </div>
+                  <div class="summary-box">
+                    SE 1 has elevated interruption load from incident follow-ups. Rebalance
+                    follow-up ownership to protect initiative-critical throughput.
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">5) Current Sprint Work (OJET draft)</h2>
+            <span class="screen-badge">Kanban + Scope Changes</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Sprint</h4>
+              <div class="nav-item active">Sprint 24.06A</div>
+              <div class="nav-item">Board: Platform</div>
+              <div class="nav-item">Refresh</div>
+            </aside>
+            <div class="main">
+              <div class="section-grid cols-4">
+                <section class="card"><h3>Sprint Name</h3><div class="metric">24.06A</div><p>State: Active</p></section>
+                <section class="card"><h3>Start Date</h3><div class="metric">Mar 23</div><p>From JIRA metadata</p></section>
+                <section class="card"><h3>End Date</h3><div class="metric">Apr 05</div><p>Target end date</p></section>
+                <section class="card"><h3>Remaining</h3><div class="metric warn">6 days</div><p>SLA pressure moderate</p></section>
+              </div>
+
+              <div class="kanban">
+                <section class="column">
+                  <h4>Done (17 | 102 SP)</h4>
+                  <div class="ticket">CEG-8464 Audit log compression</div>
+                  <div class="ticket">CEG-8451 API idempotency fix</div>
+                  <div class="ticket">CEG-8432 Alert threshold tuning</div>
+                </section>
+                <section class="column">
+                  <h4>In Progress (9 | 48 SP)</h4>
+                  <div class="ticket">CEG-8478 Release guard automation</div>
+                  <div class="ticket">CEG-8483 Failed deploy triage</div>
+                  <div class="ticket">CEG-8491 Security fix rollout</div>
+                </section>
+                <section class="column">
+                  <h4>Planned (12 | 63 SP)</h4>
+                  <div class="ticket">CEG-8504 Canary expansion</div>
+                  <div class="ticket">CEG-8508 Flaky test stabilization</div>
+                  <div class="ticket">CEG-8510 Runbook consolidation</div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">6) Security + 7) Incident + 8) Releases (OJET draft)</h2>
+            <span class="screen-badge">Placeholder Pattern</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Modules</h4>
+              <div class="nav-item active">Security</div>
+              <div class="nav-item">Incident Response</div>
+              <div class="nav-item">Releases</div>
+            </aside>
+            <div class="main">
+              <div class="section-grid cols-3">
+                <section class="card">
+                  <h3>Security Posture</h3>
+                  <div class="metric warn">Data Pending</div>
+                  <p>Open vulnerabilities, SLA risk, remediation throughput.</p>
+                </section>
+                <section class="card">
+                  <h3>Incident Operations</h3>
+                  <div class="metric warn">Data Pending</div>
+                  <p>Incident volume, MTTR trend, ownership load.</p>
+                </section>
+                <section class="card">
+                  <h3>Release Health</h3>
+                  <div class="metric warn">Data Pending</div>
+                  <p>Deployment frequency, rollback rate, lead time.</p>
+                </section>
+              </div>
+              <section class="card">
+                <h3>Shared Placeholder UX</h3>
+                <div class="summary-box">
+                  In OJET, these modules should use one reusable "not configured" state with
+                  consistent actions: configure source, run connectivity check, and open setup docs.
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <header class="screen-head">
+            <h2 class="screen-title">9) Executive Report (OJET draft)</h2>
+            <span class="screen-badge">OCI GenAI + Reporting</span>
+          </header>
+          <div class="viewport">
+            <aside class="nav-rail">
+              <h4>Report Controls</h4>
+              <div class="nav-item active">Period: Last 7 Days</div>
+              <div class="nav-item">Initiative Selection</div>
+              <div class="nav-item">Print/Export</div>
+            </aside>
+            <div class="main">
+              <div class="section-grid cols-2">
+                <section class="card">
+                  <h3>Executive Summary Draft (OCI GenAI)</h3>
+                  <div class="summary-box">
+                    Team delivered steady progress across selected initiatives with stronger
+                    momentum in release automation and vulnerability cleanup. Risk remains
+                    concentrated in timeline-critical payment hardening work where blocker age and
+                    scope movement reduced confidence for on-time completion.
+                  </div>
+                </section>
+                <section class="card">
+                  <h3>Wins and Risks (OCI GenAI)</h3>
+                  <div class="table">
+                    <table>
+                      <thead><tr><th>Wins</th><th>Risks</th></tr></thead>
+                      <tbody>
+                        <tr><td>Release guardrails improved deployment confidence.</td><td>Payment hardening timeline remains at risk.</td></tr>
+                        <tr><td>Security backlog burn accelerated in-period.</td><td>Dependency clearance lag increased blocker age.</td></tr>
+                        <tr><td>Cycle-time trend improved across selected epics.</td><td>Scope growth threatens due-date confidence.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+
+              <div class="section-grid cols-3">
+                <section class="card">
+                  <h3>Initiative RAG</h3>
+                  <div class="metric">
+                    <span class="risk">1 Red</span> / <span class="warn">3 Amber</span> /
+                    <span class="good">9 Green</span>
+                  </div>
+                  <p>Selected epics only</p>
+                </section>
+                <section class="card">
+                  <h3>Completed in Period</h3>
+                  <div class="metric">79 cards</div>
+                  <p>Selected reporting range</p>
+                </section>
+                <section class="card">
+                  <h3>Effort Distribution</h3>
+                  <div class="legend-row">
+                    <span><span class="dot" style="background:#0b5fcc"></span>Platform 42%</span>
+                    <span><span class="dot" style="background:#107d4f"></span>Security 31%</span>
+                    <span><span class="dot" style="background:#b36a00"></span>Payments 27%</span>
+                  </div>
+                </section>
+              </div>
+              <p class="oj-note">
+                Target OJET controls: oj-c-select-single (period), oj-table (progress/wins/risks),
+                oj-c-dialog (configure initiatives), oj-c-button (print/export).
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
