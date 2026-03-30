@@ -29,6 +29,7 @@ type NavItem = {
   id: ScreenId;
   label: string;
   blurb: string;
+  implemented: boolean;
 };
 
 type Props = {
@@ -36,15 +37,15 @@ type Props = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "integrations", label: "Integrations", blurb: "JIRA, OCI GenAI, Confluence" },
-  { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG" },
-  { id: "team", label: "Team Insights", blurb: "Velocity and cycle time" },
-  { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows" },
-  { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned" },
-  { id: "security", label: "Security", blurb: "Vulnerability posture" },
-  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs" },
-  { id: "releases", label: "Releases", blurb: "Release cadence and quality" },
-  { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary" },
+  { id: "integrations", label: "Integrations", blurb: "JIRA, OCI GenAI, Confluence", implemented: true },
+  { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG", implemented: true },
+  { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", implemented: true },
+  { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows", implemented: true },
+  { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned", implemented: true },
+  { id: "security", label: "Security", blurb: "Vulnerability posture", implemented: false },
+  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", implemented: false },
+  { id: "releases", label: "Releases", blurb: "Release cadence and quality", implemented: false },
+  { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", implemented: false },
 ];
 
 function screenTitle(id: ScreenId): string {
@@ -119,7 +120,7 @@ export function Content({ appName }: Props) {
           <div>
             <p class="tb-eyebrow">{appName}</p>
             <h1>Manager Console</h1>
-            <small>Oracle JET migration baseline</small>
+            <small>Illuminating Engineering Insights</small>
           </div>
         </div>
         <nav class="tb-nav">
@@ -130,7 +131,18 @@ export function Content({ appName }: Props) {
               class={`tb-nav-item${active === item.id ? " is-active" : ""}`}
               onClick={() => setActive(item.id)}
             >
-              <span>{item.label}</span>
+              <div class="tb-nav-title-row">
+                <span class="tb-nav-title">{item.label}</span>
+                {!item.implemented ? (
+                  <span
+                    class="tb-nav-construction"
+                    title="Under construction"
+                    aria-label={`${item.label} is under construction`}
+                  >
+                    🚧
+                  </span>
+                ) : null}
+              </div>
               <small>{item.blurb}</small>
             </button>
           ))}
@@ -139,11 +151,7 @@ export function Content({ appName }: Props) {
 
       <main class="tb-main">
         <header class="tb-topbar">
-          <div>
-            <p class="tb-eyebrow">TeamBeacon OJET Preview</p>
-            <h2>{heading}</h2>
-          </div>
-          <span class="tb-chip">Phase 0/1 Migration</span>
+          <h2>{heading}</h2>
         </header>
         <section class="tb-screen-body">{renderScreen(active)}</section>
       </main>

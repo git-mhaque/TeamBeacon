@@ -109,9 +109,22 @@ body {
   transform: translateY(-1px);
 }
 
-.tb-nav-item span {
+.tb-nav-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.tb-nav-title {
   display: block;
   font-weight: 600;
+}
+
+.tb-nav-construction {
+  display: inline-block;
+  font-size: 0.78rem;
+  line-height: 1;
 }
 
 .tb-nav-item small {
@@ -142,7 +155,7 @@ body {
 }
 
 .tb-topbar h2 {
-  margin: 0.12rem 0 0;
+  margin: 0;
   font-size: 1.38rem;
 }
 

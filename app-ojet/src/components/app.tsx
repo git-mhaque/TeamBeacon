@@ -17,7 +17,7 @@ type Props = Readonly<{
 
 export const App = registerCustomElement(
   "app-root",
-  ({ appName = "TeamBeacon OJET" }: Props) => {
+  ({ appName = "TeamBeacon" }: Props) => {
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     }, []);
