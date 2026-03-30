@@ -687,9 +687,6 @@ export function IntegrationsScreen() {
           <li>
             Epic Link <span class="tb-status-pill is-good">{epicLinkField}</span>
           </li>
-          <li>
-            Cycle Start Date <span class="tb-status-pill is-warn">pending</span>
-          </li>
         </ul>
       </section>
 

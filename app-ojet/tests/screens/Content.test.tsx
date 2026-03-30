@@ -41,7 +41,7 @@ describe("Content", () => {
 
     render(<Content appName="TeamBeacon" />);
 
-    expect(await screen.findByRole("heading", { name: "Integrations & Field Mapping" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Illuminating Engineering Insights")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Integrations Settings" })).not.toBeInTheDocument();
 
@@ -66,6 +66,7 @@ describe("Content", () => {
     expect(screen.getByLabelText("Release is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Progress / Scope Creep / Blockers")).toBeInTheDocument();
+    expect(screen.getByText("Connections, Field Mapping and Epic Metadata")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Executive Report is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
@@ -78,6 +79,6 @@ describe("Content", () => {
     expect(screen.getByRole("heading", { name: "Security Posture Snapshot" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
-    expect(await screen.findByRole("heading", { name: "Integrations & Field Mapping" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
   });
 });

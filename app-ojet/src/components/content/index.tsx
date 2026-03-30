@@ -45,12 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
   { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
   { id: "executive", label: "Executive Report", blurb: "Leadership summary output", showConstruction: false },
-  { id: "integrations", label: "Settings", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
+  { id: "integrations", label: "Settings", blurb: "Connections, Field Mapping and Epic Metadata", showConstruction: false },
 ];
 
 function screenTitle(id: ScreenId): string {
   const mapping: Record<ScreenId, string> = {
-    integrations: "Integrations & Field Mapping",
+    integrations: "Settings",
     initiatives: "Initiative Insights",
     team: "Team Insights",
     sprint: "Current Sprint Work",
