@@ -66,7 +66,7 @@ describe("Content", () => {
     expect(screen.getByLabelText("Release is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Progress / Scope Creep / Blockers")).toBeInTheDocument();
-    expect(screen.getByText("Connections, Field Mapping and Epic Metadata")).toBeInTheDocument();
+    expect(screen.getByText("Connections / Field Mapping / Epic Metadata")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Executive Report is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
