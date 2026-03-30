@@ -7,10 +7,10 @@
  */
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
+import { ExecutiveReportScreen } from "./screens/ExecutiveReportScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
-import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
   { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
-  { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", showConstruction: true },
+  { id: "executive", label: "Executive Report", blurb: "AI summary + wins/risks", showConstruction: false },
   { id: "integrations", label: "Settings", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
 ];
 
@@ -79,12 +79,7 @@ function renderScreen(id: ScreenId) {
     case "releases":
       return <ReleasesScreen />;
     case "executive":
-      return (
-        <PlaceholderScreen
-          heading="Executive Report"
-          detail="Migration in progress. OCI GenAI-driven executive summary and wins/risks drafting will be migrated in Phase 3."
-        />
-      );
+      return <ExecutiveReportScreen />;
     default:
       return <IntegrationsScreen />;
   }

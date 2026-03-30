@@ -53,6 +53,23 @@ export type OciGenAiIntegrationStatus = {
   error?: string | null;
 };
 
+export type OciGenAiChatResponse = {
+  source: "oci_genai";
+  modelId: string;
+  response: {
+    text: string;
+  };
+  request?: {
+    message?: string;
+    maxTokens?: number;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    frequencyPenalty?: number;
+  };
+  error?: string | null;
+};
+
 export type JiraSyncState = "idle" | "running" | "completed" | "failed";
 export type JiraSyncMode = "full" | "since_last" | "since_date";
 
@@ -279,6 +296,26 @@ export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrat
     throw await parseError(response, `OCI GenAI status request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiIntegrationStatus;
+}
+
+export async function chatWithOciGenAi(payload: {
+  message: string;
+  modelId?: string;
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  frequencyPenalty?: number;
+}): Promise<OciGenAiChatResponse> {
+  const response = await fetch(`${API_BASE}/api/ai/chat`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `OCI GenAI chat request failed (${response.status})`);
+  }
+  return (await response.json()) as OciGenAiChatResponse;
 }
 
 export async function fetchJiraSyncStatus(): Promise<JiraSyncStatus> {

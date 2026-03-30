@@ -947,6 +947,140 @@ body {
   border-bottom: none;
 }
 
+.tb-history-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.tb-history-progress-track {
+  flex: 1;
+  min-width: 5.6rem;
+  height: 0.44rem;
+  border-radius: 999px;
+  border: 1px solid #ccdaf0;
+  background: #eaf2ff;
+  overflow: hidden;
+}
+
+.tb-history-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f7bd8 0%, #0f60c9 100%);
+}
+
+.tb-history-progress-label {
+  color: #365985;
+  font-size: 0.73rem;
+  font-weight: 700;
+  min-width: 2.5rem;
+}
+
+.tb-exec-period-toolbar {
+  display: grid;
+  gap: 0.54rem;
+}
+
+.tb-exec-period-custom {
+  display: grid;
+  gap: 0.44rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tb-exec-period-field {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.tb-exec-period-field span {
+  color: #2b4f81;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tb-exec-period-field select,
+.tb-exec-period-field input {
+  border: 1px solid #c9d7ed;
+  border-radius: 0.56rem;
+  background: #f8fbff;
+  color: #203959;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.42rem 0.54rem;
+}
+
+.tb-exec-two-up {
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tb-exec-list-title {
+  color: #294b79;
+  font-size: 0.84rem;
+  margin: 0 0 0.34rem;
+}
+
+.tb-exec-search {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.tb-exec-search span {
+  color: #2b4f81;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tb-exec-search input {
+  border: 1px solid #c9d7ed;
+  border-radius: 0.56rem;
+  background: #f8fbff;
+  color: #203959;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.42rem 0.54rem;
+}
+
+.tb-exec-config-list {
+  border: 1px solid #d8e2f2;
+  border-radius: 0.68rem;
+  background: #f9fbff;
+  display: grid;
+  gap: 0.38rem;
+  max-height: 20rem;
+  overflow: auto;
+  padding: 0.44rem;
+}
+
+.tb-exec-config-item {
+  border: 1px solid #d1dff3;
+  border-radius: 0.6rem;
+  background: #fff;
+  display: grid;
+  gap: 0.24rem;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 0.42rem 0.5rem;
+}
+
+.tb-exec-config-item strong {
+  color: #203959;
+  display: block;
+  font-size: 0.79rem;
+}
+
+.tb-exec-config-item p {
+  color: #4e6382;
+  font-size: 0.72rem;
+  margin: 0.08rem 0 0;
+}
+
 @keyframes tb-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -1129,6 +1263,14 @@ body {
   }
 
   .tb-modal-two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-exec-two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-exec-period-custom {
     grid-template-columns: 1fr;
   }
 }
