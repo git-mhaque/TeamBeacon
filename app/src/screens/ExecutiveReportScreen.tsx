@@ -332,6 +332,112 @@ function buildExecutiveSummaryPrompt(params: {
     .join("\n");
 }
 
+function normalizeDraftBullets(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const deduped = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const normalized = item.trim().replace(/\s+/g, " ");
+    if (!normalized) {
+      continue;
+    }
+    deduped.add(normalized);
+    if (deduped.size >= 4) {
+      break;
+    }
+  }
+  return [...deduped];
+}
+
+function parseWinsRisksDraft(text: string): { wins: string[]; risks: string[] } {
+  const trimmed = text.trim();
+  const unwrapped = trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const candidates: string[] = [unwrapped];
+  const firstBrace = unwrapped.indexOf("{");
+  const lastBrace = unwrapped.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(unwrapped.slice(firstBrace, lastBrace + 1));
+  }
+
+  let parsed: Record<string, unknown> | null = null;
+  for (const candidate of candidates) {
+    try {
+      const next = JSON.parse(candidate);
+      if (next && typeof next === "object") {
+        parsed = next as Record<string, unknown>;
+        break;
+      }
+    } catch {
+      // Try next parse candidate.
+    }
+  }
+
+  if (!parsed) {
+    throw new Error("OCI GenAI did not return valid JSON for wins and risks.");
+  }
+
+  const wins = normalizeDraftBullets(parsed.wins);
+  const risks = normalizeDraftBullets(parsed.risks);
+  if (wins.length === 0 || risks.length === 0) {
+    throw new Error("OCI GenAI response did not include wins/risks lists.");
+  }
+  return { wins, risks };
+}
+
+function buildWinsRisksPrompt(params: {
+  reportingPeriodLabel: string;
+  reportingPeriodDays: number;
+  timezone: string;
+  rows: ExecutiveRow[];
+}): string {
+  const promptRows = params.rows.slice(0, 40);
+  const initiativeLines = promptRows.map((row, index) => {
+    const timelineText = row.timelineEnabled
+      ? `Timeline ${row.timelineStartDate ?? "?"} -> ${row.targetCompletionDate ?? "?"}`
+      : "Timeline not configured";
+    return (
+      `${index + 1}. ${row.epicName || row.epicKey} (${row.epicKey})` +
+      ` | Group: ${row.groupText}` +
+      ` | Type: ${row.typeText}` +
+      ` | Period Progress: ${row.completedLastWeekValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})` +
+      ` | Overall Progress: ${formatPercent(row.completionPercent)}` +
+      ` | RAG: ${row.rag}` +
+      ` | ${timelineText}`
+    );
+  });
+  const truncationNote = params.rows.length > promptRows.length
+    ? `Only the first ${promptRows.length} selected initiatives are listed in this prompt.`
+    : "";
+
+  return [
+    "Draft leadership-ready bullets from selected initiative progress data.",
+    "Return JSON only with this schema:",
+    "{\"wins\":[\"...\"],\"risks\":[\"...\"]}",
+    "Rules:",
+    "- wins must contain 3-4 concise bullets highlighting progress momentum.",
+    "- risks must contain 3-4 concise bullets highlighting delivery risk or missing signals.",
+    "- Each bullet must be <= 24 words.",
+    "- Use only the provided data. No invented metrics.",
+    "",
+    `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
+    truncationNote,
+    "",
+    "Selected initiative data from Progress for Key Initiatives:",
+    ...initiativeLines,
+  ]
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+}
+
 export function ExecutiveReportScreen() {
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(
@@ -363,8 +469,13 @@ export function ExecutiveReportScreen() {
   const [executiveSummaryDraft, setExecutiveSummaryDraft] = useState("Generating executive summary...");
   const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(true);
   const [executiveSummaryError, setExecutiveSummaryError] = useState<string | null>(null);
+  const [winsDraft, setWinsDraft] = useState<string[]>([]);
+  const [risksDraft, setRisksDraft] = useState<string[]>([]);
+  const [winsRisksLoading, setWinsRisksLoading] = useState(true);
+  const [winsRisksError, setWinsRisksError] = useState<string | null>(null);
   const hasInitializedInitiativeSelection = useRef(false);
   const summaryRequestSequence = useRef(0);
+  const winsRisksRequestSequence = useRef(0);
 
   const persistInitiativeSelection = useCallback((keys: string[]) => {
     if (typeof window === "undefined") return;
@@ -612,49 +723,6 @@ export function ExecutiveReportScreen() {
     [metrics.totalCompletedLastWeek, sortedTypeProgress],
   );
 
-  const wins = useMemo(() => {
-    const items: string[] = [];
-    const completedThreshold = Math.max(1, Math.round((reportingPeriodDays * 3) / 7));
-    for (const row of rows) {
-      if (
-        row.completedLastWeekValue >= completedThreshold
-        || row.deltaPercentValue >= 12
-        || (row.rag === "Green" && row.deltaPercentValue > 0)
-      ) {
-        items.push(
-          `${row.epicName || row.epicKey}: +${formatPercent(row.deltaPercentValue)} period movement (${row.completedLastWeekValue}/${row.totalCards} cards), ${row.groupText} / ${row.typeText}.`,
-        );
-      }
-      if (items.length >= 4) break;
-    }
-    if (items.length === 0 && rows.length > 0) {
-      items.push("Steady delivery across configured epics with no major slippage in the selected reporting period.");
-    }
-    return items;
-  }, [reportingPeriodDays, rows]);
-
-  const risks = useMemo(() => {
-    const items: string[] = [];
-    for (const row of rows) {
-      if (row.rag === "Red") {
-        items.push(
-          `${row.epicName || row.epicKey}: Red at ${formatPercent(row.completionPercent)} completion; prioritize scope burn-down and blocker removal.`,
-        );
-      } else if (row.totalCards > 0 && row.completedLastWeekValue === 0) {
-        items.push(
-          `${row.epicName || row.epicKey}: no completed cards in the selected reporting period (${row.groupText} / ${row.typeText}).`,
-        );
-      } else if (row.successCriteria.length === 0) {
-        items.push(`${row.epicName || row.epicKey}: success criteria not configured; outcome quality risk remains.`);
-      }
-      if (items.length >= 4) break;
-    }
-    if (items.length === 0 && rows.length > 0) {
-      items.push("No major initiative risks flagged from configured epic signals in the selected reporting period.");
-    }
-    return items;
-  }, [rows]);
-
   const reportTone = metrics.redCount > 0 ? "warn" : "good";
   const initiativeRows = useMemo(() => {
     const sorted = [...rows];
@@ -835,6 +903,83 @@ export function ExecutiveReportScreen() {
     visibleInitiativeSignals.totalEpics,
   ]);
 
+  useEffect(() => {
+    if (loading) {
+      setWinsRisksLoading(true);
+      setWinsRisksError(null);
+      return;
+    }
+
+    if (error) {
+      setWinsRisksLoading(false);
+      setWinsRisksError(null);
+      setWinsDraft(["Unable to generate wins because initiative data failed to load."]);
+      setRisksDraft(["Unable to generate risks because initiative data failed to load."]);
+      return;
+    }
+
+    if (visibleInitiativeRows.length === 0) {
+      setWinsRisksLoading(false);
+      setWinsRisksError(null);
+      if (initiativeRows.length > 0) {
+        setWinsDraft(["No initiatives are selected in Progress for Key Initiatives."]);
+        setRisksDraft(["Select at least one initiative to generate risks."]);
+      } else {
+        setWinsDraft(["No configured epics found to generate wins."]);
+        setRisksDraft(["No configured epics found to generate risks."]);
+      }
+      return;
+    }
+
+    const prompt = buildWinsRisksPrompt({
+      reportingPeriodLabel,
+      reportingPeriodDays,
+      timezone: browserTimezone,
+      rows: visibleInitiativeRows,
+    });
+
+    const requestId = winsRisksRequestSequence.current + 1;
+    winsRisksRequestSequence.current = requestId;
+    setWinsRisksLoading(true);
+    setWinsRisksError(null);
+    setWinsDraft([]);
+    setRisksDraft([]);
+
+    chatWithOciGenAi({
+      message: prompt,
+      maxTokens: 420,
+      temperature: 0.2,
+      topP: 0.8,
+      topK: 0,
+      frequencyPenalty: 0,
+    })
+      .then((response) => {
+        if (winsRisksRequestSequence.current !== requestId) return;
+        const parsed = parseWinsRisksDraft(response.response.text ?? "");
+        setWinsDraft(parsed.wins);
+        setRisksDraft(parsed.risks);
+      })
+      .catch((err) => {
+        if (winsRisksRequestSequence.current !== requestId) return;
+        const message = err instanceof Error ? err.message : "Unknown OCI GenAI wins/risks failure.";
+        setWinsRisksError(message);
+        setWinsDraft(["Unable to generate wins draft from OCI GenAI."]);
+        setRisksDraft(["Unable to generate risks draft from OCI GenAI."]);
+      })
+      .finally(() => {
+        if (winsRisksRequestSequence.current !== requestId) return;
+        setWinsRisksLoading(false);
+      });
+  }, [
+    browserTimezone,
+    error,
+    initiativeRows.length,
+    loading,
+    reportingPeriodDays,
+    reportingPeriodLabel,
+    visibleInitiativeRows,
+  ]);
+
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
     if (!query) return initiativeRows;
@@ -988,24 +1133,30 @@ export function ExecutiveReportScreen() {
         {error ? <p className="sync-history-error">Executive report error: {error}</p> : null}
       </Panel>
 
-      <Panel title="Wins and Risks" subtitle="Auto-highlighted report bullets for leadership updates.">
+      <Panel
+        title="Wins and Risks"
+        subtitle="Drafted by OCI GenAI from selected Progress for Key Initiatives data."
+      >
+        {winsRisksError ? <p className="sync-history-error">Wins and risks draft error: {winsRisksError}</p> : null}
         <div className="metrics-grid two-up">
           <div>
             <h4 className="executive-list-title">Wins</h4>
             <ul className="list">
-              {wins.map((item) => (
+              {winsDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
-              {!loading && wins.length === 0 ? <li>Wins will appear once configured epic data is available.</li> : null}
+              {winsRisksLoading ? <li>Generating wins with OCI GenAI...</li> : null}
+              {!winsRisksLoading && winsDraft.length === 0 ? <li>Wins will appear once configured epic data is available.</li> : null}
             </ul>
           </div>
           <div>
             <h4 className="executive-list-title">Risks</h4>
             <ul className="list">
-              {risks.map((item) => (
+              {risksDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
-              {!loading && risks.length === 0 ? <li>Risks will appear once configured epic data is available.</li> : null}
+              {winsRisksLoading ? <li>Generating risks with OCI GenAI...</li> : null}
+              {!winsRisksLoading && risksDraft.length === 0 ? <li>Risks will appear once configured epic data is available.</li> : null}
             </ul>
           </div>
         </div>
