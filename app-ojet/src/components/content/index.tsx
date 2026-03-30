@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
   { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
-  { id: "executive", label: "Executive Report", blurb: "AI summary + wins/risks", showConstruction: false },
+  { id: "executive", label: "Executive Report", blurb: "Leadership summary output", showConstruction: false },
   { id: "integrations", label: "Settings", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
 ];
 
@@ -129,6 +129,11 @@ export function Content({ appName }: Props) {
       <main class="tb-main">
         <header class="tb-topbar">
           <h2>{heading}</h2>
+          {active === "executive" ? (
+            <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
+              Print Report
+            </button>
+          ) : null}
         </header>
         <section class="tb-screen-body">{renderScreen(active)}</section>
       </main>

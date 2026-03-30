@@ -111,6 +111,19 @@ function formatReportingPeriodLabel(startDate: string, endDate: string): string 
   return `${startText} - ${endText}`;
 }
 
+function formatDraftTimestamp(value: string | null): string {
+  if (!value) return "Not generated yet";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function readPersistedReportingSelection(defaultRange: ReportingRange): PersistedReportingSelection {
   const fallback: PersistedReportingSelection = {
     preset: "last_7_days",
@@ -456,6 +469,9 @@ export function ExecutiveReportScreen() {
   const [executiveSummaryDraft, setExecutiveSummaryDraft] = useState("Generating executive summary...");
   const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(true);
   const [executiveSummaryError, setExecutiveSummaryError] = useState<string | null>(null);
+  const [executiveSummaryModelId, setExecutiveSummaryModelId] = useState<string | null>(null);
+  const [executiveSummaryGeneratedAt, setExecutiveSummaryGeneratedAt] = useState<string | null>(null);
+  const [summaryRefreshNonce, setSummaryRefreshNonce] = useState(0);
 
   const [winsDraft, setWinsDraft] = useState<string[]>([]);
   const [risksDraft, setRisksDraft] = useState<string[]>([]);
@@ -785,6 +801,16 @@ export function ExecutiveReportScreen() {
     [typeDistributionRows, visibleInitiativeSignals.totalCompletedInPeriod],
   );
 
+  const executiveSummaryWordCount = useMemo(() => {
+    const trimmed = executiveSummaryDraft.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }, [executiveSummaryDraft]);
+
+  const refreshExecutiveSummary = useCallback(() => {
+    setSummaryRefreshNonce((previous) => previous + 1);
+  }, []);
+
   useEffect(() => {
     if (loading) {
       setExecutiveSummaryLoading(true);
@@ -842,12 +868,16 @@ export function ExecutiveReportScreen() {
           throw new Error("OCI GenAI returned an empty summary draft.");
         }
         setExecutiveSummaryDraft(text);
+        setExecutiveSummaryModelId(response.modelId ?? null);
+        setExecutiveSummaryGeneratedAt(new Date().toISOString());
       })
       .catch((err) => {
         if (summaryRequestSequence.current !== requestId) return;
         const message = err instanceof Error ? err.message : "Unknown OCI GenAI summary failure.";
         setExecutiveSummaryError(message);
         setExecutiveSummaryDraft("Unable to generate executive summary draft from OCI GenAI.");
+        setExecutiveSummaryModelId(null);
+        setExecutiveSummaryGeneratedAt(null);
       })
       .finally(() => {
         if (summaryRequestSequence.current !== requestId) return;
@@ -860,6 +890,7 @@ export function ExecutiveReportScreen() {
     loading,
     reportingPeriodDays,
     reportingPeriodLabel,
+    summaryRefreshNonce,
     visibleInitiativeRows,
     visibleInitiativeSignals.amberCount,
     visibleInitiativeSignals.greenCount,
@@ -1022,9 +1053,6 @@ export function ExecutiveReportScreen() {
     closeInitiativeConfig();
   }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
 
-  const reportToneClass = visibleInitiativeSignals.redCount > 0 ? "is-warn" : "is-good";
-  const reportToneText = visibleInitiativeSignals.redCount > 0 ? "Review Risks" : "Ready";
-
   return (
     <div class="tb-screen-grid">
       <section class="tb-panel">
@@ -1034,58 +1062,75 @@ export function ExecutiveReportScreen() {
             <p>Drafted by OCI GenAI from selected progress data and reporting period movement.</p>
           </div>
           <div class="tb-btn-row">
-            <span class={`tb-status-pill ${reportToneClass}`}>{reportToneText}</span>
-            <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
-              Print Report
+            <button
+              type="button"
+              class="tb-btn tb-btn-sm tb-no-print"
+              onClick={refreshExecutiveSummary}
+              disabled={executiveSummaryLoading}
+            >
+              Refresh Draft
             </button>
           </div>
         </header>
 
         <div class="tb-exec-period-toolbar tb-no-print">
-          <label class="tb-exec-period-field">
-            <span>Reporting Period</span>
-            <select
-              value={reportingPreset}
-              onChange={(event) => onReportingPresetChange((event.currentTarget as HTMLSelectElement).value as ReportingPreset)}
-            >
-              <option value="last_7_days">Last 7 Days</option>
-              <option value="last_14_days">Last 14 Days</option>
-              <option value="last_30_days">Last 30 Days</option>
-              <option value="custom">Custom</option>
-            </select>
-          </label>
+          <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
+            <label class="tb-exec-period-field">
+              <span>Reporting Period</span>
+              <select
+                value={reportingPreset}
+                onChange={(event) => onReportingPresetChange((event.currentTarget as HTMLSelectElement).value as ReportingPreset)}
+              >
+                <option value="last_7_days">Last 7 Days</option>
+                <option value="last_14_days">Last 14 Days</option>
+                <option value="last_30_days">Last 30 Days</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
 
-          {reportingPreset === "custom" ? (
-            <div class="tb-exec-period-custom">
-              <label class="tb-exec-period-field">
-                <span>Start</span>
-                <input
-                  type="date"
-                  value={reportingStartDraft}
-                  onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
-                />
-              </label>
-              <label class="tb-exec-period-field">
-                <span>End</span>
-                <input
-                  type="date"
-                  value={reportingEndDraft}
-                  onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
-                />
-              </label>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={applyCustomReportingRange}>
-                Apply
-              </button>
-            </div>
-          ) : null}
+            {reportingPreset === "custom" ? (
+              <>
+                <label class="tb-exec-period-field">
+                  <span>Start</span>
+                  <input
+                    type="date"
+                    value={reportingStartDraft}
+                    onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
+                  />
+                </label>
+                <label class="tb-exec-period-field">
+                  <span>End</span>
+                  <input
+                    type="date"
+                    value={reportingEndDraft}
+                    onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
+                  />
+                </label>
+                <div class="tb-exec-period-action">
+                  <button type="button" class="tb-btn tb-btn-sm" onClick={applyCustomReportingRange}>
+                    Apply
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
 
         <p class="tb-muted-note">
           Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
         </p>
+        <div class="tb-exec-summary-meta">
+          <span>Model: {executiveSummaryModelId ?? "default"}</span>
+          <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
+          <span>{executiveSummaryWordCount} words</span>
+        </div>
         {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
-        <div class="tb-summary">
-          {executiveSummaryLoading ? "Generating executive summary with OCI GenAI..." : executiveSummaryDraft}
+        <div class={`tb-summary${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
+          {executiveSummaryLoading ? (
+            <p>Generating executive summary with OCI GenAI...</p>
+          ) : (
+            <p>{executiveSummaryDraft}</p>
+          )}
         </div>
         {executiveSummaryError ? <p class="tb-error-note">Executive summary draft error: {executiveSummaryError}</p> : null}
         {error ? <p class="tb-error-note">Executive report error: {error}</p> : null}
@@ -1217,8 +1262,18 @@ export function ExecutiveReportScreen() {
           </article>
           <article class="tb-metric-card">
             <h4>Initiative RAG</h4>
-            <strong class="tb-value">
-              {loading ? "..." : `${visibleInitiativeSignals.redCount} Red | ${visibleInitiativeSignals.amberCount} Amber | ${visibleInitiativeSignals.greenCount} Green`}
+            <strong class="tb-value tb-value-rag">
+              {loading ? (
+                "..."
+              ) : (
+                <span class="tb-initiative-rag-breakdown">
+                  <span class="tb-initiative-rag-text tb-initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
+                  <span class="tb-initiative-rag-separator">|</span>
+                  <span class="tb-initiative-rag-text tb-initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
+                  <span class="tb-initiative-rag-separator">|</span>
+                  <span class="tb-initiative-rag-text tb-initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
+                </span>
+              )}
             </strong>
             <p>For selected initiatives.</p>
           </article>
@@ -1228,107 +1283,117 @@ export function ExecutiveReportScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Effort Distribution by Group and Type</h3>
+            <h3>Work Mix by Group and Type</h3>
             <p>Share of completed cards in the selected reporting period.</p>
           </div>
         </header>
 
-        <div class="tb-exec-two-up">
-          <div>
-            <h4 class="tb-exec-list-title">Groups</h4>
-            <div class="tb-exec-donut-wrap">
-              <div
-                class="tb-exec-donut"
-                style={{ background: buildDonutBackground(groupDistributionSlices) }}
-                role="img"
-                aria-label="Group effort distribution chart"
-              >
-                {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
-              </div>
-              <ul class="tb-exec-donut-legend">
-                {groupDistributionSlices.map((slice) => (
-                  <li key={slice.label}>
-                    <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
-                    <span>{slice.label}</span>
-                    <span>{formatPercent(slice.percent)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div class="tb-sync-history-wrap">
-              <table class="tb-sync-history-table">
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Completed in Period</th>
-                    <th>%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupDistributionRows.map((row) => (
-                    <tr key={row.name}>
-                      <td>{row.name}</td>
-                      <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
-                      <td>{formatPercent(row.percent)}</td>
-                    </tr>
-                  ))}
-                  {!loading && groupDistributionRows.length === 0 ? (
+        <div class="tb-exec-workmix-stack">
+          <section class="tb-exec-workmix-row">
+            <div>
+              <h4 class="tb-exec-list-title">Groups</h4>
+              <div class="tb-sync-history-wrap">
+                <table class="tb-sync-history-table">
+                  <thead>
                     <tr>
-                      <td colSpan={3}>No group-tagged epics yet.</td>
+                      <th>Group</th>
+                      <th>Completed in Period</th>
+                      <th>%</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {groupDistributionRows.map((row) => (
+                      <tr key={row.name}>
+                        <td>{row.name}</td>
+                        <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
+                        <td>{formatPercent(row.percent)}</td>
+                      </tr>
+                    ))}
+                    {!loading && groupDistributionRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={3}>No group-tagged epics yet.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+            <div>
+              <h4 class="tb-exec-list-title">Group Mix</h4>
+              <div class="tb-exec-donut-wrap">
+                <div
+                  class="tb-exec-donut"
+                  style={{ background: buildDonutBackground(groupDistributionSlices) }}
+                  role="img"
+                  aria-label="Group effort distribution chart"
+                >
+                  {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
+                </div>
+                <ul class="tb-exec-donut-legend">
+                  {groupDistributionSlices.map((slice) => (
+                    <li key={slice.label}>
+                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>{slice.label}</span>
+                      <span>{formatPercent(slice.percent)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
 
-          <div>
-            <h4 class="tb-exec-list-title">Types</h4>
-            <div class="tb-exec-donut-wrap">
-              <div
-                class="tb-exec-donut"
-                style={{ background: buildDonutBackground(typeDistributionSlices) }}
-                role="img"
-                aria-label="Type effort distribution chart"
-              >
-                {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
-              </div>
-              <ul class="tb-exec-donut-legend">
-                {typeDistributionSlices.map((slice) => (
-                  <li key={slice.label}>
-                    <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
-                    <span>{slice.label}</span>
-                    <span>{formatPercent(slice.percent)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div class="tb-sync-history-wrap">
-              <table class="tb-sync-history-table">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Completed in Period</th>
-                    <th>%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {typeDistributionRows.map((row) => (
-                    <tr key={row.name}>
-                      <td>{row.name}</td>
-                      <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
-                      <td>{formatPercent(row.percent)}</td>
-                    </tr>
-                  ))}
-                  {!loading && typeDistributionRows.length === 0 ? (
+          <section class="tb-exec-workmix-row">
+            <div>
+              <h4 class="tb-exec-list-title">Types</h4>
+              <div class="tb-sync-history-wrap">
+                <table class="tb-sync-history-table">
+                  <thead>
                     <tr>
-                      <td colSpan={3}>No type-tagged epics yet.</td>
+                      <th>Type</th>
+                      <th>Completed in Period</th>
+                      <th>%</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {typeDistributionRows.map((row) => (
+                      <tr key={row.name}>
+                        <td>{row.name}</td>
+                        <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
+                        <td>{formatPercent(row.percent)}</td>
+                      </tr>
+                    ))}
+                    {!loading && typeDistributionRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={3}>No type-tagged epics yet.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+            <div>
+              <h4 class="tb-exec-list-title">Type Mix</h4>
+              <div class="tb-exec-donut-wrap">
+                <div
+                  class="tb-exec-donut"
+                  style={{ background: buildDonutBackground(typeDistributionSlices) }}
+                  role="img"
+                  aria-label="Type effort distribution chart"
+                >
+                  {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
+                </div>
+                <ul class="tb-exec-donut-legend">
+                  {typeDistributionSlices.map((slice) => (
+                    <li key={slice.label}>
+                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>{slice.label}</span>
+                      <span>{formatPercent(slice.percent)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
