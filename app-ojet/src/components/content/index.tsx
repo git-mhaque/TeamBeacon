@@ -32,7 +32,7 @@ type NavItem = {
   id: ScreenId;
   label: string;
   blurb: string;
-  implemented: boolean;
+  showConstruction: boolean;
 };
 
 type Props = {
@@ -40,15 +40,15 @@ type Props = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "integrations", label: "Integrations", blurb: "JIRA, OCI GenAI, Confluence", implemented: true },
-  { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG", implemented: true },
-  { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", implemented: true },
-  { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows", implemented: true },
-  { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned", implemented: true },
-  { id: "security", label: "Security", blurb: "Vulnerability posture", implemented: true },
-  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", implemented: true },
-  { id: "releases", label: "Releases", blurb: "Release cadence and quality", implemented: true },
-  { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", implemented: false },
+  { id: "integrations", label: "Integrations", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
+  { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG", showConstruction: false },
+  { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", showConstruction: true },
+  { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows", showConstruction: true },
+  { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned", showConstruction: false },
+  { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
+  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
+  { id: "releases", label: "Releases", blurb: "Release cadence and quality", showConstruction: true },
+  { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", showConstruction: true },
 ];
 
 function screenTitle(id: ScreenId): string {
@@ -121,7 +121,7 @@ export function Content({ appName }: Props) {
             >
               <div class="tb-nav-title-row">
                 <span class="tb-nav-title">{item.label}</span>
-                {!item.implemented ? (
+                {item.showConstruction ? (
                   <span
                     class="tb-nav-construction"
                     title="Under construction"

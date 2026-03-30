@@ -3,7 +3,7 @@ import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
 
 describe("Content", () => {
-  it("renders navigation with only Executive Report marked under construction", async () => {
+  it("renders construction markers for static screens in sidebar", async () => {
     setupFetchMock({
       "/api/integrations/jira/status": {
         source: "jira",
@@ -42,9 +42,17 @@ describe("Content", () => {
 
     expect(await screen.findByRole("heading", { name: "Integrations & Field Mapping" })).toBeInTheDocument();
     expect(screen.getByText("Illuminating Engineering Insights")).toBeInTheDocument();
+
+    expect(screen.getByLabelText("Team Insights is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Individual Insights is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Security is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incident Response is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Releases is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Executive Report is under construction")).toBeInTheDocument();
+
     expect(screen.queryByLabelText("Integrations is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Security is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Current Sprint is under construction")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Security/ }));
     expect(await screen.findByRole("heading", { name: "Security" })).toBeInTheDocument();
