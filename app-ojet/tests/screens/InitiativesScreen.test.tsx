@@ -2,27 +2,29 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { InitiativesScreen } from "../../src/components/content/screens/InitiativesScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
-function mockInitiativesEndpoints() {
+const DEFAULT_EPICS = [
+  {
+    epicKey: "CEG-101",
+    epicName: "Payment Orchestration",
+    completedCards: 7,
+    totalCards: 10,
+    completionPercent: 70,
+    completedInPeriod: 2,
+    deltaPercentInPeriod: 5,
+    groups: [{ id: 1, name: "Core Platform" }],
+    workTypes: [{ id: 2, name: "Feature" }],
+    successCriteria: ["Latency under 120ms"],
+    timelineEnabled: true,
+    timelineStartDate: "2026-03-01",
+    targetCompletionDate: "2026-04-15",
+    insightComment: "Delivery is aligned with sprint capacity.",
+  },
+];
+
+function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
   return setupFetchMock({
     "/api/metadata/epics/summary": {
-      epics: [
-        {
-          epicKey: "CEG-101",
-          epicName: "Payment Orchestration",
-          completedCards: 7,
-          totalCards: 10,
-          completionPercent: 70,
-          completedInPeriod: 2,
-          deltaPercentInPeriod: 5,
-          groups: [{ id: 1, name: "Core Platform" }],
-          workTypes: [{ id: 2, name: "Feature" }],
-          successCriteria: ["Latency under 120ms"],
-          timelineEnabled: true,
-          timelineStartDate: "2026-03-01",
-          targetCompletionDate: "2026-04-15",
-          insightComment: "Delivery is aligned with sprint capacity.",
-        },
-      ],
+      epics,
       reportingPeriod: {
         startDate: "2026-03-23",
         endDate: "2026-03-30",
@@ -97,5 +99,70 @@ describe("InitiativesScreen", () => {
     fireEvent.mouseDown(screen.getByRole("button", { name: /CEG-888/i }));
 
     expect(screen.getByText(/Selected epic:/i)).toHaveTextContent("Selected epic: CEG-888 (Fraud signal hardening)");
+  });
+
+  it("supports sorting and column selection in the initiative matrix", async () => {
+    mockInitiativesEndpoints([
+      {
+        epicKey: "CEG-101",
+        epicName: "Payment Orchestration",
+        completedCards: 7,
+        totalCards: 10,
+        completionPercent: 70,
+        completedInPeriod: 2,
+        deltaPercentInPeriod: 5,
+        groups: [{ id: 1, name: "Core Platform" }],
+        workTypes: [{ id: 2, name: "Feature" }],
+        successCriteria: ["Latency under 120ms"],
+        timelineEnabled: true,
+        timelineStartDate: "2026-03-01",
+        targetCompletionDate: "2026-04-15",
+        insightComment: "Delivery is aligned with sprint capacity.",
+      },
+      {
+        epicKey: "CEG-202",
+        epicName: "Risk Aggregation",
+        completedCards: 3,
+        totalCards: 12,
+        completionPercent: 25,
+        completedInPeriod: 1,
+        deltaPercentInPeriod: 2,
+        groups: [{ id: 3, name: "Customer Experience" }],
+        workTypes: [{ id: 4, name: "Tech Debt" }],
+        successCriteria: ["Failover exercised in staging"],
+        timelineEnabled: true,
+        timelineStartDate: "2026-02-20",
+        targetCompletionDate: "2026-05-01",
+        insightComment: "Workstream was paused for incident load.",
+      },
+    ]);
+
+    const { container } = render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+    expect(screen.getByText("CEG-202")).toBeInTheDocument();
+
+    const getEpicOrder = () =>
+      Array.from(container.querySelectorAll("tbody tr .tb-initiative-epic-key"))
+        .map((node) => node.textContent?.trim() ?? "")
+        .filter((value) => value.length > 0);
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Progress/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()[0]).toBe("CEG-202");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Progress/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()[0]).toBe("CEG-101");
+    });
+
+    expect(screen.getByRole("columnheader", { name: "Delta" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    expect(screen.getByRole("dialog", { name: "Select Initiative Columns" })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Delta"));
+    expect(screen.queryByRole("columnheader", { name: "Delta" })).not.toBeInTheDocument();
   });
 });

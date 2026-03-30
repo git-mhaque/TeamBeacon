@@ -25,6 +25,30 @@ type SummaryRow = InitiativeEpicSummary & {
   successCriteriaTooltip: string;
 };
 
+type OptionalColumnId = "group" | "type" | "progress" | "completed" | "delta" | "rag" | "criteria";
+
+type SortField = "epic" | OptionalColumnId;
+
+type SortDirection = "asc" | "desc";
+
+const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }> = [
+  { id: "group", label: "Group" },
+  { id: "type", label: "Type" },
+  { id: "progress", label: "Progress" },
+  { id: "completed", label: "Completed" },
+  { id: "delta", label: "Delta" },
+  { id: "rag", label: "RAG" },
+  { id: "criteria", label: "Criteria / Insight" },
+];
+
+const DEFAULT_VISIBLE_OPTIONAL_COLUMNS: OptionalColumnId[] = OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id);
+
+const RAG_SORT_RANK: Record<RagLabel, number> = {
+  Red: 0,
+  Amber: 1,
+  Green: 2,
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
@@ -184,6 +208,15 @@ function toSingleIdArray(raw: string): number[] {
   return [candidate];
 }
 
+function compareText(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { sensitivity: "base" });
+}
+
+function compareNumber(left: number, right: number): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
@@ -198,6 +231,12 @@ export function InitiativesScreen() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ragFilter, setRagFilter] = useState<"all" | RagLabel>("all");
+  const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(
+    DEFAULT_VISIBLE_OPTIONAL_COLUMNS,
+  );
+  const [sortField, setSortField] = useState<SortField>("epic");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [isColumnOverlayOpen, setIsColumnOverlayOpen] = useState(false);
 
   const [isConfigureOpen, setIsConfigureOpen] = useState(false);
   const [configureSaving, setConfigureSaving] = useState(false);
@@ -386,6 +425,97 @@ export function InitiativesScreen() {
       );
     });
   }, [groupFilter, ragFilter, rows, searchQuery, typeFilter]);
+
+  const visibleColumnSet = useMemo(() => new Set(visibleOptionalColumns), [visibleOptionalColumns]);
+
+  useEffect(() => {
+    if (sortField === "epic") {
+      return;
+    }
+    if (!visibleColumnSet.has(sortField)) {
+      setSortField("epic");
+    }
+  }, [sortField, visibleColumnSet]);
+
+  const sortedRows = useMemo(() => {
+    const nextRows = [...filteredRows];
+    nextRows.sort((left, right) => {
+      let comparison = 0;
+      switch (sortField) {
+        case "epic":
+          comparison = compareText(left.epicKey, right.epicKey);
+          break;
+        case "group":
+          comparison = compareText(left.groupText, right.groupText);
+          break;
+        case "type":
+          comparison = compareText(left.typeText, right.typeText);
+          break;
+        case "progress":
+          comparison = compareNumber(left.completionPercent, right.completionPercent);
+          break;
+        case "completed":
+          comparison = compareNumber(left.completedCards, right.completedCards);
+          if (comparison === 0) {
+            comparison = compareNumber(left.totalCards, right.totalCards);
+          }
+          break;
+        case "delta":
+          comparison = compareNumber(left.deltaPercentValue, right.deltaPercentValue);
+          break;
+        case "rag":
+          comparison = compareNumber(RAG_SORT_RANK[left.ragLabel], RAG_SORT_RANK[right.ragLabel]);
+          break;
+        case "criteria":
+          comparison = compareNumber(left.successCriteria.length, right.successCriteria.length);
+          break;
+      }
+
+      if (comparison === 0) {
+        comparison = compareText(left.epicKey, right.epicKey);
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+    return nextRows;
+  }, [filteredRows, sortDirection, sortField]);
+
+  const tableColumnCount = 2 + visibleOptionalColumns.length;
+
+  const handleSortHeaderClick = useCallback((field: SortField) => {
+    setSortField((current) => {
+      if (current === field) {
+        setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+        return current;
+      }
+      setSortDirection("asc");
+      return field;
+    });
+  }, []);
+
+  const toggleColumnVisibility = useCallback((columnId: OptionalColumnId) => {
+    setVisibleOptionalColumns((current) => {
+      if (current.includes(columnId)) {
+        return current.filter((value) => value !== columnId);
+      }
+      const nextSet = new Set<OptionalColumnId>(current);
+      nextSet.add(columnId);
+      return OPTIONAL_COLUMN_DEFINITIONS
+        .map((column) => column.id)
+        .filter((column) => nextSet.has(column));
+    });
+  }, []);
+
+  const showAllColumns = useCallback(() => {
+    setVisibleOptionalColumns(DEFAULT_VISIBLE_OPTIONAL_COLUMNS);
+  }, []);
+
+  const openColumnOverlay = useCallback(() => {
+    setIsColumnOverlayOpen(true);
+  }, []);
+
+  const closeColumnOverlay = useCallback(() => {
+    setIsColumnOverlayOpen(false);
+  }, []);
 
   const totalConfigured = rows.length;
   const averageCompletion = useMemo(() => {
@@ -644,7 +774,12 @@ export function InitiativesScreen() {
             <h3>Initiative Progress Matrix</h3>
             <p>Filter by group, type, and RAG to inspect initiative health.</p>
           </div>
-          <span class="tb-chip">{filteredRows.length} visible</span>
+          <div class="tb-panel-header-actions">
+            <span class="tb-chip">{filteredRows.length} visible</span>
+            <button type="button" class="tb-btn tb-btn-sm" onClick={openColumnOverlay}>
+              Columns
+            </button>
+          </div>
         </header>
 
         <div class="tb-initiative-toolbar">
@@ -702,32 +837,142 @@ export function InitiativesScreen() {
           <table class="tb-initiative-table">
             <thead>
               <tr>
-                <th>Epic</th>
-                <th>Group</th>
-                <th>Type</th>
-                <th>Progress</th>
-                <th>Completed</th>
-                <th>Delta</th>
-                <th>RAG</th>
-                <th>Criteria / Insight</th>
+                <th>
+                  <button
+                    type="button"
+                    class={`tb-table-sort${sortField === "epic" ? " is-active" : ""}`}
+                    onClick={() => handleSortHeaderClick("epic")}
+                    aria-label={`Sort by Epic (${sortField === "epic" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                  >
+                    <span>Epic</span>
+                    <span class="tb-table-sort-indicator" aria-hidden="true">
+                      {sortField === "epic" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                    </span>
+                  </button>
+                </th>
+                {visibleColumnSet.has("group") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "group" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("group")}
+                      aria-label={`Sort by Group (${sortField === "group" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Group</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "group" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("type") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "type" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("type")}
+                      aria-label={`Sort by Type (${sortField === "type" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Type</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "type" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("progress") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "progress" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("progress")}
+                      aria-label={`Sort by Progress (${sortField === "progress" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Progress</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "progress" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("completed") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "completed" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("completed")}
+                      aria-label={`Sort by Completed (${sortField === "completed" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Completed</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "completed" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("delta") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "delta" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("delta")}
+                      aria-label={`Sort by Delta (${sortField === "delta" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Delta</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "delta" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("rag") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "rag" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("rag")}
+                      aria-label={`Sort by RAG (${sortField === "rag" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>RAG</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "rag" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
+                {visibleColumnSet.has("criteria") ? (
+                  <th>
+                    <button
+                      type="button"
+                      class={`tb-table-sort${sortField === "criteria" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("criteria")}
+                      aria-label={`Sort by Criteria / Insight (${sortField === "criteria" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Criteria / Insight</span>
+                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "criteria" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} class="tb-initiative-empty">Loading configured initiatives...</td>
+                  <td colSpan={tableColumnCount} class="tb-initiative-empty">Loading configured initiatives...</td>
                 </tr>
               ) : null}
 
-              {!loading && filteredRows.length === 0 ? (
+              {!loading && sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} class="tb-initiative-empty">No initiative rows match the active filters.</td>
+                  <td colSpan={tableColumnCount} class="tb-initiative-empty">No initiative rows match the active filters.</td>
                 </tr>
               ) : null}
 
               {!loading
-                ? filteredRows.map((row) => {
+                ? sortedRows.map((row) => {
                     const progressPercent = Math.max(0, Math.min(100, row.completionPercent));
                     const epicHref = jiraBaseUrl ? `${jiraBaseUrl}/browse/${encodeURIComponent(row.epicKey)}` : null;
                     return (
@@ -744,38 +989,46 @@ export function InitiativesScreen() {
                             <p class="tb-initiative-epic-name">{row.epicName || "(Untitled epic)"}</p>
                           </div>
                         </td>
-                        <td>{row.groupText}</td>
-                        <td>{row.typeText}</td>
-                        <td>
-                          <div class="tb-initiative-progress">
-                            <div class="tb-initiative-progress-track">
-                              <span style={{ width: `${progressPercent}%` }} />
+                        {visibleColumnSet.has("group") ? <td>{row.groupText}</td> : null}
+                        {visibleColumnSet.has("type") ? <td>{row.typeText}</td> : null}
+                        {visibleColumnSet.has("progress") ? (
+                          <td>
+                            <div class="tb-initiative-progress">
+                              <div class="tb-initiative-progress-track">
+                                <span style={{ width: `${progressPercent}%` }} />
+                              </div>
+                              <span>{formatPercent(progressPercent)}</span>
                             </div>
-                            <span>{formatPercent(progressPercent)}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div>
-                            <strong>{row.completedCards} / {row.totalCards}</strong>
-                            <p class="tb-muted-note">Period: {row.completedInPeriodValue}</p>
-                          </div>
-                        </td>
-                        <td>{formatPercent(row.deltaPercentValue)}</td>
-                        <td>
-                          <span class={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
-                            {row.ragLabel}
-                          </span>
-                        </td>
-                        <td>
-                          <p class="tb-initiative-criteria" title={row.successCriteriaTooltip}>
-                            {row.successCriteria.length > 0
-                              ? `${row.successCriteria.length} criteria configured`
-                              : "No criteria configured"}
-                          </p>
-                          <p class="tb-initiative-insight" title={row.ragReason}>
-                            {row.insightComment?.trim() || row.ragReason}
-                          </p>
-                        </td>
+                          </td>
+                        ) : null}
+                        {visibleColumnSet.has("completed") ? (
+                          <td>
+                            <div>
+                              <strong>{row.completedCards} / {row.totalCards}</strong>
+                              <p class="tb-muted-note">Period: {row.completedInPeriodValue}</p>
+                            </div>
+                          </td>
+                        ) : null}
+                        {visibleColumnSet.has("delta") ? <td>{formatPercent(row.deltaPercentValue)}</td> : null}
+                        {visibleColumnSet.has("rag") ? (
+                          <td>
+                            <span class={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
+                              {row.ragLabel}
+                            </span>
+                          </td>
+                        ) : null}
+                        {visibleColumnSet.has("criteria") ? (
+                          <td>
+                            <p class="tb-initiative-criteria" title={row.successCriteriaTooltip}>
+                              {row.successCriteria.length > 0
+                                ? `${row.successCriteria.length} criteria configured`
+                                : "No criteria configured"}
+                            </p>
+                            <p class="tb-initiative-insight" title={row.ragReason}>
+                              {row.insightComment?.trim() || row.ragReason}
+                            </p>
+                          </td>
+                        ) : null}
                         <td>
                           <div class="tb-action-row">
                             <button type="button" class="tb-btn tb-btn-sm" onClick={() => openEditDialog(row)}>
@@ -803,6 +1056,51 @@ export function InitiativesScreen() {
           </table>
         </div>
       </section>
+
+      {isColumnOverlayOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Initiative Columns">
+          <div class="tb-modal-backdrop" onClick={closeColumnOverlay} />
+          <div class="tb-modal tb-modal-columns">
+            <header class="tb-modal-head">
+              <h3>Select Columns</h3>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={closeColumnOverlay}>
+                Close
+              </button>
+            </header>
+
+            <p class="tb-muted-note">
+              Choose which initiative matrix columns are visible. Sorting is applied by clicking any visible header.
+            </p>
+
+            <div class="tb-column-overlay-list" role="group" aria-label="Initiative column selection">
+              {OPTIONAL_COLUMN_DEFINITIONS.map((column) => (
+                <label key={column.id} class="tb-column-toggle">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumnSet.has(column.id)}
+                    onChange={() => toggleColumnVisibility(column.id)}
+                  />
+                  <span>{column.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <footer class="tb-modal-actions">
+              <button
+                type="button"
+                class="tb-btn"
+                onClick={showAllColumns}
+                disabled={visibleOptionalColumns.length === OPTIONAL_COLUMN_DEFINITIONS.length}
+              >
+                Show all
+              </button>
+              <button type="button" class="tb-btn tb-btn-primary" onClick={closeColumnOverlay}>
+                Done
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
 
       {pendingDeleteEpic ? (
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
