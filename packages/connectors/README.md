@@ -7,6 +7,7 @@ This package defines source connector contracts and hosted Atlassian connector i
 - `models.py`: normalized records passed into persistence and metrics layers.
 - `jira_rest_stub.py`: hosted JIRA PAT-authenticated connector implementation.
 - `jira_config.py`: runtime config and `.env` loader for local/integration runs.
+- `oci_genai_config.py`: runtime config model for OCI Generative AI endpoints.
 - `confluence_rest_stub.py`: hosted Confluence PAT-authenticated implementation stub.
 
 ## Usage

@@ -16,6 +16,7 @@ from services.api.integrations.jira_sync import (
     get_jira_sync_status,
     start_jira_sync,
 )
+from services.api.integrations.oci_genai_chat import chat_with_oci_genai, get_oci_genai_status
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
@@ -48,6 +49,8 @@ MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
 MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
 MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
+OciGenAiStatusProvider = Callable[[], dict[str, Any]]
+OciGenAiChatProvider = Callable[..., dict[str, Any]]
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -75,6 +78,8 @@ def build_handler(
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
     metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
+    oci_genai_status_provider: OciGenAiStatusProvider = get_oci_genai_status,
+    oci_genai_chat_provider: OciGenAiChatProvider = chat_with_oci_genai,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_json_headers(self, status_code: int = 200) -> None:
@@ -119,6 +124,12 @@ def build_handler(
                 except ValueError:
                     limit = 20
                 payload = jira_sync_history_provider(limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/integrations/oci-genai/status":
+                payload = oci_genai_status_provider()
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
@@ -269,6 +280,87 @@ def build_handler(
                     return
                 status_code = 202 if payload.get("started") else 200
                 self._set_json_headers(status_code)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/ai/chat":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+
+                message_raw = body_payload.get("message")
+                if not isinstance(message_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "message is required."}))
+                    return
+
+                model_id_raw = body_payload.get("modelId")
+                if model_id_raw is not None and not isinstance(model_id_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "modelId must be a string."}))
+                    return
+                model_id = model_id_raw if isinstance(model_id_raw, str) else None
+
+                max_tokens_raw = body_payload.get("maxTokens")
+                if max_tokens_raw is not None and not isinstance(max_tokens_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "maxTokens must be an integer."}))
+                    return
+                max_tokens = max_tokens_raw if isinstance(max_tokens_raw, int) else None
+
+                temperature_raw = body_payload.get("temperature")
+                if temperature_raw is not None and not isinstance(temperature_raw, (int, float)):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "temperature must be a number."}))
+                    return
+                temperature = float(temperature_raw) if isinstance(temperature_raw, (int, float)) else None
+
+                top_p_raw = body_payload.get("topP")
+                if top_p_raw is not None and not isinstance(top_p_raw, (int, float)):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "topP must be a number."}))
+                    return
+                top_p = float(top_p_raw) if isinstance(top_p_raw, (int, float)) else None
+
+                top_k_raw = body_payload.get("topK")
+                if top_k_raw is not None and not isinstance(top_k_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "topK must be an integer."}))
+                    return
+                top_k = top_k_raw if isinstance(top_k_raw, int) else None
+
+                frequency_penalty_raw = body_payload.get("frequencyPenalty")
+                if frequency_penalty_raw is not None and not isinstance(frequency_penalty_raw, (int, float)):
+                    self._set_json_headers(400)
+                    self.wfile.write(
+                        _json_bytes({"error": "bad_request", "detail": "frequencyPenalty must be a number."})
+                    )
+                    return
+                frequency_penalty = (
+                    float(frequency_penalty_raw) if isinstance(frequency_penalty_raw, (int, float)) else None
+                )
+
+                try:
+                    payload = oci_genai_chat_provider(
+                        message=message_raw,
+                        model_id=model_id,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                        frequency_penalty=frequency_penalty,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                except RuntimeError as exc:
+                    self._set_json_headers(502)
+                    self.wfile.write(_json_bytes({"error": "upstream_error", "detail": str(exc)}))
+                    return
+
+                self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
 

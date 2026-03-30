@@ -34,6 +34,10 @@ TeamBeacon/
 ```bash
 cp config/.env.example config/.env
 ```
+For OCI GenAI features, also install OCI SDK:
+```bash
+python3 -m pip install oci
+```
 2. Start UI shell (optional):
 ```bash
 cd app

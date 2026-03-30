@@ -11,10 +11,13 @@ This directory contains product, architecture, plan, and design artifacts for Te
 ## Design Artifacts
 - [design/teambeacon-mockups.html](design/teambeacon-mockups.html): current UI screen mockups for six core workflows.
 
+## Operations Runbooks
+- [ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): smoke test for OCI GenAI connectivity and chat execution.
+- [ops/database/LOCAL_DATABASE_QUERIES.md](ops/database/LOCAL_DATABASE_QUERIES.md): local SQLite inspection and sample queries.
+
 ## Maintenance Rule
 When product scope or UX flow changes, update these files together:
 1. `SPEC.md`
 2. `architecture/ARCHITECTURE.md`
 3. `plans/PLAN.md`
 4. `design/teambeacon-mockups.html`
-

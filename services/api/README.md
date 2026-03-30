@@ -19,6 +19,20 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `{"mode":"since_last"}`
     - `{"mode":"since_date","sinceDate":"2026-03-01"}`
 - `GET /api/integrations/jira/sync/history?limit=30`
+- `GET /api/integrations/oci-genai/status`
+  - Validates local OCI GenAI wiring:
+    - OCI SDK availability
+    - `~/.oci/config` profile readability
+    - Required OCI GenAI environment variables
+- `POST /api/ai/chat`
+  - Body:
+    - `message` (required string)
+    - `modelId` (optional string; defaults from `OCI_GENAI_MODEL_ID`)
+    - `maxTokens` (optional integer)
+    - `temperature` (optional number)
+    - `topP` (optional number)
+    - `topK` (optional integer)
+    - `frequencyPenalty` (optional number)
 - `GET /api/issues/search`
   - Optional query params:
     - `epicKey=CEGBUPOL-4482`
@@ -80,6 +94,7 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 
 ## Notes
 - The JIRA status endpoint reads `config/.env` (or process env vars).
+- OCI GenAI endpoints read `config/.env` (or process env vars) and require the OCI Python SDK (`python3 -m pip install oci`).
 - JIRA sync persists board/sprint/issue/changelog data to local SQLite (`teambeacon.db` by default).
 - Parent-child lineage is stored on `issues.parent_issue_key`; epic linkage is stored on `issues.epic_key`.
 - Epic metadata is persisted across:

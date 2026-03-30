@@ -27,6 +27,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_delete_calls: list[str] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
         self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
+        self.oci_chat_calls: list[dict[str, object]] = []
 
         def fake_status():
             return {
@@ -97,6 +98,58 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "finishedAt": "2026-03-25T00:10:00+00:00",
                     }
                 ],
+            }
+
+        def fake_oci_status():
+            return {
+                "source": "oci_genai",
+                "connected": True,
+                "checkedAt": "2026-03-25T00:00:00+00:00",
+                "config": {
+                    "endpoint": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+                    "modelId": "cohere.command-r-08-2024",
+                },
+                "checks": [
+                    {"name": "oci_sdk", "ok": True, "detail": "OCI Python SDK is available."},
+                    {"name": "oci_profile", "ok": True, "detail": "Profile DEFAULT loaded."},
+                ],
+                "error": None,
+            }
+
+        def fake_oci_chat(
+            *,
+            message,  # noqa: ANN001
+            model_id=None,  # noqa: ANN001
+            max_tokens=None,  # noqa: ANN001
+            temperature=None,  # noqa: ANN001
+            top_p=None,  # noqa: ANN001
+            top_k=None,  # noqa: ANN001
+            frequency_penalty=None,  # noqa: ANN001
+        ):
+            self.oci_chat_calls.append(
+                {
+                    "message": message,
+                    "model_id": model_id,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "frequency_penalty": frequency_penalty,
+                }
+            )
+            return {
+                "source": "oci_genai",
+                "modelId": model_id or "cohere.command-r-08-2024",
+                "response": {"text": "TeamBeacon can summarize sprint risk weekly."},
+                "request": {
+                    "message": message,
+                    "maxTokens": max_tokens if max_tokens is not None else 600,
+                    "temperature": temperature if temperature is not None else 1.0,
+                    "topP": top_p if top_p is not None else 0.75,
+                    "topK": top_k if top_k is not None else 0,
+                    "frequencyPenalty": frequency_penalty if frequency_penalty is not None else 0.0,
+                },
+                "error": None,
             }
 
         def fake_issue_search(**kwargs):  # noqa: ANN003
@@ -426,6 +479,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_search_epics_provider=fake_search_epics,
             metadata_upsert_epic_provider=fake_upsert_epic,
             metadata_delete_epic_provider=fake_delete_epic,
+            oci_genai_status_provider=fake_oci_status,
+            oci_genai_chat_provider=fake_oci_chat,
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -511,6 +566,60 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["history"][0]["boardName"], "CEGBU Polaris")
         self.assertEqual(body["history"][0]["syncMode"], "since_last")
         self.assertEqual(body["history"][0]["issuesSynced"], 5000)
+
+    def test_oci_genai_status_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/integrations/oci-genai/status", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "oci_genai")
+        self.assertTrue(body["connected"])
+        self.assertEqual(body["config"]["modelId"], "cohere.command-r-08-2024")
+        self.assertEqual(len(body["checks"]), 2)
+
+    def test_oci_genai_chat_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/ai/chat",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "message": "Summarize blockers from this sprint.",
+                    "maxTokens": 300,
+                    "temperature": 0.3,
+                    "topP": 0.8,
+                    "topK": 5,
+                    "frequencyPenalty": 0.2,
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "oci_genai")
+        self.assertIn("TeamBeacon", body["response"]["text"])
+        self.assertEqual(self.oci_chat_calls[-1]["message"], "Summarize blockers from this sprint.")
+        self.assertEqual(self.oci_chat_calls[-1]["max_tokens"], 300)
+        self.assertEqual(self.oci_chat_calls[-1]["temperature"], 0.3)
+        self.assertEqual(self.oci_chat_calls[-1]["top_p"], 0.8)
+        self.assertEqual(self.oci_chat_calls[-1]["top_k"], 5)
+        self.assertEqual(self.oci_chat_calls[-1]["frequency_penalty"], 0.2)
+
+    def test_oci_genai_chat_endpoint_rejects_non_numeric_temperature(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/ai/chat",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "message": "Summarize blockers from this sprint.",
+                    "temperature": "hot",
+                }
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
 
     def test_issue_search_endpoint(self) -> None:
         with urlopen(
