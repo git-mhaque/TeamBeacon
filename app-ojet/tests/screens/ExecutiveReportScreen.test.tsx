@@ -127,13 +127,14 @@ describe("ExecutiveReportScreen", () => {
 
     expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
     expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();
+    expect(screen.getByLabelText("Group effort distribution chart")).toBeInTheDocument();
+    expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Configure" }));
     const dialog = screen.getByRole("dialog", { name: "Configure Initiative Epics" });
     expect(dialog).toBeInTheDocument();
 
-    const removeButtons = within(dialog).getAllByRole("button", { name: "Remove" });
-    fireEvent.click(removeButtons[0]);
+    fireEvent.dblClick(within(dialog).getByText("Executive reporting automation"));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {

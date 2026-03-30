@@ -19,6 +19,13 @@ type ExecutiveRow = InitiativeEpicSummary & {
   deltaPercentValue: number;
 };
 
+type DistributionSlice = {
+  label: string;
+  value: number;
+  percent: number;
+  color: string;
+};
+
 type ReportingPreset = "last_7_days" | "last_14_days" | "last_30_days" | "custom";
 
 type ReportingRange = {
@@ -217,6 +224,43 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1).replace(/\.0$/, "")}%`;
 }
 
+const DISTRIBUTION_COLORS = [
+  "#1f8f63",
+  "#0f5570",
+  "#b77700",
+  "#c2372e",
+  "#6c4ba6",
+  "#1c6f9a",
+  "#8a4f00",
+  "#4a6b2d",
+];
+
+function buildDistributionSlices(
+  rows: Array<{ name: string; completedInPeriod: number }>,
+  totalCompleted: number,
+): DistributionSlice[] {
+  return rows.map((row, index) => ({
+    label: row.name,
+    value: row.completedInPeriod,
+    percent: totalCompleted > 0 ? (row.completedInPeriod / totalCompleted) * 100 : 0,
+    color: DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length],
+  }));
+}
+
+function buildDonutBackground(slices: DistributionSlice[]): string {
+  if (slices.length === 0) {
+    return "#e1ebf0";
+  }
+  let cursor = 0;
+  const stops = slices.map((slice) => {
+    const start = cursor;
+    const end = cursor + slice.percent;
+    cursor = end;
+    return `${slice.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
 function buildExecutiveSummaryPrompt(params: {
   reportingPeriodLabel: string;
   reportingPeriodDays: number;
@@ -398,6 +442,7 @@ export function ExecutiveReportScreen() {
   const [isInitiativeConfigOpen, setIsInitiativeConfigOpen] = useState(false);
   const [initiativeConfigDraftKeys, setInitiativeConfigDraftKeys] = useState<string[]>([]);
   const [initiativeConfigQuery, setInitiativeConfigQuery] = useState("");
+  const [initiativeConfigDraggingKey, setInitiativeConfigDraggingKey] = useState<string | null>(null);
 
   const [reportingPreset, setReportingPreset] = useState<ReportingPreset>(initialReportingSelection.preset);
   const [reportingStartDraft, setReportingStartDraft] = useState(initialReportingSelection.startDate);
@@ -730,6 +775,16 @@ export function ExecutiveReportScreen() {
       .sort((left, right) => right.completedInPeriod - left.completedInPeriod);
   }, [visibleInitiativeRows, visibleInitiativeSignals.totalCompletedInPeriod]);
 
+  const groupDistributionSlices = useMemo(
+    () => buildDistributionSlices(groupDistributionRows, visibleInitiativeSignals.totalCompletedInPeriod),
+    [groupDistributionRows, visibleInitiativeSignals.totalCompletedInPeriod],
+  );
+
+  const typeDistributionSlices = useMemo(
+    () => buildDistributionSlices(typeDistributionRows, visibleInitiativeSignals.totalCompletedInPeriod),
+    [typeDistributionRows, visibleInitiativeSignals.totalCompletedInPeriod],
+  );
+
   useEffect(() => {
     if (loading) {
       setExecutiveSummaryLoading(true);
@@ -922,8 +977,39 @@ export function ExecutiveReportScreen() {
   const openInitiativeConfig = useCallback(() => {
     setInitiativeConfigDraftKeys(selectedInitiativeEpicKeys);
     setInitiativeConfigQuery("");
+    setInitiativeConfigDraggingKey(null);
     setIsInitiativeConfigOpen(true);
   }, [selectedInitiativeEpicKeys]);
+
+  const closeInitiativeConfig = useCallback(() => {
+    setIsInitiativeConfigOpen(false);
+    setInitiativeConfigQuery("");
+    setInitiativeConfigDraggingKey(null);
+  }, []);
+
+  const addInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftKeys((previous) => {
+      if (previous.includes(epicKey)) return previous;
+      return [...previous, epicKey];
+    });
+  }, []);
+
+  const removeInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftKeys((previous) => previous.filter((key) => key !== epicKey));
+  }, []);
+
+  const moveInitiativeDraftKey = useCallback((sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return;
+    setInitiativeConfigDraftKeys((previous) => {
+      const sourceIndex = previous.indexOf(sourceKey);
+      const targetIndex = previous.indexOf(targetKey);
+      if (sourceIndex < 0 || targetIndex < 0) return previous;
+      const reordered = [...previous];
+      reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, sourceKey);
+      return reordered;
+    });
+  }, []);
 
   const saveInitiativeConfig = useCallback(() => {
     const available = new Set(initiativeRows.map((row) => row.epicKey));
@@ -933,28 +1019,8 @@ export function ExecutiveReportScreen() {
 
     setSelectedInitiativeEpicKeys(normalized);
     persistInitiativeSelection(normalized);
-    setIsInitiativeConfigOpen(false);
-  }, [initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
-
-  const moveDraftKeyUp = useCallback((epicKey: string) => {
-    setInitiativeConfigDraftKeys((previous) => {
-      const index = previous.indexOf(epicKey);
-      if (index <= 0) return previous;
-      const next = [...previous];
-      [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      return next;
-    });
-  }, []);
-
-  const moveDraftKeyDown = useCallback((epicKey: string) => {
-    setInitiativeConfigDraftKeys((previous) => {
-      const index = previous.indexOf(epicKey);
-      if (index < 0 || index >= previous.length - 1) return previous;
-      const next = [...previous];
-      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      return next;
-    });
-  }, []);
+    closeInitiativeConfig();
+  }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
 
   const reportToneClass = visibleInitiativeSignals.redCount > 0 ? "is-warn" : "is-good";
   const reportToneText = visibleInitiativeSignals.redCount > 0 ? "Review Risks" : "Ready";
@@ -969,13 +1035,13 @@ export function ExecutiveReportScreen() {
           </div>
           <div class="tb-btn-row">
             <span class={`tb-status-pill ${reportToneClass}`}>{reportToneText}</span>
-            <button type="button" class="tb-btn tb-btn-sm" onClick={() => window.print()}>
+            <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
               Print Report
             </button>
           </div>
         </header>
 
-        <div class="tb-exec-period-toolbar">
+        <div class="tb-exec-period-toolbar tb-no-print">
           <label class="tb-exec-period-field">
             <span>Reporting Period</span>
             <select
@@ -1065,7 +1131,7 @@ export function ExecutiveReportScreen() {
             <h3>Progress for Key Initiatives</h3>
             <p>Selected initiatives used for executive narrative generation.</p>
           </div>
-          <button type="button" class="tb-btn tb-btn-sm" onClick={openInitiativeConfig}>
+          <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={openInitiativeConfig}>
             Configure
           </button>
         </header>
@@ -1170,6 +1236,25 @@ export function ExecutiveReportScreen() {
         <div class="tb-exec-two-up">
           <div>
             <h4 class="tb-exec-list-title">Groups</h4>
+            <div class="tb-exec-donut-wrap">
+              <div
+                class="tb-exec-donut"
+                style={{ background: buildDonutBackground(groupDistributionSlices) }}
+                role="img"
+                aria-label="Group effort distribution chart"
+              >
+                {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
+              </div>
+              <ul class="tb-exec-donut-legend">
+                {groupDistributionSlices.map((slice) => (
+                  <li key={slice.label}>
+                    <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                    <span>{slice.label}</span>
+                    <span>{formatPercent(slice.percent)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
             <div class="tb-sync-history-wrap">
               <table class="tb-sync-history-table">
                 <thead>
@@ -1199,6 +1284,25 @@ export function ExecutiveReportScreen() {
 
           <div>
             <h4 class="tb-exec-list-title">Types</h4>
+            <div class="tb-exec-donut-wrap">
+              <div
+                class="tb-exec-donut"
+                style={{ background: buildDonutBackground(typeDistributionSlices) }}
+                role="img"
+                aria-label="Type effort distribution chart"
+              >
+                {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
+              </div>
+              <ul class="tb-exec-donut-legend">
+                {typeDistributionSlices.map((slice) => (
+                  <li key={slice.label}>
+                    <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                    <span>{slice.label}</span>
+                    <span>{formatPercent(slice.percent)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
             <div class="tb-sync-history-wrap">
               <table class="tb-sync-history-table">
                 <thead>
@@ -1230,7 +1334,7 @@ export function ExecutiveReportScreen() {
 
       {isInitiativeConfigOpen ? (
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Initiative Epics">
-          <div class="tb-modal-backdrop" onClick={() => setIsInitiativeConfigOpen(false)} />
+          <div class="tb-modal-backdrop" onClick={closeInitiativeConfig} />
           <div class="tb-modal tb-modal-wide">
             <header class="tb-modal-head">
               <div>
@@ -1238,7 +1342,7 @@ export function ExecutiveReportScreen() {
                 <p class="tb-muted-note">Choose which epics appear in Progress for Key Initiatives.</p>
               </div>
               <div class="tb-action-row">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsInitiativeConfigOpen(false)}>
+                <button type="button" class="tb-btn tb-btn-sm" onClick={closeInitiativeConfig}>
                   Cancel
                 </button>
                 <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveInitiativeConfig}>
@@ -1269,22 +1373,21 @@ export function ExecutiveReportScreen() {
                     Select All
                   </button>
                 </header>
+                <p class="tb-muted-note">Double-click to add.</p>
 
                 <div class="tb-exec-config-list">
                   {availableConfigRows.map((row) => (
-                    <div key={row.epicKey} class="tb-exec-config-item">
+                    <button
+                      key={row.epicKey}
+                      type="button"
+                      class="tb-exec-config-item tb-exec-config-item-button"
+                      onDblClick={() => addInitiativeDraftKey(row.epicKey)}
+                    >
                       <div>
                         <strong>{row.epicName || row.epicKey}</strong>
                         <p>{row.groupText} | {row.typeText} | {row.epicKey}</p>
                       </div>
-                      <button
-                        type="button"
-                        class="tb-btn tb-btn-sm"
-                        onClick={() => setInitiativeConfigDraftKeys((previous) => [...previous, row.epicKey])}
-                      >
-                        Add
-                      </button>
-                    </div>
+                    </button>
                   ))}
                   {availableConfigRows.length === 0 ? <p class="tb-muted-note">No epics match the current search.</p> : null}
                 </div>
@@ -1301,38 +1404,33 @@ export function ExecutiveReportScreen() {
                     Clear All
                   </button>
                 </header>
+                <p class="tb-muted-note">Double-click to remove. Drag to reorder.</p>
 
                 <div class="tb-exec-config-list">
-                  {selectedConfigRows.map((row, index) => (
-                    <div key={row.epicKey} class="tb-exec-config-item">
+                  {selectedConfigRows.map((row) => (
+                    <div
+                      key={row.epicKey}
+                      class={`tb-exec-config-item tb-exec-config-item-draggable${initiativeConfigDraggingKey === row.epicKey ? " is-dragging" : ""}`}
+                      draggable
+                      onDblClick={() => removeInitiativeDraftKey(row.epicKey)}
+                      onDragStart={() => setInitiativeConfigDraggingKey(row.epicKey)}
+                      onDragEnd={() => setInitiativeConfigDraggingKey(null)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (!initiativeConfigDraggingKey) return;
+                        moveInitiativeDraftKey(initiativeConfigDraggingKey, row.epicKey);
+                        setInitiativeConfigDraggingKey(null);
+                      }}
+                    >
+                      <span class="tb-exec-drag-handle" aria-hidden="true">
+                        ::
+                      </span>
                       <div>
                         <strong>{row.epicName || row.epicKey}</strong>
                         <p>{row.groupText} | {row.typeText} | {row.epicKey}</p>
-                      </div>
-                      <div class="tb-action-row">
-                        <button
-                          type="button"
-                          class="tb-btn tb-btn-sm"
-                          onClick={() => moveDraftKeyUp(row.epicKey)}
-                          disabled={index === 0}
-                        >
-                          Up
-                        </button>
-                        <button
-                          type="button"
-                          class="tb-btn tb-btn-sm"
-                          onClick={() => moveDraftKeyDown(row.epicKey)}
-                          disabled={index === selectedConfigRows.length - 1}
-                        >
-                          Down
-                        </button>
-                        <button
-                          type="button"
-                          class="tb-btn tb-btn-sm tb-btn-danger"
-                          onClick={() => setInitiativeConfigDraftKeys((previous) => previous.filter((key) => key !== row.epicKey))}
-                        >
-                          Remove
-                        </button>
                       </div>
                     </div>
                   ))}
