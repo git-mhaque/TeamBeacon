@@ -14,7 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: "integrations",
     label: "Integrations",
-    blurb: "JIRA and Confluence setup"
+    blurb: "JIRA, OCI GenAI, Confluence"
   },
   {
     id: "initiatives",

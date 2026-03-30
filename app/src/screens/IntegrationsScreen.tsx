@@ -9,10 +9,12 @@ import {
   deleteWorkType,
   EpicLookupConfig,
   fetchJiraIntegrationStatus,
+  fetchOciGenAiIntegrationStatus,
   fetchEpicLookupConfig,
   fetchJiraSyncHistory,
   fetchJiraSyncStatus,
   JiraIntegrationStatus,
+  OciGenAiIntegrationStatus,
   JiraSyncHistoryEntry,
   JiraSyncMode,
   JiraSyncStatus,
@@ -49,6 +51,9 @@ export function IntegrationsScreen() {
   const [editingGroupName, setEditingGroupName] = useState("");
   const [editingWorkTypeId, setEditingWorkTypeId] = useState<number | null>(null);
   const [editingWorkTypeName, setEditingWorkTypeName] = useState("");
+  const [ociStatus, setOciStatus] = useState<OciGenAiIntegrationStatus | null>(null);
+  const [ociLoading, setOciLoading] = useState(true);
+  const [ociError, setOciError] = useState<string | null>(null);
 
   const loadJiraStatus = useCallback(async () => {
     setLoading(true);
@@ -72,6 +77,20 @@ export function IntegrationsScreen() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown sync status failure";
       setSyncError(message);
+    }
+  }, []);
+
+  const loadOciStatus = useCallback(async () => {
+    setOciLoading(true);
+    setOciError(null);
+    try {
+      const status = await fetchOciGenAiIntegrationStatus();
+      setOciStatus(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown OCI GenAI status failure";
+      setOciError(message);
+    } finally {
+      setOciLoading(false);
     }
   }, []);
 
@@ -129,9 +148,21 @@ export function IntegrationsScreen() {
     setIsSyncOptionsOpen(true);
   }, [jiraSyncStatus?.state, todayLocalDate]);
 
+  const checkSourceConnections = useCallback(() => {
+    loadJiraStatus().catch(() => {
+      // loadJiraStatus already sets local error state.
+    });
+    loadOciStatus().catch(() => {
+      // loadOciStatus already sets local error state.
+    });
+  }, [loadJiraStatus, loadOciStatus]);
+
   useEffect(() => {
     loadJiraStatus().catch(() => {
       // loadJiraStatus already sets local error state.
+    });
+    loadOciStatus().catch(() => {
+      // loadOciStatus already sets local error state.
     });
     loadJiraSyncStatus().catch(() => {
       // loadJiraSyncStatus already sets local error state.
@@ -139,7 +170,7 @@ export function IntegrationsScreen() {
     loadEpicMetadataConfig().catch(() => {
       // loadEpicMetadataConfig already sets local error state.
     });
-  }, [loadJiraStatus, loadJiraSyncStatus, loadEpicMetadataConfig]);
+  }, [loadJiraStatus, loadOciStatus, loadJiraSyncStatus, loadEpicMetadataConfig]);
 
   useEffect(() => {
     if (jiraSyncStatus?.state !== "running") {
@@ -169,6 +200,13 @@ export function IntegrationsScreen() {
     };
   }, [isHistoryOpen, jiraSyncStatus?.state, loadJiraSyncHistory]);
 
+  const formatCheckedAt = useCallback((value: string | null | undefined): string => {
+    if (!value) return "n/a";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+  }, []);
+
   const jiraTone = useMemo(() => {
     if (error) return "risk";
     if (loading) return "warn";
@@ -189,6 +227,37 @@ export function IntegrationsScreen() {
     const checksPassed = jiraStatus.checks.filter((check) => check.ok).length;
     return `${checksPassed}/${jiraStatus.checks.length} connectivity checks passed.`;
   }, [error, jiraStatus, loading]);
+
+  const jiraCheckedAtText = useMemo(() => {
+    if (!jiraStatus?.checkedAt) return "n/a";
+    return formatCheckedAt(jiraStatus.checkedAt);
+  }, [jiraStatus?.checkedAt, formatCheckedAt]);
+
+  const ociTone = useMemo(() => {
+    if (ociError) return "risk";
+    if (ociLoading) return "warn";
+    return ociStatus?.connected ? "good" : "warn";
+  }, [ociError, ociLoading, ociStatus]);
+
+  const ociValue = useMemo(() => {
+    if (ociError) return "Unavailable";
+    if (ociLoading) return "Checking...";
+    return ociStatus?.connected ? "Connected" : "Check Required";
+  }, [ociError, ociLoading, ociStatus]);
+
+  const ociHint = useMemo(() => {
+    if (ociError) return `Failed to reach local API: ${ociError}`;
+    if (ociLoading) return "Testing OCI GenAI endpoint and OCI profile access.";
+    if (!ociStatus) return "Status not loaded.";
+    if (ociStatus.error) return ociStatus.error;
+    const checksPassed = ociStatus.checks.filter((check) => check.ok).length;
+    return `${checksPassed}/${ociStatus.checks.length} connectivity checks passed.`;
+  }, [ociError, ociLoading, ociStatus]);
+
+  const ociCheckedAtText = useMemo(() => {
+    if (!ociStatus?.checkedAt) return "n/a";
+    return formatCheckedAt(ociStatus.checkedAt);
+  }, [ociStatus?.checkedAt, formatCheckedAt]);
 
   const jiraSyncTone = useMemo(() => {
     if (syncError) return "risk";
@@ -470,8 +539,8 @@ export function IntegrationsScreen() {
         title="Source Connections"
         subtitle="Live connectivity checks from local API to configured systems."
         action={
-          <button className="sync-btn" onClick={loadJiraStatus} type="button">
-            {loading ? "Checking..." : "Check Now"}
+          <button className="sync-btn" onClick={checkSourceConnections} type="button">
+            {loading || ociLoading ? "Checking..." : "Check Now"}
           </button>
         }
       >
@@ -482,6 +551,8 @@ export function IntegrationsScreen() {
             hint={
               <>
                 {jiraHint}
+                <br />
+                Last checked: {jiraCheckedAtText}
                 <br />
                 <span className="sync-progress-row">
                   <span>Sync:</span>
@@ -536,15 +607,25 @@ export function IntegrationsScreen() {
             tone={jiraTone}
           />
           <MetricCard
+            label="OCI GenAI Connection"
+            value={ociValue}
+            hint={
+              <>
+                {ociHint}
+                <br />
+                Last checked: {ociCheckedAtText}
+                <br />
+                Model: {ociStatus?.config.modelId ?? "n/a"}
+                <br />
+                Endpoint: {ociStatus?.config.endpoint ?? "n/a"}
+              </>
+            }
+            tone={ociTone}
+          />
+          <MetricCard
             label="Confluence Connection"
             value="Not Implemented"
             hint="Confluence health endpoint not wired yet."
-            tone="warn"
-          />
-          <MetricCard
-            label="SCM Connection"
-            value="Not Implemented"
-            hint="SCM connectivity endpoint not wired yet."
             tone="warn"
           />
         </div>

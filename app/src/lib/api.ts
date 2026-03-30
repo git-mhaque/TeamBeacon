@@ -34,6 +34,25 @@ export type JiraIntegrationStatus = {
   error?: string | null;
 };
 
+export type OciGenAiIntegrationStatus = {
+  source: "oci_genai";
+  connected: boolean;
+  checkedAt: string;
+  config: {
+    compartmentId?: string;
+    endpoint?: string;
+    modelId?: string;
+    configProfile?: string;
+    configFile?: string;
+    timeoutSeconds?: {
+      connect?: number;
+      read?: number;
+    };
+  };
+  checks: IntegrationCheck[];
+  error?: string | null;
+};
+
 export type JiraSyncState = "idle" | "running" | "completed" | "failed";
 export type JiraSyncMode = "full" | "since_last" | "since_date";
 
@@ -220,6 +239,17 @@ export async function fetchJiraIntegrationStatus(): Promise<JiraIntegrationStatu
     throw new Error(`JIRA status request failed (${response.status})`);
   }
   return (await response.json()) as JiraIntegrationStatus;
+}
+
+export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrationStatus> {
+  const response = await fetch("/api/integrations/oci-genai/status", {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`OCI GenAI status request failed (${response.status})`);
+  }
+  return (await response.json()) as OciGenAiIntegrationStatus;
 }
 
 export async function fetchJiraSyncStatus(): Promise<JiraSyncStatus> {
