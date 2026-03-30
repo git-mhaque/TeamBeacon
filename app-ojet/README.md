@@ -15,7 +15,8 @@ This directory is the Oracle JET (vDOM) migration workspace for TeamBeacon.
 5. Initiative Insights screen with live initiative summary endpoint:
    1. `GET /api/metadata/epics/summary`
    2. `GET /api/integrations/jira/status` (JIRA browse links)
-6. Remaining screens are scaffolded placeholders for phased migration.
+6. Security, Incident Response, and Releases migrated as baseline screens.
+7. Executive Report remains a scaffolded placeholder for phased migration.
 
 ## Run Locally
 1. Start TeamBeacon backend API:
@@ -31,6 +32,14 @@ npm run build
 3. Serve OJET app:
 ```bash
 npm run dev
+```
+4. Run OJET unit tests:
+```bash
+npm run test
+```
+5. Run OJET unit tests with coverage:
+```bash
+npm run test:coverage
 ```
 
 Default OJET dev URL: `http://127.0.0.1:5174`

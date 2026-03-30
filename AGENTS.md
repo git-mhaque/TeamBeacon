@@ -69,9 +69,11 @@ Use Conventional Commits. Current history follows:
 
 Strict pre-commit quality gate:
 - Run and pass unit and integration tests for impacted areas.
+- Run and pass front-end tests for impacted UI workspaces (mandatory for UI changes).
 - Keep combined test coverage for changed code at `90%+`.
 - Run style/lint checks before commit. For current baseline run:
   - `cd app && npm run build`
+  - `cd app-ojet && npm run build && npm run test:coverage`
   - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py services/api/*.py services/api/integrations/*.py`
 - If new language/tooling is introduced, add and document an explicit lint command in `README.md` and enforce it in PR validation.
 

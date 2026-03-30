@@ -115,7 +115,8 @@ Current migrated slice in `app-ojet`:
 5. Initiative Insights migrated with:
    - `GET /api/metadata/epics/summary`
    - `GET /api/integrations/jira/status` (for epic browse links)
-6. Remaining screens are scaffolded as migration placeholders.
+6. Security, Incident Response, and Releases migrated to OJET baseline screens.
+7. Executive Report remains scaffolded as a migration placeholder.
 
 ## Planned Stack
 - Desktop app: Tauri + React
@@ -139,6 +140,7 @@ Current migrated slice in `app-ojet`:
   - Backend unit tests: `python3 -m unittest discover -s tests/unit -p "test_*.py" -v`
   - Backend API integration tests: `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v`
   - Frontend build: `cd app && npm ci && npm run build`
+  - OJET build + tests with coverage: `cd app-ojet && npm ci && npm run build && npm run test:coverage`
 
 ## Documentation Index
 - [AGENTS.md](AGENTS.md): contributor conventions and repository map.

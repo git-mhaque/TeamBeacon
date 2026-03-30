@@ -7,10 +7,13 @@
  */
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
+import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { IndividualsScreen } from "./screens/IndividualsScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
+import { ReleasesScreen } from "./screens/ReleasesScreen";
+import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
 import { TeamInsightsScreen } from "./screens/TeamInsightsScreen";
 
@@ -42,9 +45,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", implemented: true },
   { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows", implemented: true },
   { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned", implemented: true },
-  { id: "security", label: "Security", blurb: "Vulnerability posture", implemented: false },
-  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", implemented: false },
-  { id: "releases", label: "Releases", blurb: "Release cadence and quality", implemented: false },
+  { id: "security", label: "Security", blurb: "Vulnerability posture", implemented: true },
+  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", implemented: true },
+  { id: "releases", label: "Releases", blurb: "Release cadence and quality", implemented: true },
   { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", implemented: false },
 ];
 
@@ -76,26 +79,11 @@ function renderScreen(id: ScreenId) {
     case "sprint":
       return <SprintBoardScreen />;
     case "security":
-      return (
-        <PlaceholderScreen
-          heading="Security"
-          detail="Migration in progress. Shared OJET placeholder pattern is established for this module."
-        />
-      );
+      return <SecurityScreen />;
     case "incidents":
-      return (
-        <PlaceholderScreen
-          heading="Incident Response"
-          detail="Migration in progress. Shared OJET placeholder pattern is established for this module."
-        />
-      );
+      return <IncidentResponseScreen />;
     case "releases":
-      return (
-        <PlaceholderScreen
-          heading="Releases"
-          detail="Migration in progress. Shared OJET placeholder pattern is established for this module."
-        />
-      );
+      return <ReleasesScreen />;
     case "executive":
       return (
         <PlaceholderScreen
