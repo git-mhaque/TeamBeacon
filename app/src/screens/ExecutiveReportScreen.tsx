@@ -3,6 +3,7 @@ import { MetricCard } from "../components/MetricCard";
 import { Panel } from "../components/Panel";
 import { StatusPill } from "../components/StatusPill";
 import {
+  chatWithOciGenAi,
   fetchConfiguredEpicSummary,
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
@@ -279,6 +280,58 @@ function buildDonutBackground(slices: DistributionSlice[]): string {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
+function buildExecutiveSummaryPrompt(params: {
+  reportingPeriodLabel: string;
+  reportingPeriodDays: number;
+  timezone: string;
+  totalEpics: number;
+  totalCompletedLastWeek: number;
+  greenCount: number;
+  amberCount: number;
+  redCount: number;
+  rows: ExecutiveRow[];
+}): string {
+  const promptRows = params.rows.slice(0, 40);
+  const initiativeLines = promptRows.map((row, index) => {
+    const timelineText = row.timelineEnabled
+      ? `Timeline ${row.timelineStartDate ?? "?"} -> ${row.targetCompletionDate ?? "?"}`
+      : "Timeline not configured";
+    return (
+      `${index + 1}. ${row.epicName || row.epicKey} (${row.epicKey})` +
+      ` | Group: ${row.groupText}` +
+      ` | Type: ${row.typeText}` +
+      ` | Period Progress: ${row.completedLastWeekValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})` +
+      ` | Overall Progress: ${formatPercent(row.completionPercent)}` +
+      ` | RAG: ${row.rag}` +
+      ` | ${timelineText}`
+    );
+  });
+  const truncationNote = params.rows.length > promptRows.length
+    ? `Only the first ${promptRows.length} selected initiatives are listed in this prompt.`
+    : "";
+
+  return [
+    "You are drafting an executive summary paragraph for an engineering leadership report.",
+    "Write exactly one paragraph of 4-6 sentences in plain text.",
+    "Do not use bullet points, markdown, or headings.",
+    "Use only the provided data; do not invent metrics or claims.",
+    "Cover overall period progress, current RAG risk mix, strongest momentum areas, and immediate focus areas.",
+    "",
+    `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
+    `Selected initiatives: ${params.totalEpics}`,
+    `Completed cards in period (selected): ${params.totalCompletedLastWeek}`,
+    `Selected RAG mix: ${params.greenCount} Green, ${params.amberCount} Amber, ${params.redCount} Red`,
+    truncationNote,
+    "",
+    "Selected initiative data from Progress for Key Initiatives:",
+    ...initiativeLines,
+    "",
+    "Return only the paragraph."
+  ]
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+}
+
 export function ExecutiveReportScreen() {
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(
@@ -307,7 +360,11 @@ export function ExecutiveReportScreen() {
     endDate: initialReportingSelection.endDate,
   });
   const [reportingValidationError, setReportingValidationError] = useState<string | null>(null);
+  const [executiveSummaryDraft, setExecutiveSummaryDraft] = useState("Generating executive summary...");
+  const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(true);
+  const [executiveSummaryError, setExecutiveSummaryError] = useState<string | null>(null);
   const hasInitializedInitiativeSelection = useRef(false);
+  const summaryRequestSequence = useRef(0);
 
   const persistInitiativeSelection = useCallback((keys: string[]) => {
     if (typeof window === "undefined") return;
@@ -598,23 +655,6 @@ export function ExecutiveReportScreen() {
     return items;
   }, [rows]);
 
-  const executiveSummary = useMemo(() => {
-    if (rows.length === 0) {
-      return "No configured epics found. Configure epic metadata to generate an executive report.";
-    }
-    const topEpic = rows[0];
-    const topGroup = groupProgress[0];
-    const topType = typeProgress[0];
-    return (
-      `Tracking ${metrics.totalEpics} configured epics across ${metrics.totalCards} scoped cards. ` +
-      `${metrics.totalCompletedLastWeek} cards were completed in ${reportingPeriodLabel} (${formatPercent(metrics.avgDelta)} period progress), ` +
-      `with average completion at ${formatPercent(metrics.avgCompletion)}. ` +
-      `RAG distribution is ${metrics.greenCount} Green, ${metrics.amberCount} Amber, ${metrics.redCount} Red. ` +
-      `Top momentum epic: ${topEpic.epicName || topEpic.epicKey} (+${formatPercent(topEpic.deltaPercentValue)}). ` +
-      `Top group/type contributors in this period: ${topGroup?.name ?? "n/a"} and ${topType?.name ?? "n/a"}.`
-    );
-  }, [groupProgress, metrics, reportingPeriodLabel, rows, typeProgress]);
-
   const reportTone = metrics.redCount > 0 ? "warn" : "good";
   const initiativeRows = useMemo(() => {
     const sorted = [...rows];
@@ -712,6 +752,89 @@ export function ExecutiveReportScreen() {
     };
   }, [visibleInitiativeRows]);
 
+  useEffect(() => {
+    if (loading) {
+      setExecutiveSummaryLoading(true);
+      setExecutiveSummaryError(null);
+      return;
+    }
+
+    if (error) {
+      setExecutiveSummaryLoading(false);
+      setExecutiveSummaryError(null);
+      setExecutiveSummaryDraft("Unable to generate executive summary because initiative data failed to load.");
+      return;
+    }
+
+    if (visibleInitiativeRows.length === 0) {
+      setExecutiveSummaryLoading(false);
+      setExecutiveSummaryError(null);
+      setExecutiveSummaryDraft(
+        initiativeRows.length > 0
+          ? "No initiatives are selected in Progress for Key Initiatives. Select at least one initiative to generate the summary."
+          : "No configured epics found. Configure epic metadata to generate an executive summary.",
+      );
+      return;
+    }
+
+    const prompt = buildExecutiveSummaryPrompt({
+      reportingPeriodLabel,
+      reportingPeriodDays,
+      timezone: browserTimezone,
+      totalEpics: visibleInitiativeSignals.totalEpics,
+      totalCompletedLastWeek: visibleInitiativeSignals.totalCompletedLastWeek,
+      greenCount: visibleInitiativeSignals.greenCount,
+      amberCount: visibleInitiativeSignals.amberCount,
+      redCount: visibleInitiativeSignals.redCount,
+      rows: visibleInitiativeRows,
+    });
+
+    const requestId = summaryRequestSequence.current + 1;
+    summaryRequestSequence.current = requestId;
+    setExecutiveSummaryLoading(true);
+    setExecutiveSummaryError(null);
+
+    chatWithOciGenAi({
+      message: prompt,
+      maxTokens: 260,
+      temperature: 0.2,
+      topP: 0.8,
+      topK: 0,
+      frequencyPenalty: 0,
+    })
+      .then((response) => {
+        if (summaryRequestSequence.current !== requestId) return;
+        const text = response.response.text?.trim();
+        if (!text) {
+          throw new Error("OCI GenAI returned an empty summary draft.");
+        }
+        setExecutiveSummaryDraft(text);
+      })
+      .catch((err) => {
+        if (summaryRequestSequence.current !== requestId) return;
+        const message = err instanceof Error ? err.message : "Unknown OCI GenAI summary failure.";
+        setExecutiveSummaryError(message);
+        setExecutiveSummaryDraft("Unable to generate executive summary draft from OCI GenAI.");
+      })
+      .finally(() => {
+        if (summaryRequestSequence.current !== requestId) return;
+        setExecutiveSummaryLoading(false);
+      });
+  }, [
+    browserTimezone,
+    error,
+    initiativeRows.length,
+    loading,
+    reportingPeriodDays,
+    reportingPeriodLabel,
+    visibleInitiativeRows,
+    visibleInitiativeSignals.amberCount,
+    visibleInitiativeSignals.greenCount,
+    visibleInitiativeSignals.redCount,
+    visibleInitiativeSignals.totalCompletedLastWeek,
+    visibleInitiativeSignals.totalEpics,
+  ]);
+
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
     if (!query) return initiativeRows;
@@ -807,7 +930,7 @@ export function ExecutiveReportScreen() {
     <div className="screen-grid">
       <Panel
         title="Executive Summary Draft"
-        subtitle="Generated from configured epics, group/type dimensions, and selected reporting period movement."
+        subtitle="Drafted by OCI GenAI using selected items from Progress for Key Initiatives and reporting period movement."
         action={(
           <div className="executive-actions no-print">
             <StatusPill tone={reportTone} text={metrics.redCount > 0 ? "Review Risks" : "Ready to Export"} />
@@ -858,7 +981,10 @@ export function ExecutiveReportScreen() {
           Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {browserTimezone})
         </p>
         {reportingValidationError ? <p className="sync-history-error">{reportingValidationError}</p> : null}
-        <p className="summary">{loading ? "Generating executive summary..." : executiveSummary}</p>
+        <p className="summary">
+          {executiveSummaryLoading ? "Generating executive summary with OCI GenAI..." : executiveSummaryDraft}
+        </p>
+        {executiveSummaryError ? <p className="sync-history-error">Executive summary draft error: {executiveSummaryError}</p> : null}
         {error ? <p className="sync-history-error">Executive report error: {error}</p> : null}
       </Panel>
 
