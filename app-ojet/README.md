@@ -12,7 +12,10 @@ This directory is the Oracle JET (vDOM) migration workspace for TeamBeacon.
    1. `GET /api/sprints/current`
    2. `GET /api/sprints/current/work`
    3. `GET /api/sprints/current/changes`
-5. Remaining screens are scaffolded placeholders for phased migration.
+5. Initiative Insights screen with live initiative summary endpoint:
+   1. `GET /api/metadata/epics/summary`
+   2. `GET /api/integrations/jira/status` (JIRA browse links)
+6. Remaining screens are scaffolded placeholders for phased migration.
 
 ## Run Locally
 1. Start TeamBeacon backend API:

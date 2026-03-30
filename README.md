@@ -112,7 +112,10 @@ Current migrated slice in `app-ojet`:
    - `GET /api/sprints/current`
    - `GET /api/sprints/current/work`
    - `GET /api/sprints/current/changes`
-5. Remaining screens are scaffolded as migration placeholders.
+5. Initiative Insights migrated with:
+   - `GET /api/metadata/epics/summary`
+   - `GET /api/integrations/jira/status` (for epic browse links)
+6. Remaining screens are scaffolded as migration placeholders.
 
 ## Planned Stack
 - Desktop app: Tauri + React

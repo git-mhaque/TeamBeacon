@@ -8,7 +8,8 @@ Last updated: 2026-03-30
 3. Integrations screen is wired to live backend connectivity endpoints for JIRA and OCI GenAI.
 4. Team Insights and Individual Insights are migrated into the OJET workspace.
 5. Current Sprint Work is migrated with live sprint metadata, scope changes, and work columns.
-6. Remaining screens are scaffolded as placeholders for phased migration.
+6. Initiative Insights is migrated with live configured epic summary data and JIRA browse-link wiring.
+7. Remaining screens are scaffolded as placeholders for phased migration.
 
 ## 1. Scope and Goal
 This document captures:

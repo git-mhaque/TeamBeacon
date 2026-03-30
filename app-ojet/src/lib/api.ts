@@ -34,6 +34,45 @@ export type OciGenAiIntegrationStatus = {
   error?: string | null;
 };
 
+export type EpicLookupItem = {
+  id: number;
+  name: string;
+};
+
+export type InitiativeEpicSummary = {
+  epicKey: string;
+  epicName: string;
+  completedCards: number;
+  totalCards: number;
+  completionPercent: number;
+  completedLastWeek?: number;
+  deltaPercent?: number;
+  completedInPeriod?: number;
+  deltaPercentInPeriod?: number;
+  groups: EpicLookupItem[];
+  workTypes: EpicLookupItem[];
+  successCriteria: string[];
+  timelineEnabled?: boolean;
+  timelineStartDate?: string | null;
+  targetCompletionDate?: string | null;
+  ragScore?: string | null;
+  insightComment?: string | null;
+  updatedAt?: string | null;
+};
+
+export type EpicSummaryReportingPeriod = {
+  startDate: string;
+  endDate: string;
+  days: number;
+  timezone: string;
+};
+
+export type ConfiguredEpicSummaryResponse = {
+  epics: InitiativeEpicSummary[];
+  reportingPeriod?: EpicSummaryReportingPeriod;
+  error?: string | null;
+};
+
 export type CurrentSprint = {
   id: number;
   boardId?: number | null;
@@ -157,6 +196,36 @@ export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrat
     throw await parseError(response, `OCI GenAI status request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiIntegrationStatus;
+}
+
+export async function fetchConfiguredEpicSummary(
+  limit = 50,
+  options?: {
+    periodStart?: string | null;
+    periodEnd?: string | null;
+    timezone?: string | null;
+  },
+): Promise<ConfiguredEpicSummaryResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (options?.periodStart) {
+    params.set("periodStart", options.periodStart);
+  }
+  if (options?.periodEnd) {
+    params.set("periodEnd", options.periodEnd);
+  }
+  if (options?.timezone) {
+    params.set("timezone", options.timezone);
+  }
+
+  const response = await fetch(`${API_BASE}/api/metadata/epics/summary?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Configured epic summary request failed (${response.status})`);
+  }
+  return (await response.json()) as ConfiguredEpicSummaryResponse;
 }
 
 export async function fetchCurrentSprint(): Promise<CurrentSprintResponse> {

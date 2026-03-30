@@ -7,6 +7,7 @@
  */
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
+import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { IndividualsScreen } from "./screens/IndividualsScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
@@ -66,12 +67,7 @@ function renderScreen(id: ScreenId) {
     case "integrations":
       return <IntegrationsScreen />;
     case "initiatives":
-      return (
-        <PlaceholderScreen
-          heading="Initiative Insights"
-          detail="Migration in progress. This screen will move next with OJET table/filter/dialog patterns."
-        />
-      );
+      return <InitiativesScreen />;
     case "team":
       return <TeamInsightsScreen />;
     case "individuals":
