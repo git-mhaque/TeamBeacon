@@ -50,11 +50,14 @@ describe("IntegrationsScreen", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
-    expect(screen.getAllByText("Connected")).toHaveLength(2);
-    expect(screen.getAllByText("2/2 connectivity checks passed.")).toHaveLength(2);
+    await waitFor(() => {
+      expect(screen.getAllByText("Connected")).toHaveLength(2);
+      expect(screen.getAllByText("2/2 connectivity checks passed.")).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "Check Now" })).toBeInTheDocument();
+    });
+
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(2);
     expect(screen.getByText("Project: CEG")).toBeInTheDocument();
     expect(screen.getByText("Model: cohere.command-r-08-2024")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check Now" })).toBeInTheDocument();
   });
 });
