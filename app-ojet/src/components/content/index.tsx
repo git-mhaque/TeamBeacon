@@ -10,7 +10,6 @@ import { useMemo, useState } from "preact/hooks";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
-import { IndividualsScreen } from "./screens/IndividualsScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
@@ -21,7 +20,6 @@ type ScreenId =
   | "integrations"
   | "initiatives"
   | "team"
-  | "individuals"
   | "sprint"
   | "security"
   | "incidents"
@@ -40,15 +38,14 @@ type Props = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "integrations", label: "Integrations", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
+  { id: "sprint", label: "Current Sprint", blurb: "Progress / Scope Creep / Blockers", showConstruction: false },
   { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG", showConstruction: false },
   { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", showConstruction: true },
-  { id: "individuals", label: "Individual Insights", blurb: "Alias-based work windows", showConstruction: true },
-  { id: "sprint", label: "Current Sprint", blurb: "Done / In Progress / Planned", showConstruction: false },
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
-  { id: "releases", label: "Releases", blurb: "Release cadence and quality", showConstruction: true },
+  { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
   { id: "executive", label: "Executive Report", blurb: "Leadership-ready summary", showConstruction: true },
+  { id: "integrations", label: "Settings", blurb: "JIRA, OCI GenAI, Confluence", showConstruction: false },
 ];
 
 function screenTitle(id: ScreenId): string {
@@ -56,7 +53,6 @@ function screenTitle(id: ScreenId): string {
     integrations: "Integrations & Field Mapping",
     initiatives: "Initiative Insights",
     team: "Team Insights",
-    individuals: "Individual Insights",
     sprint: "Current Sprint Work",
     security: "Security",
     incidents: "Incident Response",
@@ -74,8 +70,6 @@ function renderScreen(id: ScreenId) {
       return <InitiativesScreen />;
     case "team":
       return <TeamInsightsScreen />;
-    case "individuals":
-      return <IndividualsScreen />;
     case "sprint":
       return <SprintBoardScreen />;
     case "security":

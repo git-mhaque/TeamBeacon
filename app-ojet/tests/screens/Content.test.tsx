@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
+import { within } from "@testing-library/dom";
 import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
 
@@ -42,20 +43,41 @@ describe("Content", () => {
 
     expect(await screen.findByRole("heading", { name: "Integrations & Field Mapping" })).toBeInTheDocument();
     expect(screen.getByText("Illuminating Engineering Insights")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Integrations Settings" })).not.toBeInTheDocument();
+
+    const nav = screen.getByRole("navigation");
+    const orderedTitles = within(nav)
+      .getAllByRole("button")
+      .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
+    expect(orderedTitles).toEqual([
+      "Current Sprint",
+      "Initiative Insights",
+      "Team Insights",
+      "Security",
+      "Incident Response",
+      "Release",
+      "Executive Report",
+      "Settings",
+    ]);
 
     expect(screen.getByLabelText("Team Insights is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Individual Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Security is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Incident Response is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Releases is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Release is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Executive Report is under construction")).toBeInTheDocument();
 
-    expect(screen.queryByLabelText("Integrations is under construction")).not.toBeInTheDocument();
+    expect(screen.getByText("Progress / Scope Creep / Blockers")).toBeInTheDocument();
+
+    expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Current Sprint is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Security/ }));
     expect(await screen.findByRole("heading", { name: "Security" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Security Posture Snapshot" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
+    expect(await screen.findByRole("heading", { name: "Integrations & Field Mapping" })).toBeInTheDocument();
   });
 });
