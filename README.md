@@ -31,12 +31,9 @@ TeamBeacon/                  # Repository root
 - `node` and `npm` (Node 22 recommended, aligned with CI) for frontend build/test.
 - `sqlite3` CLI for applying local schema migrations and ad-hoc DB checks.
 - Rust toolchain (`rustup`, `cargo`, `rustc`) for Tauri desktop commands.
-- Tauri CLI via cargo:
-  - `cargo install tauri-cli`
-- OCI Python SDK (required only for OCI GenAI endpoints):
-  - `python3 -m pip install oci`
-- Platform prerequisites for Tauri desktop builds:
-  - macOS: Xcode Command Line Tools (`xcode-select --install`)
+- Tauri CLI via cargo: `cargo install tauri-cli`
+- OCI Python SDK (required only for OCI GenAI endpoints): `python3 -m pip install oci`
+- Platform prerequisites for Tauri desktop builds (macOS): Xcode Command Line Tools (`xcode-select --install`)
 
 ## Quick Start
 1. Copy configuration template (or use existing `config/.env`):
@@ -44,14 +41,16 @@ TeamBeacon/                  # Repository root
 cp config/.env.example config/.env
 ```
 Configuration details are documented in [config/README.md](config/README.md).
+
 2. Start frontend + local API:
 ```bash
 cd app
 npm install
 npm run dev
 ```
-- Frontend: `http://127.0.0.1:5174`
-- API: `http://127.0.0.1:8000`
+   - Frontend: `http://127.0.0.1:5174`
+   - API: `http://127.0.0.1:8000`
+
 3. Apply local schema (if needed):
 ```bash
 sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
