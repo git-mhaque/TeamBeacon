@@ -544,7 +544,7 @@ export function IntegrationsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Source Connections</h3>
-            <p>Live connectivity checks from OJET frontend to TeamBeacon backend integrations.</p>
+            <p>Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
           </div>
           <button type="button" class="tb-btn tb-btn-primary" onClick={checkSourceConnections}>
             {loading || ociLoading ? "Checking..." : "Check Now"}

@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.teambeacon.desktop",
   "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
+    "frontendDist": "../web",
+    "devUrl": "http://localhost:5174",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:release"
   },
   "app": {
     "windows": [

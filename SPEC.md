@@ -26,16 +26,13 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - Sprint committed vs completed story points.
   - Average cycle time and trend.
   - Custom JIRA field mapping.
-- Individual insights:
-  - Team member aliasing (for example `SE 1`, `SE 2`, `QA 1`).
-  - Work activity by configurable time window.
 - Completed/In-progress work:
-  - Current sprint board-style snapshot (`Done`, `In Progress`, `Planned`).
+  - Current sprint board-style snapshot (`Done`, `In Progress`, `Planned`) with sprint goals and work mix breakdown.
 - Executive report:
   - Summary since last report.
   - Initiative-level progress and risks.
 - UX mockups:
-  - Maintain mockup coverage for six core screens in `docs/design/teambeacon-mockups.html`.
+  - Maintain mockup coverage for current OJET screens in `docs/design/teambeacon-ojet-mockups.html`.
 
 ## 5. Out of Scope (MVP)
 - Two-way updates to JIRA/Confluence.
@@ -111,7 +108,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 ## 9. Suggested Repository Structure
 ```text
 TeamBeacon/
-  app/                     # Desktop UI (Tauri + React)
+  app/                     # Desktop UI (Oracle JET + Tauri)
   services/api/            # FastAPI backend for sync + analytics
   services/workers/        # Scheduled jobs/sync processors
   packages/connectors/     # JIRA + Confluence API clients
@@ -126,12 +123,12 @@ TeamBeacon/
 ```
 
 ## 10. Design Artifacts
-- Primary UX reference: `docs/design/teambeacon-mockups.html`
+- Primary UX reference: `docs/design/teambeacon-ojet-mockups.html`
 - Supporting notes: `docs/design/README.md`
 - Mockups must reflect:
-  - Integrations & field mapping
+  - Settings (connections, field mapping, epic metadata)
   - Initiative insights
   - Team insights
-  - Individual insights
-  - Current sprint work
+  - Current sprint
+  - Security / Incident response / Releases
   - Executive report

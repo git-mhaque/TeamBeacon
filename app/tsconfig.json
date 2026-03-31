@@ -1,13 +1,48 @@
 {
+  "compileOnSave": true,
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "target": "es6",
     "strict": true,
-    "noEmit": true,
+    "module": "amd",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "lib": [
+      "es2021",
+      "dom",
+      "esnext.asynciterable"
+    ],
+    "typeRoots": [
+      "./node_modules/@oracle/oraclejet/dist/types",
+      "./node_modules/@types"
+    ],
+    "paths": {
+      "ojs/*": [
+        "./node_modules/@oracle/oraclejet/dist/types/*"
+      ],
+      "@oracle/oraclejet-preact/*": [
+        "./node_modules/@oracle/oraclejet-preact/*"
+      ],
+      "oj-c/*": [
+        "./node_modules/@oracle/oraclejet-core-pack/oj-c/types/*"
+      ],
+      "preact": [
+        "./node_modules/preact"
+      ]
+    },
+    "declaration": true,
+    "noEmitOnError": true,
+    "experimentalDecorators": true,
     "skipLibCheck": true,
-    "types": ["vite/client"]
+    "removeComments": true
   },
-  "include": ["src"]
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "./src/**/*.test.ts",
+    "./src/**/*.test.tsx",
+    "./src/test/**/*"
+  ]
 }

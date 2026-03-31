@@ -42,9 +42,9 @@ ensure_port_free() {
 }
 
 kill_port_listeners 8000
-kill_port_listeners 5173
+kill_port_listeners 5174
 ensure_port_free 8000
-ensure_port_free 5173
+ensure_port_free 5174
 
 "${SCRIPT_DIR}/run-api.sh" &
 API_PID=$!
@@ -81,4 +81,4 @@ wait_for_api() {
 }
 
 wait_for_api
-npm run dev:ui
+npm run dev:web

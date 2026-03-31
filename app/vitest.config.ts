@@ -15,7 +15,6 @@ export default defineConfig({
       exclude: [
         "tests/**",
         "src/components/app.tsx",
-        "src/components/header.tsx",
       ],
     },
   },

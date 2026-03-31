@@ -8,9 +8,9 @@ TeamBeacon is a local-first desktop analytics system:
 
 ## 2. High-Level Components
 1. UI (`app/`)
-- Tauri + React frontend.
-- Screens: Integrations, Initiatives, Team Insights, Individuals, Current Sprint, Reports.
-- UX reference: `docs/design/teambeacon-mockups.html`
+- Oracle JET (vDOM) frontend with Tauri desktop shell.
+- Screens: Settings, Initiative Insights, Team Insights, Current Sprint, Security, Incident Response, Releases, Executive Report.
+- UX reference: `docs/design/teambeacon-ojet-mockups.html`
 
 2. API (`services/api/`)
 - FastAPI service exposing internal endpoints for UI.
@@ -77,14 +77,16 @@ Default thresholds:
 
 ## 9. UI Information Architecture
 - Primary navigation:
-  - Integrations & Field Mapping
+  - Settings
   - Initiative Insights
   - Team Insights
-  - Individual Insights
-  - Current Sprint Work
+  - Current Sprint
+  - Security
+  - Incident Response
+  - Releases
   - Executive Report
 - Interaction pattern:
   - Left rail for filters/context scope.
   - Main pane for KPI cards, trend widgets, and narrative insights.
 - Design source:
-  - `docs/design/teambeacon-mockups.html` should be updated with major flow changes.
+  - `docs/design/teambeacon-ojet-mockups.html` should be updated with major flow changes.

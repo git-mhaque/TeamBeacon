@@ -7,19 +7,14 @@ ACTION="${1:-}"
 
 ensure_rust_toolchain() {
   if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
-    return 0
-  fi
-
-  if [ -f "${HOME}/.cargo/env" ]; then
+    :
+  elif [ -f "${HOME}/.cargo/env" ]; then
     # shellcheck source=/dev/null
     . "${HOME}/.cargo/env"
   fi
 
-  if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
-    return 0
-  fi
-
-  cat >&2 <<'EOF'
+  if ! command -v cargo >/dev/null 2>&1 || ! command -v rustc >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
 Rust toolchain not found on PATH.
 
 Install once:
@@ -30,16 +25,32 @@ Install once:
 Then re-run:
   npm run desktop:dev
 EOF
+    exit 1
+  fi
+
+  if cargo tauri --version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  cat >&2 <<'EOF'
+Tauri CLI is not available via cargo.
+
+Install once:
+  cargo install tauri-cli
+
+Then re-run:
+  npm run desktop:dev
+EOF
   exit 1
 }
 
 run_tauri() {
   case "${ACTION}" in
     dev)
-      npm run tauri -- dev
+      cargo tauri dev
       ;;
     build)
-      npm run tauri -- build
+      cargo tauri build
       ;;
     *)
       echo "Usage: ./scripts/tauri-with-rust.sh <dev|build>" >&2
@@ -51,4 +62,3 @@ run_tauri() {
 cd "${APP_DIR}"
 ensure_rust_toolchain
 run_tauri
-

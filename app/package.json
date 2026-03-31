@@ -1,34 +1,43 @@
 {
-  "name": "teambeacon-ui-shell",
+  "name": "teambeacon-ui",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "TeamBeacon Oracle JET desktop frontend",
   "scripts": {
-    "clean:generated": "node -e \"const fs=require('fs');['vite.config.js','vite.config.d.ts','tsconfig.tsbuildinfo','tsconfig.node.tsbuildinfo'].forEach((f)=>fs.rmSync(f,{force:true}));\"",
-    "predev": "npm run clean:generated",
-    "prebuild": "npm run clean:generated",
-    "predesktop:dev": "npm run clean:generated",
-    "predesktop:build": "npm run clean:generated",
     "api:dev": "./scripts/run-api.sh",
-    "dev:ui": "vite",
+    "dev:web": "ojet serve web --server-port 5174 --server-only",
     "dev": "./scripts/dev-with-api.sh",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
+    "build": "ojet build web",
+    "build:release": "ojet build web --release",
+    "restore": "ojet restore",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "desktop:dev": "./scripts/tauri-with-rust.sh dev",
     "desktop:build": "./scripts/tauri-with-rust.sh build"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "@oracle/oraclejet": "~20.0.0",
+    "@oracle/oraclejet-core-pack": "~20.0.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.1",
-    "@types/react": "^19.1.9",
-    "@types/react-dom": "^19.1.7",
-    "@vitejs/plugin-react": "^5.0.4",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.10"
+    "@oracle/ojet-cli": "~20.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/preact": "^3.2.4",
+    "@vitest/coverage-v8": "^4.1.2",
+    "extract-zip": "^1.7.0",
+    "fs-extra": "^8.1.0",
+    "glob": "10.4.5",
+    "jsdom": "^29.0.1",
+    "typescript": "5.8.3",
+    "underscore": "^1.10.2",
+    "vitest": "^4.0.18",
+    "yargs-parser": "13.1.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "overrides": {
+    "@types/minimatch": "5.1.2"
   }
 }

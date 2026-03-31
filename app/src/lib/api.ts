@@ -18,7 +18,7 @@ export type JiraIntegrationStatus = {
     authMode?: string;
   };
   checks: IntegrationCheck[];
-  metrics: {
+  metrics?: {
     boardCount?: number;
     projectSampleIssueCount?: number;
   };
@@ -120,6 +120,11 @@ export type EpicLookupConfig = {
   workTypes: EpicLookupItem[];
 };
 
+export type EpicCandidate = {
+  epicKey: string;
+  epicName: string;
+};
+
 export type EpicMetadataEntry = {
   epicKey: string;
   epicTitle?: string | null;
@@ -132,11 +137,6 @@ export type EpicMetadataEntry = {
   workTypeIds: number[];
   workTypes: EpicLookupItem[];
   updatedAt?: string | null;
-};
-
-export type EpicCandidate = {
-  epicKey: string;
-  epicName: string;
 };
 
 export type InitiativeEpicSummary = {
@@ -167,6 +167,12 @@ export type EpicSummaryReportingPeriod = {
   timezone: string;
 };
 
+export type ConfiguredEpicSummaryResponse = {
+  epics: InitiativeEpicSummary[];
+  reportingPeriod?: EpicSummaryReportingPeriod;
+  error?: string | null;
+};
+
 export type CurrentSprint = {
   id: number;
   boardId?: number | null;
@@ -182,35 +188,6 @@ export type CurrentSprint = {
 export type CurrentSprintResponse = {
   source: "local";
   sprint: CurrentSprint | null;
-  error?: string | null;
-};
-
-export type CurrentSprintChangeGroup = {
-  count: number;
-  storyPointsTotal: number;
-  issueKeys: string[];
-  issueCards: CurrentSprintChangeIssue[];
-};
-
-export type CurrentSprintChangeIssue = {
-  issueKey: string;
-  summary: string;
-  issueUrl?: string | null;
-  epicName?: string | null;
-  epicUrl?: string | null;
-  storyPoints?: number | null;
-  status?: string | null;
-  statusCategory?: string | null;
-};
-
-export type CurrentSprintChangesResponse = {
-  source: "local";
-  sprint: CurrentSprint | null;
-  changes: {
-    addedAfterStart: CurrentSprintChangeGroup;
-    removedAfterStart: CurrentSprintChangeGroup;
-    blockedCards: CurrentSprintChangeGroup;
-  };
   error?: string | null;
 };
 
@@ -251,24 +228,76 @@ export type CurrentSprintWorkResponse = {
   error?: string | null;
 };
 
+export type CurrentSprintChangeIssue = {
+  issueKey: string;
+  summary: string;
+  issueUrl?: string | null;
+  epicName?: string | null;
+  epicUrl?: string | null;
+  storyPoints?: number | null;
+  status?: string | null;
+  statusCategory?: string | null;
+};
+
+export type CurrentSprintChangesResponse = {
+  source: "local";
+  sprint: CurrentSprint | null;
+  changes: {
+    addedAfterStart: {
+      count: number;
+      storyPointsTotal: number;
+      issueKeys: string[];
+      issueCards: CurrentSprintChangeIssue[];
+    };
+    removedAfterStart: {
+      count: number;
+      storyPointsTotal: number;
+      issueKeys: string[];
+      issueCards: CurrentSprintChangeIssue[];
+    };
+    blockedCards: {
+      count: number;
+      storyPointsTotal: number;
+      issueKeys: string[];
+      issueCards: CurrentSprintChangeIssue[];
+    };
+  };
+  error?: string | null;
+};
+
+const API_BASE = (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE
+  ?? "http://127.0.0.1:8000";
+
+async function parseError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const payload = (await response.json()) as { detail?: string };
+    if (payload?.detail) {
+      return new Error(payload.detail);
+    }
+  } catch {
+    // Best-effort parsing; fallback below.
+  }
+  return new Error(fallback);
+}
+
 export async function fetchJiraIntegrationStatus(): Promise<JiraIntegrationStatus> {
-  const response = await fetch("/api/integrations/jira/status", {
+  const response = await fetch(`${API_BASE}/api/integrations/jira/status`, {
     method: "GET",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`JIRA status request failed (${response.status})`);
+    throw await parseError(response, `JIRA status request failed (${response.status})`);
   }
   return (await response.json()) as JiraIntegrationStatus;
 }
 
 export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrationStatus> {
-  const response = await fetch("/api/integrations/oci-genai/status", {
+  const response = await fetch(`${API_BASE}/api/integrations/oci-genai/status`, {
     method: "GET",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`OCI GenAI status request failed (${response.status})`);
+    throw await parseError(response, `OCI GenAI status request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiIntegrationStatus;
 }
@@ -282,37 +311,24 @@ export async function chatWithOciGenAi(payload: {
   topK?: number;
   frequencyPenalty?: number;
 }): Promise<OciGenAiChatResponse> {
-  const response = await fetch("/api/ai/chat", {
+  const response = await fetch(`${API_BASE}/api/ai/chat`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    try {
-      const errorPayload = (await response.json()) as { detail?: string };
-      if (errorPayload.detail) {
-        throw new Error(errorPayload.detail);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message) {
-        throw err;
-      }
-    }
-    throw new Error(`OCI GenAI chat request failed (${response.status})`);
+    throw await parseError(response, `OCI GenAI chat request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiChatResponse;
 }
 
 export async function fetchJiraSyncStatus(): Promise<JiraSyncStatus> {
-  const response = await fetch("/api/integrations/jira/sync/status", {
+  const response = await fetch(`${API_BASE}/api/integrations/jira/sync/status`, {
     method: "GET",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error("JIRA sync status endpoint is unavailable. Restart local API (npm run dev).");
-    }
-    throw new Error(`JIRA sync status request failed (${response.status})`);
+    throw await parseError(response, `JIRA sync status request failed (${response.status})`);
   }
   return (await response.json()) as JiraSyncStatus;
 }
@@ -322,207 +338,27 @@ export async function startJiraSync(mode: JiraSyncMode = "full", sinceDate?: str
   if (sinceDate) {
     payload.sinceDate = sinceDate;
   }
-  const response = await fetch("/api/integrations/jira/sync/start", {
+  const response = await fetch(`${API_BASE}/api/integrations/jira/sync/start`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    if (response.status === 400) {
-      try {
-        const payload = (await response.json()) as { detail?: string };
-        throw new Error(payload.detail ?? "JIRA sync request is invalid.");
-      } catch {
-        throw new Error("JIRA sync request is invalid.");
-      }
-    }
-    if (response.status === 501 || response.status === 404) {
-      throw new Error("JIRA sync endpoint is unavailable. Restart local API (npm run dev).");
-    }
-    throw new Error(`JIRA sync start request failed (${response.status})`);
+    throw await parseError(response, `JIRA sync start request failed (${response.status})`);
   }
   return (await response.json()) as JiraSyncStatus;
 }
 
 export async function fetchJiraSyncHistory(limit = 20): Promise<JiraSyncHistoryEntry[]> {
-  const response = await fetch(`/api/integrations/jira/sync/history?limit=${encodeURIComponent(String(limit))}`, {
+  const response = await fetch(`${API_BASE}/api/integrations/jira/sync/history?limit=${encodeURIComponent(String(limit))}`, {
     method: "GET",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`JIRA sync history request failed (${response.status})`);
+    throw await parseError(response, `JIRA sync history request failed (${response.status})`);
   }
   const payload = (await response.json()) as { source: string; history?: JiraSyncHistoryEntry[] };
   return payload.history ?? [];
-}
-
-export async function fetchCurrentSprint(): Promise<CurrentSprintResponse> {
-  const response = await fetch("/api/sprints/current", {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Current sprint request failed (${response.status})`);
-  }
-  return (await response.json()) as CurrentSprintResponse;
-}
-
-export async function fetchCurrentSprintWork(): Promise<CurrentSprintWorkResponse> {
-  const response = await fetch("/api/sprints/current/work", {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Current sprint work request failed (${response.status})`);
-  }
-  return (await response.json()) as CurrentSprintWorkResponse;
-}
-
-export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesResponse> {
-  const response = await fetch("/api/sprints/current/changes", {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Current sprint changes request failed (${response.status})`);
-  }
-  return (await response.json()) as CurrentSprintChangesResponse;
-}
-
-export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
-  const response = await fetch("/api/metadata/lookup", {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Epic lookup request failed (${response.status})`);
-  }
-  return (await response.json()) as EpicLookupConfig;
-}
-
-export async function addEpicGroup(name: string): Promise<EpicLookupItem> {
-  const response = await fetch("/api/metadata/lookup/groups", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ name })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid epic group payload.");
-    }
-    throw new Error(`Epic group create failed (${response.status})`);
-  }
-  return (await response.json()) as EpicLookupItem;
-}
-
-export async function updateEpicGroup(id: number, name: string): Promise<EpicLookupItem> {
-  const response = await fetch("/api/metadata/lookup/groups/update", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ id, name })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid epic group update payload.");
-    }
-    throw new Error(`Epic group update failed (${response.status})`);
-  }
-  return (await response.json()) as EpicLookupItem;
-}
-
-export async function deleteEpicGroup(id: number): Promise<{ id: number; deleted: boolean }> {
-  const response = await fetch("/api/metadata/lookup/groups/delete", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ id })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid epic group delete payload.");
-    }
-    throw new Error(`Epic group delete failed (${response.status})`);
-  }
-  return (await response.json()) as { id: number; deleted: boolean };
-}
-
-export async function addWorkType(name: string): Promise<EpicLookupItem> {
-  const response = await fetch("/api/metadata/lookup/work-types", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ name })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid work type payload.");
-    }
-    throw new Error(`Work type create failed (${response.status})`);
-  }
-  return (await response.json()) as EpicLookupItem;
-}
-
-export async function updateWorkType(id: number, name: string): Promise<EpicLookupItem> {
-  const response = await fetch("/api/metadata/lookup/work-types/update", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ id, name })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid work type update payload.");
-    }
-    throw new Error(`Work type update failed (${response.status})`);
-  }
-  return (await response.json()) as EpicLookupItem;
-}
-
-export async function deleteWorkType(id: number): Promise<{ id: number; deleted: boolean }> {
-  const response = await fetch("/api/metadata/lookup/work-types/delete", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ id })
-  });
-  if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid work type delete payload.");
-    }
-    throw new Error(`Work type delete failed (${response.status})`);
-  }
-  return (await response.json()) as { id: number; deleted: boolean };
-}
-
-export async function fetchEpicMetadata(limit = 50): Promise<EpicMetadataEntry[]> {
-  const response = await fetch(`/api/metadata/epics?limit=${encodeURIComponent(String(limit))}`, {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Epic metadata request failed (${response.status})`);
-  }
-  const payload = (await response.json()) as { epics?: EpicMetadataEntry[] };
-  return payload.epics ?? [];
-}
-
-export async function fetchEpicCandidates(query: string, limit = 20): Promise<EpicCandidate[]> {
-  const params = new URLSearchParams();
-  if (query.trim()) {
-    params.set("q", query.trim());
-  }
-  params.set("limit", String(limit));
-  const response = await fetch(`/api/metadata/epics/candidates?${params.toString()}`, {
-    method: "GET",
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`Epic candidate request failed (${response.status})`);
-  }
-  const payload = (await response.json()) as { epics?: EpicCandidate[] };
-  return payload.epics ?? [];
 }
 
 export async function fetchConfiguredEpicSummary(
@@ -532,7 +368,7 @@ export async function fetchConfiguredEpicSummary(
     periodEnd?: string | null;
     timezone?: string | null;
   },
-): Promise<InitiativeEpicSummary[]> {
+): Promise<ConfiguredEpicSummaryResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
   if (options?.periodStart) {
@@ -544,21 +380,114 @@ export async function fetchConfiguredEpicSummary(
   if (options?.timezone) {
     params.set("timezone", options.timezone);
   }
-  const response = await fetch(`/api/metadata/epics/summary?${params.toString()}`, {
+
+  const response = await fetch(`${API_BASE}/api/metadata/epics/summary?${params.toString()}`, {
     method: "GET",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid configured epic summary request.");
-    }
-    throw new Error(`Configured epic summary request failed (${response.status})`);
+    throw await parseError(response, `Configured epic summary request failed (${response.status})`);
   }
-  const payload = (await response.json()) as {
-    epics?: InitiativeEpicSummary[];
-    reportingPeriod?: EpicSummaryReportingPeriod;
-  };
+  return (await response.json()) as ConfiguredEpicSummaryResponse;
+}
+
+export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic lookup request failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupConfig;
+}
+
+export async function addEpicGroup(name: string): Promise<EpicLookupItem> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/groups`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic group create failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function updateEpicGroup(id: number, name: string): Promise<EpicLookupItem> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/groups/update`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic group update failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function deleteEpicGroup(id: number): Promise<{ id: number; deleted: boolean }> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/groups/delete`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic group delete failed (${response.status})`);
+  }
+  return (await response.json()) as { id: number; deleted: boolean };
+}
+
+export async function addWorkType(name: string): Promise<EpicLookupItem> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/work-types`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Work type create failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function updateWorkType(id: number, name: string): Promise<EpicLookupItem> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/work-types/update`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Work type update failed (${response.status})`);
+  }
+  return (await response.json()) as EpicLookupItem;
+}
+
+export async function deleteWorkType(id: number): Promise<{ id: number; deleted: boolean }> {
+  const response = await fetch(`${API_BASE}/api/metadata/lookup/work-types/delete`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Work type delete failed (${response.status})`);
+  }
+  return (await response.json()) as { id: number; deleted: boolean };
+}
+
+export async function fetchEpicCandidates(query: string, limit = 20): Promise<EpicCandidate[]> {
+  const params = new URLSearchParams();
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
+  params.set("limit", String(limit));
+  const response = await fetch(`${API_BASE}/api/metadata/epics/candidates?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic candidate request failed (${response.status})`);
+  }
+  const payload = (await response.json()) as { epics?: EpicCandidate[] };
   return payload.epics ?? [];
 }
 
@@ -571,17 +500,13 @@ export async function upsertEpicMetadata(payload: {
   timelineStartDate?: string | null;
   targetCompletionDate?: string | null;
 }): Promise<EpicMetadataEntry> {
-  const response = await fetch("/api/metadata/epics", {
+  const response = await fetch(`${API_BASE}/api/metadata/epics`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    if (response.status === 400) {
-      const errorPayload = (await response.json()) as { detail?: string };
-      throw new Error(errorPayload.detail ?? "Invalid epic metadata payload.");
-    }
-    throw new Error(`Epic metadata save failed (${response.status})`);
+    throw await parseError(response, `Epic metadata save failed (${response.status})`);
   }
   return (await response.json()) as EpicMetadataEntry;
 }
@@ -593,17 +518,13 @@ export async function deleteEpicMetadata(epicKey: string): Promise<{
   removedWorkTypeMappings: number;
   removedMetadataRows: number;
 }> {
-  const response = await fetch("/api/metadata/epics/delete", {
+  const response = await fetch(`${API_BASE}/api/metadata/epics/delete`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ epicKey }),
   });
   if (!response.ok) {
-    if (response.status === 400) {
-      const payload = (await response.json()) as { detail?: string };
-      throw new Error(payload.detail ?? "Invalid epic metadata delete payload.");
-    }
-    throw new Error(`Epic metadata delete failed (${response.status})`);
+    throw await parseError(response, `Epic metadata delete failed (${response.status})`);
   }
   return (await response.json()) as {
     epicKey: string;
@@ -612,4 +533,37 @@ export async function deleteEpicMetadata(epicKey: string): Promise<{
     removedWorkTypeMappings: number;
     removedMetadataRows: number;
   };
+}
+
+export async function fetchCurrentSprint(): Promise<CurrentSprintResponse> {
+  const response = await fetch(`${API_BASE}/api/sprints/current`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Current sprint request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintResponse;
+}
+
+export async function fetchCurrentSprintWork(): Promise<CurrentSprintWorkResponse> {
+  const response = await fetch(`${API_BASE}/api/sprints/current/work`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Current sprint work request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintWorkResponse;
+}
+
+export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesResponse> {
+  const response = await fetch(`${API_BASE}/api/sprints/current/changes`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Current sprint changes request failed (${response.status})`);
+  }
+  return (await response.json()) as CurrentSprintChangesResponse;
 }

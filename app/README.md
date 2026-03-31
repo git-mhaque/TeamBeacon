@@ -1,96 +1,49 @@
-# TeamBeacon UI Shell
+# TeamBeacon Frontend (OJET + Tauri)
 
-This app is the initial React + Vite shell plus a Tauri desktop wrapper for TeamBeacon UI flows.
-
-## Screens Included
-1. Integrations & Field Mapping
-2. Initiative Insights
-3. Team Insights
-4. Individual Insights
-5. Current Sprint Work
-6. Executive Report
+This directory is the single TeamBeacon frontend workspace using Oracle JET (vDOM) and the Tauri desktop shell.
 
 ## Local Development
+1. Install dependencies:
 ```bash
 cd app
 npm install
+```
+2. Start UI + backend API together:
+```bash
 npm run dev
 ```
+- OJET dev server: `http://127.0.0.1:5174`
+- Local API: `http://127.0.0.1:8000`
 
-`npm run dev` now starts both:
-- local API on `127.0.0.1:8000`
-- Vite UI on `localhost:5173`
-- pre-start cleanup automatically stops any existing listeners on ports `8000` and `5173` so dev always starts on the same ports
-
-## Desktop Development (Tauri)
-Prerequisites:
-- Rust toolchain (`rustup`, `cargo`, `rustc`)
-- Platform dependencies required by Tauri (for macOS, Xcode command line tools)
-
-Commands:
+If you only need the backend API:
 ```bash
-cd app
-npm install
-npm run desktop:dev
-```
-
-`desktop:dev` and `desktop:build` automatically source `~/.cargo/env` if `cargo` is not already on your PATH.
-
-## JIRA Integrations Screen Connectivity
-`npm run dev` is the recommended path and starts everything needed for the Integrations screen.
-
-If you want to run only the API service:
-
-```bash
-cd app
 npm run api:dev
 ```
 
-The Vite dev server proxies `/api/*` requests to `http://127.0.0.1:8000`.
-The npm scripts auto-clean stale generated `vite.config.js` artifacts so proxy config from `vite.config.ts` is always used.
-
-## JIRA Sync Data (Offline)
-- The JIRA card in **Source Connections** now has its own `Sync Data` button.
-- Clicking `Sync Data` opens a mode selector:
-  - `Sync Since Last Timestamp` (default) using the last successful sync timestamp
-  - `Full Sync` (refreshes the entire configured board scope)
-- Sync progress is shown live (example: `12 of 5000 issues downloaded`).
-- `Last synced` is shown from persisted checkpoint data.
-- Synced entities are stored in local SQLite (`teambeacon.db`) for offline feature usage.
-
-## Build
+## Build and Test
 ```bash
-cd app
 npm run build
+npm run test
+npm run test:coverage
 ```
 
-## Desktop Build
+Release web build:
 ```bash
-cd app
+npm run build:release
+```
+
+## Desktop (Tauri)
+Prerequisites:
+- Rust toolchain (`rustup`, `cargo`, `rustc`)
+- Platform dependencies for Tauri (Xcode command line tools on macOS)
+
+Commands:
+```bash
+npm run desktop:dev
 npm run desktop:build
 ```
 
-## Troubleshooting: `cargo metadata` Not Found
-If you see:
-
-```text
-failed to run command cargo metadata ... No such file or directory (os error 2)
-```
-
-Install Rust once:
-
-```bash
-xcode-select -p || xcode-select --install
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-```
-
-For future terminal sessions:
-
-```bash
-echo 'source "$HOME/.cargo/env"' >> ~/.zshrc
-```
-
 ## Notes
-- Most screens still use mock data and local component state.
-- Integrations is wired to the local API endpoint in `services/api`.
+- The frontend consumes TeamBeacon backend endpoints under `/api/*`.
+- OJET build output is generated under `app/web`.
+- Tauri is configured to use OJET dev URL (`5174`) and production output (`web`).

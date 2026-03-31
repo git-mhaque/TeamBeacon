@@ -37,8 +37,8 @@ jobs:
       - name: Run API integration tests
         run: python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 
-  frontend-build:
-    name: Frontend Build
+  frontend-tests:
+    name: Frontend (OJET) Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -57,34 +57,10 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Build frontend
+      - name: Build OJET frontend
         working-directory: app
         run: npm run build
 
-  ojet-tests:
-    name: Frontend (OJET) Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: app-ojet/package-lock.json
-
-      - name: Install dependencies
-        working-directory: app-ojet
-        run: npm ci
-
-      - name: Build OJET frontend
-        working-directory: app-ojet
-        run: npm run build
-
       - name: Run OJET unit tests with coverage
-        working-directory: app-ojet
+        working-directory: app
         run: npm run test:coverage
