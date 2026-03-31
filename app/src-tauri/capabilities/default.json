@@ -6,6 +6,10 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "opener:default",
+    "allow-prefs-get",
+    "allow-prefs-set",
+    "allow-prefs-remove"
   ]
 }

@@ -7,6 +7,7 @@ import {
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
 } from "../../../lib/api";
+import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 type RagLabel = "Red" | "Amber" | "Green";
 
@@ -131,12 +132,15 @@ function readPersistedReportingSelection(defaultRange: ReportingRange): Persiste
     endDate: defaultRange.endDate,
   };
 
-  if (typeof window === "undefined") return fallback;
+  return parsePersistedReportingSelection(getPreferenceSync(REPORTING_PERIOD_SELECTION_KEY), fallback);
+}
 
+function parsePersistedReportingSelection(
+  raw: string | null,
+  fallback: PersistedReportingSelection,
+): PersistedReportingSelection {
   try {
-    const raw = window.localStorage.getItem(REPORTING_PERIOD_SELECTION_KEY);
     if (!raw) return fallback;
-
     const parsed = JSON.parse(raw) as Partial<PersistedReportingSelection>;
     if (!isReportingPreset(parsed.preset) || !isIsoDate(parsed.startDate) || !isIsoDate(parsed.endDate)) {
       return fallback;
@@ -479,16 +483,13 @@ export function ExecutiveReportScreen() {
   const [winsRisksError, setWinsRisksError] = useState<string | null>(null);
 
   const hasInitializedInitiativeSelection = useRef(false);
+  const hasHydratedInitiativeSelectionFromStore = useRef(false);
+  const hasHydratedReportingSelectionFromStore = useRef(false);
   const summaryRequestSequence = useRef(0);
   const winsRisksRequestSequence = useRef(0);
 
   const persistInitiativeSelection = useCallback((keys: string[]) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify(keys));
-    } catch {
-      // Best-effort persistence only.
-    }
+    void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify(keys));
   }, []);
 
   const loadExecutiveData = useCallback(async (range: ReportingRange) => {
@@ -584,18 +585,56 @@ export function ExecutiveReportScreen() {
   }, [loadExecutiveData, reportingRange]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const payload: PersistedReportingSelection = {
-        preset: reportingPreset,
-        startDate: reportingRange.startDate,
-        endDate: reportingRange.endDate,
-      };
-      window.localStorage.setItem(REPORTING_PERIOD_SELECTION_KEY, JSON.stringify(payload));
-    } catch {
-      // Best-effort persistence only.
-    }
+    const payload: PersistedReportingSelection = {
+      preset: reportingPreset,
+      startDate: reportingRange.startDate,
+      endDate: reportingRange.endDate,
+    };
+    void setPreference(REPORTING_PERIOD_SELECTION_KEY, JSON.stringify(payload));
   }, [reportingPreset, reportingRange.endDate, reportingRange.startDate]);
+
+  useEffect(() => {
+    if (hasHydratedReportingSelectionFromStore.current) return;
+    hasHydratedReportingSelectionFromStore.current = true;
+
+    let cancelled = false;
+    const fallback: PersistedReportingSelection = {
+      preset: initialReportingSelection.preset,
+      startDate: initialReportingSelection.startDate,
+      endDate: initialReportingSelection.endDate,
+    };
+
+    void (async () => {
+      const raw = await getPreference(REPORTING_PERIOD_SELECTION_KEY);
+      if (cancelled) return;
+
+      const persisted = parsePersistedReportingSelection(raw, fallback);
+      const isSame =
+        persisted.preset === reportingPreset
+        && persisted.startDate === reportingRange.startDate
+        && persisted.endDate === reportingRange.endDate;
+      if (isSame) return;
+
+      setReportingPreset(persisted.preset);
+      setReportingStartDraft(persisted.startDate);
+      setReportingEndDraft(persisted.endDate);
+      setReportingRange({
+        startDate: persisted.startDate,
+        endDate: persisted.endDate,
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    initialReportingSelection.endDate,
+    initialReportingSelection.preset,
+    initialReportingSelection.startDate,
+    reportingPreset,
+    reportingRange.endDate,
+    reportingRange.startDate,
+  ]);
 
   const effectivePeriodStart = resolvedReportingPeriod?.startDate ?? reportingRange.startDate;
   const effectivePeriodEnd = resolvedReportingPeriod?.endDate ?? reportingRange.endDate;
@@ -686,6 +725,7 @@ export function ExecutiveReportScreen() {
     if (rows.length === 0) {
       setSelectedInitiativeEpicKeys([]);
       hasInitializedInitiativeSelection.current = false;
+      hasHydratedInitiativeSelectionFromStore.current = false;
       return;
     }
 
@@ -694,18 +734,16 @@ export function ExecutiveReportScreen() {
 
     if (!hasInitializedInitiativeSelection.current) {
       let storedKeys: string[] = [];
-      if (typeof window !== "undefined") {
-        try {
-          const raw = window.localStorage.getItem(INITIATIVE_SECTION_SELECTION_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              storedKeys = parsed.filter((value): value is string => typeof value === "string");
-            }
+      try {
+        const raw = getPreferenceSync(INITIATIVE_SECTION_SELECTION_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            storedKeys = parsed.filter((value): value is string => typeof value === "string");
           }
-        } catch {
-          storedKeys = [];
         }
+      } catch {
+        storedKeys = [];
       }
 
       const initialKeys = storedKeys.filter((key) => available.has(key));
@@ -725,6 +763,46 @@ export function ExecutiveReportScreen() {
       return normalized;
     });
   }, [persistInitiativeSelection, rows]);
+
+  useEffect(() => {
+    if (rows.length === 0 || !hasInitializedInitiativeSelection.current) return;
+    if (hasHydratedInitiativeSelectionFromStore.current) return;
+    hasHydratedInitiativeSelectionFromStore.current = true;
+
+    const available = new Set(rows.map((row) => row.epicKey));
+    let cancelled = false;
+
+    void (async () => {
+      const raw = await getPreference(INITIATIVE_SECTION_SELECTION_KEY);
+      if (cancelled || !raw) return;
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+
+        const persistedKeys = parsed
+          .filter((value): value is string => typeof value === "string")
+          .filter((key) => available.has(key));
+        if (persistedKeys.length === 0) return;
+
+        setSelectedInitiativeEpicKeys((previous) => {
+          if (
+            previous.length === persistedKeys.length
+            && previous.every((value, index) => value === persistedKeys[index])
+          ) {
+            return previous;
+          }
+          return persistedKeys;
+        });
+      } catch {
+        // Ignore malformed persisted payloads.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
 
   const visibleInitiativeRows = useMemo(() => {
     const rowByKey = new Map(initiativeRows.map((row) => [row.epicKey, row]));
