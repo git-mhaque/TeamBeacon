@@ -113,6 +113,47 @@ class CurrentSprintServiceUnitTests(unittest.TestCase):
             self.assertIsNone(payload["sprint"])
             self.assertEqual(payload["error"], "No active sprint found in local data.")
 
+    def test_get_current_sprint_includes_board_url(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            self._init_db(db_path)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO sprints (
+                      external_sprint_id,
+                      board_external_id,
+                      name,
+                      state,
+                      start_date,
+                      end_date
+                    ) VALUES (14001, 27193, 'Current Sprint', 'active', '2026-03-20T00:00:00+00:00', '2026-04-02T00:00:00+00:00')
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "JIRA_BASE_URL": "https://gbujira.oraclecorp.com",
+                    "JIRA_PAT": "token-123",
+                    "JIRA_BOARD_ID": "27193",
+                },
+                clear=False,
+            ):
+                payload = get_current_sprint(db_path=str(db_path))
+
+            sprint = payload["sprint"]
+            self.assertIsNotNone(sprint)
+            self.assertEqual(
+                sprint["sprintUrl"],
+                "https://gbujira.oraclecorp.com/secure/RapidBoard.jspa?rapidView=27193",
+            )
+
     def test_get_current_sprint_scopes_to_configured_board(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"

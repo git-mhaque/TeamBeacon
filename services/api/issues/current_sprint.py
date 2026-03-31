@@ -45,6 +45,15 @@ def _resolve_configured_board_id() -> int | None:
         return None
 
 
+def _resolve_jira_base_url() -> str | None:
+    try:
+        load_env_files()
+        runtime = JiraRuntimeConfig.from_env()
+        return runtime.base_url.rstrip("/")
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def get_current_sprint(
     *,
     db_path: str | None = None,
@@ -54,6 +63,7 @@ def get_current_sprint(
     resolved_db_path = db_path or _resolve_db_path()
     current_time = now_utc or datetime.now(timezone.utc)
     scoped_board_id = board_id if board_id is not None else _resolve_configured_board_id()
+    jira_base_url = _resolve_jira_base_url()
 
     conn = sqlite3.connect(resolved_db_path)
     conn.row_factory = sqlite3.Row
@@ -92,16 +102,22 @@ def get_current_sprint(
         }
 
     end_date = _parse_iso_datetime(row["end_date"])
+    board_external_id = row["board_external_id"]
+    sprint_external_id = row["external_sprint_id"]
+    sprint_url = None
+    if jira_base_url and board_external_id is not None:
+        sprint_url = f"{jira_base_url}/secure/RapidBoard.jspa?rapidView={board_external_id}"
     return {
         "source": "local",
         "sprint": {
-            "id": row["external_sprint_id"],
-            "boardId": row["board_external_id"],
+            "id": sprint_external_id,
+            "boardId": board_external_id,
             "name": row["name"],
             "state": row["state"],
             "startDate": row["start_date"],
             "endDate": row["end_date"],
             "goal": row["goal"],
+            "sprintUrl": sprint_url,
             "remainingDays": _remaining_days(end_date, current_time),
         },
         "error": None,

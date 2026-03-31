@@ -352,7 +352,21 @@ export function SprintBoardScreen() {
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
             <h4>Sprint Name</h4>
-            <strong class="tb-value">{sprintLoading ? "Loading..." : sprint?.name ?? "Not Available"}</strong>
+            <strong class="tb-value">
+              {sprintLoading ? (
+                "Loading..."
+              ) : sprint?.name ? (
+                sprint.sprintUrl ? (
+                  <a class="tb-external-link" href={sprint.sprintUrl} target="_blank" rel="noopener noreferrer">
+                    {sprint.name}
+                  </a>
+                ) : (
+                  sprint.name
+                )
+              ) : (
+                "Not Available"
+              )}
+            </strong>
             <p>{sprint?.state ? `State: ${sprint.state}` : "No active sprint state available."}</p>
           </article>
           <article class="tb-metric-card">

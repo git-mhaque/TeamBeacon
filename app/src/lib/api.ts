@@ -175,6 +175,7 @@ export type CurrentSprint = {
   startDate?: string | null;
   endDate?: string | null;
   goal?: string | null;
+  sprintUrl?: string | null;
   remainingDays?: number | null;
 };
 
