@@ -11,33 +11,39 @@ TeamBeacon is a desktop engineering insights app that aggregates delivery and op
 
 ## Repository Layout
 ```text
-TeamBeacon/
+TeamBeacon/                  # Repository root
   app/                       # Oracle JET frontend + Tauri desktop shell
-  services/
-    api/
-    workers/
-  packages/
-    connectors/
-    metrics/
-    reporting/
-  docs/
-    architecture/
-    design/
-    plans/
-    ops/
-  infra/
-  tests/
+  services/                  # Runtime services
+    api/                     # Local API endpoints and orchestration
+  packages/                  # Shared Python packages
+    connectors/              # Source connector configs and clients
+  docs/                      # Product/architecture/design/ops documentation
+    architecture/            # Architecture reference docs
+    design/                  # UI/UX mockups and design notes
+    plans/                   # Delivery and implementation plans
+    ops/                     # Operational runbooks
+  tests/                     # Backend unit/integration test suites
 ```
+
+## Prerequisites
+- `git` for cloning and collaboration.
+- `python3` (3.11+ recommended) for API/runtime and backend tests.
+- `node` and `npm` (Node 22 recommended, aligned with CI) for frontend build/test.
+- `sqlite3` CLI for applying local schema migrations and ad-hoc DB checks.
+- Rust toolchain (`rustup`, `cargo`, `rustc`) for Tauri desktop commands.
+- Tauri CLI via cargo:
+  - `cargo install tauri-cli`
+- OCI Python SDK (required only for OCI GenAI endpoints):
+  - `python3 -m pip install oci`
+- Platform prerequisites for Tauri desktop builds:
+  - macOS: Xcode Command Line Tools (`xcode-select --install`)
 
 ## Quick Start
 1. Copy configuration template (or use existing `config/.env`):
 ```bash
 cp config/.env.example config/.env
 ```
-For OCI GenAI features, install OCI SDK:
-```bash
-python3 -m pip install oci
-```
+Configuration details are documented in [config/README.md](config/README.md).
 2. Start frontend + local API:
 ```bash
 cd app
@@ -78,6 +84,7 @@ npm run desktop:build
 
 ## Documentation Index
 - [AGENTS.md](AGENTS.md): contributor conventions and repository map
+- [config/README.md](config/README.md): required and optional environment variables
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap

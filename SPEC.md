@@ -110,15 +110,11 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 TeamBeacon/
   app/                     # Desktop UI (Oracle JET + Tauri)
   services/api/            # FastAPI backend for sync + analytics
-  services/workers/        # Scheduled jobs/sync processors
   packages/connectors/     # JIRA + Confluence API clients
-  packages/metrics/        # RAG and performance calculations
-  packages/reporting/      # Executive report generation
   docs/
     architecture/
     design/
     plans/
-  infra/                   # Local/dev deployment and secrets templates
   tests/                   # Integration and end-to-end tests
 ```
 

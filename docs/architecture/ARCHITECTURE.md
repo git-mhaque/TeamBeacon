@@ -16,18 +16,10 @@ TeamBeacon is a local-first desktop analytics system:
 - FastAPI service exposing internal endpoints for UI.
 - Orchestrates sync, metric calculation, and report generation.
 
-3. Workers (`services/workers/`)
-- Scheduled/manual jobs:
-  - JIRA incremental sync.
-  - Confluence page fetch for context/initiative notes.
-  - Metric snapshot generation.
-
-4. Shared packages
+3. Shared packages
 - `packages/connectors`: hosted JIRA/Confluence API adapters.
-- `packages/metrics`: cycle time, velocity, RAG logic.
-- `packages/reporting`: executive narrative + export formatting.
 
-5. Data store
+4. Data store
 - SQLite for configs, raw snapshots, normalized entities, and generated reports.
 
 ## 3. External Integrations
@@ -47,7 +39,7 @@ TeamBeacon is a local-first desktop analytics system:
 
 ## 5. Data Flow
 1. User configures integrations, field mappings, and epic metadata taxonomy.
-2. Worker pulls incremental issue/sprint/content changes.
+2. API sync logic pulls incremental issue/sprint/content changes.
 3. API normalizes and stores data.
 4. Metrics engine computes initiative/team/individual KPIs.
 5. UI reads snapshots and renders dashboards.

@@ -11,22 +11,17 @@ TeamBeacon/
     architecture/ARCHITECTURE.md
     design/teambeacon-ojet-mockups.html
     plans/PLAN.md
-  infra/                        # Local/dev infra templates
   packages/
     connectors/                 # Source connectors (JIRA/Confluence)
-    metrics/                    # KPI and RAG logic
-    reporting/                  # Executive report generation
   services/
     api/
       db/
         migrations/0001_initial.sql
-    workers/                    # Sync and background jobs
   tests/                        # Integration and E2E tests
 ```
 
 ## Project Structure & Module Organization
 - `services/api` owns ingestion orchestration, persistence, and internal APIs.
-- `services/workers` owns scheduled/manual sync jobs.
 - `packages/connectors` defines interfaces and hosted Atlassian stubs.
 - `docs/` is the source of truth for product scope, architecture, and plan.
 - `app/` should stay UI-only; business logic belongs in services/packages.

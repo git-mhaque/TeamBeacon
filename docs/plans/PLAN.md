@@ -7,7 +7,7 @@ Deliver in thin vertical slices: integrate data first, then insights, then execu
 
 ## Phase 0 (Week 1): Foundation
 - Initialize repo structure and toolchain.
-- Scaffold `app/` (Oracle JET + Tauri), `services/api/`, `services/workers/`, shared packages.
+- Scaffold `app/` (Oracle JET + Tauri), `services/api/`, and shared packages.
 - Define DB schema v1 and migrations.
 - Implement secure secret handling via OS keychain.
 - Establish baseline UI mockups for all MVP workflows.
