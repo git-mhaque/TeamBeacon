@@ -1179,7 +1179,7 @@ export function ExecutiveReportScreen() {
               onClick={refreshExecutiveSummary}
               disabled={executiveSummaryLoading}
             >
-              Refresh Draft
+              Refresh Summary
             </button>
           </div>
         </header>
@@ -1195,6 +1195,7 @@ export function ExecutiveReportScreen() {
           )}
         </div>
         <div class="tb-exec-summary-meta">
+          <span>Generated with OCI GenAI</span>
           <span>Model: {executiveSummaryModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
           <span>{executiveSummaryWordCount} words</span>
