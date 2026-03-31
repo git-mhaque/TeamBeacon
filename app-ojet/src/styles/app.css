@@ -519,6 +519,116 @@ body {
   text-underline-offset: 2px;
 }
 
+.tb-sprint-summary-grid {
+  margin-top: 0.62rem;
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tb-sprint-summary-card {
+  border: 1px solid #d5e1f2;
+  border-radius: 0.78rem;
+  background: #f8fbff;
+  padding: 0.58rem 0.62rem;
+}
+
+.tb-sprint-summary-card h4 {
+  margin: 0;
+  color: #294b79;
+  font-size: 0.84rem;
+}
+
+.tb-sprint-goal-text {
+  margin: 0.4rem 0 0;
+  color: #203959;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.tb-sprint-goal-list {
+  margin: 0.42rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.tb-sprint-goal-list li {
+  color: #203959;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.tb-sprint-stack-group {
+  margin-top: 0.44rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tb-sprint-stack-row {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.tb-sprint-stack-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #355a8b;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.tb-sprint-stack-bar {
+  height: 0.68rem;
+  border: 1px solid #cbd9ef;
+  border-radius: 999px;
+  background: #ebf2ff;
+  overflow: hidden;
+  display: flex;
+}
+
+.tb-sprint-stack-segment {
+  display: block;
+  height: 100%;
+}
+
+.tb-sprint-segment-done {
+  background: #1f8f63;
+}
+
+.tb-sprint-segment-in-progress {
+  background: #b77700;
+}
+
+.tb-sprint-segment-planned {
+  background: #2f7bd8;
+}
+
+.tb-sprint-breakdown-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.tb-sprint-breakdown-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.36rem;
+  color: #314e78;
+  font-size: 0.75rem;
+}
+
+.tb-sprint-swatch {
+  width: 0.68rem;
+  height: 0.68rem;
+  border-radius: 0.18rem;
+}
+
 .tb-initiative-period {
   margin-top: 0.56rem;
 }
@@ -1519,6 +1629,10 @@ body {
 
   .tb-initiative-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tb-sprint-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .tb-modal-two-up {

@@ -14,6 +14,7 @@ describe("SprintBoardScreen", () => {
           state: "active",
           startDate: "2026-03-24",
           endDate: "2026-04-06",
+          goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           remainingDays: 7,
         },
         work: {
@@ -75,6 +76,7 @@ describe("SprintBoardScreen", () => {
           state: "active",
           startDate: "2026-03-24",
           endDate: "2026-04-06",
+          goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           remainingDays: 7,
         },
         changes: {
@@ -124,6 +126,7 @@ describe("SprintBoardScreen", () => {
           state: "active",
           startDate: "2026-03-24",
           endDate: "2026-04-06",
+          goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           remainingDays: 7,
         },
       },
@@ -133,6 +136,11 @@ describe("SprintBoardScreen", () => {
 
     expect(await screen.findByText("Sprint 42")).toBeInTheDocument();
     expect(screen.getByText("State: active")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sprint Goals" })).toBeInTheDocument();
+    expect(screen.getByText("Reduce production defects by closing top reliability stories")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "State Breakdown" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Card breakdown:/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Story point breakdown:/i })).toBeInTheDocument();
     expect(screen.getByText("Added (1 | 3 SP)")).toBeInTheDocument();
     expect(screen.getByText("Blocked (1 | 5 SP)")).toBeInTheDocument();
     expect(screen.getByText("Done (1 | 8 SP)")).toBeInTheDocument();

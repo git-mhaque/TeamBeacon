@@ -39,13 +39,21 @@ function formatDate(value: string | null | undefined): string {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString();
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = parsed.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const year = String(parsed.getUTCFullYear());
+  return `${day}-${month}-${year}`;
 }
 
 function formatStoryPoints(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "-";
   if (Number.isInteger(value)) return String(value);
   return value.toFixed(1).replace(/\.0$/, "");
+}
+
+function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return "0%";
+  return `${value.toFixed(1).replace(/\.0$/, "")}%`;
 }
 
 function resolveToneForRemainingDays(days: number | null | undefined): string {
@@ -127,6 +135,16 @@ function Column({
   );
 }
 
+type StateBreakdownRow = {
+  key: "done" | "inProgress" | "planned";
+  label: string;
+  cards: number;
+  storyPoints: number;
+  cardsPercent: number;
+  storyPointsPercent: number;
+  toneClass: string;
+};
+
 export function SprintBoardScreen() {
   const [sprint, setSprint] = useState<CurrentSprint | null>(null);
   const [sprintLoading, setSprintLoading] = useState(true);
@@ -207,6 +225,59 @@ export function SprintBoardScreen() {
     [sprint?.remainingDays],
   );
 
+  const sprintGoals = useMemo(() => {
+    const rawGoal = sprint?.goal?.trim();
+    if (!rawGoal) return [];
+    return rawGoal
+      .split(/\r?\n|;\s*/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  }, [sprint?.goal]);
+
+  const stateBreakdownRows = useMemo<StateBreakdownRow[]>(() => {
+    const cardTotal = work.totals.total;
+    const storyPointsTotal = work.totals.storyPoints.total;
+    const rows: StateBreakdownRow[] = [
+      {
+        key: "done",
+        label: "Done",
+        cards: work.totals.done,
+        storyPoints: work.totals.storyPoints.done,
+        cardsPercent: cardTotal > 0 ? (work.totals.done / cardTotal) * 100 : 0,
+        storyPointsPercent: storyPointsTotal > 0 ? (work.totals.storyPoints.done / storyPointsTotal) * 100 : 0,
+        toneClass: "done",
+      },
+      {
+        key: "inProgress",
+        label: "In Progress",
+        cards: work.totals.inProgress,
+        storyPoints: work.totals.storyPoints.inProgress,
+        cardsPercent: cardTotal > 0 ? (work.totals.inProgress / cardTotal) * 100 : 0,
+        storyPointsPercent: storyPointsTotal > 0 ? (work.totals.storyPoints.inProgress / storyPointsTotal) * 100 : 0,
+        toneClass: "in-progress",
+      },
+      {
+        key: "planned",
+        label: "Planned",
+        cards: work.totals.planned,
+        storyPoints: work.totals.storyPoints.planned,
+        cardsPercent: cardTotal > 0 ? (work.totals.planned / cardTotal) * 100 : 0,
+        storyPointsPercent: storyPointsTotal > 0 ? (work.totals.storyPoints.planned / storyPointsTotal) * 100 : 0,
+        toneClass: "planned",
+      },
+    ];
+    return rows;
+  }, [
+    work.totals.done,
+    work.totals.inProgress,
+    work.totals.planned,
+    work.totals.storyPoints.done,
+    work.totals.storyPoints.inProgress,
+    work.totals.storyPoints.planned,
+    work.totals.storyPoints.total,
+    work.totals.total,
+  ]);
+
   return (
     <div class="tb-screen-grid">
       <section class="tb-panel">
@@ -241,6 +312,87 @@ export function SprintBoardScreen() {
               {sprintLoading ? "Loading..." : sprint?.remainingDays ?? "-"}
             </strong>
             <p>{sprint?.endDate ? `Until ${formatDate(sprint.endDate)}` : "End date not available."}</p>
+          </article>
+        </div>
+        <div class="tb-sprint-summary-grid">
+          <article class="tb-sprint-summary-card">
+            <h4>Sprint Goals</h4>
+            {sprintLoading ? <p class="tb-muted-note">Loading sprint goals...</p> : null}
+            {!sprintLoading && sprintGoals.length === 0 ? (
+              <p class="tb-muted-note">No sprint goals available in active sprint metadata.</p>
+            ) : null}
+            {!sprintLoading && sprintGoals.length === 1 ? <p class="tb-sprint-goal-text">{sprintGoals[0]}</p> : null}
+            {!sprintLoading && sprintGoals.length > 1 ? (
+              <ul class="tb-sprint-goal-list">
+                {sprintGoals.map((goal) => (
+                  <li key={goal}>{goal}</li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+
+          <article class="tb-sprint-summary-card">
+            <h4>State Breakdown</h4>
+            <p class="tb-muted-note">In Progress, Planned, and Done split by card count and story points.</p>
+
+            <div class="tb-sprint-stack-group">
+              <div class="tb-sprint-stack-row">
+                <div class="tb-sprint-stack-label">
+                  <span>Cards</span>
+                  <strong>{workLoading ? "-" : work.totals.total}</strong>
+                </div>
+                <div
+                  class="tb-sprint-stack-bar"
+                  role="img"
+                  aria-label={`Card breakdown: ${stateBreakdownRows
+                    .map((row) => `${row.label} ${row.cards}`)
+                    .join(", ")}`}
+                >
+                  {stateBreakdownRows.map((row) => (
+                    <span
+                      key={`cards-${row.key}`}
+                      class={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
+                      style={{ width: `${row.cardsPercent}%` }}
+                      title={`${row.label}: ${row.cards} cards (${formatPercent(row.cardsPercent)})`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div class="tb-sprint-stack-row">
+                <div class="tb-sprint-stack-label">
+                  <span>Story Points</span>
+                  <strong>{workLoading ? "-" : formatStoryPoints(work.totals.storyPoints.total)}</strong>
+                </div>
+                <div
+                  class="tb-sprint-stack-bar"
+                  role="img"
+                  aria-label={`Story point breakdown: ${stateBreakdownRows
+                    .map((row) => `${row.label} ${formatStoryPoints(row.storyPoints)} SP`)
+                    .join(", ")}`}
+                >
+                  {stateBreakdownRows.map((row) => (
+                    <span
+                      key={`sp-${row.key}`}
+                      class={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
+                      style={{ width: `${row.storyPointsPercent}%` }}
+                      title={`${row.label}: ${formatStoryPoints(row.storyPoints)} SP (${formatPercent(row.storyPointsPercent)})`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <ul class="tb-sprint-breakdown-list">
+              {stateBreakdownRows.map((row) => (
+                <li key={`legend-${row.key}`}>
+                  <span class={`tb-sprint-swatch tb-sprint-segment-${row.toneClass}`} aria-hidden="true" />
+                  <strong>{row.label}</strong>
+                  <span>{row.cards} cards</span>
+                  <span>{formatStoryPoints(row.storyPoints)} SP</span>
+                </li>
+              ))}
+            </ul>
           </article>
         </div>
         {sprintError && !sprintLoading ? <p class="tb-error-note">Current sprint status: {sprintError}</p> : null}
@@ -308,4 +460,3 @@ export function SprintBoardScreen() {
     </div>
   );
 }
-

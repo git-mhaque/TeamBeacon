@@ -67,7 +67,8 @@ def get_current_sprint(
               name,
               state,
               start_date,
-              end_date
+              end_date,
+              goal
             FROM sprints
             WHERE lower(state) = 'active'
               AND (? IS NULL OR board_external_id = ?)
@@ -100,6 +101,7 @@ def get_current_sprint(
             "state": row["state"],
             "startDate": row["start_date"],
             "endDate": row["end_date"],
+            "goal": row["goal"],
             "remainingDays": _remaining_days(end_date, current_time),
         },
         "error": None,

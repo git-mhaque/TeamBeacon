@@ -180,6 +180,7 @@ export type CurrentSprint = {
   state: string;
   startDate?: string | null;
   endDate?: string | null;
+  goal?: string | null;
   remainingDays?: number | null;
 };
 
