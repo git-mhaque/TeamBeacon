@@ -119,17 +119,27 @@ function Column({
   items,
   loading,
   emptyLabel,
+  positiveEmpty = false,
 }: {
   title: string;
   items: Array<CurrentSprintWorkIssue | CurrentSprintChangeIssue>;
   loading: boolean;
   emptyLabel: string;
+  positiveEmpty?: boolean;
 }) {
   return (
     <article class="tb-column">
       <h4>{title}</h4>
       {loading ? <p class="tb-muted-note">Loading...</p> : null}
-      {!loading && items.length === 0 ? <p class="tb-muted-note">{emptyLabel}</p> : null}
+      {!loading && items.length === 0 && !positiveEmpty ? <p class="tb-muted-note">{emptyLabel}</p> : null}
+      {!loading && items.length === 0 && positiveEmpty ? (
+        <div class="tb-column-empty-good">
+          <span class="tb-column-empty-good-icon" aria-hidden="true">
+            <span class="tb-column-empty-good-check" />
+          </span>
+          <p class="tb-column-empty-good-text">{emptyLabel}</p>
+        </div>
+      ) : null}
       {!loading ? items.map((item) => <Ticket key={item.issueKey} issue={item} />) : null}
     </article>
   );
@@ -577,18 +587,21 @@ export function SprintBoardScreen() {
             items={changes.addedAfterStart.issueCards}
             loading={changesLoading}
             emptyLabel="No cards added after sprint start."
+            positiveEmpty
           />
           <Column
             title={`Removed (${changes.removedAfterStart.count} | ${formatStoryPoints(changes.removedAfterStart.storyPointsTotal)} SP)`}
             items={changes.removedAfterStart.issueCards}
             loading={changesLoading}
             emptyLabel="No cards removed after sprint start."
+            positiveEmpty
           />
           <Column
             title={`Blocked (${changes.blockedCards.count} | ${formatStoryPoints(changes.blockedCards.storyPointsTotal)} SP)`}
             items={changes.blockedCards.issueCards}
             loading={changesLoading}
             emptyLabel="No blocked cards in current sprint."
+            positiveEmpty
           />
         </div>
         {changesError && !changesLoading ? <p class="tb-error-note">Current sprint changes: {changesError}</p> : null}
