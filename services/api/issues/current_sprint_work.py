@@ -179,6 +179,7 @@ def get_current_sprint_work(
               i.status_name,
               i.status_category,
               i.story_points,
+              i.assignee_account_id,
               i.epic_key,
               e.summary AS epic_summary,
               eg.name AS group_name,
@@ -203,6 +204,7 @@ def get_current_sprint_work(
               i.status_name,
               i.status_category,
               i.story_points,
+              i.assignee_account_id,
               i.epic_key,
               e.summary AS epic_summary,
               eg.name AS group_name,
@@ -240,6 +242,7 @@ def get_current_sprint_work(
             "status_name": row["status_name"],
             "status_category": row["status_category"],
             "story_points": row["story_points"],
+            "assignee_account_id": row["assignee_account_id"],
             "epic_key": row["epic_key"],
             "epic_summary": row["epic_summary"],
             "group_name": row["group_name"],
@@ -269,6 +272,7 @@ def get_current_sprint_work(
                 "status_name": row["status_name"],
                 "status_category": row["status_category"],
                 "story_points": row["story_points"],
+                "assignee_account_id": row["assignee_account_id"],
                 "epic_key": row["epic_key"],
                 "epic_summary": row["epic_summary"],
                 "group_name": row["group_name"],
@@ -290,6 +294,7 @@ def get_current_sprint_work(
             "epicName": row["epic_summary"],
             "groupName": row["group_name"],
             "workTypeName": row["work_type_name"],
+            "assigneeAccountId": row["assignee_account_id"],
             "epicUrl": (
                 f"{jira_base_url}/browse/{row['epic_key']}"
                 if jira_base_url and row["epic_key"]

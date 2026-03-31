@@ -162,6 +162,11 @@ type WorkMixSlice = {
   color: string;
 };
 
+type FilterOption = {
+  value: string;
+  label: string;
+};
+
 const WORK_MIX_COLORS = [
   "#1f8f63",
   "#0f5570",
@@ -172,6 +177,60 @@ const WORK_MIX_COLORS = [
   "#8a4f00",
   "#4a6b2d",
 ];
+
+const FILTER_ALL = "__tb_filter_all__";
+const FILTER_UNASSIGNED = "__tb_filter_unassigned__";
+
+function normalizeFilterValue(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function resolveEpicFilterValue(issue: CurrentSprintWorkIssue): string | null {
+  return normalizeFilterValue(issue.epicName) ?? normalizeFilterValue(issue.epicKey);
+}
+
+function buildFilterOptions(
+  issues: CurrentSprintWorkIssue[],
+  allLabel: string,
+  selector: (issue: CurrentSprintWorkIssue) => string | null,
+): FilterOption[] {
+  const values = new Set<string>();
+  let hasUnassigned = false;
+  for (const issue of issues) {
+    const value = selector(issue);
+    if (value) {
+      values.add(value);
+    } else {
+      hasUnassigned = true;
+    }
+  }
+  const sortedValues = [...values].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+  const options: FilterOption[] = [{ value: FILTER_ALL, label: allLabel }];
+  for (const value of sortedValues) {
+    options.push({ value, label: value });
+  }
+  if (hasUnassigned) {
+    options.push({ value: FILTER_UNASSIGNED, label: "Unassigned" });
+  }
+  return options;
+}
+
+function matchesFilter(selected: string, value: string | null): boolean {
+  if (selected === FILTER_ALL) return true;
+  if (selected === FILTER_UNASSIGNED) return !value;
+  return value === selected;
+}
+
+function sumStoryPoints(issues: CurrentSprintWorkIssue[]): number {
+  let total = 0;
+  for (const issue of issues) {
+    if (typeof issue.storyPoints === "number" && Number.isFinite(issue.storyPoints)) {
+      total += issue.storyPoints;
+    }
+  }
+  return total;
+}
 
 function buildWorkMixSlices(issues: CurrentSprintWorkIssue[], field: "group" | "type"): WorkMixSlice[] {
   const counts = new Map<string, number>();
@@ -222,6 +281,10 @@ export function SprintBoardScreen() {
   const [work, setWork] = useState<CurrentSprintWorkResponse["work"]>(EMPTY_WORK);
   const [workLoading, setWorkLoading] = useState(true);
   const [workError, setWorkError] = useState<string | null>(null);
+  const [groupFilter, setGroupFilter] = useState<string>(FILTER_ALL);
+  const [typeFilter, setTypeFilter] = useState<string>(FILTER_ALL);
+  const [epicFilter, setEpicFilter] = useState<string>(FILTER_ALL);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(FILTER_ALL);
 
   const loadCurrentSprint = useCallback(async () => {
     setSprintLoading(true);
@@ -349,6 +412,80 @@ export function SprintBoardScreen() {
     () => [...work.done, ...work.inProgress, ...work.planned],
     [work.done, work.inProgress, work.planned],
   );
+
+  const groupFilterOptions = useMemo(
+    () => buildFilterOptions(allWorkItems, "All groups", (issue) => normalizeFilterValue(issue.groupName)),
+    [allWorkItems],
+  );
+  const typeFilterOptions = useMemo(
+    () => buildFilterOptions(allWorkItems, "All types", (issue) => normalizeFilterValue(issue.workTypeName)),
+    [allWorkItems],
+  );
+  const epicFilterOptions = useMemo(
+    () => buildFilterOptions(allWorkItems, "All epics", (issue) => resolveEpicFilterValue(issue)),
+    [allWorkItems],
+  );
+  const assigneeFilterOptions = useMemo(
+    () => buildFilterOptions(allWorkItems, "All assignees", (issue) => normalizeFilterValue(issue.assigneeAccountId)),
+    [allWorkItems],
+  );
+
+  useEffect(() => {
+    if (!groupFilterOptions.some((option) => option.value === groupFilter)) {
+      setGroupFilter(FILTER_ALL);
+    }
+  }, [groupFilter, groupFilterOptions]);
+
+  useEffect(() => {
+    if (!typeFilterOptions.some((option) => option.value === typeFilter)) {
+      setTypeFilter(FILTER_ALL);
+    }
+  }, [typeFilter, typeFilterOptions]);
+
+  useEffect(() => {
+    if (!epicFilterOptions.some((option) => option.value === epicFilter)) {
+      setEpicFilter(FILTER_ALL);
+    }
+  }, [epicFilter, epicFilterOptions]);
+
+  useEffect(() => {
+    if (!assigneeFilterOptions.some((option) => option.value === assigneeFilter)) {
+      setAssigneeFilter(FILTER_ALL);
+    }
+  }, [assigneeFilter, assigneeFilterOptions]);
+
+  const matchesWorkFilters = useCallback(
+    (issue: CurrentSprintWorkIssue): boolean =>
+      matchesFilter(groupFilter, normalizeFilterValue(issue.groupName)) &&
+      matchesFilter(typeFilter, normalizeFilterValue(issue.workTypeName)) &&
+      matchesFilter(epicFilter, resolveEpicFilterValue(issue)) &&
+      matchesFilter(assigneeFilter, normalizeFilterValue(issue.assigneeAccountId)),
+    [assigneeFilter, epicFilter, groupFilter, typeFilter],
+  );
+
+  const filteredPlannedWork = useMemo(
+    () => work.planned.filter((issue) => matchesWorkFilters(issue)),
+    [matchesWorkFilters, work.planned],
+  );
+  const filteredInProgressWork = useMemo(
+    () => work.inProgress.filter((issue) => matchesWorkFilters(issue)),
+    [matchesWorkFilters, work.inProgress],
+  );
+  const filteredDoneWork = useMemo(
+    () => work.done.filter((issue) => matchesWorkFilters(issue)),
+    [matchesWorkFilters, work.done],
+  );
+  const filteredPlannedStoryPoints = useMemo(() => sumStoryPoints(filteredPlannedWork), [filteredPlannedWork]);
+  const filteredInProgressStoryPoints = useMemo(
+    () => sumStoryPoints(filteredInProgressWork),
+    [filteredInProgressWork],
+  );
+  const filteredDoneStoryPoints = useMemo(() => sumStoryPoints(filteredDoneWork), [filteredDoneWork]);
+  const hasActiveWorkFilters =
+    groupFilter !== FILTER_ALL ||
+    typeFilter !== FILTER_ALL ||
+    epicFilter !== FILTER_ALL ||
+    assigneeFilter !== FILTER_ALL;
 
   const groupMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "group"), [allWorkItems]);
   const typeMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "type"), [allWorkItems]);
@@ -611,27 +748,77 @@ export function SprintBoardScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Current Sprint Work</h3>
-            <p>Completed, in-progress, and planned issues from the active sprint.</p>
+            <p>Planned, in-progress, and completed issues from the active sprint.</p>
           </div>
         </header>
+        <div class="tb-initiative-toolbar tb-initiative-toolbar-sprint">
+          <label class="tb-initiative-filter">
+            <span>Group</span>
+            <select
+              value={groupFilter}
+              onChange={(event) => setGroupFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              {groupFilterOptions.map((option) => (
+                <option key={`group-filter-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-initiative-filter">
+            <span>Type</span>
+            <select value={typeFilter} onChange={(event) => setTypeFilter((event.currentTarget as HTMLSelectElement).value)}>
+              {typeFilterOptions.map((option) => (
+                <option key={`type-filter-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-initiative-filter">
+            <span>Epic</span>
+            <select value={epicFilter} onChange={(event) => setEpicFilter((event.currentTarget as HTMLSelectElement).value)}>
+              {epicFilterOptions.map((option) => (
+                <option key={`epic-filter-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-initiative-filter">
+            <span>Assignee</span>
+            <select
+              value={assigneeFilter}
+              onChange={(event) => setAssigneeFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              {assigneeFilterOptions.map((option) => (
+                <option key={`assignee-filter-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div class="tb-kanban">
           <Column
-            title={`Done (${work.totals.done} | ${formatStoryPoints(work.totals.storyPoints.done)} SP)`}
-            items={work.done}
+            title={`Planned (${filteredPlannedWork.length} | ${formatStoryPoints(filteredPlannedStoryPoints)} SP)`}
+            items={filteredPlannedWork}
             loading={workLoading}
-            emptyLabel="No items in Done."
+            emptyLabel={hasActiveWorkFilters ? "No items in Planned for the selected filters." : "No items in Planned."}
           />
           <Column
-            title={`In Progress (${work.totals.inProgress} | ${formatStoryPoints(work.totals.storyPoints.inProgress)} SP)`}
-            items={work.inProgress}
+            title={`In Progress (${filteredInProgressWork.length} | ${formatStoryPoints(filteredInProgressStoryPoints)} SP)`}
+            items={filteredInProgressWork}
             loading={workLoading}
-            emptyLabel="No items in In Progress."
+            emptyLabel={
+              hasActiveWorkFilters ? "No items in In Progress for the selected filters." : "No items in In Progress."
+            }
           />
           <Column
-            title={`Planned (${work.totals.planned} | ${formatStoryPoints(work.totals.storyPoints.planned)} SP)`}
-            items={work.planned}
+            title={`Done (${filteredDoneWork.length} | ${formatStoryPoints(filteredDoneStoryPoints)} SP)`}
+            items={filteredDoneWork}
             loading={workLoading}
-            emptyLabel="No items in Planned."
+            emptyLabel={hasActiveWorkFilters ? "No items in Done for the selected filters." : "No items in Done."}
           />
         </div>
         {workError && !workLoading ? <p class="tb-error-note">Current sprint work: {workError}</p> : null}

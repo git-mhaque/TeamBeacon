@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { SprintBoardScreen } from "../../src/components/content/screens/SprintBoardScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
@@ -30,6 +30,7 @@ describe("SprintBoardScreen", () => {
               epicName: "Executive Reporting",
               groupName: "Core Platform",
               workTypeName: "Feature",
+              assigneeAccountId: "acct-1",
               issueUrl: "https://jira.example.com/browse/CEG-901",
               epicUrl: "https://jira.example.com/browse/CEG-100",
             },
@@ -45,6 +46,7 @@ describe("SprintBoardScreen", () => {
               epicName: "Executive Reporting",
               groupName: "Core Platform",
               workTypeName: "Reliability",
+              assigneeAccountId: "acct-2",
             },
           ],
           planned: [
@@ -58,6 +60,7 @@ describe("SprintBoardScreen", () => {
               epicName: "Release Comms",
               groupName: "Ops Excellence",
               workTypeName: "Feature",
+              assigneeAccountId: null,
             },
           ],
           totals: {
@@ -159,15 +162,54 @@ describe("SprintBoardScreen", () => {
     expect(screen.getByRole("heading", { name: "Work Mix by Type" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Work mix by group chart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Work mix by type chart" })).toBeInTheDocument();
-    expect(screen.getByText("Core Platform")).toBeInTheDocument();
-    expect(screen.getByText("Ops Excellence")).toBeInTheDocument();
-    expect(screen.getByText("Reliability")).toBeInTheDocument();
+    expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ops Excellence").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Reliability").length).toBeGreaterThan(0);
     expect(screen.getByText("Added (1 | 3 SP)")).toBeInTheDocument();
     expect(screen.getByText("Blocked (1 | 5 SP)")).toBeInTheDocument();
-    expect(screen.getByText("Done (1 | 8 SP)")).toBeInTheDocument();
-    expect(screen.getByText("In Progress (1 | 5 SP)")).toBeInTheDocument();
-    expect(screen.getByText("Planned (1 | 3 SP)")).toBeInTheDocument();
     expect(screen.getByText("CEG-901")).toBeInTheDocument();
     expect(screen.getByText("CEG-777")).toBeInTheDocument();
+
+    const workPanel = screen.getByRole("heading", { name: "Current Sprint Work" }).closest("section");
+    expect(workPanel).not.toBeNull();
+    if (!workPanel) {
+      throw new Error("Current Sprint Work section not found.");
+    }
+    const scopedWork = within(workPanel);
+    const plannedHeading = scopedWork.getByRole("heading", { name: "Planned (1 | 3 SP)" });
+    const inProgressHeading = scopedWork.getByRole("heading", { name: "In Progress (1 | 5 SP)" });
+    const doneHeading = scopedWork.getByRole("heading", { name: "Done (1 | 8 SP)" });
+    expect(plannedHeading.compareDocumentPosition(inProgressHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(inProgressHeading.compareDocumentPosition(doneHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const groupFilter = scopedWork.getByLabelText("Group") as HTMLSelectElement;
+    const typeFilter = scopedWork.getByLabelText("Type") as HTMLSelectElement;
+    const epicFilter = scopedWork.getByLabelText("Epic") as HTMLSelectElement;
+    const assigneeFilter = scopedWork.getByLabelText("Assignee") as HTMLSelectElement;
+    expect(groupFilter).toBeInTheDocument();
+    expect(typeFilter).toBeInTheDocument();
+    expect(epicFilter).toBeInTheDocument();
+    expect(assigneeFilter).toBeInTheDocument();
+
+    fireEvent.change(groupFilter, { target: { value: "Ops Excellence" } });
+    expect(scopedWork.getByRole("heading", { name: "Planned (1 | 3 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "In Progress (0 | 0 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "Done (0 | 0 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByText("CEG-903")).toBeInTheDocument();
+    expect(scopedWork.queryByText("CEG-901")).not.toBeInTheDocument();
+
+    fireEvent.change(groupFilter, { target: { value: groupFilter.options[0].value } });
+    const unassignedOption = [...assigneeFilter.options].find((option) => option.textContent === "Unassigned");
+    expect(unassignedOption).toBeTruthy();
+    fireEvent.change(assigneeFilter, { target: { value: unassignedOption?.value ?? "" } });
+    expect(scopedWork.getByRole("heading", { name: "Planned (1 | 3 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "In Progress (0 | 0 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "Done (0 | 0 SP)" })).toBeInTheDocument();
+
+    fireEvent.change(assigneeFilter, { target: { value: assigneeFilter.options[0].value } });
+    fireEvent.change(epicFilter, { target: { value: "Executive Reporting" } });
+    expect(scopedWork.getByRole("heading", { name: "Planned (0 | 0 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "In Progress (1 | 5 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "Done (1 | 8 SP)" })).toBeInTheDocument();
   });
 });

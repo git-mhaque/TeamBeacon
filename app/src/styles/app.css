@@ -750,6 +750,22 @@ body {
   padding: 0.42rem 0.54rem;
 }
 
+.tb-initiative-toolbar-sprint {
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  align-items: end;
+}
+
+.tb-initiative-toolbar-sprint .tb-initiative-filter {
+  min-width: 0;
+}
+
+.tb-initiative-toolbar-sprint .tb-initiative-filter select,
+.tb-initiative-toolbar-sprint .tb-initiative-filter input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .tb-initiative-filter input:focus,
 .tb-initiative-filter select:focus {
   border-color: #6a98d8;
