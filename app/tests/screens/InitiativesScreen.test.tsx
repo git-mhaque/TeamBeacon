@@ -55,6 +55,7 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
         { epicKey: "CEG-889", epicName: "OAuth service rollout" },
       ],
     },
+    "/api/metadata/epics": {},
   });
 }
 
@@ -99,6 +100,12 @@ describe("InitiativesScreen", () => {
     fireEvent.mouseDown(screen.getByRole("button", { name: /CEG-888/i }));
 
     expect(screen.getByText(/Selected epic:/i)).toHaveTextContent("Selected epic: CEG-888 (Fraud signal hardening)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Epic Metadata" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Epic metadata saved for CEG-888.")).toBeInTheDocument();
+    });
   });
 
   it("supports sorting and column selection in the initiative matrix", async () => {

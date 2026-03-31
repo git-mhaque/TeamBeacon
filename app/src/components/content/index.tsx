@@ -38,8 +38,8 @@ type Props = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false },
   { id: "sprint", label: "Current Sprint", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false },
-  { id: "initiatives", label: "Initiative Insights", blurb: "Epic progress + RAG", showConstruction: false },
   { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", showConstruction: true },
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },

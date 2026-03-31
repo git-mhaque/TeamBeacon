@@ -50,8 +50,8 @@ describe("Content", () => {
       .getAllByRole("button")
       .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
     expect(orderedTitles).toEqual([
-      "Current Sprint",
       "Initiative Insights",
+      "Current Sprint",
       "Team Insights",
       "Security",
       "Incident Response",
@@ -65,6 +65,7 @@ describe("Content", () => {
     expect(screen.getByLabelText("Incident Response is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Release is under construction")).toBeInTheDocument();
 
+    expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
     expect(screen.getByText("Connections / Field Mapping / Epic Metadata")).toBeInTheDocument();
 

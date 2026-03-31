@@ -327,6 +327,18 @@ export function InitiativesScreen() {
     });
   }, [refresh]);
 
+  useEffect(() => {
+    if (!metaSuccess) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setMetaSuccess(null);
+    }, 2600);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [metaSuccess]);
+
   const loadConfigureCandidates = useCallback(async (query: string) => {
     setConfigureCandidatesLoading(true);
     setConfigureCandidatesError(null);
@@ -723,6 +735,8 @@ export function InitiativesScreen() {
 
   return (
     <div class="tb-screen-grid">
+      <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod)}</p>
+
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
@@ -762,10 +776,8 @@ export function InitiativesScreen() {
           </article>
         </div>
 
-        <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod)}</p>
         {error && !loading ? <p class="tb-error-note">Initiative summary: {error}</p> : null}
         {metaError ? <p class="tb-error-note">Epic metadata: {metaError}</p> : null}
-        {metaSuccess ? <p class="tb-success-note">{metaSuccess}</p> : null}
       </section>
 
       <section class="tb-panel">
@@ -1310,6 +1322,12 @@ export function InitiativesScreen() {
               </button>
             </footer>
           </div>
+        </div>
+      ) : null}
+
+      {metaSuccess ? (
+        <div class="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
+          <div class="tb-overlay-toast is-success">{metaSuccess}</div>
         </div>
       ) : null}
 
