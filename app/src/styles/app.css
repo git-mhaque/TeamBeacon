@@ -649,7 +649,7 @@ body {
   margin-top: 0.56rem;
 }
 
-.tb-sprint-pie {
+.tb-sprint-donut {
   width: 8.4rem;
   height: 8.4rem;
   border-radius: 999px;
@@ -660,7 +660,19 @@ body {
   overflow: hidden;
 }
 
-.tb-sprint-pie span {
+.tb-sprint-donut::after {
+  content: "";
+  width: 4.6rem;
+  height: 4.6rem;
+  border-radius: 999px;
+  border: 1px solid #d6e3f4;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #f4f8ff;
+}
+
+.tb-sprint-donut span {
+  position: absolute;
+  z-index: 2;
   color: #4c6284;
   font-size: 0.72rem;
   font-weight: 700;

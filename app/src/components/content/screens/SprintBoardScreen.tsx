@@ -470,10 +470,10 @@ export function SprintBoardScreen() {
             {!workLoading ? (
               <div class="tb-sprint-pie-wrap">
                 <div
-                  class="tb-sprint-pie"
+                  class="tb-sprint-donut"
                   style={{ background: buildDonutBackground(statePieSlices) }}
                   role="img"
-                  aria-label={`State breakdown pie: ${stateBreakdownRows
+                  aria-label={`State breakdown donut: ${stateBreakdownRows
                     .map((row) => `${row.label} ${row.cards}`)
                     .join(", ")}`}
                 >
