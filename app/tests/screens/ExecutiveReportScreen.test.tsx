@@ -128,11 +128,24 @@ describe("ExecutiveReportScreen", () => {
 
     expect(await screen.findByText(/Executive automation epic delivered five cards this period\./i)).toBeInTheDocument();
     expect(await screen.findByText(/Reliability epic completion remains below midpoint and needs focus\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/Drafted by OCI GenAI from selected Progress for Key Initiatives data\./i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh Wins and Risks" })).toBeInTheDocument();
 
     expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
     expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();
     expect(screen.getByLabelText("Group effort distribution chart")).toBeInTheDocument();
     expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();
+
+    const winsRisksPanel = screen.getByRole("heading", { name: "Wins and Risks" }).closest("section");
+    expect(winsRisksPanel).not.toBeNull();
+    if (!winsRisksPanel) {
+      throw new Error("Wins and Risks section not found.");
+    }
+    const scopedWinsRisks = within(winsRisksPanel);
+    expect(scopedWinsRisks.getByText("Generated with OCI GenAI")).toBeInTheDocument();
+    expect(scopedWinsRisks.getByText(/Model:/i)).toBeInTheDocument();
+    expect(scopedWinsRisks.getByText(/Updated:/i)).toBeInTheDocument();
+    expect(scopedWinsRisks.getByText(/words/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Configure" }));
     const dialog = screen.getByRole("dialog", { name: "Configure Initiative Epics" });

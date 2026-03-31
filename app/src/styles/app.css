@@ -352,6 +352,15 @@ body {
   color: #223752;
 }
 
+.tb-exec-narrative-list {
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+
+.tb-exec-narrative-list li {
+  color: #203b63;
+}
+
 .tb-summary {
   margin-top: 0.56rem;
   border: 1px solid #cddcf1;
@@ -389,6 +398,12 @@ body {
   border-radius: 999px;
   background: #f4f8ff;
   padding: 0.12rem 0.42rem;
+}
+
+.tb-section-divider {
+  margin: 0.62rem 0 0;
+  border: 0;
+  border-top: 1px solid #d8e2f2;
 }
 
 .tb-error-note {

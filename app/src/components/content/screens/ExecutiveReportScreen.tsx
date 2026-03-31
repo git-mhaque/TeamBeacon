@@ -483,6 +483,9 @@ export function ExecutiveReportScreen() {
   const [risksDraft, setRisksDraft] = useState<string[]>([]);
   const [winsRisksLoading, setWinsRisksLoading] = useState(true);
   const [winsRisksError, setWinsRisksError] = useState<string | null>(null);
+  const [winsRisksModelId, setWinsRisksModelId] = useState<string | null>(null);
+  const [winsRisksGeneratedAt, setWinsRisksGeneratedAt] = useState<string | null>(null);
+  const [winsRisksRefreshNonce, setWinsRisksRefreshNonce] = useState(0);
 
   const hasInitializedInitiativeSelection = useRef(false);
   const hasHydratedInitiativeSelectionFromStore = useRef(false);
@@ -923,6 +926,10 @@ export function ExecutiveReportScreen() {
     setSummaryRefreshNonce((previous) => previous + 1);
   }, []);
 
+  const refreshWinsRisks = useCallback(() => {
+    setWinsRisksRefreshNonce((previous) => previous + 1);
+  }, []);
+
   useEffect(() => {
     if (loading) {
       setExecutiveSummaryLoading(true);
@@ -1023,6 +1030,8 @@ export function ExecutiveReportScreen() {
       setWinsRisksError(null);
       setWinsDraft(["Unable to generate wins because initiative data failed to load."]);
       setRisksDraft(["Unable to generate risks because initiative data failed to load."]);
+      setWinsRisksModelId(null);
+      setWinsRisksGeneratedAt(null);
       return;
     }
 
@@ -1036,6 +1045,8 @@ export function ExecutiveReportScreen() {
         setWinsDraft(["No configured epics found to generate wins."]);
         setRisksDraft(["No configured epics found to generate risks."]);
       }
+      setWinsRisksModelId(null);
+      setWinsRisksGeneratedAt(null);
       return;
     }
 
@@ -1067,6 +1078,8 @@ export function ExecutiveReportScreen() {
         const parsed = parseWinsRisksDraft(response.response.text ?? "");
         setWinsDraft(parsed.wins);
         setRisksDraft(parsed.risks);
+        setWinsRisksModelId(response.modelId ?? null);
+        setWinsRisksGeneratedAt(new Date().toISOString());
       })
       .catch((err) => {
         if (winsRisksRequestSequence.current !== requestId) return;
@@ -1074,6 +1087,8 @@ export function ExecutiveReportScreen() {
         setWinsRisksError(message);
         setWinsDraft(["Unable to generate wins draft from OCI GenAI."]);
         setRisksDraft(["Unable to generate risks draft from OCI GenAI."]);
+        setWinsRisksModelId(null);
+        setWinsRisksGeneratedAt(null);
       })
       .finally(() => {
         if (winsRisksRequestSequence.current !== requestId) return;
@@ -1086,8 +1101,15 @@ export function ExecutiveReportScreen() {
     loading,
     reportingPeriodDays,
     reportingPeriodLabel,
+    winsRisksRefreshNonce,
     visibleInitiativeRows,
   ]);
+
+  const winsRisksWordCount = useMemo(() => {
+    const text = [...winsDraft, ...risksDraft].join(" ").trim();
+    if (!text) return 0;
+    return text.split(/\s+/).length;
+  }, [risksDraft, winsDraft]);
 
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
@@ -1208,7 +1230,16 @@ export function ExecutiveReportScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Wins and Risks</h3>
-            <p>Drafted by OCI GenAI from selected Progress for Key Initiatives data.</p>
+          </div>
+          <div class="tb-btn-row">
+            <button
+              type="button"
+              class="tb-btn tb-btn-sm tb-no-print"
+              onClick={refreshWinsRisks}
+              disabled={winsRisksLoading}
+            >
+              Refresh Wins and Risks
+            </button>
           </div>
         </header>
 
@@ -1217,7 +1248,7 @@ export function ExecutiveReportScreen() {
         <div class="tb-exec-two-up">
           <div>
             <h4 class="tb-exec-list-title">Wins</h4>
-            <ul class="tb-list">
+            <ul class="tb-list tb-exec-narrative-list">
               {winsDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -1227,7 +1258,7 @@ export function ExecutiveReportScreen() {
           </div>
           <div>
             <h4 class="tb-exec-list-title">Risks</h4>
-            <ul class="tb-list">
+            <ul class="tb-list tb-exec-narrative-list">
               {risksDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -1235,6 +1266,13 @@ export function ExecutiveReportScreen() {
               {!winsRisksLoading && risksDraft.length === 0 ? <li>Risks will appear once configured epic data is available.</li> : null}
             </ul>
           </div>
+        </div>
+        <hr class="tb-section-divider" />
+        <div class="tb-exec-summary-meta">
+          <span>Generated with OCI GenAI</span>
+          <span>Model: {winsRisksModelId ?? "default"}</span>
+          <span>Updated: {formatDraftTimestamp(winsRisksGeneratedAt)}</span>
+          <span>{winsRisksWordCount} words</span>
         </div>
       </section>
 
