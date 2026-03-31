@@ -7,7 +7,7 @@
  */
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
-import { ExecutiveReportScreen } from "./screens/ExecutiveReportScreen";
+import { ExecutiveReportScreen, OPEN_EXEC_REPORTING_PERIOD_EVENT } from "./screens/ExecutiveReportScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
@@ -130,9 +130,18 @@ export function Content({ appName }: Props) {
         <header class="tb-topbar">
           <h2>{heading}</h2>
           {active === "executive" ? (
-            <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
-              Print Report
-            </button>
+            <div class="tb-topbar-actions">
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_EXEC_REPORTING_PERIOD_EVENT))}
+              >
+                Reporting Period
+              </button>
+              <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
+                Print Report
+              </button>
+            </div>
           ) : null}
         </header>
         <section class="tb-screen-body">{renderScreen(active)}</section>

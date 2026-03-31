@@ -159,6 +159,12 @@ body {
   font-size: 1.38rem;
 }
 
+.tb-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .tb-chip {
   display: inline-block;
   border: 1px solid #b7caeb;
@@ -1272,7 +1278,7 @@ body {
 }
 
 .tb-exec-period-row.is-custom {
-  grid-template-columns: minmax(12rem, 1.2fr) minmax(9.4rem, 1fr) minmax(9.4rem, 1fr) auto;
+  grid-template-columns: minmax(12rem, 1.2fr) minmax(9.4rem, 1fr) minmax(9.4rem, 1fr);
 }
 
 .tb-exec-period-field {
@@ -1550,6 +1556,10 @@ body {
   width: min(100%, 52rem);
 }
 
+.tb-modal-reporting {
+  width: min(100%, 44rem);
+}
+
 .tb-modal-head {
   display: flex;
   align-items: flex-start;
@@ -1804,6 +1814,11 @@ body {
   .tb-topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .tb-topbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .tb-panel-header {

@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { within } from "@testing-library/dom";
 import { vi } from "vitest";
-import { ExecutiveReportScreen } from "../../src/components/content/screens/ExecutiveReportScreen";
+import {
+  ExecutiveReportScreen,
+  OPEN_EXEC_REPORTING_PERIOD_EVENT,
+} from "../../src/components/content/screens/ExecutiveReportScreen";
 
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
@@ -119,7 +122,8 @@ describe("ExecutiveReportScreen", () => {
 
     render(<ExecutiveReportScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Executive Summary Draft" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
+    expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
     expect(await screen.findByText(/selected initiatives advanced during the reporting period/i)).toBeInTheDocument();
 
     expect(await screen.findByText(/Executive automation epic delivered five cards this period\./i)).toBeInTheDocument();
@@ -144,6 +148,9 @@ describe("ExecutiveReportScreen", () => {
     await waitFor(() => {
       expect(screen.queryByText("Executive reporting automation")).not.toBeInTheDocument();
     });
+
+    window.dispatchEvent(new CustomEvent(OPEN_EXEC_REPORTING_PERIOD_EVENT));
+    expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
 
     expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
   });

@@ -42,6 +42,7 @@ type PersistedReportingSelection = {
 
 const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
 const REPORTING_PERIOD_SELECTION_KEY = "teambeacon.executive.reporting.period";
+export const OPEN_EXEC_REPORTING_PERIOD_EVENT = "teambeacon:executive-open-reporting-period";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -469,6 +470,7 @@ export function ExecutiveReportScreen() {
     endDate: initialReportingSelection.endDate,
   });
   const [reportingValidationError, setReportingValidationError] = useState<string | null>(null);
+  const [isReportingConfigOpen, setIsReportingConfigOpen] = useState(false);
 
   const [executiveSummaryDraft, setExecutiveSummaryDraft] = useState("Generating executive summary...");
   const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(true);
@@ -655,21 +657,21 @@ export function ExecutiveReportScreen() {
     return Math.max(1, daysBetweenUtc(startUtc, endUtc) + 1);
   }, [effectivePeriodEnd, effectivePeriodStart, resolvedReportingPeriod?.days]);
 
-  const applyCustomReportingRange = useCallback(() => {
+  const applyCustomReportingRange = useCallback((): boolean => {
     if (!reportingStartDraft || !reportingEndDraft) {
       setReportingValidationError("Start and end date are required.");
-      return;
+      return false;
     }
 
     const startUtc = parseIsoDateToUtcDay(reportingStartDraft);
     const endUtc = parseIsoDateToUtcDay(reportingEndDraft);
     if (startUtc === null || endUtc === null) {
       setReportingValidationError("Invalid reporting period date format.");
-      return;
+      return false;
     }
     if (startUtc > endUtc) {
       setReportingValidationError("Start date cannot be after end date.");
-      return;
+      return false;
     }
 
     setReportingValidationError(null);
@@ -677,6 +679,7 @@ export function ExecutiveReportScreen() {
       startDate: reportingStartDraft,
       endDate: reportingEndDraft,
     });
+    return true;
   }, [reportingEndDraft, reportingStartDraft]);
 
   const onReportingPresetChange = useCallback((preset: ReportingPreset) => {
@@ -695,6 +698,37 @@ export function ExecutiveReportScreen() {
     setReportingEndDraft(nextRange.endDate);
     setReportingRange(nextRange);
   }, []);
+
+  const openReportingConfig = useCallback(() => {
+    setReportingStartDraft(reportingRange.startDate);
+    setReportingEndDraft(reportingRange.endDate);
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(true);
+  }, [reportingRange.endDate, reportingRange.startDate]);
+
+  const closeReportingConfig = useCallback(() => {
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(false);
+  }, []);
+
+  const saveReportingConfig = useCallback(() => {
+    if (reportingPreset === "custom" && !applyCustomReportingRange()) {
+      return;
+    }
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(false);
+  }, [applyCustomReportingRange, reportingPreset]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => {
+      openReportingConfig();
+    };
+    window.addEventListener(OPEN_EXEC_REPORTING_PERIOD_EVENT, handleOpen);
+    return () => {
+      window.removeEventListener(OPEN_EXEC_REPORTING_PERIOD_EVENT, handleOpen);
+    };
+  }, [openReportingConfig]);
 
   const initiativeRows = useMemo(() => {
     const sorted = [...rows];
@@ -1136,8 +1170,7 @@ export function ExecutiveReportScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Executive Summary Draft</h3>
-            <p>Drafted by OCI GenAI from selected progress data and reporting period movement.</p>
+            <h3>Executive Summary</h3>
           </div>
           <div class="tb-btn-row">
             <button
@@ -1151,64 +1184,20 @@ export function ExecutiveReportScreen() {
           </div>
         </header>
 
-        <div class="tb-exec-period-toolbar tb-no-print">
-          <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
-            <label class="tb-exec-period-field">
-              <span>Reporting Period</span>
-              <select
-                value={reportingPreset}
-                onChange={(event) => onReportingPresetChange((event.currentTarget as HTMLSelectElement).value as ReportingPreset)}
-              >
-                <option value="last_7_days">Last 7 Days</option>
-                <option value="last_14_days">Last 14 Days</option>
-                <option value="last_30_days">Last 30 Days</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-
-            {reportingPreset === "custom" ? (
-              <>
-                <label class="tb-exec-period-field">
-                  <span>Start</span>
-                  <input
-                    type="date"
-                    value={reportingStartDraft}
-                    onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
-                  />
-                </label>
-                <label class="tb-exec-period-field">
-                  <span>End</span>
-                  <input
-                    type="date"
-                    value={reportingEndDraft}
-                    onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
-                  />
-                </label>
-                <div class="tb-exec-period-action">
-                  <button type="button" class="tb-btn tb-btn-sm" onClick={applyCustomReportingRange}>
-                    Apply
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-
         <p class="tb-muted-note">
           Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
         </p>
-        <div class="tb-exec-summary-meta">
-          <span>Model: {executiveSummaryModelId ?? "default"}</span>
-          <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
-          <span>{executiveSummaryWordCount} words</span>
-        </div>
-        {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
         <div class={`tb-summary${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
           {executiveSummaryLoading ? (
             <p>Generating executive summary with OCI GenAI...</p>
           ) : (
             <p>{executiveSummaryDraft}</p>
           )}
+        </div>
+        <div class="tb-exec-summary-meta">
+          <span>Model: {executiveSummaryModelId ?? "default"}</span>
+          <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
+          <span>{executiveSummaryWordCount} words</span>
         </div>
         {executiveSummaryError ? <p class="tb-error-note">Executive summary draft error: {executiveSummaryError}</p> : null}
         {error ? <p class="tb-error-note">Executive report error: {error}</p> : null}
@@ -1474,6 +1463,71 @@ export function ExecutiveReportScreen() {
           </section>
         </div>
       </section>
+
+      {isReportingConfigOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
+          <div class="tb-modal-backdrop" onClick={closeReportingConfig} />
+          <div class="tb-modal tb-modal-reporting">
+            <header class="tb-modal-head">
+              <div>
+                <h3>Configure Reporting Period</h3>
+                <p class="tb-muted-note">Set the reporting window used across Executive Report sections.</p>
+              </div>
+              <div class="tb-action-row">
+                <button type="button" class="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
+                  Cancel
+                </button>
+                <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
+                  Save
+                </button>
+              </div>
+            </header>
+
+            <div class="tb-exec-period-toolbar">
+              <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
+                <label class="tb-exec-period-field">
+                  <span>Reporting Period</span>
+                  <select
+                    value={reportingPreset}
+                    onChange={(event) => onReportingPresetChange((event.currentTarget as HTMLSelectElement).value as ReportingPreset)}
+                  >
+                    <option value="last_7_days">Last 7 Days</option>
+                    <option value="last_14_days">Last 14 Days</option>
+                    <option value="last_30_days">Last 30 Days</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+
+                {reportingPreset === "custom" ? (
+                  <>
+                    <label class="tb-exec-period-field">
+                      <span>Start</span>
+                      <input
+                        type="date"
+                        value={reportingStartDraft}
+                        onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
+                      />
+                    </label>
+                    <label class="tb-exec-period-field">
+                      <span>End</span>
+                      <input
+                        type="date"
+                        value={reportingEndDraft}
+                        onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <p class="tb-muted-note">
+              Active period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
+            </p>
+            {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
+          </div>
+        </div>
+      ) : null}
 
       {isInitiativeConfigOpen ? (
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Initiative Epics">
