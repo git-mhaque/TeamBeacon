@@ -69,6 +69,10 @@ describe("InitiativesScreen", () => {
     expect(screen.getByRole("heading", { name: "Configured Initiative Summary" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Initiative Progress Matrix" })).toBeInTheDocument();
     expect(screen.getByText(/Reporting period:/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Initiative RAG" })).toBeInTheDocument();
+    expect(screen.getByText(/\d+\s+Red/)).toBeInTheDocument();
+    expect(screen.getByText(/\d+\s+Amber/)).toBeInTheDocument();
+    expect(screen.getByText(/\d+\s+Green/)).toBeInTheDocument();
     expect(screen.getByText("Payment Orchestration")).toBeInTheDocument();
     expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Feature").length).toBeGreaterThan(0);

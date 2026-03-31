@@ -173,11 +173,15 @@ function formatPercent(value: number): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const utcDay = parseIsoDateToUtcDay(value);
+  if (utcDay === null) {
     return value;
   }
-  return date.toLocaleDateString();
+  const date = new Date(utcDay);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const year = String(date.getUTCFullYear());
+  return `${day}-${month}-${year}`;
 }
 
 function periodLabel(period: ConfiguredEpicSummaryResponse["reportingPeriod"]): string {
@@ -535,10 +539,13 @@ export function InitiativesScreen() {
     const total = rows.reduce((sum, row) => sum + Math.max(0, Math.min(100, row.completionPercent)), 0);
     return total / rows.length;
   }, [rows]);
-  const atRiskCount = useMemo(
-    () => rows.filter((row) => row.ragLabel === "Red" || row.ragLabel === "Amber").length,
-    [rows],
-  );
+  const ragCounts = useMemo<Record<RagLabel, number>>(() => {
+    const counts: Record<RagLabel, number> = { Red: 0, Amber: 0, Green: 0 };
+    for (const row of rows) {
+      counts[row.ragLabel] += 1;
+    }
+    return counts;
+  }, [rows]);
   const completedInPeriodTotal = useMemo(
     () => rows.reduce((sum, row) => sum + row.completedInPeriodValue, 0),
     [rows],
@@ -765,9 +772,17 @@ export function InitiativesScreen() {
             <p>Average completion percentage across configured epics.</p>
           </article>
           <article class="tb-metric-card">
-            <h4>At Risk</h4>
-            <strong class={`tb-value ${atRiskCount > 0 ? "tb-value-warn" : "tb-value-good"}`}>{atRiskCount}</strong>
-            <p>RAG status currently Red or Amber.</p>
+            <h4>Initiative RAG</h4>
+            <strong class="tb-value tb-value-rag">
+              <span class="tb-initiative-rag-breakdown">
+                <span class="tb-initiative-rag-text tb-initiative-rag-red">{ragCounts.Red} Red</span>
+                <span class="tb-initiative-rag-separator">|</span>
+                <span class="tb-initiative-rag-text tb-initiative-rag-amber">{ragCounts.Amber} Amber</span>
+                <span class="tb-initiative-rag-separator">|</span>
+                <span class="tb-initiative-rag-text tb-initiative-rag-green">{ragCounts.Green} Green</span>
+              </span>
+            </strong>
+            <p>For configured initiatives.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Completed In Period</h4>
