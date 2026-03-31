@@ -641,6 +641,31 @@ body {
   margin-bottom: 0;
 }
 
+.tb-sprint-pie-wrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.66rem;
+  align-items: center;
+  margin-top: 0.56rem;
+}
+
+.tb-sprint-pie {
+  width: 8.4rem;
+  height: 8.4rem;
+  border-radius: 999px;
+  border: 1px solid #c7d6eb;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.tb-sprint-pie span {
+  color: #4c6284;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .tb-initiative-period {
   margin-top: 0.56rem;
 }
@@ -1649,6 +1674,11 @@ body {
 
   .tb-sprint-mix-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tb-sprint-pie-wrap {
+    grid-template-columns: 1fr;
+    justify-items: start;
   }
 
   .tb-modal-two-up {

@@ -196,6 +196,12 @@ function buildDonutBackground(slices: WorkMixSlice[]): string {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
+function resolveStateToneColor(toneClass: StateBreakdownRow["toneClass"]): string {
+  if (toneClass === "done") return "#1f8f63";
+  if (toneClass === "in-progress") return "#b77700";
+  return "#2f7bd8";
+}
+
 export function SprintBoardScreen() {
   const [sprint, setSprint] = useState<CurrentSprint | null>(null);
   const [sprintLoading, setSprintLoading] = useState(true);
@@ -336,6 +342,16 @@ export function SprintBoardScreen() {
 
   const groupMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "group"), [allWorkItems]);
   const typeMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "type"), [allWorkItems]);
+  const statePieSlices = useMemo<WorkMixSlice[]>(
+    () =>
+      stateBreakdownRows.map((row) => ({
+        label: row.label,
+        count: row.cards,
+        percent: row.cardsPercent,
+        color: resolveStateToneColor(row.toneClass),
+      })),
+    [stateBreakdownRows],
+  );
 
   return (
     <div class="tb-screen-grid">
@@ -388,22 +404,6 @@ export function SprintBoardScreen() {
           </article>
         </div>
         <div class="tb-sprint-summary-grid">
-          <article class="tb-sprint-summary-card">
-            <h4>Sprint Goals</h4>
-            {sprintLoading ? <p class="tb-muted-note">Loading sprint goals...</p> : null}
-            {!sprintLoading && sprintGoals.length === 0 ? (
-              <p class="tb-muted-note">No sprint goals available in active sprint metadata.</p>
-            ) : null}
-            {!sprintLoading && sprintGoals.length === 1 ? <p class="tb-sprint-goal-text">{sprintGoals[0]}</p> : null}
-            {!sprintLoading && sprintGoals.length > 1 ? (
-              <ul class="tb-sprint-goal-list">
-                {sprintGoals.map((goal) => (
-                  <li key={goal}>{goal}</li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-
           <article class="tb-sprint-summary-card">
             <h4>State Breakdown</h4>
             <p class="tb-muted-note">In Progress, Planned, and Done split by card count and story points.</p>
@@ -466,6 +466,46 @@ export function SprintBoardScreen() {
                 </li>
               ))}
             </ul>
+
+            {!workLoading ? (
+              <div class="tb-sprint-pie-wrap">
+                <div
+                  class="tb-sprint-pie"
+                  style={{ background: buildDonutBackground(statePieSlices) }}
+                  role="img"
+                  aria-label={`State breakdown pie: ${stateBreakdownRows
+                    .map((row) => `${row.label} ${row.cards}`)
+                    .join(", ")}`}
+                >
+                  {work.totals.total <= 0 ? <span>No data</span> : null}
+                </div>
+                <ul class="tb-exec-donut-legend">
+                  {statePieSlices.map((slice) => (
+                    <li key={`state-pie-${slice.label}`}>
+                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>{slice.label}</span>
+                      <span>{slice.count} ({formatPercent(slice.percent)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </article>
+
+          <article class="tb-sprint-summary-card">
+            <h4>Sprint Goals</h4>
+            {sprintLoading ? <p class="tb-muted-note">Loading sprint goals...</p> : null}
+            {!sprintLoading && sprintGoals.length === 0 ? (
+              <p class="tb-muted-note">No sprint goals available in active sprint metadata.</p>
+            ) : null}
+            {!sprintLoading && sprintGoals.length === 1 ? <p class="tb-sprint-goal-text">{sprintGoals[0]}</p> : null}
+            {!sprintLoading && sprintGoals.length > 1 ? (
+              <ul class="tb-sprint-goal-list">
+                {sprintGoals.map((goal) => (
+                  <li key={goal}>{goal}</li>
+                ))}
+              </ul>
+            ) : null}
           </article>
         </div>
         <div class="tb-sprint-mix-grid">
