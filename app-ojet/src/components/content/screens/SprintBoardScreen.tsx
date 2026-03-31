@@ -230,7 +230,7 @@ export function SprintBoardScreen() {
     if (!rawGoal) return [];
     return rawGoal
       .split(/\r?\n|;\s*/)
-      .map((line) => line.trim())
+      .map((line) => line.replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim())
       .filter((line) => line.length > 0);
   }, [sprint?.goal]);
 
