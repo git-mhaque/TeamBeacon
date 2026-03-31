@@ -1189,6 +1189,10 @@ export function ExecutiveReportScreen() {
 
   return (
     <div class="tb-screen-grid">
+      <p class="tb-muted-note tb-exec-reporting-period-note">
+        Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
+      </p>
+
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
@@ -1206,16 +1210,14 @@ export function ExecutiveReportScreen() {
           </div>
         </header>
 
-        <p class="tb-muted-note">
-          Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
-        </p>
-        <div class={`tb-summary${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
+        <div class={`tb-summary tb-summary-plain${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
           {executiveSummaryLoading ? (
             <p>Generating executive summary with OCI GenAI...</p>
           ) : (
             <p>{executiveSummaryDraft}</p>
           )}
         </div>
+        <hr class="tb-section-divider" />
         <div class="tb-exec-summary-meta">
           <span>Generated with OCI GenAI</span>
           <span>Model: {executiveSummaryModelId ?? "default"}</span>

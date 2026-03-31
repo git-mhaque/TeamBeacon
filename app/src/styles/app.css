@@ -378,6 +378,19 @@ body {
   border-color: #d6e2f4;
 }
 
+.tb-summary.tb-summary-plain {
+  border: none;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.tb-summary.tb-summary-plain.is-loading {
+  background: transparent;
+  border-color: transparent;
+}
+
 .tb-summary p {
   margin: 0;
   white-space: pre-wrap;
@@ -404,6 +417,10 @@ body {
   margin: 0.62rem 0 0;
   border: 0;
   border-top: 1px solid #d8e2f2;
+}
+
+.tb-exec-reporting-period-note {
+  margin: -0.1rem 0 0.1rem;
 }
 
 .tb-error-note {
