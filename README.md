@@ -13,6 +13,7 @@ TeamBeacon is a desktop engineering insights app that aggregates delivery and op
 ```text
 TeamBeacon/                  # Repository root
   app/                       # Oracle JET frontend + Tauri desktop shell
+  scripts/                   # Local automation helpers (release helpers, tooling)
   services/                  # Runtime services
     api/                     # Local API endpoints and orchestration
   packages/                  # Shared Python packages
@@ -73,6 +74,30 @@ From `app/`:
 npm run desktop:dev
 npm run desktop:build
 ```
+
+## macOS Release Automation
+- Automated workflow: [.github/workflows/release-macos.yml](.github/workflows/release-macos.yml)
+- Local release command (version bump, commit, tag, push):
+```bash
+./scripts/release-macos.sh 0.3.0
+```
+- This triggers a draft GitHub Release build for macOS targets.
+
+### How to Test
+1. CI build-only test (no release created):
+   - GitHub Actions -> `Release macOS Desktop` -> `Run workflow`
+   - Keep `build_only=true`
+   - Download artifacts `teambeacon-macos-*` and verify installers are produced.
+2. End-to-end release test:
+```bash
+./scripts/release-macos.sh 0.3.1-rc.1
+```
+   - Confirm a draft release `v0.3.1-rc.1` appears in GitHub Releases with macOS assets.
+3. Production release:
+```bash
+./scripts/release-macos.sh 0.3.1
+```
+   - Review and publish the draft release in GitHub UI when ready.
 
 ## CI Pipeline
 - GitHub Actions workflow: `.github/workflows/ci.yml`
