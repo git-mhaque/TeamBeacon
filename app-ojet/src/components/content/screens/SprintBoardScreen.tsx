@@ -145,6 +145,57 @@ type StateBreakdownRow = {
   toneClass: string;
 };
 
+type WorkMixSlice = {
+  label: string;
+  count: number;
+  percent: number;
+  color: string;
+};
+
+const WORK_MIX_COLORS = [
+  "#1f8f63",
+  "#0f5570",
+  "#b77700",
+  "#c2372e",
+  "#6c4ba6",
+  "#1c6f9a",
+  "#8a4f00",
+  "#4a6b2d",
+];
+
+function buildWorkMixSlices(issues: CurrentSprintWorkIssue[], field: "group" | "type"): WorkMixSlice[] {
+  const counts = new Map<string, number>();
+  for (const issue of issues) {
+    const raw = field === "group" ? issue.groupName : issue.workTypeName;
+    const name = raw?.trim() ? raw.trim() : "Unassigned";
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+
+  const total = issues.length;
+  return [...counts.entries()]
+    .map(([label, count], index) => ({
+      label,
+      count,
+      percent: total > 0 ? (count / total) * 100 : 0,
+      color: WORK_MIX_COLORS[index % WORK_MIX_COLORS.length],
+    }))
+    .sort((left, right) => right.count - left.count);
+}
+
+function buildDonutBackground(slices: WorkMixSlice[]): string {
+  if (slices.length === 0) {
+    return "#e1ebf0";
+  }
+  let cursor = 0;
+  const stops = slices.map((slice) => {
+    const start = cursor;
+    const end = cursor + slice.percent;
+    cursor = end;
+    return `${slice.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
 export function SprintBoardScreen() {
   const [sprint, setSprint] = useState<CurrentSprint | null>(null);
   const [sprintLoading, setSprintLoading] = useState(true);
@@ -278,6 +329,14 @@ export function SprintBoardScreen() {
     work.totals.total,
   ]);
 
+  const allWorkItems = useMemo(
+    () => [...work.done, ...work.inProgress, ...work.planned],
+    [work.done, work.inProgress, work.planned],
+  );
+
+  const groupMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "group"), [allWorkItems]);
+  const typeMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "type"), [allWorkItems]);
+
   return (
     <div class="tb-screen-grid">
       <section class="tb-panel">
@@ -393,6 +452,59 @@ export function SprintBoardScreen() {
                 </li>
               ))}
             </ul>
+          </article>
+        </div>
+        <div class="tb-sprint-mix-grid">
+          <article class="tb-sprint-summary-card">
+            <h4>Work Mix by Group</h4>
+            {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
+            {!workLoading ? (
+              <div class="tb-exec-donut-wrap">
+                <div
+                  class="tb-exec-donut"
+                  style={{ background: buildDonutBackground(groupMixSlices) }}
+                  role="img"
+                  aria-label="Work mix by group chart"
+                >
+                  {groupMixSlices.length === 0 ? <span>No data</span> : null}
+                </div>
+                <ul class="tb-exec-donut-legend">
+                  {groupMixSlices.map((slice) => (
+                    <li key={`group-${slice.label}`}>
+                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>{slice.label}</span>
+                      <span>{slice.count} ({formatPercent(slice.percent)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </article>
+
+          <article class="tb-sprint-summary-card">
+            <h4>Work Mix by Type</h4>
+            {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
+            {!workLoading ? (
+              <div class="tb-exec-donut-wrap">
+                <div
+                  class="tb-exec-donut"
+                  style={{ background: buildDonutBackground(typeMixSlices) }}
+                  role="img"
+                  aria-label="Work mix by type chart"
+                >
+                  {typeMixSlices.length === 0 ? <span>No data</span> : null}
+                </div>
+                <ul class="tb-exec-donut-legend">
+                  {typeMixSlices.map((slice) => (
+                    <li key={`type-${slice.label}`}>
+                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>{slice.label}</span>
+                      <span>{slice.count} ({formatPercent(slice.percent)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </article>
         </div>
         {sprintError && !sprintLoading ? <p class="tb-error-note">Current sprint status: {sprintError}</p> : null}

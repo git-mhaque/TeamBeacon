@@ -221,6 +221,8 @@ export type CurrentSprintWorkIssue = {
   storyPoints?: number | null;
   epicKey?: string | null;
   epicName?: string | null;
+  groupName?: string | null;
+  workTypeName?: string | null;
   epicUrl?: string | null;
   issueUrl?: string | null;
 };

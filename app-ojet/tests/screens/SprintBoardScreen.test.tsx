@@ -27,6 +27,8 @@ describe("SprintBoardScreen", () => {
               storyPoints: 8,
               epicKey: "CEG-100",
               epicName: "Executive Reporting",
+              groupName: "Core Platform",
+              workTypeName: "Feature",
               issueUrl: "https://jira.example.com/browse/CEG-901",
               epicUrl: "https://jira.example.com/browse/CEG-100",
             },
@@ -40,6 +42,8 @@ describe("SprintBoardScreen", () => {
               storyPoints: 5,
               epicKey: "CEG-100",
               epicName: "Executive Reporting",
+              groupName: "Core Platform",
+              workTypeName: "Reliability",
             },
           ],
           planned: [
@@ -51,6 +55,8 @@ describe("SprintBoardScreen", () => {
               storyPoints: 3,
               epicKey: "CEG-111",
               epicName: "Release Comms",
+              groupName: "Ops Excellence",
+              workTypeName: "Feature",
             },
           ],
           totals: {
@@ -141,6 +147,13 @@ describe("SprintBoardScreen", () => {
     expect(screen.getByRole("heading", { name: "State Breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Card breakdown:/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Story point breakdown:/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Work Mix by Group" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Work Mix by Type" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Work mix by group chart" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Work mix by type chart" })).toBeInTheDocument();
+    expect(screen.getByText("Core Platform")).toBeInTheDocument();
+    expect(screen.getByText("Ops Excellence")).toBeInTheDocument();
+    expect(screen.getByText("Reliability")).toBeInTheDocument();
     expect(screen.getByText("Added (1 | 3 SP)")).toBeInTheDocument();
     expect(screen.getByText("Blocked (1 | 5 SP)")).toBeInTheDocument();
     expect(screen.getByText("Done (1 | 8 SP)")).toBeInTheDocument();

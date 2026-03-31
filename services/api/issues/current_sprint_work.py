@@ -180,9 +180,16 @@ def get_current_sprint_work(
               i.status_category,
               i.story_points,
               i.epic_key,
-              e.summary AS epic_summary
+              e.summary AS epic_summary,
+              eg.name AS group_name,
+              wt.name AS work_type_name
             FROM issues i
             LEFT JOIN issues e ON e.issue_key = i.epic_key
+            LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
+            LEFT JOIN epic_metadata_groups emg ON emg.epic_metadata_id = em.id
+            LEFT JOIN epic_groups eg ON eg.id = emg.group_id
+            LEFT JOIN epic_metadata_work_types emwt ON emwt.epic_metadata_id = em.id
+            LEFT JOIN work_types wt ON wt.id = emwt.work_type_id
             WHERE i.sprint_external_id = ?
             ORDER BY i.issue_key ASC
             """,
@@ -198,9 +205,16 @@ def get_current_sprint_work(
               i.story_points,
               i.epic_key,
               e.summary AS epic_summary,
+              eg.name AS group_name,
+              wt.name AS work_type_name,
               i.raw_json
             FROM issues i
             LEFT JOIN issues e ON e.issue_key = i.epic_key
+            LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
+            LEFT JOIN epic_metadata_groups emg ON emg.epic_metadata_id = em.id
+            LEFT JOIN epic_groups eg ON eg.id = emg.group_id
+            LEFT JOIN epic_metadata_work_types emwt ON emwt.epic_metadata_id = em.id
+            LEFT JOIN work_types wt ON wt.id = emwt.work_type_id
             WHERE i.sprint_external_id IS NULL
               AND i.raw_json LIKE ?
             ORDER BY i.issue_key ASC
@@ -228,6 +242,8 @@ def get_current_sprint_work(
             "story_points": row["story_points"],
             "epic_key": row["epic_key"],
             "epic_summary": row["epic_summary"],
+            "group_name": row["group_name"],
+            "work_type_name": row["work_type_name"],
         }
         for row in rows
     ]
@@ -255,6 +271,8 @@ def get_current_sprint_work(
                 "story_points": row["story_points"],
                 "epic_key": row["epic_key"],
                 "epic_summary": row["epic_summary"],
+                "group_name": row["group_name"],
+                "work_type_name": row["work_type_name"],
             }
         )
         seen_issue_keys.add(issue_key)
@@ -270,6 +288,8 @@ def get_current_sprint_work(
             "storyPoints": story_points,
             "epicKey": row["epic_key"],
             "epicName": row["epic_summary"],
+            "groupName": row["group_name"],
+            "workTypeName": row["work_type_name"],
             "epicUrl": (
                 f"{jira_base_url}/browse/{row['epic_key']}"
                 if jira_base_url and row["epic_key"]

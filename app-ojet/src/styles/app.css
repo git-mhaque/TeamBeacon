@@ -526,6 +526,13 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.tb-sprint-mix-grid {
+  margin-top: 0.62rem;
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .tb-sprint-summary-card {
   border: 1px solid #d5e1f2;
   border-radius: 0.78rem;
@@ -627,6 +634,11 @@ body {
   width: 0.68rem;
   height: 0.68rem;
   border-radius: 0.18rem;
+}
+
+.tb-sprint-mix-grid .tb-exec-donut-wrap {
+  margin-top: 0.42rem;
+  margin-bottom: 0;
 }
 
 .tb-initiative-period {
@@ -1632,6 +1644,10 @@ body {
   }
 
   .tb-sprint-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-sprint-mix-grid {
     grid-template-columns: 1fr;
   }
 
