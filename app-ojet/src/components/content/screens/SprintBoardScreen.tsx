@@ -283,7 +283,7 @@ export function SprintBoardScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Current Sprint</h3>
+            <h3>Sprint Overview</h3>
             <p>Active sprint metadata from local synced JIRA data.</p>
           </div>
           <button type="button" class="tb-btn" onClick={() => refresh()}>
