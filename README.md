@@ -1,6 +1,8 @@
 # TeamBeacon
 
-TeamBeacon is a desktop engineering insights app that aggregates delivery and operations data from hosted JIRA/Confluence and OCI GenAI-backed reporting workflows.
+TeamBeacon is a lightweight, intelligent layer on top of existing engineering data sources.
+
+It helps Engineering Managers move from fragmented status gathering to focused delivery leadership by combining synced data, metadata-driven insight, and AI-assisted reporting in a local-first workflow.
 
 ## Current Status
 - Product scope: [SPEC.md](SPEC.md)
@@ -29,7 +31,7 @@ TeamBeacon/                  # Repository root
 - `git` for cloning and collaboration.
 - `python3` (3.11+ recommended) for API/runtime and backend tests.
 - `node` and `npm` (Node 22 recommended, aligned with CI) for frontend build/test.
-- `sqlite3` CLI for applying local schema migrations and ad-hoc DB checks.
+- `sqlite3` CLI (mandatory) for applying local schema migrations and ad-hoc DB checks.
 - Rust toolchain (`rustup`, `cargo`, `rustc`) for Tauri desktop commands.
 - Tauri CLI via cargo: `cargo install tauri-cli`
 - OCI Python SDK (required only for OCI GenAI endpoints): `python3 -m pip install oci`
@@ -42,7 +44,12 @@ cp config/.env.example config/.env
 ```
 Configuration details are documented in [config/README.md](config/README.md).
 
-2. Start frontend + local API:
+2. Apply local database schema (mandatory before first run):
+```bash
+test -f teambeacon.db || sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
+```
+
+3. Start frontend + local API:
 ```bash
 cd app
 npm install
@@ -51,10 +58,6 @@ npm run dev
    - Frontend: `http://127.0.0.1:5174`
    - API: `http://127.0.0.1:8000`
 
-3. Apply local schema (if needed):
-```bash
-sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
-```
 4. Run backend tests:
 ```bash
 python3 -m unittest discover -s tests/unit -p "test_*.py" -v

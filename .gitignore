@@ -25,3 +25,6 @@ teambeacon.db-wal
 
 # macOS
 .DS_Store
+
+# Communication screenshots (local only; do not commit)
+docs/communication/images/
