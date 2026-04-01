@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { within } from "@testing-library/dom";
 import { vi } from "vitest";
 import {
-  ExecutiveReportScreen,
-  OPEN_EXEC_REPORTING_PERIOD_EVENT,
-} from "../../src/components/content/screens/ExecutiveReportScreen";
+  OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
+  OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
+  TeamDashboardScreen,
+} from "../../src/components/content/screens/TeamDashboardScreen";
 
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
@@ -15,7 +16,7 @@ function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   );
 }
 
-describe("ExecutiveReportScreen", () => {
+describe("TeamDashboardScreen", () => {
   it("loads executive data, drafts summary/wins-risks, and supports initiative selection", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url =
@@ -120,7 +121,7 @@ describe("ExecutiveReportScreen", () => {
       return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
     });
 
-    render(<ExecutiveReportScreen />);
+    render(<TeamDashboardScreen />);
 
     expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
     expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
@@ -147,8 +148,8 @@ describe("ExecutiveReportScreen", () => {
     expect(scopedWinsRisks.getByText(/Updated:/i)).toBeInTheDocument();
     expect(scopedWinsRisks.getByText(/words/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
-    const dialog = screen.getByRole("dialog", { name: "Configure Initiative Epics" });
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT));
+    const dialog = await screen.findByRole("dialog", { name: "Configure Initiative Epics" });
     expect(dialog).toBeInTheDocument();
 
     fireEvent.dblClick(within(dialog).getByText("Executive reporting automation"));
@@ -162,7 +163,7 @@ describe("ExecutiveReportScreen", () => {
       expect(screen.queryByText("Executive reporting automation")).not.toBeInTheDocument();
     });
 
-    window.dispatchEvent(new CustomEvent(OPEN_EXEC_REPORTING_PERIOD_EVENT));
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT));
     expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
 
     expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);

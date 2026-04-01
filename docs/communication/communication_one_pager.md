@@ -77,10 +77,12 @@ Manager value:
 - More meaningful coaching and operational improvement discussions.
 - Faster adaptation during weekly execution cycles.
 
-### 4 Executive Report (Killer Feature)
+### 4 Team Dashboard (Killer Feature)
 What is implemented today:
 - AI-generated Executive Summary using integrated OCI GenAI.
 - AI-generated Wins and Risks using current configured initiative data.
+- Progress for key initiatives with RAG indicators and reporting-period progress.
+- Work mix by group and type for selected reporting-period output.
 - Reporting period control and print-ready output.
 
 Manager value:

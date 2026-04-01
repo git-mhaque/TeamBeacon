@@ -56,7 +56,7 @@ describe("Content", () => {
       "Security",
       "Incident Response",
       "Release",
-      "Executive Report",
+      "Team Dashboard",
       "Settings",
     ]);
 
@@ -67,9 +67,10 @@ describe("Content", () => {
 
     expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
+    expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
     expect(screen.getByText("Connections / Field Mapping / Epic Metadata")).toBeInTheDocument();
 
-    expect(screen.queryByLabelText("Executive Report is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();

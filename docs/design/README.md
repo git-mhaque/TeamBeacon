@@ -11,7 +11,7 @@ This folder contains Oracle JET-oriented screen mockups for the desktop-first Te
 3. Team Insights
 4. Sprint Insights
 5. Security / Incident Response / Releases
-6. Executive Report
+6. Team Dashboard
 
 ## How to View
 Open the HTML file in any browser:

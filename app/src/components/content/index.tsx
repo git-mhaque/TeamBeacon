@@ -7,7 +7,11 @@
  */
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
-import { ExecutiveReportScreen, OPEN_EXEC_REPORTING_PERIOD_EVENT } from "./screens/ExecutiveReportScreen";
+import {
+  OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
+  OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
+  TeamDashboardScreen,
+} from "./screens/TeamDashboardScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
@@ -44,7 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
   { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
-  { id: "executive", label: "Executive Report", blurb: "Leadership summary output", showConstruction: false },
+  { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false },
   { id: "integrations", label: "Settings", blurb: "Connections / Field Mapping / Epic Metadata", showConstruction: false },
 ];
 
@@ -57,7 +61,7 @@ function screenTitle(id: ScreenId): string {
     security: "Security",
     incidents: "Incident Response",
     releases: "Releases",
-    executive: "Executive Report",
+    executive: "Team Dashboard",
   };
   return mapping[id];
 }
@@ -79,7 +83,7 @@ function renderScreen(id: ScreenId) {
     case "releases":
       return <ReleasesScreen />;
     case "executive":
-      return <ExecutiveReportScreen />;
+      return <TeamDashboardScreen />;
     default:
       return <IntegrationsScreen />;
   }
@@ -134,12 +138,19 @@ export function Content({ appName }: Props) {
               <button
                 type="button"
                 class="tb-btn tb-btn-sm tb-no-print"
-                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_EXEC_REPORTING_PERIOD_EVENT))}
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT))}
               >
                 Reporting Period
               </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT))}
+              >
+                Configure Initiatives
+              </button>
               <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
-                Print Report
+                Print
               </button>
             </div>
           ) : null}

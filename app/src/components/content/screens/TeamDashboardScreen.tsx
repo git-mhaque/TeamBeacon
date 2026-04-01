@@ -42,7 +42,8 @@ type PersistedReportingSelection = {
 
 const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
 const REPORTING_PERIOD_SELECTION_KEY = "teambeacon.executive.reporting.period";
-export const OPEN_EXEC_REPORTING_PERIOD_EVENT = "teambeacon:executive-open-reporting-period";
+export const OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT = "teambeacon:team-dashboard-open-initiative-config";
+export const OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT = "teambeacon:team-dashboard-open-reporting-period";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -441,7 +442,7 @@ function ragToneClass(value: RagLabel): string {
   return "is-risk";
 }
 
-export function ExecutiveReportScreen() {
+export function TeamDashboardScreen() {
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(() => readPersistedReportingSelection(initialRange), [initialRange]);
 
@@ -727,9 +728,9 @@ export function ExecutiveReportScreen() {
     const handleOpen = () => {
       openReportingConfig();
     };
-    window.addEventListener(OPEN_EXEC_REPORTING_PERIOD_EVENT, handleOpen);
+    window.addEventListener(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT, handleOpen);
     return () => {
-      window.removeEventListener(OPEN_EXEC_REPORTING_PERIOD_EVENT, handleOpen);
+      window.removeEventListener(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT, handleOpen);
     };
   }, [openReportingConfig]);
 
@@ -1152,6 +1153,17 @@ export function ExecutiveReportScreen() {
     setInitiativeConfigDraggingKey(null);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => {
+      openInitiativeConfig();
+    };
+    window.addEventListener(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT, handleOpen);
+    return () => {
+      window.removeEventListener(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT, handleOpen);
+    };
+  }, [openInitiativeConfig]);
+
   const addInitiativeDraftKey = useCallback((epicKey: string) => {
     setInitiativeConfigDraftKeys((previous) => {
       if (previous.includes(epicKey)) return previous;
@@ -1282,14 +1294,11 @@ export function ExecutiveReportScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Progress for Key Initiatives</h3>
-            <p>Selected initiatives used for executive narrative generation.</p>
+            <p class="tb-muted-note">Selected initiatives used for executive narrative generation.</p>
           </div>
-          <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={openInitiativeConfig}>
-            Configure
-          </button>
         </header>
 
-        <div class="tb-sync-history-wrap">
+        <div class="tb-sync-history-wrap tb-sync-history-wrap-no-scroll">
           <table class="tb-sync-history-table">
             <thead>
               <tr>
@@ -1338,7 +1347,7 @@ export function ExecutiveReportScreen() {
                 <tr>
                   <td colSpan={5}>
                     {initiativeRows.length > 0
-                      ? "No initiatives selected. Use Configure to include epics in this section."
+                      ? "No initiatives selected. Use Configure Initiatives to include epics in this section."
                       : "No configured epic data available yet."}
                   </td>
                 </tr>
@@ -1352,7 +1361,7 @@ export function ExecutiveReportScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Report Signals</h3>
-            <p>High-level confidence snapshot for final review.</p>
+            <p class="tb-muted-note">High-level confidence snapshot for final review.</p>
           </div>
         </header>
         <div class="tb-metrics-grid tb-three-up">
@@ -1392,7 +1401,7 @@ export function ExecutiveReportScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Work Mix by Group and Type</h3>
-            <p>Share of completed cards in the selected reporting period.</p>
+            <p class="tb-muted-note">Share of completed cards in the selected reporting period.</p>
           </div>
         </header>
 
@@ -1512,7 +1521,7 @@ export function ExecutiveReportScreen() {
             <header class="tb-modal-head">
               <div>
                 <h3>Configure Reporting Period</h3>
-                <p class="tb-muted-note">Set the reporting window used across Executive Report sections.</p>
+                <p class="tb-muted-note">Set the reporting window used across Team Dashboard sections.</p>
               </div>
               <div class="tb-action-row">
                 <button type="button" class="tb-btn tb-btn-sm" onClick={closeReportingConfig}>

@@ -1214,6 +1214,11 @@ body {
   overflow-y: auto;
 }
 
+.tb-sync-history-wrap-no-scroll {
+  max-height: none;
+  overflow: visible;
+}
+
 .tb-sync-history-table {
   width: 100%;
   border-collapse: collapse;
