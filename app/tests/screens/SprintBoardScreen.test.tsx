@@ -153,8 +153,7 @@ describe("SprintBoardScreen", () => {
       "https://jira.example.com/secure/RapidBoard.jspa?rapidView=42",
     );
     expect(screen.getByText("State: active")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Sprint Goals" })).toBeInTheDocument();
-    expect(screen.getByText("Reduce production defects by closing top reliability stories")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sprint Goals" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "State Breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Card breakdown:/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Story point breakdown:/i })).toBeInTheDocument();

@@ -9,7 +9,7 @@ This folder contains Oracle JET-oriented screen mockups for the desktop-first Te
 1. Settings
 2. Initiative Insights
 3. Team Insights
-4. Current Sprint
+4. Sprint Insights
 5. Security / Incident Response / Releases
 6. Executive Report
 

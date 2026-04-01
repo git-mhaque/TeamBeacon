@@ -51,7 +51,7 @@ describe("Content", () => {
       .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
     expect(orderedTitles).toEqual([
       "Initiative Insights",
-      "Current Sprint",
+      "Sprint Insights",
       "Team Insights",
       "Security",
       "Incident Response",
@@ -72,7 +72,7 @@ describe("Content", () => {
     expect(screen.queryByLabelText("Executive Report is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Current Sprint is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Security/ }));

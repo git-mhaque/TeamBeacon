@@ -11,7 +11,7 @@ TeamBeacon is a local-first engineering intelligence app that sits on top of exi
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, and metadata configuration.
 - Initiative Insights: progress matrix, filters, and RAG visibility.
-- Current Sprint: state breakdown, work mix, scope-change and blocker visibility.
+- Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Executive Report: AI-generated summary and wins/risks for leadership updates.
 
 ## 📣 Communication One-Pager
@@ -32,8 +32,8 @@ For product messaging, capability narrative, and value framing, see:
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/communication/images/current-sprint-overview.png" alt="Current sprint" width="360" /><br />
-      <sub>Current Sprint</sub>
+      <img src="docs/communication/images/current-sprint-overview.png" alt="Sprint insights" width="360" /><br />
+      <sub>Sprint Insights</sub>
     </td>
     <td align="center">
       <img src="docs/communication/images/executive-report-ready.png" alt="Executive report" width="360" /><br />

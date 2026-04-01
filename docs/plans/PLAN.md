@@ -32,7 +32,7 @@ Exit criteria:
 - Initiative insights with configurable success criteria.
 - Team metrics: committed/completed points, cycle time trends.
 - Individual insights by alias and date range.
-- Current sprint snapshot (`Done`, `In Progress`, `Planned`).
+- Sprint Insights snapshot (`Done`, `In Progress`, `Planned`).
 - Align implemented UI routes/components with mockup intent.
 
 Exit criteria:

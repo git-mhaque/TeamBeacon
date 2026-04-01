@@ -64,9 +64,9 @@ Manager value:
 - Lower cognitive overhead through group/type/progress slicing.
 - Earlier intervention opportunities when trends turn Amber or Red.
 
-### 3 Current Sprint
+### 3 Sprint Insights
 What is implemented today:
-- Sprint overview (dates, goals, state breakdown).
+- Sprint overview (dates and state breakdown).
 - Work mix views by group and type.
 - Scope change and blocker visibility.
 - Sprint work filtering for targeted drill-down.
@@ -100,7 +100,7 @@ Manager value:
 - Quarterly review prep: show trend-backed narrative with clear RAG signals.
 
 ## Typical Usage Rhythm
-- Weekly: Current Sprint plus Initiative Insights plus AI draft update.
+- Weekly: Sprint Insights plus Initiative Insights plus AI draft update.
 - Monthly: executive summary and risk posture review.
 - Quarterly: progress narrative with initiative-level RAG and trends.
 

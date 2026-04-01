@@ -27,7 +27,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - Average cycle time and trend.
   - Custom JIRA field mapping.
 - Completed/In-progress work:
-  - Current sprint board-style snapshot (`Done`, `In Progress`, `Planned`) with sprint goals and work mix breakdown.
+  - Sprint Insights board-style snapshot (`Done`, `In Progress`, `Planned`) with state breakdown and work mix breakdown.
 - Executive report:
   - Summary since last report.
   - Initiative-level progress and risks.
@@ -125,6 +125,6 @@ TeamBeacon/
   - Settings (connections, field mapping, epic metadata)
   - Initiative insights
   - Team insights
-  - Current sprint
+  - Sprint Insights
   - Security / Incident response / Releases
   - Executive report

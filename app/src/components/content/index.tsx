@@ -39,7 +39,7 @@ type Props = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false },
-  { id: "sprint", label: "Current Sprint", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false },
+  { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false },
   { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", showConstruction: true },
   { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
   { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
@@ -53,7 +53,7 @@ function screenTitle(id: ScreenId): string {
     integrations: "Settings",
     initiatives: "Initiative Insights",
     team: "Team Insights",
-    sprint: "Current Sprint",
+    sprint: "Sprint Insights",
     security: "Security",
     incidents: "Incident Response",
     releases: "Releases",

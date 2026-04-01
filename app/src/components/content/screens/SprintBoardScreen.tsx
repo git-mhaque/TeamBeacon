@@ -355,15 +355,6 @@ export function SprintBoardScreen() {
     [sprint?.remainingDays],
   );
 
-  const sprintGoals = useMemo(() => {
-    const rawGoal = sprint?.goal?.trim();
-    if (!rawGoal) return [];
-    return rawGoal
-      .split(/\r?\n|;\s*/)
-      .map((line) => line.replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim())
-      .filter((line) => line.length > 0);
-  }, [sprint?.goal]);
-
   const stateBreakdownRows = useMemo<StateBreakdownRow[]>(() => {
     const cardTotal = work.totals.total;
     const storyPointsTotal = work.totals.storyPoints.total;
@@ -506,7 +497,7 @@ export function SprintBoardScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Sprint Overview</h3>
-            <p>Active sprint metadata from local synced JIRA data.</p>
+            <p class="tb-muted-note">Active sprint metadata from local synced JIRA data.</p>
           </div>
           <button type="button" class="tb-btn" onClick={() => refresh()}>
             {sprintLoading || changesLoading || workLoading ? "Loading..." : "Refresh"}
@@ -639,24 +630,7 @@ export function SprintBoardScreen() {
             ) : null}
           </article>
 
-          <article class="tb-sprint-summary-card">
-            <h4>Sprint Goals</h4>
-            {sprintLoading ? <p class="tb-muted-note">Loading sprint goals...</p> : null}
-            {!sprintLoading && sprintGoals.length === 0 ? (
-              <p class="tb-muted-note">No sprint goals available in active sprint metadata.</p>
-            ) : null}
-            {!sprintLoading && sprintGoals.length === 1 ? <p class="tb-sprint-goal-text">{sprintGoals[0]}</p> : null}
-            {!sprintLoading && sprintGoals.length > 1 ? (
-              <ul class="tb-sprint-goal-list">
-                {sprintGoals.map((goal) => (
-                  <li key={goal}>{goal}</li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-        </div>
-        <div class="tb-sprint-mix-grid">
-          <article class="tb-sprint-summary-card">
+          <article class="tb-sprint-summary-card tb-sprint-mix-card">
             <h4>Work Mix by Group</h4>
             {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
             {!workLoading ? (
@@ -682,7 +656,7 @@ export function SprintBoardScreen() {
             ) : null}
           </article>
 
-          <article class="tb-sprint-summary-card">
+          <article class="tb-sprint-summary-card tb-sprint-mix-card">
             <h4>Work Mix by Type</h4>
             {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
             {!workLoading ? (
@@ -715,7 +689,7 @@ export function SprintBoardScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Sprint Scope Changes & Blockers</h3>
-            <p>Scope volatility and blocked cards observed after sprint start.</p>
+            <p class="tb-muted-note">Scope volatility and blocked cards observed after sprint start.</p>
           </div>
         </header>
         <div class="tb-kanban">
@@ -748,7 +722,7 @@ export function SprintBoardScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Current Sprint Work</h3>
-            <p>Planned, in-progress, and completed issues from the active sprint.</p>
+            <p class="tb-muted-note">Planned, in-progress, and completed issues from the active sprint.</p>
           </div>
         </header>
         <div class="tb-initiative-toolbar tb-initiative-toolbar-sprint">

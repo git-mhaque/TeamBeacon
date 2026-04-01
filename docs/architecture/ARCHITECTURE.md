@@ -9,7 +9,7 @@ TeamBeacon is a local-first desktop analytics system:
 ## 2. High-Level Components
 1. UI (`app/`)
 - Oracle JET (vDOM) frontend with Tauri desktop shell.
-- Screens: Settings, Initiative Insights, Team Insights, Current Sprint, Security, Incident Response, Releases, Executive Report.
+- Screens: Settings, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Executive Report.
 - UX reference: `docs/design/teambeacon-ojet-mockups.html`
 
 2. API (`services/api/`)
@@ -72,7 +72,7 @@ Default thresholds:
   - Settings
   - Initiative Insights
   - Team Insights
-  - Current Sprint
+  - Sprint Insights
   - Security
   - Incident Response
   - Releases
