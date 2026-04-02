@@ -1,11 +1,14 @@
 import { h } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import {
+  chatWithOciGenAi,
   ConfiguredEpicSummaryResponse,
   EpicCandidate,
+  EpicCompletedCard,
   EpicLookupConfig,
   InitiativeEpicSummary,
   deleteEpicMetadata,
+  fetchEpicCompletedCards,
   fetchConfiguredEpicSummary,
   fetchEpicCandidates,
   fetchEpicLookupConfig,
@@ -193,6 +196,55 @@ function periodLabel(period: ConfiguredEpicSummaryResponse["reportingPeriod"]): 
   return `${start} - ${end} (${period.days} day${period.days === 1 ? "" : "s"}, ${period.timezone})`;
 }
 
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return "Not generated yet";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function buildCompletedCardsSummaryPrompt(params: {
+  epicKey: string;
+  epicName: string;
+  reportingPeriodText: string;
+  completedCards: EpicCompletedCard[];
+  expectedCount: number;
+}): string {
+  const cards = params.completedCards.slice(0, 80);
+  const cardLines = cards.map((card, index) => {
+    const storyPoints = card.storyPoints != null ? `SP ${card.storyPoints}` : "SP n/a";
+    const completedAt = card.completedAt || "n/a";
+    const status = card.status || "unknown";
+    return `${index + 1}. ${card.issueKey} | ${status} | ${storyPoints} | ${completedAt} | ${card.summary}`;
+  });
+  const truncationNote = params.expectedCount > cards.length
+    ? `Only ${cards.length} of ${params.expectedCount} completed cards are listed.`
+    : "";
+
+  return [
+    "You are summarizing completed cards for an initiative update.",
+    "Return exactly one concise paragraph (4-6 sentences) in plain text.",
+    "Use only the provided card data and do not invent metrics.",
+    "Call out what shipped, work-type patterns, and any risk signals.",
+    "",
+    `Epic: ${params.epicKey} - ${params.epicName}`,
+    `Reporting period: ${params.reportingPeriodText}`,
+    `Completed cards in period: ${params.expectedCount}`,
+    truncationNote,
+    "",
+    "Completed card details:",
+    ...cardLines,
+  ]
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+}
+
 function normalizeDateInputValue(value: string | null | undefined): string {
   if (!value) return "";
   const candidate = value.trim();
@@ -271,6 +323,17 @@ export function InitiativesScreen() {
 
   const [pendingDeleteEpic, setPendingDeleteEpic] = useState<SummaryRow | null>(null);
   const [deletingEpicKey, setDeletingEpicKey] = useState<string | null>(null);
+  const [completedSummaryEpic, setCompletedSummaryEpic] = useState<SummaryRow | null>(null);
+  const [completedSummaryCards, setCompletedSummaryCards] = useState<EpicCompletedCard[]>([]);
+  const [completedSummaryCount, setCompletedSummaryCount] = useState(0);
+  const [completedSummaryTruncated, setCompletedSummaryTruncated] = useState(false);
+  const [completedSummaryLoading, setCompletedSummaryLoading] = useState(false);
+  const [completedSummaryError, setCompletedSummaryError] = useState<string | null>(null);
+  const [completedSummaryText, setCompletedSummaryText] = useState("");
+  const [completedSummaryTextLoading, setCompletedSummaryTextLoading] = useState(false);
+  const [completedSummaryTextError, setCompletedSummaryTextError] = useState<string | null>(null);
+  const [completedSummaryModelId, setCompletedSummaryModelId] = useState<string | null>(null);
+  const [completedSummaryGeneratedAt, setCompletedSummaryGeneratedAt] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -740,6 +803,94 @@ export function InitiativesScreen() {
     }
   }, [editingEpic?.epicKey, loadSummary, pendingDeleteEpic]);
 
+  const closeCompletedSummary = useCallback(() => {
+    setCompletedSummaryEpic(null);
+    setCompletedSummaryCards([]);
+    setCompletedSummaryCount(0);
+    setCompletedSummaryTruncated(false);
+    setCompletedSummaryLoading(false);
+    setCompletedSummaryError(null);
+    setCompletedSummaryText("");
+    setCompletedSummaryTextLoading(false);
+    setCompletedSummaryTextError(null);
+    setCompletedSummaryModelId(null);
+    setCompletedSummaryGeneratedAt(null);
+  }, []);
+
+  const openCompletedSummary = useCallback(async (row: SummaryRow) => {
+    setCompletedSummaryEpic(row);
+    setCompletedSummaryCards([]);
+    setCompletedSummaryCount(0);
+    setCompletedSummaryTruncated(false);
+    setCompletedSummaryLoading(true);
+    setCompletedSummaryError(null);
+    setCompletedSummaryText("");
+    setCompletedSummaryTextLoading(false);
+    setCompletedSummaryTextError(null);
+    setCompletedSummaryModelId(null);
+    setCompletedSummaryGeneratedAt(null);
+
+    const timezone = reportingPeriod?.timezone
+      || Intl.DateTimeFormat().resolvedOptions().timeZone
+      || "UTC";
+    try {
+      const payload = await fetchEpicCompletedCards(row.epicKey, {
+        limit: 250,
+        periodStart: reportingPeriod?.startDate ?? null,
+        periodEnd: reportingPeriod?.endDate ?? null,
+        timezone,
+      });
+      const completedCards = payload.completedCards ?? [];
+      const count = Number.isFinite(payload.count) ? payload.count : completedCards.length;
+      setCompletedSummaryCards(completedCards);
+      setCompletedSummaryCount(count);
+      setCompletedSummaryTruncated(Boolean(payload.truncated));
+
+      if (count <= 0 || completedCards.length === 0) {
+        setCompletedSummaryText("No completed cards were found for this reporting period.");
+        return;
+      }
+
+      setCompletedSummaryTextLoading(true);
+      const effectivePeriod = payload.reportingPeriod ?? reportingPeriod;
+      const prompt = buildCompletedCardsSummaryPrompt({
+        epicKey: row.epicKey,
+        epicName: row.epicName || "(Untitled epic)",
+        reportingPeriodText: periodLabel(effectivePeriod),
+        completedCards,
+        expectedCount: count,
+      });
+      try {
+        const aiPayload = await chatWithOciGenAi({
+          message: prompt,
+          maxTokens: 420,
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 0,
+          frequencyPenalty: 0,
+        });
+        const summaryText = aiPayload.response?.text?.trim();
+        if (!summaryText) {
+          throw new Error("OCI GenAI returned an empty completed-card summary.");
+        }
+        setCompletedSummaryText(summaryText);
+        setCompletedSummaryModelId(aiPayload.modelId);
+        setCompletedSummaryGeneratedAt(new Date().toISOString());
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to generate completed-card summary.";
+        setCompletedSummaryTextError(message);
+        setCompletedSummaryText("Unable to generate completed-card summary from OCI GenAI.");
+      } finally {
+        setCompletedSummaryTextLoading(false);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load completed cards for this epic.";
+      setCompletedSummaryError(message);
+    } finally {
+      setCompletedSummaryLoading(false);
+    }
+  }, [reportingPeriod]);
+
   return (
     <div class="tb-screen-grid">
       <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod)}</p>
@@ -1032,7 +1183,17 @@ export function InitiativesScreen() {
                           <td>
                             <div>
                               <strong>{row.completedCards} / {row.totalCards}</strong>
-                              <p class="tb-muted-note">Period: {row.completedInPeriodValue}</p>
+                              <p class="tb-muted-note">
+                                Period:{" "}
+                                <button
+                                  type="button"
+                                  class="tb-initiative-period-trigger"
+                                  onClick={() => void openCompletedSummary(row)}
+                                  aria-label={`Summarize completed cards for ${row.epicKey}`}
+                                >
+                                  {row.completedInPeriodValue}
+                                </button>
+                              </p>
                             </div>
                           </td>
                         ) : null}
@@ -1176,6 +1337,72 @@ export function InitiativesScreen() {
                 {deletingEpicKey ? "Removing..." : "Remove"}
               </button>
             </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {completedSummaryEpic ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Completed Cards Summary">
+          <div class="tb-modal-backdrop" onClick={closeCompletedSummary} />
+          <div class="tb-modal tb-modal-wide">
+            <header class="tb-modal-head">
+              <h3>Completed Cards Summary</h3>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={closeCompletedSummary}>
+                Close
+              </button>
+            </header>
+
+            <p class="tb-muted-note">
+              Epic: <strong>{completedSummaryEpic.epicKey}</strong>
+              {completedSummaryEpic.epicName ? ` (${completedSummaryEpic.epicName})` : ""}
+            </p>
+            <p class="tb-muted-note">Reporting period: {periodLabel(reportingPeriod)}</p>
+
+            {completedSummaryError ? <p class="tb-error-note">{completedSummaryError}</p> : null}
+
+            <section>
+              <h4>LLM Summary</h4>
+              {completedSummaryLoading ? <p class="tb-muted-note">Loading completed cards...</p> : null}
+              {completedSummaryTextLoading ? <p class="tb-muted-note">Generating summary with OCI GenAI...</p> : null}
+              {completedSummaryTextError ? <p class="tb-error-note">{completedSummaryTextError}</p> : null}
+              {completedSummaryText ? (
+                <div class="tb-summary">
+                  <p>{completedSummaryText}</p>
+                </div>
+              ) : null}
+              {(completedSummaryModelId || completedSummaryGeneratedAt) && !completedSummaryTextLoading ? (
+                <p class="tb-muted-note">
+                  Generated with OCI GenAI
+                  {completedSummaryModelId ? ` | Model: ${completedSummaryModelId}` : ""}
+                  {completedSummaryGeneratedAt ? ` | Updated: ${formatTimestamp(completedSummaryGeneratedAt)}` : ""}
+                </p>
+              ) : null}
+            </section>
+
+            <section>
+              <h4>Completed Cards ({completedSummaryCount})</h4>
+              {completedSummaryTruncated ? (
+                <p class="tb-muted-note">Showing the first {completedSummaryCards.length} cards due to response limit.</p>
+              ) : null}
+              {!completedSummaryLoading && completedSummaryCards.length === 0 ? (
+                <p class="tb-muted-note">No completed cards were returned for this period.</p>
+              ) : null}
+              {completedSummaryCards.length > 0 ? (
+                <div class="tb-initiative-completed-list">
+                  {completedSummaryCards.map((card) => (
+                    <article key={card.issueKey} class="tb-initiative-completed-card">
+                      <p class="tb-initiative-completed-key">{card.issueKey}</p>
+                      <p>{card.summary || "No summary available."}</p>
+                      <p class="tb-muted-note">
+                        Status: {card.status || "Unknown"}
+                        {card.storyPoints != null ? ` | SP: ${card.storyPoints}` : ""}
+                        {card.completedAt ? ` | Completed: ${formatTimestamp(card.completedAt)}` : ""}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           </div>
         </div>
       ) : null}

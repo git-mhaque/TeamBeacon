@@ -55,6 +55,47 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
         { epicKey: "CEG-889", epicName: "OAuth service rollout" },
       ],
     },
+    "/api/metadata/epics/completed-cards": {
+      source: "local",
+      epicKey: "CEG-101",
+      epicName: "Payment Orchestration",
+      count: 2,
+      limit: 200,
+      truncated: false,
+      completedCards: [
+        {
+          issueKey: "CEG-1001",
+          summary: "Enable retry strategy for payment orchestration",
+          status: "Done",
+          statusCategory: "Done",
+          storyPoints: 5,
+          assigneeAccountId: "user-dev",
+          completedAt: "2026-03-28T08:00:00Z",
+        },
+        {
+          issueKey: "CEG-1002",
+          summary: "Close latency spikes under load test",
+          status: "Closed",
+          statusCategory: "Done",
+          storyPoints: 3,
+          assigneeAccountId: "user-qa",
+          completedAt: "2026-03-29T08:00:00Z",
+        },
+      ],
+      reportingPeriod: {
+        startDate: "2026-03-23",
+        endDate: "2026-03-30",
+        days: 8,
+        timezone: "Australia/Melbourne",
+      },
+    },
+    "/api/ai/chat": {
+      source: "oci_genai",
+      modelId: "cohere.command-r-08-2024",
+      response: {
+        text: "Completed cards concentrated on resilience hardening and latency closure, indicating delivery momentum with clear operational stabilization in the reporting period.",
+      },
+    },
     "/api/metadata/epics": {},
   });
 }
@@ -175,5 +216,20 @@ describe("InitiativesScreen", () => {
     expect(screen.getByRole("dialog", { name: "Select Initiative Columns" })).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Delta"));
     expect(screen.queryByRole("columnheader", { name: "Delta" })).not.toBeInTheDocument();
+  });
+
+  it("opens completed-in-period overlay and generates LLM summary", async () => {
+    mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Summarize completed cards for CEG-101/i }));
+
+    expect(await screen.findByRole("dialog", { name: "Completed Cards Summary" })).toBeInTheDocument();
+    expect(await screen.findByText(/delivery momentum with clear operational stabilization/i)).toBeInTheDocument();
+    expect(screen.getByText("CEG-1001")).toBeInTheDocument();
+    expect(screen.getByText("CEG-1002")).toBeInTheDocument();
+    expect(screen.getByText(/Generated with OCI GenAI/i)).toBeInTheDocument();
   });
 });

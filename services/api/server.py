@@ -30,6 +30,7 @@ from services.api.metadata.epic_config import (
     delete_epic_group,
     delete_work_type,
     get_configured_epic_summary,
+    get_epic_completed_cards,
     get_epic_lookup_config,
     get_epic_metadata,
     search_unconfigured_epics,
@@ -55,6 +56,7 @@ MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
 MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
 MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
+MetadataEpicCompletedCardsProvider = Callable[..., dict[str, Any]]
 ConfluenceStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiChatProvider = Callable[..., dict[str, Any]]
@@ -525,6 +527,23 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "responses": {"200": {"description": "Configured epic summary", "content": json_payload}, "400": error_payload},
                 }
             },
+            "/api/metadata/epics/completed-cards": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Completed cards in reporting period for an epic",
+                    "parameters": [
+                        {"name": "epicKey", "in": "query", "required": True, "schema": {"type": "string"}},
+                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 200}},
+                        {"name": "periodStart", "in": "query", "schema": {"type": "string"}},
+                        {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
+                        {"name": "timezone", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {
+                        "200": {"description": "Completed cards in period", "content": json_payload},
+                        "400": error_payload,
+                    },
+                }
+            },
             "/api/metadata/epics/candidates": {
                 "get": {
                     "tags": ["metadata"],
@@ -558,6 +577,7 @@ def build_handler(
     metadata_delete_work_type_provider: MetadataDeleteProvider = delete_work_type,
     metadata_read_epics_provider: MetadataEpicReadProvider = get_epic_metadata,
     metadata_summary_provider: MetadataEpicSummaryProvider = get_configured_epic_summary,
+    metadata_completed_cards_provider: MetadataEpicCompletedCardsProvider = get_epic_completed_cards,
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
     metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
@@ -755,6 +775,45 @@ def build_handler(
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
                     return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epics/completed-cards":
+                query = parse_qs(parsed.query)
+                epic_key_raw = query.get("epicKey", [None])[0]
+                epic_key = epic_key_raw.strip() if isinstance(epic_key_raw, str) else None
+                if not epic_key:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "epicKey is required."}))
+                    return
+
+                limit_raw = query.get("limit", ["200"])[0]
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    limit = 200
+
+                period_start_raw = query.get("periodStart", [None])[0]
+                period_start = period_start_raw.strip() if isinstance(period_start_raw, str) else None
+                period_end_raw = query.get("periodEnd", [None])[0]
+                period_end = period_end_raw.strip() if isinstance(period_end_raw, str) else None
+                timezone_raw = query.get("timezone", [None])[0]
+                timezone_name = timezone_raw.strip() if isinstance(timezone_raw, str) else None
+
+                try:
+                    payload = metadata_completed_cards_provider(
+                        epic_key=epic_key,
+                        limit=limit,
+                        period_start=period_start,
+                        period_end=period_end,
+                        timezone_name=timezone_name,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

@@ -969,6 +969,50 @@ body {
   white-space: nowrap;
 }
 
+.tb-initiative-period-trigger {
+  border: none;
+  background: transparent;
+  color: #1f4f95;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tb-initiative-period-trigger:hover {
+  color: #1a4380;
+}
+
+.tb-initiative-completed-list {
+  display: grid;
+  gap: 0.48rem;
+  max-height: 38vh;
+  overflow: auto;
+}
+
+.tb-initiative-completed-card {
+  border: 1px solid var(--tb-line);
+  border-radius: 0.76rem;
+  background: var(--tb-surface-alt);
+  padding: 0.56rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.tb-initiative-completed-card p {
+  margin: 0;
+  color: #223752;
+  font-size: 0.78rem;
+}
+
+.tb-initiative-completed-key {
+  color: #1f4f95 !important;
+  font-weight: 700;
+}
+
 .tb-initiative-empty {
   color: #4e5f7a;
   font-style: italic;

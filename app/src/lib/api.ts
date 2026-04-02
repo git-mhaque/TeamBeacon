@@ -189,6 +189,28 @@ export type ConfiguredEpicSummaryResponse = {
   error?: string | null;
 };
 
+export type EpicCompletedCard = {
+  issueKey: string;
+  summary: string;
+  status?: string | null;
+  statusCategory?: string | null;
+  storyPoints?: number | null;
+  assigneeAccountId?: string | null;
+  completedAt?: string | null;
+};
+
+export type EpicCompletedCardsResponse = {
+  source: "local";
+  epicKey: string;
+  epicName?: string | null;
+  count: number;
+  limit: number;
+  truncated: boolean;
+  completedCards: EpicCompletedCard[];
+  reportingPeriod?: EpicSummaryReportingPeriod;
+  error?: string | null;
+};
+
 export type CurrentSprint = {
   id: number;
   boardId?: number | null;
@@ -462,6 +484,43 @@ export async function fetchConfiguredEpicSummary(
     throw await parseError(response, `Configured epic summary request failed (${response.status})`);
   }
   return (await response.json()) as ConfiguredEpicSummaryResponse;
+}
+
+export async function fetchEpicCompletedCards(
+  epicKey: string,
+  options?: {
+    limit?: number;
+    periodStart?: string | null;
+    periodEnd?: string | null;
+    timezone?: string | null;
+  },
+): Promise<EpicCompletedCardsResponse> {
+  const normalizedEpicKey = epicKey.trim();
+  if (!normalizedEpicKey) {
+    throw new Error("epicKey is required.");
+  }
+
+  const params = new URLSearchParams();
+  params.set("epicKey", normalizedEpicKey);
+  params.set("limit", String(options?.limit ?? 200));
+  if (options?.periodStart) {
+    params.set("periodStart", options.periodStart);
+  }
+  if (options?.periodEnd) {
+    params.set("periodEnd", options.periodEnd);
+  }
+  if (options?.timezone) {
+    params.set("timezone", options.timezone);
+  }
+
+  const response = await fetch(`${API_BASE}/api/metadata/epics/completed-cards?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Epic completed cards request failed (${response.status})`);
+  }
+  return (await response.json()) as EpicCompletedCardsResponse;
 }
 
 export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
