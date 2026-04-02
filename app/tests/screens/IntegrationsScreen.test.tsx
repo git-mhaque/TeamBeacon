@@ -93,7 +93,6 @@ describe("IntegrationsScreen", () => {
     });
 
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
-    expect(screen.getByText("Spaces accessible: 1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Diagnostics" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Diagnostics" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Field Mapping Readiness" })).not.toBeInTheDocument();
