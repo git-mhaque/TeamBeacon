@@ -89,6 +89,58 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
         timezone: "Australia/Melbourne",
       },
     },
+    "/api/metadata/epics/completed-cards/configured": {
+      source: "local",
+      scope: "configured",
+      count: 3,
+      limit: 300,
+      truncated: false,
+      completedCards: [
+        {
+          issueKey: "CEG-1001",
+          summary: "Enable retry strategy for payment orchestration",
+          status: "Done",
+          statusCategory: "Done",
+          storyPoints: 5,
+          assigneeAccountId: "user-dev",
+          completedAt: "2026-03-28T08:00:00Z",
+          epicKey: "CEG-101",
+          epicName: "Payment Orchestration",
+        },
+        {
+          issueKey: "CEG-2002",
+          summary: "Improve fallback auth for dependency calls",
+          status: "Closed",
+          statusCategory: "Done",
+          storyPoints: 3,
+          assigneeAccountId: "user-qa",
+          completedAt: "2026-03-29T08:00:00Z",
+          epicKey: "CEG-202",
+          epicName: "Risk Aggregation",
+        },
+        {
+          issueKey: "CEG-2003",
+          summary: "Close rollout checklist gaps",
+          status: "Done",
+          statusCategory: "Done",
+          storyPoints: 2,
+          assigneeAccountId: "user-dev",
+          completedAt: "2026-03-29T12:00:00Z",
+          epicKey: "CEG-202",
+          epicName: "Risk Aggregation",
+        },
+      ],
+      perEpicCounts: {
+        "CEG-101": 1,
+        "CEG-202": 2,
+      },
+      reportingPeriod: {
+        startDate: "2026-03-23",
+        endDate: "2026-03-30",
+        days: 8,
+        timezone: "Australia/Melbourne",
+      },
+    },
     "/api/ai/chat": {
       source: "oci_genai",
       modelId: "cohere.command-r-08-2024",
@@ -218,7 +270,7 @@ describe("InitiativesScreen", () => {
     expect(screen.queryByRole("columnheader", { name: "Delta" })).not.toBeInTheDocument();
   });
 
-  it("opens completed-in-period overlay and generates LLM summary", async () => {
+  it("opens completed-in-period overlay and generates AI summary", async () => {
     mockInitiativesEndpoints();
     render(<InitiativesScreen />);
 
@@ -227,9 +279,28 @@ describe("InitiativesScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Summarize completed cards for CEG-101/i }));
 
     expect(await screen.findByRole("dialog", { name: "Completed Cards Summary" })).toBeInTheDocument();
+    expect(screen.getByText("AI Summary")).toBeInTheDocument();
     expect(await screen.findByText(/delivery momentum with clear operational stabilization/i)).toBeInTheDocument();
-    expect(screen.getByText("CEG-1001")).toBeInTheDocument();
-    expect(screen.getByText("CEG-1002")).toBeInTheDocument();
+    expect(await screen.findByText(/CEG-1001.*Done.*SP 5/i)).toBeInTheDocument();
+    expect(await screen.findByText(/CEG-1002.*Closed.*SP 3/i)).toBeInTheDocument();
     expect(screen.getByText(/Generated with OCI GenAI/i)).toBeInTheDocument();
+  });
+
+  it("opens configured completed-in-period summary from top card", async () => {
+    mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Summarize completed cards across configured initiatives" }),
+    );
+
+    expect(await screen.findByRole("dialog", { name: "Completed Cards Summary" })).toBeInTheDocument();
+    expect(screen.getByText("AI Summary")).toBeInTheDocument();
+    expect(screen.getByText("Scope:")).toBeInTheDocument();
+    expect(screen.getByText("All configured initiatives")).toBeInTheDocument();
+    expect(await screen.findByText(/CEG-2002.*Risk Aggregation/i)).toBeInTheDocument();
+    expect(await screen.findByText(/delivery momentum with clear operational stabilization/i)).toBeInTheDocument();
   });
 });

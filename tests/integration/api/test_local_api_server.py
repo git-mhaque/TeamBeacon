@@ -28,6 +28,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
         self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
         self.epic_completed_cards_calls: list[tuple[str, int, str | None, str | None, str | None]] = []
+        self.configured_completed_cards_calls: list[tuple[int, str | None, str | None, str | None]] = []
         self.oci_chat_calls: list[dict[str, object]] = []
         self.release_refresh_start_calls: list[dict[str, object]] = []
 
@@ -573,6 +574,58 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 },
             }
 
+        def fake_configured_completed_cards(limit=300, period_start=None, period_end=None, timezone_name=None):  # noqa: ANN001
+            self.configured_completed_cards_calls.append((limit, period_start, period_end, timezone_name))
+            return {
+                "source": "local",
+                "scope": "configured",
+                "count": 3,
+                "limit": limit,
+                "truncated": False,
+                "completedCards": [
+                    {
+                        "issueKey": "CEGBUPOL-7001",
+                        "summary": "Harden notification retries",
+                        "status": "Done",
+                        "statusCategory": "Done",
+                        "storyPoints": 5.0,
+                        "assigneeAccountId": "user-dev",
+                        "completedAt": "2026-03-24T00:00:00+00:00",
+                        "epicKey": "CEGBUPOL-4482",
+                        "epicName": "Enable offline initiative scoring",
+                    },
+                    {
+                        "issueKey": "CEGBUPOL-7002",
+                        "summary": "Reduce flaky e2e checks",
+                        "status": "Done",
+                        "statusCategory": "Done",
+                        "storyPoints": 3.0,
+                        "assigneeAccountId": "user-qa",
+                        "completedAt": "2026-03-25T00:00:00+00:00",
+                        "epicKey": "CEGBUPOL-3553",
+                        "epicName": "Domain Support Q4",
+                    },
+                    {
+                        "issueKey": "CEGBUPOL-7003",
+                        "summary": "Tighten rollout guardrails",
+                        "status": "Closed",
+                        "statusCategory": "Done",
+                        "storyPoints": 2.0,
+                        "assigneeAccountId": "user-dev",
+                        "completedAt": "2026-03-26T00:00:00+00:00",
+                        "epicKey": "CEGBUPOL-3553",
+                        "epicName": "Domain Support Q4",
+                    },
+                ],
+                "perEpicCounts": {"CEGBUPOL-4482": 1, "CEGBUPOL-3553": 2},
+                "reportingPeriod": {
+                    "startDate": "2026-03-01",
+                    "endDate": "2026-03-30",
+                    "days": 30,
+                    "timezone": timezone_name or "UTC",
+                },
+            }
+
         def fake_upsert_epic(**kwargs):  # noqa: ANN003
             self.epic_upsert_calls.append(kwargs)
             return {
@@ -617,6 +670,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_read_epics_provider=fake_read_epics,
             metadata_summary_provider=fake_epic_summary,
             metadata_completed_cards_provider=fake_epic_completed_cards,
+            metadata_configured_completed_cards_provider=fake_configured_completed_cards,
             metadata_search_epics_provider=fake_search_epics,
             metadata_upsert_epic_provider=fake_upsert_epic,
             metadata_delete_epic_provider=fake_delete_epic,
@@ -658,6 +712,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/releases/refresh/result", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards", body["paths"])
+        self.assertIn("/api/metadata/epics/completed-cards/configured", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
     def test_docs_endpoint(self) -> None:
@@ -1122,6 +1177,24 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as exc_ctx:
             urlopen(f"{self.base_url}/api/metadata/epics/completed-cards", timeout=5)  # noqa: S310
         self.assertEqual(exc_ctx.exception.code, 400)
+
+    def test_metadata_completed_cards_configured_endpoint(self) -> None:
+        with urlopen(
+            f"{self.base_url}/api/metadata/epics/completed-cards/configured?limit=50&periodStart=2026-03-01&periodEnd=2026-03-30&timezone=Australia/Melbourne",
+            timeout=5,
+        ) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["scope"], "configured")
+        self.assertEqual(body["count"], 3)
+        self.assertEqual(len(body["completedCards"]), 3)
+        self.assertEqual(body["perEpicCounts"]["CEGBUPOL-3553"], 2)
+        self.assertEqual(
+            self.configured_completed_cards_calls[-1],
+            (50, "2026-03-01", "2026-03-30", "Australia/Melbourne"),
+        )
 
     def test_metadata_upsert_epic_endpoint_rejects_non_string_timeline_start_date(self) -> None:
         request = Request(

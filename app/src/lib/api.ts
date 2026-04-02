@@ -197,6 +197,8 @@ export type EpicCompletedCard = {
   storyPoints?: number | null;
   assigneeAccountId?: string | null;
   completedAt?: string | null;
+  epicKey?: string | null;
+  epicName?: string | null;
 };
 
 export type EpicCompletedCardsResponse = {
@@ -207,6 +209,18 @@ export type EpicCompletedCardsResponse = {
   limit: number;
   truncated: boolean;
   completedCards: EpicCompletedCard[];
+  reportingPeriod?: EpicSummaryReportingPeriod;
+  error?: string | null;
+};
+
+export type ConfiguredEpicsCompletedCardsResponse = {
+  source: "local";
+  scope: "configured";
+  count: number;
+  limit: number;
+  truncated: boolean;
+  completedCards: EpicCompletedCard[];
+  perEpicCounts: Record<string, number>;
   reportingPeriod?: EpicSummaryReportingPeriod;
   error?: string | null;
 };
@@ -521,6 +535,34 @@ export async function fetchEpicCompletedCards(
     throw await parseError(response, `Epic completed cards request failed (${response.status})`);
   }
   return (await response.json()) as EpicCompletedCardsResponse;
+}
+
+export async function fetchConfiguredEpicsCompletedCards(options?: {
+  limit?: number;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  timezone?: string | null;
+}): Promise<ConfiguredEpicsCompletedCardsResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options?.limit ?? 300));
+  if (options?.periodStart) {
+    params.set("periodStart", options.periodStart);
+  }
+  if (options?.periodEnd) {
+    params.set("periodEnd", options.periodEnd);
+  }
+  if (options?.timezone) {
+    params.set("timezone", options.timezone);
+  }
+
+  const response = await fetch(`${API_BASE}/api/metadata/epics/completed-cards/configured?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Configured completed cards request failed (${response.status})`);
+  }
+  return (await response.json()) as ConfiguredEpicsCompletedCardsResponse;
 }
 
 export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {

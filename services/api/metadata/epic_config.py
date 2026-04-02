@@ -996,6 +996,160 @@ def get_epic_completed_cards(
     }
 
 
+def get_configured_epics_completed_cards(
+    *,
+    limit: int = 300,
+    period_start: str | None = None,
+    period_end: str | None = None,
+    timezone_name: str | None = None,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    safe_limit = max(1, min(int(limit), 1000))
+    (
+        period_start_date,
+        period_end_date,
+        resolved_timezone_name,
+        resolved_timezone,
+    ) = _resolve_reporting_period(
+        period_start=period_start,
+        period_end=period_end,
+        timezone_name=timezone_name,
+    )
+
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        configured_rows = conn.execute(
+            """
+            SELECT em.epic_key, em.epic_name, i.summary AS issue_summary
+            FROM epic_metadata em
+            LEFT JOIN issues i ON i.issue_key = em.epic_key
+            ORDER BY em.epic_key ASC
+            """
+        ).fetchall()
+
+        configured_epic_keys = [str(row["epic_key"]) for row in configured_rows]
+        if not configured_epic_keys:
+            return {
+                "source": "local",
+                "scope": "configured",
+                "count": 0,
+                "limit": safe_limit,
+                "truncated": False,
+                "completedCards": [],
+                "perEpicCounts": {},
+                "reportingPeriod": {
+                    "startDate": period_start_date.isoformat(),
+                    "endDate": period_end_date.isoformat(),
+                    "days": (period_end_date - period_start_date).days + 1,
+                    "timezone": resolved_timezone_name,
+                },
+            }
+
+        epic_name_by_key: dict[str, str] = {}
+        for row in configured_rows:
+            key = str(row["epic_key"])
+            name_raw = row["epic_name"] if row["epic_name"] is not None else row["issue_summary"]
+            name = str(name_raw).strip() if name_raw is not None else ""
+            epic_name_by_key[key] = name
+
+        placeholders = ",".join("?" for _ in configured_epic_keys)
+        query = f"""
+            SELECT
+              i.issue_key,
+              i.summary,
+              i.status_name,
+              i.status_category,
+              i.story_points,
+              i.assignee_account_id,
+              i.resolved_at_source,
+              i.updated_at_source,
+              i.synced_at,
+              i.epic_key,
+              i.parent_issue_key,
+              p.epic_key AS parent_epic_key
+            FROM issues i
+            LEFT JOIN issues p ON p.issue_key = i.parent_issue_key
+            WHERE LOWER(COALESCE(i.issue_type, '')) <> 'epic'
+              AND (
+                i.epic_key IN ({placeholders})
+                OR i.parent_issue_key IN ({placeholders})
+                OR p.epic_key IN ({placeholders})
+              )
+            ORDER BY datetime(COALESCE(i.resolved_at_source, i.updated_at_source, i.synced_at)) DESC, i.issue_key ASC
+        """
+        params = configured_epic_keys + configured_epic_keys + configured_epic_keys
+        issue_rows = conn.execute(query, params).fetchall()
+
+        configured_epic_set = set(configured_epic_keys)
+        completed_cards: list[dict[str, Any]] = []
+        per_epic_counts: dict[str, int] = {}
+        completed_count = 0
+        for row in issue_rows:
+            if not _is_done_issue(row):
+                continue
+            if not _is_completed_in_period(
+                row,
+                period_start_date=period_start_date,
+                period_end_date=period_end_date,
+                reporting_timezone=resolved_timezone,
+            ):
+                continue
+
+            owning_epic_key = None
+            raw_epic_key = str(row["epic_key"] or "").strip()
+            raw_parent_key = str(row["parent_issue_key"] or "").strip()
+            raw_parent_epic_key = str(row["parent_epic_key"] or "").strip()
+            if raw_epic_key in configured_epic_set:
+                owning_epic_key = raw_epic_key
+            elif raw_parent_key in configured_epic_set:
+                owning_epic_key = raw_parent_key
+            elif raw_parent_epic_key in configured_epic_set:
+                owning_epic_key = raw_parent_epic_key
+            if not owning_epic_key:
+                continue
+
+            completed_count += 1
+            per_epic_counts[owning_epic_key] = per_epic_counts.get(owning_epic_key, 0) + 1
+            if len(completed_cards) >= safe_limit:
+                continue
+
+            completed_at_raw = row["resolved_at_source"] or row["updated_at_source"] or row["synced_at"]
+            completed_at = _parse_source_datetime(completed_at_raw)
+            completed_cards.append(
+                {
+                    "issueKey": row["issue_key"],
+                    "summary": row["summary"],
+                    "status": row["status_name"],
+                    "statusCategory": row["status_category"],
+                    "storyPoints": row["story_points"],
+                    "assigneeAccountId": row["assignee_account_id"],
+                    "completedAt": completed_at.isoformat() if completed_at is not None else None,
+                    "epicKey": owning_epic_key,
+                    "epicName": epic_name_by_key.get(owning_epic_key) or owning_epic_key,
+                }
+            )
+    finally:
+        conn.close()
+
+    return {
+        "source": "local",
+        "scope": "configured",
+        "count": completed_count,
+        "limit": safe_limit,
+        "truncated": completed_count > len(completed_cards),
+        "completedCards": completed_cards,
+        "perEpicCounts": per_epic_counts,
+        "reportingPeriod": {
+            "startDate": period_start_date.isoformat(),
+            "endDate": period_end_date.isoformat(),
+            "days": (period_end_date - period_start_date).days + 1,
+            "timezone": resolved_timezone_name,
+        },
+    }
+
+
 def upsert_epic_metadata(
     *,
     epic_key: str,

@@ -986,31 +986,53 @@ body {
   color: #1a4380;
 }
 
+.tb-initiative-period-trigger-metric {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1;
+}
+
 .tb-initiative-completed-list {
   display: grid;
-  gap: 0.48rem;
+  gap: 0.34rem;
   max-height: 38vh;
   overflow: auto;
 }
 
 .tb-initiative-completed-card {
   border: 1px solid var(--tb-line);
-  border-radius: 0.76rem;
+  border-radius: 0.64rem;
   background: var(--tb-surface-alt);
-  padding: 0.56rem;
+  padding: 0.46rem 0.52rem;
   display: grid;
-  gap: 0.2rem;
+  gap: 0.08rem;
 }
 
-.tb-initiative-completed-card p {
+.tb-initiative-completed-line-primary,
+.tb-initiative-completed-line-meta {
   margin: 0;
-  color: #223752;
-  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tb-initiative-completed-key {
-  color: #1f4f95 !important;
-  font-weight: 700;
+.tb-initiative-completed-line-primary {
+  color: #203a5d;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.tb-initiative-completed-line-meta {
+  color: #4c6382;
+  font-size: 0.71rem;
+}
+
+.tb-initiative-completed-section-title {
+  margin: 0 0 0.22rem;
+  color: #234772;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.18;
 }
 
 .tb-initiative-empty {

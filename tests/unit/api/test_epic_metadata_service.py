@@ -12,6 +12,7 @@ from services.api.metadata.epic_config import (
     delete_epic_metadata,
     delete_epic_group,
     delete_work_type,
+    get_configured_epics_completed_cards,
     get_epic_completed_cards,
     get_configured_epic_summary,
     get_epic_lookup_config,
@@ -725,6 +726,149 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["completedCards"][0]["assigneeAccountId"], "user-dev")
             self.assertEqual(payload["reportingPeriod"]["startDate"], "2026-03-23")
             self.assertEqual(payload["reportingPeriod"]["endDate"], "2026-03-30")
+
+    def test_get_configured_epics_completed_cards_aggregates_across_configured_epics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS issues (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      issue_key TEXT NOT NULL UNIQUE,
+                      issue_id TEXT NOT NULL,
+                      project_key TEXT,
+                      issue_type TEXT,
+                      summary TEXT NOT NULL,
+                      status_name TEXT NOT NULL,
+                      status_category TEXT,
+                      priority TEXT,
+                      assignee_account_id TEXT,
+                      reporter_account_id TEXT,
+                      story_points REAL,
+                      sprint_external_id INTEGER,
+                      epic_key TEXT,
+                      parent_issue_key TEXT,
+                      labels_json TEXT NOT NULL DEFAULT '[]',
+                      components_json TEXT NOT NULL DEFAULT '[]',
+                      created_at_source TEXT,
+                      updated_at_source TEXT,
+                      resolved_at_source TEXT,
+                      raw_json TEXT NOT NULL DEFAULT '{}',
+                      synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO issues (issue_key, issue_id, issue_type, summary, status_name, status_category, updated_at_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "CEGBUPOL-4482",
+                            "4482",
+                            "Epic",
+                            "Enable offline initiative scoring",
+                            "In Progress",
+                            "In Progress",
+                            "2026-03-20T10:00:00+00:00",
+                        ),
+                        (
+                            "CEGBUPOL-3553",
+                            "3553",
+                            "Epic",
+                            "Domain Support Q4",
+                            "In Progress",
+                            "In Progress",
+                            "2026-03-20T10:00:00+00:00",
+                        ),
+                    ],
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category,
+                      epic_key, story_points, assignee_account_id, updated_at_source, resolved_at_source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "CEGBUPOL-7001",
+                            "7001",
+                            "Story",
+                            "Harden notification retries",
+                            "Done",
+                            "Done",
+                            "CEGBUPOL-4482",
+                            5.0,
+                            "user-dev",
+                            "2026-03-24T00:00:00+00:00",
+                            "2026-03-24T00:00:00+00:00",
+                        ),
+                        (
+                            "CEGBUPOL-7002",
+                            "7002",
+                            "Story",
+                            "Reduce flaky e2e checks",
+                            "Closed",
+                            "Done",
+                            "CEGBUPOL-3553",
+                            3.0,
+                            "user-qa",
+                            "2026-03-25T00:00:00+00:00",
+                            "2026-03-25T00:00:00+00:00",
+                        ),
+                        (
+                            "CEGBUPOL-7003",
+                            "7003",
+                            "Story",
+                            "Out of period item",
+                            "Done",
+                            "Done",
+                            "CEGBUPOL-3553",
+                            2.0,
+                            "user-dev",
+                            "2026-02-10T00:00:00+00:00",
+                            "2026-02-10T00:00:00+00:00",
+                        ),
+                    ],
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-4482",
+                success_criteria=["Keep blockers at zero"],
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-3553",
+                success_criteria=["Reduce incident intake"],
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+
+            payload = get_configured_epics_completed_cards(
+                period_start="2026-03-23",
+                period_end="2026-03-30",
+                timezone_name="UTC",
+                db_path=db_path,
+            )
+            self.assertEqual(payload["scope"], "configured")
+            self.assertEqual(payload["count"], 2)
+            self.assertFalse(payload["truncated"])
+            self.assertEqual(len(payload["completedCards"]), 2)
+            self.assertEqual(payload["perEpicCounts"]["CEGBUPOL-4482"], 1)
+            self.assertEqual(payload["perEpicCounts"]["CEGBUPOL-3553"], 1)
+            self.assertEqual(payload["completedCards"][0]["epicKey"], "CEGBUPOL-3553")
+            self.assertEqual(payload["completedCards"][1]["epicKey"], "CEGBUPOL-4482")
 
     def test_configured_epic_summary_rejects_invalid_period(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
