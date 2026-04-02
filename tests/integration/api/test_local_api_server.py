@@ -116,6 +116,23 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
+        def fake_confluence_status():
+            return {
+                "source": "confluence",
+                "connected": True,
+                "checkedAt": "2026-03-25T00:00:00+00:00",
+                "config": {
+                    "baseUrl": "https://gbuconfluence.oraclecorp.com",
+                    "authMode": "pat_bearer",
+                    "timeoutSeconds": 30,
+                },
+                "checks": [
+                    {"name": "space_query", "ok": True, "detail": "Confluence space query succeeded."},
+                ],
+                "metrics": {"spaceCount": 1},
+                "error": None,
+            }
+
         def fake_oci_chat(
             *,
             message,  # noqa: ANN001
@@ -479,6 +496,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_search_epics_provider=fake_search_epics,
             metadata_upsert_epic_provider=fake_upsert_epic,
             metadata_delete_epic_provider=fake_delete_epic,
+            confluence_status_provider=fake_confluence_status,
             oci_genai_status_provider=fake_oci_status,
             oci_genai_chat_provider=fake_oci_chat,
         )
@@ -507,6 +525,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["openapi"], "3.0.3")
         self.assertEqual(body["info"]["title"], "TeamBeacon Local API")
         self.assertIn("/api/ai/chat", body["paths"])
+        self.assertIn("/api/integrations/confluence/status", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
@@ -602,6 +621,15 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertTrue(body["connected"])
         self.assertEqual(body["config"]["modelId"], "cohere.command-r-08-2024")
         self.assertEqual(len(body["checks"]), 2)
+
+    def test_confluence_status_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/integrations/confluence/status", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "confluence")
+        self.assertTrue(body["connected"])
+        self.assertEqual(body["config"]["baseUrl"], "https://gbuconfluence.oraclecorp.com")
+        self.assertEqual(body["metrics"]["spaceCount"], 1)
 
     def test_oci_genai_chat_endpoint(self) -> None:
         request = Request(

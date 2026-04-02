@@ -19,6 +19,13 @@
 - `JIRA_TIMEOUT_SECONDS` (default: `30`)
 - `RUN_LIVE_JIRA_TESTS` (`1` enables live integration tests)
 
+## Confluence Variables
+- `CONFLUENCE_BASE_URL` (required)
+- `CONFLUENCE_PAT` (required)
+- `CONFLUENCE_AUTH_MODE` (`pat_bearer` default, `basic` also supported)
+- `CONFLUENCE_USERNAME` (only needed for `basic` auth mode)
+- `CONFLUENCE_TIMEOUT_SECONDS` (default: `30`)
+
 ## OCI GenAI Variables
 - `OCI_GENAI_COMPARTMENT_ID` (required)
 - `OCI_GENAI_ENDPOINT` (required, e.g. `https://inference.generativeai.us-chicago-1.oci.oraclecloud.com`)

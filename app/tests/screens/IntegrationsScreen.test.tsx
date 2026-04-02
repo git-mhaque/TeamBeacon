@@ -39,6 +39,23 @@ describe("IntegrationsScreen", () => {
           { name: "inference", ok: true, detail: "responding" },
         ],
       },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-03-30T09:15:00Z",
+        config: {
+          baseUrl: "https://gbuconfluence.oraclecorp.com",
+          authMode: "pat_bearer",
+          timeoutSeconds: 30,
+        },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+        metrics: {
+          spaceCount: 1,
+        },
+      },
       "/api/integrations/jira/sync/status": {
         source: "jira",
         state: "idle",
@@ -66,17 +83,16 @@ describe("IntegrationsScreen", () => {
     expect(screen.getByRole("heading", { name: "Confluence Connection" })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
+      expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(5);
     });
 
     await waitFor(() => {
-      expect(screen.getAllByText("Connected")).toHaveLength(2);
-      expect(screen.getAllByText("2/2 connectivity checks passed.")).toHaveLength(2);
+      expect(screen.getAllByText("Connected")).toHaveLength(3);
+      expect(screen.getAllByText("2/2 connectivity checks passed.")).toHaveLength(3);
       expect(screen.getByRole("button", { name: "Check Now" })).toBeInTheDocument();
     });
 
-    expect(screen.getAllByText(/Last checked:/i)).toHaveLength(2);
-    expect(screen.getByText("Model: cohere.command-r-08-2024")).toBeInTheDocument();
+    expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "JIRA Diagnostics" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Field Mapping Readiness" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Epic Metadata Configuration" })).toBeInTheDocument();
@@ -116,6 +132,19 @@ describe("IntegrationsScreen", () => {
         checks: [
           { name: "auth", ok: true, detail: "reachable" },
           { name: "inference", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-03-30T09:15:00Z",
+        config: {
+          baseUrl: "https://gbuconfluence.oraclecorp.com",
+          authMode: "pat_bearer",
+        },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
         ],
       },
       "/api/integrations/jira/sync/status": {
@@ -197,6 +226,16 @@ describe("IntegrationsScreen", () => {
         checks: [
           { name: "auth", ok: true, detail: "reachable" },
           { name: "inference", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-03-30T09:15:00Z",
+        config: { baseUrl: "https://gbuconfluence.oraclecorp.com" },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
         ],
       },
       "/api/integrations/jira/sync/status": {

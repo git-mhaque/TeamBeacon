@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import {
   addEpicGroup,
   addWorkType,
+  ConfluenceIntegrationStatus,
   deleteEpicGroup,
   deleteWorkType,
   EpicLookupConfig,
+  fetchConfluenceIntegrationStatus,
   fetchEpicLookupConfig,
   fetchJiraIntegrationStatus,
   fetchJiraSyncHistory,
@@ -66,11 +68,13 @@ export function IntegrationsScreen() {
 
   const [jiraStatus, setJiraStatus] = useState<JiraIntegrationStatus | null>(null);
   const [ociStatus, setOciStatus] = useState<OciGenAiIntegrationStatus | null>(null);
+  const [confluenceStatus, setConfluenceStatus] = useState<ConfluenceIntegrationStatus | null>(null);
   const [jiraSyncStatus, setJiraSyncStatus] = useState<JiraSyncStatus | null>(null);
   const [jiraSyncHistory, setJiraSyncHistory] = useState<JiraSyncHistoryEntry[]>([]);
 
   const [jiraError, setJiraError] = useState<string | null>(null);
   const [ociError, setOciError] = useState<string | null>(null);
+  const [confluenceError, setConfluenceError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
@@ -78,6 +82,7 @@ export function IntegrationsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [ociLoading, setOciLoading] = useState(true);
+  const [confluenceLoading, setConfluenceLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -122,6 +127,21 @@ export function IntegrationsScreen() {
       setOciStatus(null);
     } finally {
       setOciLoading(false);
+    }
+  }, []);
+
+  const loadConfluenceStatus = useCallback(async () => {
+    setConfluenceLoading(true);
+    setConfluenceError(null);
+    try {
+      const status = await fetchConfluenceIntegrationStatus();
+      setConfluenceStatus(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown Confluence status failure.";
+      setConfluenceError(message);
+      setConfluenceStatus(null);
+    } finally {
+      setConfluenceLoading(false);
     }
   }, []);
 
@@ -171,7 +191,10 @@ export function IntegrationsScreen() {
     loadOciStatus().catch(() => {
       // loadOciStatus updates local state.
     });
-  }, [loadJiraStatus, loadOciStatus]);
+    loadConfluenceStatus().catch(() => {
+      // loadConfluenceStatus updates local state.
+    });
+  }, [loadConfluenceStatus, loadJiraStatus, loadOciStatus]);
 
   const triggerJiraSync = useCallback(async (mode: JiraSyncMode, sinceDate?: string) => {
     setSyncError(null);
@@ -193,13 +216,16 @@ export function IntegrationsScreen() {
     loadOciStatus().catch(() => {
       // loadOciStatus updates local state.
     });
+    loadConfluenceStatus().catch(() => {
+      // loadConfluenceStatus updates local state.
+    });
     loadJiraSyncStatus().catch(() => {
       // loadJiraSyncStatus updates local state.
     });
     loadEpicMetadataConfig().catch(() => {
       // loadEpicMetadataConfig updates local state.
     });
-  }, [loadEpicMetadataConfig, loadJiraStatus, loadJiraSyncStatus, loadOciStatus]);
+  }, [loadConfluenceStatus, loadEpicMetadataConfig, loadJiraStatus, loadJiraSyncStatus, loadOciStatus]);
 
   useEffect(() => {
     if (jiraSyncStatus?.state !== "running") {
@@ -427,8 +453,19 @@ export function IntegrationsScreen() {
     return ociStatus?.connected ? "Connected" : "Check Required";
   }, [ociError, ociLoading, ociStatus]);
 
+  const confluenceValue = useMemo(() => {
+    if (confluenceError) return "Unavailable";
+    if (confluenceLoading) return "Checking...";
+    return confluenceStatus?.connected ? "Connected" : "Check Required";
+  }, [confluenceError, confluenceLoading, confluenceStatus]);
+
   const jiraToneClass = jiraError ? "tb-value-risk" : jiraStatus?.connected ? "tb-value-good" : "tb-value-warn";
   const ociToneClass = ociError ? "tb-value-risk" : ociStatus?.connected ? "tb-value-good" : "tb-value-warn";
+  const confluenceToneClass = confluenceError
+    ? "tb-value-risk"
+    : confluenceStatus?.connected
+      ? "tb-value-good"
+      : "tb-value-warn";
 
   const jiraHint = useMemo(() => {
     if (jiraError) return jiraError;
@@ -445,6 +482,14 @@ export function IntegrationsScreen() {
     if (ociStatus.error) return ociStatus.error;
     return checksSummary(ociStatus.checks);
   }, [ociError, ociLoading, ociStatus]);
+
+  const confluenceHint = useMemo(() => {
+    if (confluenceError) return confluenceError;
+    if (confluenceLoading) return "Testing Confluence REST API reachability and PAT access.";
+    if (!confluenceStatus) return "Status not loaded.";
+    if (confluenceStatus.error) return confluenceStatus.error;
+    return checksSummary(confluenceStatus.checks);
+  }, [confluenceError, confluenceLoading, confluenceStatus]);
 
   const jiraSyncToneClass = useMemo(() => {
     if (syncError) return "is-risk";
@@ -496,20 +541,9 @@ export function IntegrationsScreen() {
 
   const jiraLastSyncedText = useMemo(() => formatCheckedAt(jiraSyncStatus?.lastSyncedAt), [jiraSyncStatus?.lastSyncedAt]);
 
-  const jiraSyncModeText = useMemo(() => {
-    const mode = jiraSyncStatus?.syncMode;
-    if (mode === "since_date") {
-      const requestedSince = jiraSyncStatus?.requestedSince;
-      if (!requestedSince) return "Since specific date";
-      const requestedDate = new Date(requestedSince);
-      if (Number.isNaN(requestedDate.getTime())) return `Since ${requestedSince}`;
-      return `Since ${requestedDate.toLocaleDateString()}`;
-    }
-    if (mode === "since_last") {
-      return "Since last checkpoint";
-    }
-    return "Full";
-  }, [jiraSyncStatus?.requestedSince, jiraSyncStatus?.syncMode]);
+  const showJiraSyncStatusPill = Boolean(
+    syncError || jiraSyncStatus?.state === "running" || jiraSyncStatus?.state === "failed",
+  );
 
   const jiraBaseUrl = jiraStatus?.config.baseUrl ? jiraStatus.config.baseUrl.replace(/\/$/, "") : null;
   const configuredBoard = jiraStatus?.configuredBoard;
@@ -544,10 +578,10 @@ export function IntegrationsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Source Connections</h3>
-            <p>Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
+            <p class="tb-muted-note">Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
           </div>
           <button type="button" class="tb-btn tb-btn-primary" onClick={checkSourceConnections}>
-            {loading || ociLoading ? "Checking..." : "Check Now"}
+            {loading || ociLoading || confluenceLoading ? "Checking..." : "Check Now"}
           </button>
         </header>
         <div class="tb-metrics-grid tb-three-up">
@@ -556,29 +590,32 @@ export function IntegrationsScreen() {
             <strong class={`tb-value ${jiraToneClass}`}>{jiraValue}</strong>
             <p>{jiraHint}</p>
             <p>Last checked: {formatCheckedAt(jiraStatus?.checkedAt)}</p>
-            <p class="tb-sync-progress-row">
-              <span>Sync:</span>
-              {jiraSyncPercent !== null ? (
-                <>
-                  <span
-                    class="tb-sync-progress-track"
-                    role="progressbar"
-                    aria-label="JIRA sync progress"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={jiraSyncPercent}
-                  >
-                    <span class="tb-sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
-                  </span>
-                  <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
-                </>
-              ) : (
-                <span class="tb-sync-progress-fallback">{jiraSyncProgressSummary}</span>
-              )}
-            </p>
-            {jiraSyncPercent !== null ? <p class="tb-sync-progress-note">{jiraSyncProgressSummary}</p> : null}
+            {jiraSyncStatus?.state === "running" ? (
+              <>
+                <p class="tb-sync-progress-row">
+                  <span>Sync:</span>
+                  {jiraSyncPercent !== null ? (
+                    <>
+                      <span
+                        class="tb-sync-progress-track"
+                        role="progressbar"
+                        aria-label="JIRA sync progress"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={jiraSyncPercent}
+                      >
+                        <span class="tb-sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
+                      </span>
+                      <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                    </>
+                  ) : (
+                    <span class="tb-sync-progress-fallback">{jiraSyncProgressSummary}</span>
+                  )}
+                </p>
+                {jiraSyncPercent !== null ? <p class="tb-sync-progress-note">{jiraSyncProgressSummary}</p> : null}
+              </>
+            ) : null}
             <p>Last synced: {jiraLastSyncedText}</p>
-            <p>Mode: {jiraSyncModeText}</p>
             <div class="tb-card-actions">
               <button
                 type="button"
@@ -591,13 +628,22 @@ export function IntegrationsScreen() {
               <button type="button" class="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
                 Sync History
               </button>
-              <span class={`tb-status-pill ${jiraSyncToneClass}`}>
-                {jiraSyncStatus?.state === "running" ? (
-                  <span class="tb-inline-spinner" aria-hidden="true" />
-                ) : null}
-                <span>{jiraSyncStateText}</span>
-              </span>
+              {showJiraSyncStatusPill ? (
+                <span class={`tb-status-pill ${jiraSyncToneClass}`}>
+                  {jiraSyncStatus?.state === "running" ? (
+                    <span class="tb-inline-spinner" aria-hidden="true" />
+                  ) : null}
+                  <span>{jiraSyncStateText}</span>
+                </span>
+              ) : null}
             </div>
+          </article>
+
+          <article class="tb-metric-card">
+            <h4>Confluence Connection</h4>
+            <strong class={`tb-value ${confluenceToneClass}`}>{confluenceValue}</strong>
+            <p>{confluenceHint}</p>
+            <p>Last checked: {formatCheckedAt(confluenceStatus?.checkedAt)}</p>
           </article>
 
           <article class="tb-metric-card">
@@ -605,14 +651,6 @@ export function IntegrationsScreen() {
             <strong class={`tb-value ${ociToneClass}`}>{ociValue}</strong>
             <p>{ociHint}</p>
             <p>Last checked: {formatCheckedAt(ociStatus?.checkedAt)}</p>
-            <p>Model: {ociStatus?.config.modelId ?? "n/a"}</p>
-            <p>Endpoint: {ociStatus?.config.endpoint ?? "n/a"}</p>
-          </article>
-
-          <article class="tb-metric-card">
-            <h4>Confluence Connection</h4>
-            <strong class="tb-value tb-value-warn">Not Implemented</strong>
-            <p>Confluence health endpoint not wired yet.</p>
           </article>
         </div>
       </section>
@@ -621,7 +659,7 @@ export function IntegrationsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>JIRA Diagnostics</h3>
-            <p>Board and project checks from live API response.</p>
+            <p class="tb-muted-note">Board and project checks from live API response.</p>
           </div>
         </header>
         <div class="tb-metrics-grid tb-three-up">
@@ -671,7 +709,7 @@ export function IntegrationsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Field Mapping Readiness</h3>
-            <p>Track required custom fields before sync pipelines run.</p>
+            <p class="tb-muted-note">Track required custom fields before sync pipelines run.</p>
           </div>
           <span class={`tb-status-pill ${jiraStatus?.connected ? "is-good" : "is-warn"}`}>
             {jiraStatus?.connected ? "JIRA Mapping Loaded" : "Pending Live Check"}
@@ -694,7 +732,7 @@ export function IntegrationsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Epic Metadata Configuration</h3>
-            <p>Manage reusable epic groups and work types used by epic configuration.</p>
+            <p class="tb-muted-note">Manage reusable epic groups and work types used by epic configuration.</p>
           </div>
         </header>
 

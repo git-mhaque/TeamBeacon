@@ -24,6 +24,10 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `{"mode":"since_last"}`
     - `{"mode":"since_date","sinceDate":"2026-03-01"}`
 - `GET /api/integrations/jira/sync/history?limit=30`
+- `GET /api/integrations/confluence/status`
+  - Validates Confluence REST reachability with PAT/basic auth:
+    - `/rest/api/space?limit=1` query
+    - Required Confluence environment variables
 - `GET /api/integrations/oci-genai/status`
   - Validates local OCI GenAI wiring:
     - OCI SDK availability
@@ -99,6 +103,7 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 
 ## Notes
 - The JIRA status endpoint reads `config/.env` (or process env vars).
+- The Confluence status endpoint reads `config/.env` (or process env vars).
 - OCI GenAI endpoints read `config/.env` (or process env vars) and require the OCI Python SDK (`python3 -m pip install oci`).
 - JIRA sync persists board/sprint/issue/changelog data to local SQLite (`teambeacon.db` by default).
 - Parent-child lineage is stored on `issues.parent_issue_key`; epic linkage is stored on `issues.epic_key`.

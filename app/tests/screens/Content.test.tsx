@@ -37,6 +37,19 @@ describe("Content", () => {
           { name: "inference", ok: true, detail: "responding" },
         ],
       },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-03-30T09:15:00Z",
+        config: {
+          baseUrl: "https://gbuconfluence.oraclecorp.com",
+          authMode: "pat_bearer",
+        },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+      },
     });
 
     render(<Content appName="TeamBeacon" />);

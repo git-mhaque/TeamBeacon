@@ -10,6 +10,7 @@ from services.api.issues.current_sprint import get_current_sprint
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
 from services.api.issues.current_sprint_work import get_current_sprint_work
 from services.api.issues.query import search_synced_issues
+from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
 from services.api.integrations.jira_sync import (
     get_jira_sync_history,
@@ -49,6 +50,7 @@ MetadataEpicSummaryProvider = Callable[..., dict[str, Any]]
 MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
 MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
+ConfluenceStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiChatProvider = Callable[..., dict[str, Any]]
 
@@ -207,6 +209,13 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         "202": {"description": "Sync started", "content": json_payload},
                         "400": error_payload,
                     },
+                }
+            },
+            "/api/integrations/confluence/status": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "Confluence integration status",
+                    "responses": {"200": {"description": "Confluence status", "content": json_payload}},
                 }
             },
             "/api/integrations/oci-genai/status": {
@@ -495,6 +504,7 @@ def build_handler(
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
     metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
+    confluence_status_provider: ConfluenceStatusProvider = get_confluence_status,
     oci_genai_status_provider: OciGenAiStatusProvider = get_oci_genai_status,
     oci_genai_chat_provider: OciGenAiChatProvider = chat_with_oci_genai,
 ) -> type[BaseHTTPRequestHandler]:
@@ -564,6 +574,12 @@ def build_handler(
                 except ValueError:
                     limit = 20
                 payload = jira_sync_history_provider(limit)
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/integrations/confluence/status":
+                payload = confluence_status_provider()
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

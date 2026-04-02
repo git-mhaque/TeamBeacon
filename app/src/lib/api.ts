@@ -53,6 +53,22 @@ export type OciGenAiIntegrationStatus = {
   error?: string | null;
 };
 
+export type ConfluenceIntegrationStatus = {
+  source: "confluence";
+  connected: boolean;
+  checkedAt: string;
+  config: {
+    baseUrl?: string;
+    authMode?: string;
+    timeoutSeconds?: number;
+  };
+  checks: IntegrationCheck[];
+  metrics?: {
+    spaceCount?: number;
+  };
+  error?: string | null;
+};
+
 export type OciGenAiChatResponse = {
   source: "oci_genai";
   modelId: string;
@@ -301,6 +317,17 @@ export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrat
     throw await parseError(response, `OCI GenAI status request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiIntegrationStatus;
+}
+
+export async function fetchConfluenceIntegrationStatus(): Promise<ConfluenceIntegrationStatus> {
+  const response = await fetch(`${API_BASE}/api/integrations/confluence/status`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Confluence status request failed (${response.status})`);
+  }
+  return (await response.json()) as ConfluenceIntegrationStatus;
 }
 
 export async function chatWithOciGenAi(payload: {
