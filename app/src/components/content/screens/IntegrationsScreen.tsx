@@ -651,6 +651,7 @@ export function IntegrationsScreen() {
             <strong class={`tb-value ${confluenceToneClass}`}>{confluenceValue}</strong>
             <p>{confluenceHint}</p>
             <p>Last checked: {formatCheckedAt(confluenceStatus?.checkedAt)}</p>
+            <p>Spaces accessible: {confluenceStatus?.metrics?.spaceCount ?? "n/a"}</p>
           </article>
 
           <article class="tb-metric-card">
