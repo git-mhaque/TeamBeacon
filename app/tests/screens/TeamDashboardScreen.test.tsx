@@ -86,8 +86,83 @@ describe("TeamDashboardScreen", () => {
         });
       }
 
+      if (url.includes("/api/metadata/epics/completed-cards/configured")) {
+        return jsonResponse({
+          source: "local",
+          scope: "configured",
+          count: 5,
+          limit: 400,
+          truncated: false,
+          completedCards: [
+            {
+              issueKey: "CEG-1010",
+              summary: "Automated executive dashboard summary workflow",
+              status: "Done",
+              storyPoints: 5,
+              completedAt: "2026-03-26T09:00:00Z",
+              epicKey: "CEG-EPIC-12",
+              epicName: "Executive reporting automation",
+            },
+            {
+              issueKey: "CEG-1011",
+              summary: "Published leadership-ready report export template",
+              status: "Closed",
+              storyPoints: 3,
+              completedAt: "2026-03-28T09:00:00Z",
+              epicKey: "CEG-EPIC-12",
+              epicName: "Executive reporting automation",
+            },
+            {
+              issueKey: "CEG-2012",
+              summary: "Improved risk signal validation against release cadence",
+              status: "Done",
+              storyPoints: 2,
+              completedAt: "2026-03-29T09:00:00Z",
+              epicKey: "CEG-EPIC-34",
+              epicName: "Risk reporting hardening",
+            },
+          ],
+          perEpicCounts: {
+            "CEG-EPIC-12": 2,
+            "CEG-EPIC-34": 1,
+          },
+          reportingPeriod: {
+            startDate: "2026-03-24",
+            endDate: "2026-03-30",
+            days: 7,
+            timezone: "UTC",
+          },
+        });
+      }
+
       if (url.includes("/api/ai/chat")) {
         const bodyText = typeof init?.body === "string" ? init.body : "";
+        if (bodyText.includes("Draft a completed-work summary grouped by initiative group for engineering leaders.")) {
+          return jsonResponse({
+            source: "oci_genai",
+            modelId: "cohere.command-r-08-2024",
+            response: {
+              text: JSON.stringify({
+                groups: [
+                  {
+                    group: "Core Platform",
+                    bullets: [
+                      "Completed workflow automation now assembles leadership-ready dashboard narratives for the selected period.",
+                      "Delivery strengthened reporting consistency and reduced manual summary preparation overhead.",
+                    ],
+                  },
+                  {
+                    group: "Operations",
+                    bullets: [
+                      "Completed validation enhancements improved reliability of risk insights used in dashboard decision reviews.",
+                    ],
+                  },
+                ],
+              }),
+            },
+          });
+        }
+
         if (bodyText.includes("Return JSON only with this schema")) {
           return jsonResponse({
             source: "oci_genai",
@@ -131,6 +206,19 @@ describe("TeamDashboardScreen", () => {
     expect(await screen.findByText(/Reliability epic completion remains below midpoint and needs focus\./i)).toBeInTheDocument();
     expect(screen.queryByText(/Drafted by OCI GenAI from selected Progress for Key Initiatives data\./i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh Wins and Risks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeInTheDocument();
+
+    const completedWorkPanel = screen.getByRole("heading", { name: "Completed Work Summary" }).closest("section");
+    expect(completedWorkPanel).not.toBeNull();
+    if (!completedWorkPanel) {
+      throw new Error("Completed Work Summary section not found.");
+    }
+    const scopedCompletedWork = within(completedWorkPanel);
+    expect(await scopedCompletedWork.findByText("Core Platform")).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText("Operations")).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText(/assembles leadership-ready dashboard narratives/i)).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText(/improved reliability of risk insights/i)).toBeInTheDocument();
+    expect(scopedCompletedWork.getAllByRole("listitem")).toHaveLength(3);
 
     expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
     expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();

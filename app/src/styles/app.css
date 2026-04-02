@@ -1417,6 +1417,11 @@ body {
   margin: 0 0 0.34rem;
 }
 
+.tb-exec-completed-summary {
+  display: grid;
+  gap: 0.56rem;
+}
+
 .tb-exec-workmix-stack {
   display: grid;
   gap: 0.9rem;

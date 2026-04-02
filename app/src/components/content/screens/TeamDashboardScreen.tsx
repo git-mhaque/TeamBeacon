@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import {
   chatWithOciGenAi,
   EpicSummaryReportingPeriod,
+  fetchConfiguredEpicsCompletedCards,
   fetchConfiguredEpicSummary,
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
@@ -25,6 +26,11 @@ type DistributionSlice = {
   value: number;
   percent: number;
   color: string;
+};
+
+type CompletedWorkSummaryGroup = {
+  group: string;
+  bullets: string[];
 };
 
 type ReportingPreset = "last_7_days" | "last_14_days" | "last_30_days" | "custom";
@@ -280,6 +286,74 @@ function buildDonutBackground(slices: DistributionSlice[]): string {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
+function buildInitiativeAlias(index: number): string {
+  return `Initiative ${index + 1}`;
+}
+
+function buildSimplifiedInitiativeName(raw: string | null | undefined, fallbackAlias: string): string {
+  const source = (raw ?? "").trim();
+  const withoutIssueKey = source
+    .replace(/\b[A-Z][A-Z0-9]+-\d+\b/g, "")
+    .replace(/^[\s:|\-_/]+|[\s:|\-_/]+$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (!withoutIssueKey) return fallbackAlias;
+
+  const words = withoutIssueKey.split(/\s+/).filter((word) => word.length > 0);
+  if (words.length <= 4) return withoutIssueKey;
+  return words.slice(0, 4).join(" ");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function applyTextReplacements(text: string, replacements: Map<string, string>): string {
+  const sortedPairs = [...replacements.entries()]
+    .map(([from, to]) => [from.trim(), to.trim()] as const)
+    .filter(([from, to]) => from.length > 0 && to.length > 0)
+    .sort((left, right) => right[0].length - left[0].length);
+
+  let next = text;
+  for (const [from, to] of sortedPairs) {
+    next = next.replace(new RegExp(escapeRegExp(from), "gi"), to);
+  }
+  return next;
+}
+
+function sanitizeNarrativeText(text: string, replacements?: Map<string, string>): string {
+  let next = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b[A-Z][A-Z0-9]+-\d+\b/g, "")
+    .replace(/\bSP\s*\d+\b/gi, "")
+    .replace(/\bstory\s*points?\b/gi, "");
+
+  if (replacements && replacements.size > 0) {
+    next = applyTextReplacements(next, replacements);
+  }
+
+  return next
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .replace(/^[,.;:\-\s]+/, "")
+    .trim();
+}
+
+function clipWords(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/).filter((word) => word.length > 0);
+  if (words.length <= maxWords) return text.trim();
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+function buildCompletedCardFallbackBullet(outcome: string, replacements?: Map<string, string>): string {
+  const sanitized = sanitizeNarrativeText(outcome, replacements);
+  if (!sanitized) {
+    return "Completed delivery outcome captured for this reporting period.";
+  }
+  return clipWords(sanitized, 22);
+}
+
 function buildExecutiveSummaryPrompt(params: {
   reportingPeriodLabel: string;
   reportingPeriodDays: number;
@@ -293,12 +367,13 @@ function buildExecutiveSummaryPrompt(params: {
 }): string {
   const promptRows = params.rows.slice(0, 40);
   const initiativeLines = promptRows.map((row, index) => {
+    const alias = buildInitiativeAlias(index);
     const timelineText = row.timelineEnabled
       ? `Timeline ${row.timelineStartDate ?? "?"} -> ${row.targetCompletionDate ?? "?"}`
       : "Timeline not configured";
 
     return (
-      `${index + 1}. ${row.epicName || row.epicKey} (${row.epicKey})` +
+      `${index + 1}. ${alias}` +
       ` | Group: ${row.groupText}` +
       ` | Type: ${row.typeText}` +
       ` | Period Progress: ${row.completedInPeriodValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})` +
@@ -318,6 +393,8 @@ function buildExecutiveSummaryPrompt(params: {
     "Do not use bullet points, markdown, or headings.",
     "Use only the provided data; do not invent metrics or claims.",
     "Cover overall period progress, current RAG risk mix, strongest momentum areas, and immediate focus areas.",
+    "Do not reference JIRA issue keys.",
+    "Do not use full initiative names literally; refer to initiative aliases, groups, and delivery themes.",
     "",
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     `Selected initiatives: ${params.totalEpics}`,
@@ -394,16 +471,22 @@ function buildWinsRisksPrompt(params: {
   reportingPeriodDays: number;
   timezone: string;
   rows: ExecutiveRow[];
+  completedCards: Array<{
+    initiativeName: string;
+    status: string;
+    completedAt: string;
+    outcome: string;
+  }>;
 }): string {
   const promptRows = params.rows.slice(0, 40);
   const initiativeLines = promptRows.map((row, index) => {
+    const simpleName = buildSimplifiedInitiativeName(row.epicName || row.epicKey, buildInitiativeAlias(index));
     const timelineText = row.timelineEnabled
       ? `Timeline ${row.timelineStartDate ?? "?"} -> ${row.targetCompletionDate ?? "?"}`
       : "Timeline not configured";
 
     return (
-      `${index + 1}. ${row.epicName || row.epicKey} (${row.epicKey})` +
-      ` | Group: ${row.groupText}` +
+      `${index + 1}. ${simpleName}` +
       ` | Type: ${row.typeText}` +
       ` | Period Progress: ${row.completedInPeriodValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})` +
       ` | Overall Progress: ${formatPercent(row.completionPercent)}` +
@@ -415,25 +498,195 @@ function buildWinsRisksPrompt(params: {
   const truncationNote = params.rows.length > promptRows.length
     ? `Only the first ${promptRows.length} selected initiatives are listed in this prompt.`
     : "";
+  const promptCards = params.completedCards.slice(0, 180);
+  const completedCardLines = promptCards.map((card, index) => (
+    `${index + 1}. ${card.initiativeName}` +
+    ` | Status: ${card.status}` +
+    ` | Completed: ${card.completedAt}` +
+    ` | Outcome: ${card.outcome}`
+  ));
+  const completedCardsTruncationNote = params.completedCards.length > promptCards.length
+    ? `Only the first ${promptCards.length} completed cards are listed in this prompt.`
+    : "";
 
   return [
-    "Draft leadership-ready bullets from selected initiative progress data.",
+    "Draft leadership-ready wins and risks bullets from selected initiative telemetry and completed-card outcomes.",
     "Return JSON only with this schema:",
     "{\"wins\":[\"...\"],\"risks\":[\"...\"]}",
     "Rules:",
-    "- wins must contain 3-4 concise bullets highlighting progress momentum.",
-    "- risks must contain 3-4 concise bullets highlighting delivery risk or missing signals.",
+    "- wins must contain 3-4 concise bullets grounded in completed-card outcomes from this reporting period.",
+    "- risks must contain 3-4 concise bullets grounded in the provided progress signals and completed-card patterns.",
+    "- Each risk bullet must mention a simplified initiative name from the provided data.",
+    "- Do not use initiative group names or numbered initiative aliases.",
     "- Each bullet must be <= 24 words.",
     "- Use only the provided data. No invented metrics.",
+    "- Do not reference JIRA issue keys.",
+    "- Do not use full initiative names literally; use initiative aliases or group descriptions.",
     "",
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     truncationNote,
+    completedCardsTruncationNote,
     "",
-    "Selected initiative data from Progress for Key Initiatives:",
+    `Completed cards in scope: ${params.completedCards.length}`,
+    "",
+    "Completed card outcomes (primary source for wins):",
+    ...completedCardLines,
+    "",
+    "Initiative progress telemetry (secondary context for risks):",
     ...initiativeLines,
   ]
     .filter((line) => line.trim().length > 0)
     .join("\n");
+}
+
+function buildCompletedWorkSummaryPrompt(params: {
+  reportingPeriodLabel: string;
+  reportingPeriodDays: number;
+  timezone: string;
+  selectedInitiatives: number;
+  completedCardsCount: number;
+  groupCounts: Array<{ name: string; count: number }>;
+  cards: Array<{ group: string; initiativeAlias: string; status: string; completedAt: string; outcome: string }>;
+}): string {
+  const promptCards = params.cards.slice(0, 220);
+  const cardLines = promptCards.map((card, index) => (
+    `${index + 1}. Group: ${card.group}` +
+    ` | Initiative: ${card.initiativeAlias}` +
+    ` | Status: ${card.status}` +
+    ` | Completed: ${card.completedAt}` +
+    ` | Outcome: ${card.outcome}`
+  ));
+  const groupLines = params.groupCounts
+    .slice(0, 30)
+    .map((entry, index) => `${index + 1}. ${entry.name}: ${entry.count} completed cards`);
+  const truncationNote = params.cards.length > promptCards.length
+    ? `Only the first ${promptCards.length} completed cards are listed in this prompt.`
+    : "";
+
+  return [
+    "Draft a completed-work summary grouped by initiative group for engineering leaders.",
+    "Return JSON only with this schema:",
+    "{\"items\":[{\"group\":\"...\",\"bullet\":\"...\"}]}",
+    "Rules:",
+    `- Return exactly ${params.completedCardsCount} items, one bullet per completed card.`,
+    "- Keep item order aligned with the completed card list.",
+    "- Each bullet must describe a delivered outcome for that completed card and be <= 22 words.",
+    "- Use only provided data. Do not invent metrics, dependencies, or blockers.",
+    "- Do not reference issue keys, ticket IDs, or story points (SP).",
+    "- Do not use full initiative names literally; keep references generic or by initiative alias.",
+    "- Mention risk only if explicitly supported by outcome text or completion timing in provided data.",
+    "",
+    `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
+    `Selected initiatives in scope: ${params.selectedInitiatives}`,
+    `Completed cards in scope: ${params.completedCardsCount}`,
+    truncationNote,
+    "",
+    "Completed-card distribution by group:",
+    ...groupLines,
+    "",
+    "Completed card outcomes by initiative group:",
+    ...cardLines,
+  ]
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+}
+
+function parseCompletedWorkSummaryDraft(
+  text: string,
+  options: {
+    expectedCount: number;
+    fallbackCards: Array<{ group: string; outcome: string }>;
+    replacements?: Map<string, string>;
+  },
+): CompletedWorkSummaryGroup[] {
+  const trimmed = text.trim();
+  const unwrapped = trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const candidates: string[] = [unwrapped];
+  const firstBrace = unwrapped.indexOf("{");
+  const lastBrace = unwrapped.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(unwrapped.slice(firstBrace, lastBrace + 1));
+  }
+
+  let parsed: Record<string, unknown> | null = null;
+  for (const candidate of candidates) {
+    try {
+      const next = JSON.parse(candidate);
+      if (next && typeof next === "object") {
+        parsed = next as Record<string, unknown>;
+        break;
+      }
+    } catch {
+      // Try next parse candidate.
+    }
+  }
+
+  if (!parsed) {
+    throw new Error("OCI GenAI did not return valid JSON for completed work summary.");
+  }
+
+  const normalizedItems: Array<{ group: string; bullet: string }> = [];
+
+  const appendItem = (rawGroup: unknown, rawBullet: unknown): void => {
+    if (typeof rawBullet !== "string") return;
+    const group = typeof rawGroup === "string" && rawGroup.trim().length > 0
+      ? rawGroup.trim().replace(/\s+/g, " ")
+      : "Unassigned";
+    const sanitized = sanitizeNarrativeText(rawBullet, options.replacements);
+    if (!sanitized) return;
+    normalizedItems.push({
+      group,
+      bullet: clipWords(sanitized, 22),
+    });
+  };
+
+  if (Array.isArray(parsed.items)) {
+    for (const entry of parsed.items) {
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as { group?: unknown; bullet?: unknown };
+      appendItem(record.group, record.bullet);
+      if (normalizedItems.length >= options.expectedCount) break;
+    }
+  } else if (Array.isArray(parsed.groups)) {
+    for (const entry of parsed.groups) {
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as { group?: unknown; bullets?: unknown };
+      if (!Array.isArray(record.bullets)) continue;
+      for (const bullet of record.bullets) {
+        appendItem(record.group, bullet);
+        if (normalizedItems.length >= options.expectedCount) break;
+      }
+      if (normalizedItems.length >= options.expectedCount) break;
+    }
+  }
+
+  for (let index = normalizedItems.length; index < options.expectedCount; index += 1) {
+    const fallback = options.fallbackCards[index];
+    if (!fallback) break;
+    normalizedItems.push({
+      group: fallback.group,
+      bullet: buildCompletedCardFallbackBullet(fallback.outcome, options.replacements),
+    });
+  }
+
+  const scopedItems = normalizedItems.slice(0, options.expectedCount);
+  if (scopedItems.length === 0) {
+    throw new Error("OCI GenAI response did not include completed work bullets.");
+  }
+
+  const grouped = new Map<string, string[]>();
+  for (const item of scopedItems) {
+    const existing = grouped.get(item.group) ?? [];
+    existing.push(item.bullet);
+    grouped.set(item.group, existing);
+  }
+
+  return [...grouped.entries()].map(([group, bullets]) => ({ group, bullets }));
 }
 
 function ragToneClass(value: RagLabel): string {
@@ -488,11 +741,19 @@ export function TeamDashboardScreen() {
   const [winsRisksGeneratedAt, setWinsRisksGeneratedAt] = useState<string | null>(null);
   const [winsRisksRefreshNonce, setWinsRisksRefreshNonce] = useState(0);
 
+  const [completedWorkDraft, setCompletedWorkDraft] = useState<CompletedWorkSummaryGroup[]>([]);
+  const [completedWorkLoading, setCompletedWorkLoading] = useState(true);
+  const [completedWorkError, setCompletedWorkError] = useState<string | null>(null);
+  const [completedWorkModelId, setCompletedWorkModelId] = useState<string | null>(null);
+  const [completedWorkGeneratedAt, setCompletedWorkGeneratedAt] = useState<string | null>(null);
+  const [completedWorkRefreshNonce, setCompletedWorkRefreshNonce] = useState(0);
+
   const hasInitializedInitiativeSelection = useRef(false);
   const hasHydratedInitiativeSelectionFromStore = useRef(false);
   const hasHydratedReportingSelectionFromStore = useRef(false);
   const summaryRequestSequence = useRef(0);
   const winsRisksRequestSequence = useRef(0);
+  const completedWorkRequestSequence = useRef(0);
 
   const persistInitiativeSelection = useCallback((keys: string[]) => {
     void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify(keys));
@@ -852,6 +1113,87 @@ export function TeamDashboardScreen() {
     return orderedRows;
   }, [initiativeRows, selectedInitiativeEpicKeys]);
 
+  const visibleInitiativeNames = useMemo(
+    () => visibleInitiativeRows
+      .map((row) => row.epicName?.trim() ?? "")
+      .filter((name) => name.length > 0),
+    [visibleInitiativeRows],
+  );
+
+  const initiativeSimpleNameByEpicKey = useMemo(() => {
+    const map = new Map<string, string>();
+    const usedNames = new Set<string>();
+    visibleInitiativeRows.forEach((row, index) => {
+      const fallbackAlias = buildInitiativeAlias(index);
+      const base = buildSimplifiedInitiativeName(row.epicName || row.epicKey, fallbackAlias);
+      let candidate = base;
+      let suffix = 2;
+      while (usedNames.has(candidate.toLowerCase())) {
+        candidate = `${base} ${suffix}`;
+        suffix += 1;
+      }
+      usedNames.add(candidate.toLowerCase());
+      map.set(row.epicKey, candidate);
+    });
+    return map;
+  }, [visibleInitiativeRows]);
+
+  const initiativeAliasByEpicKey = useMemo(
+    () => new Map(visibleInitiativeRows.map((row, index) => [row.epicKey, buildInitiativeAlias(index)])),
+    [visibleInitiativeRows],
+  );
+
+  const executiveSummaryReplacements = useMemo(() => {
+    const map = new Map<string, string>();
+    visibleInitiativeNames.forEach((name) => {
+      map.set(name, "this initiative");
+    });
+    return map;
+  }, [visibleInitiativeNames]);
+
+  const winsReplacements = useMemo(() => {
+    const map = new Map<string, string>();
+    visibleInitiativeRows.forEach((row, index) => {
+      const alias = buildInitiativeAlias(index);
+      map.set(alias, "this initiative");
+      if (row.epicName?.trim()) {
+        map.set(row.epicName.trim(), "this initiative");
+      }
+    });
+    return map;
+  }, [visibleInitiativeRows]);
+
+  const risksReplacements = useMemo(() => {
+    const map = new Map<string, string>();
+    visibleInitiativeRows.forEach((row, index) => {
+      const alias = buildInitiativeAlias(index);
+      const simpleName = initiativeSimpleNameByEpicKey.get(row.epicKey) || alias;
+      map.set(alias, simpleName);
+      if (row.epicName?.trim()) {
+        map.set(row.epicName.trim(), simpleName);
+      }
+      row.groups.forEach((group) => {
+        const groupName = group.name?.trim();
+        if (groupName) {
+          map.set(groupName, simpleName);
+        }
+      });
+    });
+    return map;
+  }, [initiativeSimpleNameByEpicKey, visibleInitiativeRows]);
+
+  const completedWorkReplacements = useMemo(() => {
+    const map = new Map<string, string>();
+    visibleInitiativeRows.forEach((row, index) => {
+      const alias = buildInitiativeAlias(index);
+      map.set(alias, "this initiative");
+      if (row.epicName?.trim()) {
+        map.set(row.epicName.trim(), "this initiative");
+      }
+    });
+    return map;
+  }, [visibleInitiativeRows]);
+
   const visibleInitiativeSignals = useMemo(() => {
     const totalEpics = visibleInitiativeRows.length;
     const totalCompletedInPeriod = visibleInitiativeRows.reduce((sum, row) => sum + row.completedInPeriodValue, 0);
@@ -931,6 +1273,10 @@ export function TeamDashboardScreen() {
     setWinsRisksRefreshNonce((previous) => previous + 1);
   }, []);
 
+  const refreshCompletedWorkSummary = useCallback(() => {
+    setCompletedWorkRefreshNonce((previous) => previous + 1);
+  }, []);
+
   useEffect(() => {
     if (loading) {
       setExecutiveSummaryLoading(true);
@@ -987,7 +1333,8 @@ export function TeamDashboardScreen() {
         if (!text) {
           throw new Error("OCI GenAI returned an empty summary draft.");
         }
-        setExecutiveSummaryDraft(text);
+        const sanitized = sanitizeNarrativeText(text, executiveSummaryReplacements);
+        setExecutiveSummaryDraft(sanitized || "Unable to generate executive summary draft from OCI GenAI.");
         setExecutiveSummaryModelId(response.modelId ?? null);
         setExecutiveSummaryGeneratedAt(new Date().toISOString());
       })
@@ -1011,6 +1358,7 @@ export function TeamDashboardScreen() {
     reportingPeriodDays,
     reportingPeriodLabel,
     summaryRefreshNonce,
+    executiveSummaryReplacements,
     visibleInitiativeRows,
     visibleInitiativeSignals.amberCount,
     visibleInitiativeSignals.greenCount,
@@ -1051,12 +1399,7 @@ export function TeamDashboardScreen() {
       return;
     }
 
-    const prompt = buildWinsRisksPrompt({
-      reportingPeriodLabel,
-      reportingPeriodDays,
-      timezone: effectivePeriodTimezone,
-      rows: visibleInitiativeRows,
-    });
+    const selectedByEpicKey = new Map(visibleInitiativeRows.map((row) => [row.epicKey, row]));
 
     const requestId = winsRisksRequestSequence.current + 1;
     winsRisksRequestSequence.current = requestId;
@@ -1066,23 +1409,95 @@ export function TeamDashboardScreen() {
     setWinsDraft([]);
     setRisksDraft([]);
 
-    chatWithOciGenAi({
-      message: prompt,
-      maxTokens: 420,
-      temperature: 0.2,
-      topP: 0.8,
-      topK: 0,
-      frequencyPenalty: 0,
-    })
-      .then((response) => {
+    void (async () => {
+      try {
+        let completedCardsPayload = await fetchConfiguredEpicsCompletedCards({
+          limit: 2000,
+          periodStart: effectivePeriodStart,
+          periodEnd: effectivePeriodEnd,
+          timezone: effectivePeriodTimezone,
+        });
+        if (completedCardsPayload.truncated && completedCardsPayload.count > completedCardsPayload.completedCards.length) {
+          completedCardsPayload = await fetchConfiguredEpicsCompletedCards({
+            limit: Math.max(2000, completedCardsPayload.count),
+            periodStart: effectivePeriodStart,
+            periodEnd: effectivePeriodEnd,
+            timezone: effectivePeriodTimezone,
+          });
+        }
+
+        if (winsRisksRequestSequence.current !== requestId) return;
+
+        const completedPromptRows = completedCardsPayload.completedCards
+          .map((card) => {
+            const epicKey = card.epicKey?.trim();
+            if (!epicKey) return null;
+            const row = selectedByEpicKey.get(epicKey);
+            const initiativeName = initiativeSimpleNameByEpicKey.get(epicKey);
+            if (!row || !initiativeName) return null;
+            return {
+              initiativeName,
+              status: card.status?.trim() || "Done",
+              completedAt: card.completedAt?.trim() || "n/a",
+              outcome: card.summary?.trim() || "No summary provided.",
+            };
+          })
+          .filter((value): value is {
+            initiativeName: string;
+            status: string;
+            completedAt: string;
+            outcome: string;
+          } => Boolean(value));
+
+        if (completedPromptRows.length === 0) {
+          setWinsDraft(["No completed cards were found for selected initiatives in this reporting period."]);
+          setRisksDraft(["Review in-progress scope and blockers because no completed outcomes were recorded in this period."]);
+          setWinsRisksModelId(null);
+          setWinsRisksGeneratedAt(null);
+          return;
+        }
+
+        const winsRisksPrompt = buildWinsRisksPrompt({
+          reportingPeriodLabel,
+          reportingPeriodDays,
+          timezone: effectivePeriodTimezone,
+          rows: visibleInitiativeRows,
+          completedCards: completedPromptRows,
+        });
+
+        const response = await chatWithOciGenAi({
+          message: winsRisksPrompt,
+          maxTokens: 520,
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 0,
+          frequencyPenalty: 0,
+        });
+
         if (winsRisksRequestSequence.current !== requestId) return;
         const parsed = parseWinsRisksDraft(response.response.text ?? "");
-        setWinsDraft(parsed.wins);
-        setRisksDraft(parsed.risks);
+
+        const simpleNames = [...initiativeSimpleNameByEpicKey.values()];
+        const sanitizedWins = parsed.wins
+          .map((item) => sanitizeNarrativeText(item, winsReplacements))
+          .filter((item) => item.length > 0);
+        const sanitizedRisks = parsed.risks
+          .map((item, index) => {
+            const sanitized = sanitizeNarrativeText(item, risksReplacements);
+            if (!sanitized) return "";
+            const hasSimpleName = simpleNames.some((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(sanitized));
+            if (hasSimpleName) return sanitized;
+            const fallback = simpleNames[index % Math.max(1, simpleNames.length)];
+            if (!fallback) return sanitized;
+            return `${fallback}: ${sanitized}`;
+          })
+          .filter((item) => item.length > 0);
+
+        setWinsDraft(sanitizedWins.length > 0 ? sanitizedWins : ["Wins summary unavailable from current completed-card data."]);
+        setRisksDraft(sanitizedRisks.length > 0 ? sanitizedRisks : ["Risk summary unavailable from current completed-card data."]);
         setWinsRisksModelId(response.modelId ?? null);
         setWinsRisksGeneratedAt(new Date().toISOString());
-      })
-      .catch((err) => {
+      } catch (err) {
         if (winsRisksRequestSequence.current !== requestId) return;
         const message = err instanceof Error ? err.message : "Unknown OCI GenAI wins/risks failure.";
         setWinsRisksError(message);
@@ -1090,18 +1505,23 @@ export function TeamDashboardScreen() {
         setRisksDraft(["Unable to generate risks draft from OCI GenAI."]);
         setWinsRisksModelId(null);
         setWinsRisksGeneratedAt(null);
-      })
-      .finally(() => {
+      } finally {
         if (winsRisksRequestSequence.current !== requestId) return;
         setWinsRisksLoading(false);
-      });
+      }
+    })();
   }, [
+    effectivePeriodEnd,
+    effectivePeriodStart,
     effectivePeriodTimezone,
     error,
+    initiativeSimpleNameByEpicKey,
     initiativeRows.length,
     loading,
     reportingPeriodDays,
     reportingPeriodLabel,
+    risksReplacements,
+    winsReplacements,
     winsRisksRefreshNonce,
     visibleInitiativeRows,
   ]);
@@ -1111,6 +1531,197 @@ export function TeamDashboardScreen() {
     if (!text) return 0;
     return text.split(/\s+/).length;
   }, [risksDraft, winsDraft]);
+
+  useEffect(() => {
+    if (loading) {
+      setCompletedWorkLoading(true);
+      setCompletedWorkError(null);
+      return;
+    }
+
+    if (error) {
+      setCompletedWorkLoading(false);
+      setCompletedWorkError(null);
+      setCompletedWorkDraft([
+        {
+          group: "Unavailable",
+          bullets: ["Unable to generate completed work summary because initiative data failed to load."],
+        },
+      ]);
+      setCompletedWorkModelId(null);
+      setCompletedWorkGeneratedAt(null);
+      return;
+    }
+
+    if (visibleInitiativeRows.length === 0) {
+      setCompletedWorkLoading(false);
+      setCompletedWorkError(null);
+      if (initiativeRows.length > 0) {
+        setCompletedWorkDraft([
+          {
+            group: "No Selection",
+            bullets: ["No initiatives are selected in Progress for Key Initiatives."],
+          },
+        ]);
+      } else {
+        setCompletedWorkDraft([
+          {
+            group: "No Data",
+            bullets: ["No configured epic data available to summarize completed work."],
+          },
+        ]);
+      }
+      setCompletedWorkModelId(null);
+      setCompletedWorkGeneratedAt(null);
+      return;
+    }
+
+    const selectedByEpicKey = new Map(visibleInitiativeRows.map((row) => [row.epicKey, row]));
+    const requestId = completedWorkRequestSequence.current + 1;
+    completedWorkRequestSequence.current = requestId;
+    setCompletedWorkLoading(true);
+    setCompletedWorkError(null);
+    setCompletedWorkDraft([]);
+
+    void (async () => {
+      try {
+        let payload = await fetchConfiguredEpicsCompletedCards({
+          limit: 2000,
+          periodStart: effectivePeriodStart,
+          periodEnd: effectivePeriodEnd,
+          timezone: effectivePeriodTimezone,
+        });
+        if (payload.truncated && payload.count > payload.completedCards.length) {
+          payload = await fetchConfiguredEpicsCompletedCards({
+            limit: Math.max(2000, payload.count),
+            periodStart: effectivePeriodStart,
+            periodEnd: effectivePeriodEnd,
+            timezone: effectivePeriodTimezone,
+          });
+        }
+
+        if (completedWorkRequestSequence.current !== requestId) return;
+
+        const scopedCards: Array<{
+          group: string;
+          initiativeAlias: string;
+          status: string;
+          completedAt: string;
+          outcome: string;
+        }> = [];
+
+        const groupCounts = new Map<string, number>();
+        for (const card of payload.completedCards) {
+          const epicKey = card.epicKey?.trim();
+          if (!epicKey) continue;
+
+          const row = selectedByEpicKey.get(epicKey);
+          const initiativeAlias = initiativeAliasByEpicKey.get(epicKey);
+          if (!row || !initiativeAlias) continue;
+
+          const groupName = row.groups[0]?.name?.trim() || "Unassigned";
+          const status = card.status?.trim() || "Done";
+          const completedAt = card.completedAt?.trim() || "n/a";
+          const outcome = card.summary?.trim() || "No summary provided.";
+
+          scopedCards.push({
+            group: groupName,
+            initiativeAlias,
+            status,
+            completedAt,
+            outcome,
+          });
+          groupCounts.set(groupName, (groupCounts.get(groupName) ?? 0) + 1);
+        }
+
+        if (scopedCards.length === 0) {
+          setCompletedWorkDraft([
+            {
+              group: "No Completed Cards",
+              bullets: ["No completed cards were found for selected initiatives in this reporting period."],
+            },
+          ]);
+          setCompletedWorkModelId(null);
+          setCompletedWorkGeneratedAt(null);
+          return;
+        }
+
+        const sortedGroupCounts = [...groupCounts.entries()]
+          .map(([name, count]) => ({ name, count }))
+          .sort((left, right) => right.count - left.count);
+
+        const prompt = buildCompletedWorkSummaryPrompt({
+          reportingPeriodLabel,
+          reportingPeriodDays,
+          timezone: effectivePeriodTimezone,
+          selectedInitiatives: visibleInitiativeRows.length,
+          completedCardsCount: scopedCards.length,
+          groupCounts: sortedGroupCounts,
+          cards: scopedCards,
+        });
+
+        const response = await chatWithOciGenAi({
+          message: prompt,
+          maxTokens: 1500,
+          temperature: 0.15,
+          topP: 0.8,
+          topK: 0,
+          frequencyPenalty: 0,
+        });
+
+        if (completedWorkRequestSequence.current !== requestId) return;
+
+        const parsed = parseCompletedWorkSummaryDraft(response.response.text ?? "", {
+          expectedCount: scopedCards.length,
+          fallbackCards: scopedCards.map((card) => ({
+            group: card.group,
+            outcome: card.outcome,
+          })),
+          replacements: completedWorkReplacements,
+        });
+        setCompletedWorkDraft(parsed);
+        setCompletedWorkModelId(response.modelId ?? null);
+        setCompletedWorkGeneratedAt(new Date().toISOString());
+      } catch (err) {
+        if (completedWorkRequestSequence.current !== requestId) return;
+        const message = err instanceof Error ? err.message : "Unknown OCI GenAI completed-work summary failure.";
+        setCompletedWorkError(message);
+        setCompletedWorkDraft([
+          {
+            group: "Summary Unavailable",
+            bullets: ["Unable to generate completed work summary draft from OCI GenAI."],
+          },
+        ]);
+        setCompletedWorkModelId(null);
+        setCompletedWorkGeneratedAt(null);
+      } finally {
+        if (completedWorkRequestSequence.current !== requestId) return;
+        setCompletedWorkLoading(false);
+      }
+    })();
+  }, [
+    completedWorkRefreshNonce,
+    effectivePeriodEnd,
+    effectivePeriodStart,
+    effectivePeriodTimezone,
+    error,
+    initiativeAliasByEpicKey,
+    initiativeRows.length,
+    loading,
+    reportingPeriodDays,
+    reportingPeriodLabel,
+    completedWorkReplacements,
+    visibleInitiativeRows,
+  ]);
+
+  const completedWorkWordCount = useMemo(() => {
+    const text = completedWorkDraft
+      .flatMap((entry) => entry.bullets)
+      .join(" ")
+      .trim();
+    if (!text) return 0;
+    return text.split(/\s+/).length;
+  }, [completedWorkDraft]);
 
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
@@ -1243,6 +1854,50 @@ export function TeamDashboardScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
+            <h3>Completed Work Summary</h3>
+          </div>
+          <div class="tb-btn-row">
+            <button
+              type="button"
+              class="tb-btn tb-btn-sm tb-no-print"
+              onClick={refreshCompletedWorkSummary}
+              disabled={completedWorkLoading}
+            >
+              Refresh Completed Work Summary
+            </button>
+          </div>
+        </header>
+
+        {completedWorkError ? <p class="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
+
+        <div class="tb-exec-completed-summary">
+          {completedWorkDraft.map((entry) => (
+            <div key={entry.group}>
+              <h4 class="tb-exec-list-title">{entry.group}</h4>
+              <ul class="tb-list tb-exec-narrative-list">
+                {entry.bullets.map((item) => (
+                  <li key={`${entry.group}:${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with OCI GenAI...</p> : null}
+          {!completedWorkLoading && completedWorkDraft.length === 0 ? (
+            <p class="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
+          ) : null}
+        </div>
+        <hr class="tb-section-divider" />
+        <div class="tb-exec-summary-meta">
+          <span>Generated with OCI GenAI</span>
+          <span>Model: {completedWorkModelId ?? "default"}</span>
+          <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
+          <span>{completedWorkWordCount} words</span>
+        </div>
+      </section>
+
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
             <h3>Wins and Risks</h3>
           </div>
           <div class="tb-btn-row">
@@ -1278,7 +1933,7 @@ export function TeamDashboardScreen() {
               ))}
               {winsRisksLoading ? <li>Generating risks with OCI GenAI...</li> : null}
               {!winsRisksLoading && risksDraft.length === 0 ? <li>Risks will appear once configured epic data is available.</li> : null}
-            </ul>
+              </ul>
           </div>
         </div>
         <hr class="tb-section-divider" />
