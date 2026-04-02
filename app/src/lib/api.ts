@@ -282,6 +282,51 @@ export type CurrentSprintChangesResponse = {
   error?: string | null;
 };
 
+export type ReleaseRefreshState = "idle" | "running" | "completed" | "failed";
+export type ReleaseRefreshSourceState = "queued" | "fetching" | "processing" | "completed" | "failed";
+
+export type ReleaseRefreshSourceInput = {
+  confluenceUrl: string;
+  prompt?: string;
+};
+
+export type ReleaseRefreshSourceStatus = {
+  id: number;
+  confluenceUrl: string;
+  prompt?: string;
+  state: ReleaseRefreshSourceState;
+  percent?: number | null;
+  message?: string | null;
+  error?: string | null;
+  title?: string | null;
+  resolvedUrl?: string | null;
+  summary?: string | null;
+};
+
+export type ReleaseRefreshStatus = {
+  source: "releases";
+  state: ReleaseRefreshState;
+  phase: string;
+  percent?: number | null;
+  message?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  generatedAt?: string | null;
+  error?: string | null;
+  sources: ReleaseRefreshSourceStatus[];
+  started?: boolean;
+};
+
+export type ReleaseRefreshResult = {
+  source: "releases";
+  state: ReleaseRefreshState;
+  generatedAt?: string | null;
+  html?: string | null;
+  text?: string | null;
+  sources: ReleaseRefreshSourceStatus[];
+  error?: string | null;
+};
+
 const API_BASE = (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE
   ?? "http://127.0.0.1:8000";
 
@@ -594,4 +639,41 @@ export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesR
     throw await parseError(response, `Current sprint changes request failed (${response.status})`);
   }
   return (await response.json()) as CurrentSprintChangesResponse;
+}
+
+export async function startReleaseRefresh(payload: {
+  sources: ReleaseRefreshSourceInput[];
+  overallPrompt?: string;
+}): Promise<ReleaseRefreshStatus> {
+  const response = await fetch(`${API_BASE}/api/releases/refresh/start`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Release refresh start request failed (${response.status})`);
+  }
+  return (await response.json()) as ReleaseRefreshStatus;
+}
+
+export async function fetchReleaseRefreshStatus(): Promise<ReleaseRefreshStatus> {
+  const response = await fetch(`${API_BASE}/api/releases/refresh/status`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Release refresh status request failed (${response.status})`);
+  }
+  return (await response.json()) as ReleaseRefreshStatus;
+}
+
+export async function fetchReleaseRefreshResult(): Promise<ReleaseRefreshResult> {
+  const response = await fetch(`${API_BASE}/api/releases/refresh/result`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Release refresh result request failed (${response.status})`);
+  }
+  return (await response.json()) as ReleaseRefreshResult;
 }

@@ -18,6 +18,11 @@ from services.api.integrations.jira_sync import (
     start_jira_sync,
 )
 from services.api.integrations.oci_genai_chat import chat_with_oci_genai, get_oci_genai_status
+from services.api.integrations.release_refresh import (
+    get_release_refresh_result,
+    get_release_refresh_status,
+    start_release_refresh,
+)
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
@@ -53,6 +58,9 @@ MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
 ConfluenceStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiStatusProvider = Callable[[], dict[str, Any]]
 OciGenAiChatProvider = Callable[..., dict[str, Any]]
+ReleaseRefreshStatusProvider = Callable[[], dict[str, Any]]
+ReleaseRefreshStartProvider = Callable[[Optional[list[dict[str, Any]]], Optional[str]], dict[str, Any]]
+ReleaseRefreshResultProvider = Callable[[], dict[str, Any]]
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -216,6 +224,55 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "tags": ["integrations"],
                     "summary": "Confluence integration status",
                     "responses": {"200": {"description": "Confluence status", "content": json_payload}},
+                }
+            },
+            "/api/releases/refresh/status": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "Release Insights refresh status",
+                    "responses": {"200": {"description": "Release refresh status", "content": json_payload}},
+                }
+            },
+            "/api/releases/refresh/result": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "Release Insights refresh result",
+                    "responses": {"200": {"description": "Release refresh result", "content": json_payload}},
+                }
+            },
+            "/api/releases/refresh/start": {
+                "post": {
+                    "tags": ["integrations"],
+                    "summary": "Start Release Insights refresh",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["sources"],
+                                    "properties": {
+                                        "sources": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "confluenceUrl": {"type": "string"},
+                                                    "prompt": {"type": "string"},
+                                                },
+                                            },
+                                        },
+                                        "overallPrompt": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Refresh already running or no-op", "content": json_payload},
+                        "202": {"description": "Refresh started", "content": json_payload},
+                        "400": error_payload,
+                    },
                 }
             },
             "/api/integrations/oci-genai/status": {
@@ -507,6 +564,9 @@ def build_handler(
     confluence_status_provider: ConfluenceStatusProvider = get_confluence_status,
     oci_genai_status_provider: OciGenAiStatusProvider = get_oci_genai_status,
     oci_genai_chat_provider: OciGenAiChatProvider = chat_with_oci_genai,
+    release_refresh_status_provider: ReleaseRefreshStatusProvider = get_release_refresh_status,
+    release_refresh_result_provider: ReleaseRefreshResultProvider = get_release_refresh_result,
+    release_refresh_start_provider: ReleaseRefreshStartProvider = start_release_refresh,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_headers(self, content_type: str, status_code: int = 200) -> None:
@@ -580,6 +640,18 @@ def build_handler(
 
             if path == "/api/integrations/confluence/status":
                 payload = confluence_status_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/releases/refresh/status":
+                payload = release_refresh_status_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/releases/refresh/result":
+                payload = release_refresh_result_provider()
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
@@ -734,6 +806,41 @@ def build_handler(
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
                     return
+                status_code = 202 if payload.get("started") else 200
+                self._set_json_headers(status_code)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/releases/refresh/start":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+
+                sources_raw = body_payload.get("sources")
+                if sources_raw is None:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "sources is required."}))
+                    return
+                if not isinstance(sources_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "sources must be an array."}))
+                    return
+
+                overall_prompt_raw = body_payload.get("overallPrompt")
+                if overall_prompt_raw is not None and not isinstance(overall_prompt_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "overallPrompt must be a string."}))
+                    return
+                overall_prompt = overall_prompt_raw if isinstance(overall_prompt_raw, str) else None
+
+                try:
+                    payload = release_refresh_start_provider(sources_raw, overall_prompt)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+
                 status_code = 202 if payload.get("started") else 200
                 self._set_json_headers(status_code)
                 self.wfile.write(_json_bytes(payload))

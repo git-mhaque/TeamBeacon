@@ -28,6 +28,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
         self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
         self.oci_chat_calls: list[dict[str, object]] = []
+        self.release_refresh_start_calls: list[dict[str, object]] = []
 
         def fake_status():
             return {
@@ -131,6 +132,84 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ],
                 "metrics": {"spaceCount": 1},
                 "error": None,
+            }
+
+        def fake_release_refresh_status():
+            return {
+                "source": "releases",
+                "state": "completed",
+                "phase": "done",
+                "percent": 100.0,
+                "message": "Release refresh complete.",
+                "startedAt": "2026-03-25T00:00:00+00:00",
+                "finishedAt": "2026-03-25T00:04:00+00:00",
+                "generatedAt": "2026-03-25T00:04:00+00:00",
+                "error": None,
+                "sources": [
+                    {
+                        "id": 1,
+                        "confluenceUrl": "https://gbuconfluence.oraclecorp.com/display/SEN/Release+Notes",
+                        "prompt": "Summarize release highlights.",
+                        "state": "completed",
+                        "percent": 100.0,
+                        "message": "Completed.",
+                        "error": None,
+                    }
+                ],
+            }
+
+        def fake_release_refresh_result():
+            return {
+                "source": "releases",
+                "state": "completed",
+                "generatedAt": "2026-03-25T00:04:00+00:00",
+                "html": "<h4>Summary</h4><p>Release output.</p>",
+                "text": "Summary:\nRelease output.",
+                "sources": [
+                    {
+                        "id": 1,
+                        "confluenceUrl": "https://gbuconfluence.oraclecorp.com/display/SEN/Release+Notes",
+                        "title": "Release Notes",
+                        "resolvedUrl": "https://gbuconfluence.oraclecorp.com/display/SEN/Release+Notes",
+                        "summary": "Source summary",
+                        "state": "completed",
+                        "error": None,
+                    }
+                ],
+                "error": None,
+            }
+
+        def fake_release_refresh_start(sources=None, overall_prompt=None):  # noqa: ANN001
+            if not isinstance(sources, list):
+                raise ValueError("sources must be an array.")
+            self.release_refresh_start_calls.append(
+                {
+                    "sources": sources,
+                    "overall_prompt": overall_prompt,
+                }
+            )
+            return {
+                "source": "releases",
+                "state": "running",
+                "phase": "initializing",
+                "percent": 0.0,
+                "message": "Starting release refresh.",
+                "startedAt": "2026-03-25T00:00:00+00:00",
+                "finishedAt": None,
+                "generatedAt": None,
+                "error": None,
+                "started": True,
+                "sources": [
+                    {
+                        "id": 1,
+                        "confluenceUrl": "https://gbuconfluence.oraclecorp.com/display/SEN/Release+Notes",
+                        "prompt": "Summarize release highlights.",
+                        "state": "queued",
+                        "percent": 0.0,
+                        "message": "Queued",
+                        "error": None,
+                    }
+                ],
             }
 
         def fake_oci_chat(
@@ -499,6 +578,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             confluence_status_provider=fake_confluence_status,
             oci_genai_status_provider=fake_oci_status,
             oci_genai_chat_provider=fake_oci_chat,
+            release_refresh_status_provider=fake_release_refresh_status,
+            release_refresh_result_provider=fake_release_refresh_result,
+            release_refresh_start_provider=fake_release_refresh_start,
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -526,6 +608,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["info"]["title"], "TeamBeacon Local API")
         self.assertIn("/api/ai/chat", body["paths"])
         self.assertIn("/api/integrations/confluence/status", body["paths"])
+        self.assertIn("/api/releases/refresh/start", body["paths"])
+        self.assertIn("/api/releases/refresh/status", body["paths"])
+        self.assertIn("/api/releases/refresh/result", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
@@ -630,6 +715,69 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertTrue(body["connected"])
         self.assertEqual(body["config"]["baseUrl"], "https://gbuconfluence.oraclecorp.com")
         self.assertEqual(body["metrics"]["spaceCount"], 1)
+
+    def test_release_refresh_status_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/releases/refresh/status", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "releases")
+        self.assertEqual(body["state"], "completed")
+        self.assertEqual(body["percent"], 100.0)
+        self.assertEqual(len(body["sources"]), 1)
+
+    def test_release_refresh_result_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/releases/refresh/result", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "releases")
+        self.assertEqual(body["state"], "completed")
+        self.assertIn("<h4>Summary</h4>", body["html"])
+        self.assertEqual(body["sources"][0]["title"], "Release Notes")
+
+    def test_release_refresh_start_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/releases/refresh/start",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "sources": [
+                        {
+                            "confluenceUrl": "https://gbuconfluence.oraclecorp.com/display/SEN/Release+Notes",
+                            "prompt": "Summarize release scope and risks.",
+                        }
+                    ],
+                    "overallPrompt": "Generate release narrative for engineering leaders.",
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 202)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "releases")
+        self.assertTrue(body["started"])
+        self.assertEqual(body["state"], "running")
+        self.assertEqual(len(self.release_refresh_start_calls), 1)
+        self.assertEqual(
+            self.release_refresh_start_calls[0]["overall_prompt"],
+            "Generate release narrative for engineering leaders.",
+        )
+
+    def test_release_refresh_start_endpoint_rejects_missing_sources(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/releases/refresh/start",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "overallPrompt": "Generate release narrative for engineering leaders.",
+                }
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
 
     def test_oci_genai_chat_endpoint(self) -> None:
         request = Request(
