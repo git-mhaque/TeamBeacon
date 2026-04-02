@@ -53,20 +53,24 @@ describe("Content", () => {
       "Initiative Insights",
       "Sprint Insights",
       "Team Insights",
-      "Security",
-      "Incident Response",
-      "Release",
+      "Security Insights",
+      "Operations Insights",
+      "Release Insights",
       "Team Dashboard",
       "Settings",
     ]);
 
     expect(screen.getByLabelText("Team Insights is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Security is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Incident Response is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Release is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
+    expect(screen.getByLabelText("Release Insights is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
+    expect(screen.getByText("Cycle Time / Sprint Trend / Work Mix")).toBeInTheDocument();
+    expect(screen.getByText("Scan / Vulnerability Posture")).toBeInTheDocument();
+    expect(screen.getByText("Incidents / DR / Observability")).toBeInTheDocument();
+    expect(screen.getByText("Cadence / Release Notes")).toBeInTheDocument();
     expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
     expect(screen.getByText("Connections / Field Mapping / Epic Metadata")).toBeInTheDocument();
 
@@ -76,8 +80,8 @@ describe("Content", () => {
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Security/ }));
-    expect(await screen.findByRole("heading", { name: "Security" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Security Insights/ }));
+    expect(await screen.findByRole("heading", { name: "Security Insights" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Security Posture Snapshot" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Settings/ }));

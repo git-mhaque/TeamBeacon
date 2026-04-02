@@ -44,10 +44,10 @@ type Props = {
 const NAV_ITEMS: NavItem[] = [
   { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false },
   { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false },
-  { id: "team", label: "Team Insights", blurb: "Velocity and cycle time", showConstruction: true },
-  { id: "security", label: "Security", blurb: "Vulnerability posture", showConstruction: true },
-  { id: "incidents", label: "Incident Response", blurb: "Operational incidents and SLAs", showConstruction: true },
-  { id: "releases", label: "Release", blurb: "Release cadence and quality", showConstruction: true },
+  { id: "team", label: "Team Insights", blurb: "Cycle Time / Sprint Trend / Work Mix", showConstruction: true },
+  { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true },
+  { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true },
+  { id: "releases", label: "Release Insights", blurb: "Cadence / Release Notes", showConstruction: true },
   { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false },
   { id: "integrations", label: "Settings", blurb: "Connections / Field Mapping / Epic Metadata", showConstruction: false },
 ];
@@ -58,9 +58,9 @@ function screenTitle(id: ScreenId): string {
     initiatives: "Initiative Insights",
     team: "Team Insights",
     sprint: "Sprint Insights",
-    security: "Security",
-    incidents: "Incident Response",
-    releases: "Releases",
+    security: "Security Insights",
+    incidents: "Operations Insights",
+    releases: "Release Insights",
     executive: "Team Dashboard",
   };
   return mapping[id];
