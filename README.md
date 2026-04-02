@@ -89,6 +89,8 @@ npm run dev
 ```
 - Frontend: `http://127.0.0.1:5174`
 - API: `http://127.0.0.1:8000`
+- API Swagger UI: `http://127.0.0.1:8000/docs`
+- API OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
 
 4. Run backend tests:
 ```bash
@@ -121,6 +123,7 @@ npm run desktop:build
 - [TeamBeacon Communication One-Pager](docs/communication/communication_one_pager.md): product narrative, value framing, and screenshots
 - [AGENTS.md](AGENTS.md): contributor conventions and repository map
 - [config/README.md](config/README.md): required and optional environment variables
+- [services/api/README.md](services/api/README.md): local API endpoints and Swagger/OpenAPI docs
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap

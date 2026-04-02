@@ -57,6 +57,423 @@ def _json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def _text_bytes(payload: str) -> bytes:
+    return payload.encode("utf-8")
+
+
+def _swagger_ui_html(openapi_url: str = "/openapi.json") -> str:
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TeamBeacon Local API - Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <style>
+      html {{
+        box-sizing: border-box;
+        overflow-y: scroll;
+      }}
+
+      *,
+      *::before,
+      *::after {{
+        box-sizing: inherit;
+      }}
+
+      body {{
+        margin: 0;
+        background: #f7f9fd;
+      }}
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({{
+        url: "{openapi_url}",
+        dom_id: "#swagger-ui",
+        presets: [SwaggerUIBundle.presets.apis],
+        layout: "BaseLayout",
+        deepLinking: true
+      }});
+    </script>
+  </body>
+</html>
+"""
+
+
+def _build_openapi_spec(server_url: str) -> dict[str, Any]:
+    json_payload = {"application/json": {"schema": {"type": "object"}}}
+    error_payload = {"description": "Bad request", "content": json_payload}
+
+    return {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "TeamBeacon Local API",
+            "version": "1.0.0",
+            "description": "Local HTTP API used by TeamBeacon desktop and web shells.",
+        },
+        "servers": [{"url": server_url}],
+        "tags": [
+            {"name": "health", "description": "Service health checks."},
+            {"name": "integrations", "description": "Integration status and sync controls."},
+            {"name": "issues", "description": "Issue and sprint-level views."},
+            {"name": "metadata", "description": "Epic metadata and lookup configuration."},
+            {"name": "ai", "description": "OCI GenAI status and chat utilities."},
+            {"name": "docs", "description": "OpenAPI and Swagger UI docs endpoints."},
+        ],
+        "paths": {
+            "/health": {
+                "get": {
+                    "tags": ["health"],
+                    "summary": "Health check",
+                    "responses": {"200": {"description": "Service is healthy", "content": json_payload}},
+                }
+            },
+            "/openapi.json": {
+                "get": {
+                    "tags": ["docs"],
+                    "summary": "OpenAPI schema",
+                    "responses": {"200": {"description": "OpenAPI schema document", "content": json_payload}},
+                }
+            },
+            "/docs": {
+                "get": {
+                    "tags": ["docs"],
+                    "summary": "Swagger UI",
+                    "responses": {
+                        "200": {
+                            "description": "Swagger UI HTML",
+                            "content": {"text/html": {"schema": {"type": "string"}}},
+                        }
+                    },
+                }
+            },
+            "/api/integrations/jira/status": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "JIRA integration status",
+                    "responses": {"200": {"description": "JIRA status", "content": json_payload}},
+                }
+            },
+            "/api/integrations/jira/sync/status": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "Current JIRA sync state",
+                    "responses": {"200": {"description": "JIRA sync state", "content": json_payload}},
+                }
+            },
+            "/api/integrations/jira/sync/history": {
+                "get": {
+                    "tags": ["integrations"],
+                    "summary": "JIRA sync history",
+                    "parameters": [
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer", "default": 20},
+                            "description": "Maximum history rows to return.",
+                        }
+                    ],
+                    "responses": {"200": {"description": "JIRA sync history", "content": json_payload}},
+                }
+            },
+            "/api/integrations/jira/sync/start": {
+                "post": {
+                    "tags": ["integrations"],
+                    "summary": "Start JIRA sync",
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "mode": {
+                                            "type": "string",
+                                            "enum": ["full", "since_last", "since_date"],
+                                        },
+                                        "sinceDate": {"type": "string", "description": "ISO date or timestamp"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Sync already running or no-op", "content": json_payload},
+                        "202": {"description": "Sync started", "content": json_payload},
+                        "400": error_payload,
+                    },
+                }
+            },
+            "/api/integrations/oci-genai/status": {
+                "get": {
+                    "tags": ["ai"],
+                    "summary": "OCI GenAI integration status",
+                    "responses": {"200": {"description": "OCI GenAI status", "content": json_payload}},
+                }
+            },
+            "/api/ai/chat": {
+                "post": {
+                    "tags": ["ai"],
+                    "summary": "Send chat request to OCI GenAI",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["message"],
+                                    "properties": {
+                                        "message": {"type": "string"},
+                                        "modelId": {"type": "string"},
+                                        "maxTokens": {"type": "integer"},
+                                        "temperature": {"type": "number"},
+                                        "topP": {"type": "number"},
+                                        "topK": {"type": "integer"},
+                                        "frequencyPenalty": {"type": "number"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OCI GenAI response", "content": json_payload},
+                        "400": error_payload,
+                        "502": {"description": "OCI GenAI upstream error", "content": json_payload},
+                    },
+                }
+            },
+            "/api/issues/search": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Search synced issues",
+                    "parameters": [
+                        {"name": "epicKey", "in": "query", "schema": {"type": "string"}},
+                        {"name": "assignee", "in": "query", "schema": {"type": "string"}},
+                        {"name": "reporter", "in": "query", "schema": {"type": "string"}},
+                        {"name": "workedBy", "in": "query", "schema": {"type": "string"}},
+                        {"name": "issueType", "in": "query", "schema": {"type": "string"}},
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "updatedSince", "in": "query", "schema": {"type": "string"}},
+                        {"name": "updatedUntil", "in": "query", "schema": {"type": "string"}},
+                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 100}},
+                    ],
+                    "responses": {"200": {"description": "Issue search results", "content": json_payload}},
+                }
+            },
+            "/api/sprints/current": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Current sprint metadata",
+                    "responses": {"200": {"description": "Current sprint", "content": json_payload}},
+                }
+            },
+            "/api/sprints/current/work": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Current sprint work buckets",
+                    "responses": {"200": {"description": "Current sprint work", "content": json_payload}},
+                }
+            },
+            "/api/sprints/current/changes": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Current sprint scope/blocker changes",
+                    "responses": {"200": {"description": "Current sprint changes", "content": json_payload}},
+                }
+            },
+            "/api/metadata/lookup": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Lookup data (groups/work types)",
+                    "responses": {"200": {"description": "Lookup data", "content": json_payload}},
+                }
+            },
+            "/api/metadata/lookup/groups": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Create epic group",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Group created", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/lookup/groups/update": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Update epic group",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id", "name"],
+                                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Group updated", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/lookup/groups/delete": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Delete epic group",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Group deleted", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/lookup/work-types": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Create work type",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Work type created", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/lookup/work-types/update": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Update work type",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id", "name"],
+                                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Work type updated", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/lookup/work-types/delete": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Delete work type",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Work type deleted", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/epics": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Read configured epics",
+                    "parameters": [
+                        {"name": "epicKey", "in": "query", "schema": {"type": "string"}},
+                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50}},
+                    ],
+                    "responses": {"200": {"description": "Configured epics", "content": json_payload}},
+                },
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Create or update epic metadata",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["epicKey"],
+                                    "properties": {
+                                        "epicKey": {"type": "string"},
+                                        "successCriteria": {"type": "array", "items": {"type": "string"}},
+                                        "groupIds": {"type": "array", "items": {"type": "integer"}},
+                                        "workTypeIds": {"type": "array", "items": {"type": "integer"}},
+                                        "timelineEnabled": {"type": "boolean"},
+                                        "timelineStartDate": {"type": "string"},
+                                        "targetCompletionDate": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Epic metadata saved", "content": json_payload}, "400": error_payload},
+                },
+            },
+            "/api/metadata/epics/delete": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Delete epic metadata",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["epicKey"],
+                                    "properties": {"epicKey": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Epic metadata deleted", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/epics/summary": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Configured epic summary",
+                    "parameters": [
+                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50}},
+                        {"name": "periodStart", "in": "query", "schema": {"type": "string"}},
+                        {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
+                        {"name": "timezone", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "Configured epic summary", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/epics/candidates": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Unconfigured epic candidates",
+                    "parameters": [
+                        {"name": "q", "in": "query", "schema": {"type": "string"}},
+                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 20}},
+                    ],
+                    "responses": {"200": {"description": "Epic candidates", "content": json_payload}},
+                }
+            },
+        },
+    }
+
+
 def build_handler(
     jira_status_provider: StatusProvider = get_jira_status,
     jira_sync_status_provider: StatusProvider = get_jira_sync_status,
@@ -82,14 +499,26 @@ def build_handler(
     oci_genai_chat_provider: OciGenAiChatProvider = chat_with_oci_genai,
 ) -> type[BaseHTTPRequestHandler]:
     class TeamBeaconHandler(BaseHTTPRequestHandler):
-        def _set_json_headers(self, status_code: int = 200) -> None:
+        def _set_headers(self, content_type: str, status_code: int = 200) -> None:
             self.send_response(status_code)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Type", content_type)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
+
+        def _set_json_headers(self, status_code: int = 200) -> None:
+            self._set_headers("application/json; charset=utf-8", status_code)
+
+        def _set_html_headers(self, status_code: int = 200) -> None:
+            self._set_headers("text/html; charset=utf-8", status_code)
+
+        def _public_server_url(self) -> str:
+            host = (self.headers.get("Host") or "127.0.0.1:8000").strip()
+            proto_header = (self.headers.get("X-Forwarded-Proto") or "http").strip()
+            proto = proto_header.split(",", 1)[0].strip() or "http"
+            return f"{proto}://{host}"
 
         def do_OPTIONS(self) -> None:  # noqa: N802
             self._set_json_headers(204)
@@ -98,6 +527,17 @@ def build_handler(
         def do_GET(self) -> None:  # noqa: N802
             parsed = urlparse(self.path)
             path = parsed.path
+
+            if path in {"/openapi.json", "/api/openapi.json"}:
+                payload = _build_openapi_spec(server_url=self._public_server_url())
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path in {"/docs", "/docs/", "/api/docs", "/api/docs/", "/swagger", "/swagger/"}:
+                self._set_html_headers(200)
+                self.wfile.write(_text_bytes(_swagger_ui_html("/openapi.json")))
+                return
 
             if path == "/health":
                 self._set_json_headers(200)

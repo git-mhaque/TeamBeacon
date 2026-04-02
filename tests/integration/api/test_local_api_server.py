@@ -498,6 +498,33 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             body = json.loads(response.read().decode("utf-8"))
         self.assertEqual(body["status"], "ok")
 
+    def test_openapi_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/openapi.json", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            self.assertIn("application/json", response.headers.get("Content-Type", ""))
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["openapi"], "3.0.3")
+        self.assertEqual(body["info"]["title"], "TeamBeacon Local API")
+        self.assertIn("/api/ai/chat", body["paths"])
+        self.assertIn("/api/metadata/epics/summary", body["paths"])
+        self.assertEqual(body["servers"][0]["url"], self.base_url)
+
+    def test_docs_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/docs", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            self.assertIn("text/html", response.headers.get("Content-Type", ""))
+            body = response.read().decode("utf-8")
+
+        self.assertIn("TeamBeacon Local API - Swagger UI", body)
+        self.assertIn("SwaggerUIBundle", body)
+        self.assertIn("/openapi.json", body)
+
+    def test_docs_alias_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/docs", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            self.assertIn("text/html", response.headers.get("Content-Type", ""))
+
     def test_jira_status_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/integrations/jira/status", timeout=5) as response:  # noqa: S310
             self.assertEqual(response.status, 200)

@@ -10,6 +10,11 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 ```
 
 ## Endpoints
+- `GET /openapi.json`
+  - Machine-readable OpenAPI schema for the local API.
+- `GET /docs`
+  - Interactive Swagger UI for exploring and trying endpoints.
+  - Aliases: `/api/docs`, `/swagger`
 - `GET /health`
 - `GET /api/integrations/jira/status`
 - `GET /api/integrations/jira/sync/status`
