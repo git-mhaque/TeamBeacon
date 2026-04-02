@@ -87,6 +87,7 @@ export function IntegrationsScreen() {
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSyncOptionsOpen, setIsSyncOptionsOpen] = useState(false);
+  const [isJiraDiagnosticsOpen, setIsJiraDiagnosticsOpen] = useState(false);
   const [selectedSyncMode, setSelectedSyncMode] = useState<JiraSyncMode>("since_last");
   const [selectedSinceDate, setSelectedSinceDate] = useState(todayLocalDate);
 
@@ -541,9 +542,8 @@ export function IntegrationsScreen() {
 
   const jiraLastSyncedText = useMemo(() => formatCheckedAt(jiraSyncStatus?.lastSyncedAt), [jiraSyncStatus?.lastSyncedAt]);
 
-  const showJiraSyncStatusPill = Boolean(
-    syncError || jiraSyncStatus?.state === "running" || jiraSyncStatus?.state === "failed",
-  );
+  const showJiraSyncStatusPillInActions = Boolean(syncError || jiraSyncStatus?.state === "failed");
+  const showJiraSyncProgressNote = jiraSyncPercent !== null && jiraSyncProgressSummary !== "In progress";
 
   const jiraBaseUrl = jiraStatus?.config.baseUrl ? jiraStatus.config.baseUrl.replace(/\/$/, "") : null;
   const configuredBoard = jiraStatus?.configuredBoard;
@@ -594,6 +594,12 @@ export function IntegrationsScreen() {
               <>
                 <p class="tb-sync-progress-row">
                   <span>Sync:</span>
+                  {jiraSyncStatus?.state === "running" ? (
+                    <span class={`tb-status-pill ${jiraSyncToneClass}`}>
+                      <span class="tb-inline-spinner" aria-hidden="true" />
+                      <span>{jiraSyncStateText}</span>
+                    </span>
+                  ) : null}
                   {jiraSyncPercent !== null ? (
                     <>
                       <span
@@ -608,11 +614,9 @@ export function IntegrationsScreen() {
                       </span>
                       <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
                     </>
-                  ) : (
-                    <span class="tb-sync-progress-fallback">{jiraSyncProgressSummary}</span>
-                  )}
+                  ) : null}
                 </p>
-                {jiraSyncPercent !== null ? <p class="tb-sync-progress-note">{jiraSyncProgressSummary}</p> : null}
+                {showJiraSyncProgressNote ? <p class="tb-sync-progress-note">{jiraSyncProgressSummary}</p> : null}
               </>
             ) : null}
             <p>Last synced: {jiraLastSyncedText}</p>
@@ -628,7 +632,10 @@ export function IntegrationsScreen() {
               <button type="button" class="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
                 Sync History
               </button>
-              {showJiraSyncStatusPill ? (
+              <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
+                Diagnostics
+              </button>
+              {showJiraSyncStatusPillInActions ? (
                 <span class={`tb-status-pill ${jiraSyncToneClass}`}>
                   {jiraSyncStatus?.state === "running" ? (
                     <span class="tb-inline-spinner" aria-hidden="true" />
@@ -653,79 +660,6 @@ export function IntegrationsScreen() {
             <p>Last checked: {formatCheckedAt(ociStatus?.checkedAt)}</p>
           </article>
         </div>
-      </section>
-
-      <section class="tb-panel">
-        <header class="tb-panel-header">
-          <div>
-            <h3>JIRA Diagnostics</h3>
-            <p class="tb-muted-note">Board and project checks from live API response.</p>
-          </div>
-        </header>
-        <div class="tb-metrics-grid tb-three-up">
-          <article class="tb-metric-card">
-            <h4>Configured Board</h4>
-            <strong class={`tb-value ${jiraStatus?.connected ? "tb-value-good" : "tb-value-warn"}`}>
-              {configuredBoardUrl ? (
-                <a class="tb-external-link" href={configuredBoardUrl} target="_blank" rel="noopener noreferrer">
-                  {configuredBoardText}
-                </a>
-              ) : (
-                configuredBoardText
-              )}
-            </strong>
-            <p>JIRA_BOARD_ID from local config.</p>
-          </article>
-          <article class="tb-metric-card">
-            <h4>Sample Issue</h4>
-            <strong class={`tb-value ${jiraStatus?.sampleIssueKey ? "tb-value-good" : "tb-value-warn"}`}>
-              {sampleIssueUrl && jiraStatus?.sampleIssueKey ? (
-                <a class="tb-external-link" href={sampleIssueUrl} target="_blank" rel="noopener noreferrer">
-                  {jiraStatus.sampleIssueKey}
-                </a>
-              ) : (
-                jiraStatus?.sampleIssueKey ?? "none"
-              )}
-            </strong>
-            <p>Latest issue from configured project.</p>
-          </article>
-          <article class="tb-metric-card">
-            <h4>Configured Project</h4>
-            <strong class={`tb-value ${jiraStatus?.config.projectKey ? "tb-value-good" : "tb-value-warn"}`}>
-              {configuredProjectUrl && jiraStatus?.config.projectKey ? (
-                <a class="tb-external-link" href={configuredProjectUrl} target="_blank" rel="noopener noreferrer">
-                  {jiraStatus.config.projectKey}
-                </a>
-              ) : (
-                jiraStatus?.config.projectKey ?? "n/a"
-              )}
-            </strong>
-            <p>JIRA_PROJECT_KEY from local config.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="tb-panel">
-        <header class="tb-panel-header">
-          <div>
-            <h3>Field Mapping Readiness</h3>
-            <p class="tb-muted-note">Track required custom fields before sync pipelines run.</p>
-          </div>
-          <span class={`tb-status-pill ${jiraStatus?.connected ? "is-good" : "is-warn"}`}>
-            {jiraStatus?.connected ? "JIRA Mapping Loaded" : "Pending Live Check"}
-          </span>
-        </header>
-        <ul class="tb-integration-list">
-          <li>
-            Story Points <span class="tb-status-pill is-good">{storyPointsField}</span>
-          </li>
-          <li>
-            Sprint Fields <span class="tb-status-pill is-good">{sprintFields}</span>
-          </li>
-          <li>
-            Epic Link <span class="tb-status-pill is-good">{epicLinkField}</span>
-          </li>
-        </ul>
       </section>
 
       <section class="tb-panel">
@@ -850,6 +784,88 @@ export function IntegrationsScreen() {
       {metaSuccess ? (
         <div class="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
           <div class="tb-overlay-toast is-success">{metaSuccess}</div>
+        </div>
+      ) : null}
+
+      {isJiraDiagnosticsOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Diagnostics">
+          <div class="tb-modal-backdrop" onClick={() => setIsJiraDiagnosticsOpen(false)} />
+          <div class="tb-modal tb-modal-diagnostics">
+            <header class="tb-modal-head">
+              <div>
+                <h3>Diagnostics</h3>
+                <p class="tb-muted-note">Board and project checks from live API response.</p>
+              </div>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(false)}>
+                Close
+              </button>
+            </header>
+
+            <div class="tb-metrics-grid tb-three-up">
+              <article class="tb-metric-card">
+                <h4>Configured Board</h4>
+                <strong class={`tb-value ${jiraStatus?.connected ? "tb-value-good" : "tb-value-warn"}`}>
+                  {configuredBoardUrl ? (
+                    <a class="tb-external-link" href={configuredBoardUrl} target="_blank" rel="noopener noreferrer">
+                      {configuredBoardText}
+                    </a>
+                  ) : (
+                    configuredBoardText
+                  )}
+                </strong>
+              </article>
+              <article class="tb-metric-card">
+                <h4>Sample Issue</h4>
+                <strong class={`tb-value ${jiraStatus?.sampleIssueKey ? "tb-value-good" : "tb-value-warn"}`}>
+                  {sampleIssueUrl && jiraStatus?.sampleIssueKey ? (
+                    <a class="tb-external-link" href={sampleIssueUrl} target="_blank" rel="noopener noreferrer">
+                      {jiraStatus.sampleIssueKey}
+                    </a>
+                  ) : (
+                    jiraStatus?.sampleIssueKey ?? "none"
+                  )}
+                </strong>
+              </article>
+              <article class="tb-metric-card">
+                <h4>Configured Project</h4>
+                <strong class={`tb-value ${jiraStatus?.config.projectKey ? "tb-value-good" : "tb-value-warn"}`}>
+                  {configuredProjectUrl && jiraStatus?.config.projectKey ? (
+                    <a class="tb-external-link" href={configuredProjectUrl} target="_blank" rel="noopener noreferrer">
+                      {jiraStatus.config.projectKey}
+                    </a>
+                  ) : (
+                    jiraStatus?.config.projectKey ?? "n/a"
+                  )}
+                </strong>
+              </article>
+            </div>
+
+            <hr class="tb-section-divider" />
+
+            <header class="tb-panel-header">
+              <div>
+                <h3>Field Mapping Readiness</h3>
+                <p class="tb-muted-note">Track required custom fields before sync pipelines run.</p>
+              </div>
+              <span class={`tb-status-pill ${jiraStatus?.connected ? "is-good" : "is-warn"}`}>
+                {jiraStatus?.connected ? "JIRA Mapping Loaded" : "Pending Live Check"}
+              </span>
+            </header>
+            <ul class="tb-integration-list">
+              <li>
+                <span class="tb-integration-label">Story Points</span>
+                <span class="tb-status-pill is-good">{storyPointsField}</span>
+              </li>
+              <li>
+                <span class="tb-integration-label">Sprint Fields</span>
+                <span class="tb-status-pill is-good">{sprintFields}</span>
+              </li>
+              <li>
+                <span class="tb-integration-label">Epic Link</span>
+                <span class="tb-status-pill is-good">{epicLinkField}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       ) : null}
 

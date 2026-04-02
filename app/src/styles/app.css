@@ -1095,6 +1095,14 @@ body {
   gap: 0.42rem;
 }
 
+.tb-integration-label {
+  color: #2b4f81;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .tb-lookup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1152,6 +1160,10 @@ body {
 }
 
 .tb-modal-history {
+  width: min(100%, 72rem);
+}
+
+.tb-modal-diagnostics {
   width: min(100%, 72rem);
 }
 

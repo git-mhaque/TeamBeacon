@@ -49,7 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true },
   { id: "releases", label: "Release Insights", blurb: "Cadence / Release Notes", showConstruction: true },
   { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false },
-  { id: "integrations", label: "Settings", blurb: "Connections / Field Mapping / Epic Metadata", showConstruction: false },
+  { id: "integrations", label: "Settings", blurb: "Connections / Metadata Configuration", showConstruction: false },
 ];
 
 function screenTitle(id: ScreenId): string {

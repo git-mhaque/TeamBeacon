@@ -93,7 +93,12 @@ describe("IntegrationsScreen", () => {
     });
 
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
-    expect(screen.getByRole("heading", { name: "JIRA Diagnostics" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Diagnostics" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Diagnostics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Field Mapping Readiness" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Diagnostics" }));
+    expect(screen.getByRole("dialog", { name: "Diagnostics" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Diagnostics" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Field Mapping Readiness" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Epic Metadata Configuration" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sync Data" })).toBeInTheDocument();
