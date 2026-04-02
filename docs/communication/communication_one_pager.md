@@ -1,7 +1,7 @@
 # TeamBeacon for Engineering Managers
 
 ## Executive Snapshot (TL;DR)
-TeamBeacon is a local-first intelligence layer for Engineering Managers (EM) that sits on top of existing delivery data, without changing source records. It combines convenient sync, manager-configured metadata, initiative and sprint-level visibility, and AI-generated executive reporting to reduce cognitive load, surface risks earlier, and dramatically cut status-report preparation time. This enables EMs to become better system thinkers, have meaningful conversations, and orchestrate more wins.
+TeamBeacon is a local-first intelligence layer for Engineering Managers (EM) that sits on top of existing delivery data, without changing source records. It combines convenient sync, manager-configured metadata, initiative and sprint-level visibility, and an AI-augmented team dashboard to reduce cognitive load and surface risks earlier. This helps EMs think more systemically, lead higher-quality conversations, and drive better delivery outcomes.
 
 ## Purpose
 The purpose of this page is to highlight TeamBeacon capabilities and practical value for Engineering Managers (EMs).
@@ -9,7 +9,7 @@ The purpose of this page is to highlight TeamBeacon capabilities and practical v
 ## What is TeamBeacon? 
 TeamBeacon is a lightweight, intelligent layer on top of existing engineering data sources.
 
-It helps Engineering Managers move from fragmented status gathering to focused delivery leadership by combining synced data, metadata-driven insight, and AI-assisted reporting in a local-first workflow.
+It helps Engineering Managers move from fragmented status gathering to focused delivery leadership by combining synced data, metadata-driven insight, and an AI-augmented team dashboard in a local-first workflow.
 
 Key characteristics:
 - Local-first: runs on the Engineering Manager's laptop.
@@ -112,7 +112,7 @@ TeamBeacon is built as a local-first application with a practical, enterprise-re
 - Backend: Python services for orchestration, local APIs, and data processing.
 - Source integration: JIRA integration for delivery and issue data sync.
 - Cloud SDK integration: OCI Python SDK for OCI service connectivity.
-- AI capabilities: OCI GenAI service integration for AI-powered executive summary and wins/risks generation.
+- AI capabilities: OCI GenAI service integration for AI-augmented application features.
 
 ## Try TeamBeacon
 You can try TeamBeacon from the GitHub repository:
