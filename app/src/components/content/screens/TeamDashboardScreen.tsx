@@ -417,24 +417,6 @@ function buildTeamDashboardExportHtml(params: {
       `).join("")
     : `<tr><td colspan="3" class="empty">No work-type mix data available.</td></tr>`;
 
-  const ragCountTotal = params.greenCount + params.amberCount + params.redCount;
-  const ragTotal = Math.max(1, ragCountTotal);
-  const greenWidth = ((params.greenCount / ragTotal) * 100).toFixed(1);
-  const amberWidth = ((params.amberCount / ragTotal) * 100).toFixed(1);
-  const redWidth = ((params.redCount / ragTotal) * 100).toFixed(1);
-
-  const ragSlices = [
-    { label: "Green", count: params.greenCount, color: "#1f8f63" },
-    { label: "Amber", count: params.amberCount, color: "#b77700" },
-    { label: "Red", count: params.redCount, color: "#c2372e" },
-  ];
-  let ragCursor = 0;
-  const ragStops = ragSlices.map((slice) => {
-    const start = ragCursor;
-    ragCursor += (slice.count / ragTotal) * 100;
-    return `${slice.color} ${start.toFixed(2)}% ${ragCursor.toFixed(2)}%`;
-  });
-  const ragDonutBackground = ragCountTotal > 0 ? `conic-gradient(${ragStops.join(", ")})` : "#e2e9f4";
   const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
   const modeLabel = params.mode === "print" ? "Print-ready HTML export for PDF generation." : "Interactive HTML export for browser review and sharing.";
 
@@ -527,15 +509,14 @@ function buildTeamDashboardExportHtml(params: {
         overflow-wrap: anywhere;
       }
       .mode-print .signals {
+        display: grid;
+        gap: 12px;
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .mode-print .metric {
         border: 1px solid #d2def0;
         border-radius: 10px;
         background: linear-gradient(135deg, #ffffff 0%, var(--surface-alt) 100%);
-      }
-      .mode-print .metric-emphasis {
-        border-left: 4px solid var(--brand);
       }
       .page {
         width: min(1120px, 100%);
@@ -659,10 +640,27 @@ function buildTeamDashboardExportHtml(params: {
         font-weight: 700;
         color: #1e457b;
       }
-      .metric-emphasis {
-        border-left: 4px solid var(--brand);
-        background: linear-gradient(90deg, rgba(46, 100, 179, 0.1) 0%, #ffffff 45%);
+      .metric .value.value-good { color: var(--good); }
+      .metric .value.value-warn { color: var(--warn); }
+      .metric-note {
+        margin: 0;
+        color: #4d6182;
+        font-size: 12px;
       }
+      .value-rag {
+        font-size: 16px;
+        line-height: 1.4;
+      }
+      .rag-breakdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .rag-breakdown .rag-red { color: var(--risk); }
+      .rag-breakdown .rag-amber { color: var(--warn); }
+      .rag-breakdown .rag-green { color: var(--good); }
+      .rag-breakdown .rag-sep { color: #4f6486; }
       .rag-metric {
         display: grid;
         grid-template-columns: 80px minmax(0, 1fr);
@@ -709,17 +707,6 @@ function buildTeamDashboardExportHtml(params: {
       .rag-dot-green { background: var(--good); }
       .rag-dot-amber { background: var(--warn); }
       .rag-dot-red { background: var(--risk); }
-      .rag-bar {
-        margin-top: 10px;
-        height: 9px;
-        border: 1px solid #d1deef;
-        border-radius: 999px;
-        overflow: hidden;
-        display: flex;
-      }
-      .rag-bar-green { background: var(--good); width: ${greenWidth}%; }
-      .rag-bar-amber { background: var(--warn); width: ${amberWidth}%; }
-      .rag-bar-red { background: var(--risk); width: ${redWidth}%; }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -828,10 +815,11 @@ function buildTeamDashboardExportHtml(params: {
           break-inside: avoid-page;
           page-break-inside: avoid;
         }
+        .signals { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
       }
-      @media (max-width: 900px) {
+      @media screen and (max-width: 900px) {
         .grid-2 { grid-template-columns: 1fr; }
-        .signals { grid-template-columns: 1fr; }
+        .signals { display: grid; gap: 12px; grid-template-columns: 1fr; }
         .rag-metric { grid-template-columns: 1fr; }
         .rag-donut { margin: 0 auto; }
       }
@@ -856,11 +844,6 @@ function buildTeamDashboardExportHtml(params: {
       </section>
 
       <section class="panel">
-        <h2>Completed Work Summary</h2>
-        <div class="section-stack">${completedSections}</div>
-      </section>
-
-      <section class="panel">
         <h2>Wins and Risks</h2>
         <div class="grid-2">
           <section>
@@ -878,39 +861,27 @@ function buildTeamDashboardExportHtml(params: {
         <h2>Report Signals</h2>
         <div class="signals">
           <article class="metric">
-            <div class="label">Selected Initiatives</div>
+            <div class="label">Ongoing Initiatives</div>
             <div class="value">${params.totalInitiatives}</div>
+            <p class="metric-note">Selected for Progress for Key Initiatives.</p>
           </article>
           <article class="metric">
-            <div class="label">Completed Cards</div>
-            <div class="value">${params.totalCompletedInPeriod}</div>
+            <div class="label">Period Progress</div>
+            <div class="value ${params.totalCompletedInPeriod > 0 ? "value-good" : "value-warn"}">${params.totalCompletedInPeriod} cards</div>
+            <p class="metric-note">Completed in the selected reporting period.</p>
           </article>
-          <article class="metric metric-emphasis">
-            <div class="label">RAG Mix</div>
-            <div class="rag-metric">
-              <div class="rag-donut" style="background: ${ragDonutBackground};">
-                <span class="rag-donut-hole">${ragCountTotal}</span>
-              </div>
-              <div class="rag-legend">
-                <div class="rag-legend-row">
-                  <span class="rag-dot rag-dot-green"></span>
-                  <span>Green: ${params.greenCount}</span>
-                </div>
-                <div class="rag-legend-row">
-                  <span class="rag-dot rag-dot-amber"></span>
-                  <span>Amber: ${params.amberCount}</span>
-                </div>
-                <div class="rag-legend-row">
-                  <span class="rag-dot rag-dot-red"></span>
-                  <span>Red: ${params.redCount}</span>
-                </div>
-              </div>
+          <article class="metric">
+            <div class="label">Initiative RAG</div>
+            <div class="value value-rag">
+              <span class="rag-breakdown">
+                <span class="rag-red">${params.redCount} R</span>
+                <span class="rag-sep">|</span>
+                <span class="rag-amber">${params.amberCount} A</span>
+                <span class="rag-sep">|</span>
+                <span class="rag-green">${params.greenCount} G</span>
+              </span>
             </div>
-            <div class="rag-bar">
-              <span class="rag-bar-green" title="Green ${greenWidth}%"></span>
-              <span class="rag-bar-amber" title="Amber ${amberWidth}%"></span>
-              <span class="rag-bar-red" title="Red ${redWidth}%"></span>
-            </div>
+            <p class="metric-note">For selected initiatives.</p>
           </article>
         </div>
       </section>
@@ -933,7 +904,7 @@ function buildTeamDashboardExportHtml(params: {
 
       <section class="panel">
         <h2>Work Mix by Group and Type</h2>
-        <div class="grid-2">
+        <div class="section-stack">
           <section>
             <h3>By Group</h3>
             <table>
@@ -953,6 +924,11 @@ function buildTeamDashboardExportHtml(params: {
             </table>
           </section>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2>Completed Work Summary</h2>
+        <div class="section-stack">${completedSections}</div>
       </section>
 
       <p class="footer">Generated by TeamBeacon Team Dashboard Export</p>
@@ -2634,50 +2610,6 @@ export function TeamDashboardScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Completed Work Summary</h3>
-          </div>
-          <div class="tb-btn-row">
-            <button
-              type="button"
-              class="tb-btn tb-btn-sm tb-no-print"
-              onClick={refreshCompletedWorkSummary}
-              disabled={completedWorkLoading}
-            >
-              Refresh Completed Work Summary
-            </button>
-          </div>
-        </header>
-
-        {completedWorkError ? <p class="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
-
-        <div class="tb-exec-completed-summary">
-          {completedWorkDraft.map((entry) => (
-            <div key={entry.group}>
-              <h4 class="tb-exec-list-title">{entry.group}</h4>
-              <ul class="tb-list tb-exec-narrative-list">
-                {entry.bullets.map((item) => (
-                  <li key={`${entry.group}:${item}`}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with OCI GenAI...</p> : null}
-          {!completedWorkLoading && completedWorkDraft.length === 0 ? (
-            <p class="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
-          ) : null}
-        </div>
-        <hr class="tb-section-divider" />
-        <div class="tb-exec-summary-meta">
-          <span>Generated with OCI GenAI</span>
-          <span>Model: {completedWorkModelId ?? "default"}</span>
-          <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
-          <span>{completedWorkWordCount} words</span>
-        </div>
-      </section>
-
-      <section class="tb-panel">
-        <header class="tb-panel-header">
-          <div>
             <h3>Wins and Risks</h3>
           </div>
           <div class="tb-btn-row">
@@ -2722,6 +2654,46 @@ export function TeamDashboardScreen() {
           <span>Model: {winsRisksModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(winsRisksGeneratedAt)}</span>
           <span>{winsRisksWordCount} words</span>
+        </div>
+      </section>
+
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
+            <h3>Report Signals</h3>
+            <p class="tb-muted-note">High-level confidence snapshot for final review.</p>
+          </div>
+        </header>
+        <div class="tb-metrics-grid tb-three-up">
+          <article class="tb-metric-card">
+            <h4>Ongoing Initiatives</h4>
+            <strong class="tb-value">{loading ? "..." : visibleInitiativeSignals.totalEpics}</strong>
+            <p>Selected for Progress for Key Initiatives.</p>
+          </article>
+          <article class="tb-metric-card">
+            <h4>Period Progress</h4>
+            <strong class={`tb-value ${visibleInitiativeSignals.totalCompletedInPeriod > 0 ? "tb-value-good" : "tb-value-warn"}`}>
+              {loading ? "..." : `${visibleInitiativeSignals.totalCompletedInPeriod} cards`}
+            </strong>
+            <p>Completed in the selected reporting period.</p>
+          </article>
+          <article class="tb-metric-card">
+            <h4>Initiative RAG</h4>
+            <strong class="tb-value tb-value-rag">
+              {loading ? (
+                "..."
+              ) : (
+                <span class="tb-initiative-rag-breakdown">
+                  <span class="tb-initiative-rag-text tb-initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
+                  <span class="tb-initiative-rag-separator">|</span>
+                  <span class="tb-initiative-rag-text tb-initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
+                  <span class="tb-initiative-rag-separator">|</span>
+                  <span class="tb-initiative-rag-text tb-initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
+                </span>
+              )}
+            </strong>
+            <p>For selected initiatives.</p>
+          </article>
         </div>
       </section>
 
@@ -2789,46 +2761,6 @@ export function TeamDashboardScreen() {
               ) : null}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <section class="tb-panel">
-        <header class="tb-panel-header">
-          <div>
-            <h3>Report Signals</h3>
-            <p class="tb-muted-note">High-level confidence snapshot for final review.</p>
-          </div>
-        </header>
-        <div class="tb-metrics-grid tb-three-up">
-          <article class="tb-metric-card">
-            <h4>Ongoing Initiatives</h4>
-            <strong class="tb-value">{loading ? "..." : visibleInitiativeSignals.totalEpics}</strong>
-            <p>Selected for Progress for Key Initiatives.</p>
-          </article>
-          <article class="tb-metric-card">
-            <h4>Period Progress</h4>
-            <strong class={`tb-value ${visibleInitiativeSignals.totalCompletedInPeriod > 0 ? "tb-value-good" : "tb-value-warn"}`}>
-              {loading ? "..." : `${visibleInitiativeSignals.totalCompletedInPeriod} cards`}
-            </strong>
-            <p>Completed in the selected reporting period.</p>
-          </article>
-          <article class="tb-metric-card">
-            <h4>Initiative RAG</h4>
-            <strong class="tb-value tb-value-rag">
-              {loading ? (
-                "..."
-              ) : (
-                <span class="tb-initiative-rag-breakdown">
-                  <span class="tb-initiative-rag-text tb-initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
-                  <span class="tb-initiative-rag-separator">|</span>
-                  <span class="tb-initiative-rag-text tb-initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
-                  <span class="tb-initiative-rag-separator">|</span>
-                  <span class="tb-initiative-rag-text tb-initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
-                </span>
-              )}
-            </strong>
-            <p>For selected initiatives.</p>
-          </article>
         </div>
       </section>
 
@@ -2946,6 +2878,50 @@ export function TeamDashboardScreen() {
               </div>
             </div>
           </section>
+        </div>
+      </section>
+
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
+            <h3>Completed Work Summary</h3>
+          </div>
+          <div class="tb-btn-row">
+            <button
+              type="button"
+              class="tb-btn tb-btn-sm tb-no-print"
+              onClick={refreshCompletedWorkSummary}
+              disabled={completedWorkLoading}
+            >
+              Refresh Completed Work Summary
+            </button>
+          </div>
+        </header>
+
+        {completedWorkError ? <p class="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
+
+        <div class="tb-exec-completed-summary">
+          {completedWorkDraft.map((entry) => (
+            <div key={entry.group}>
+              <h4 class="tb-exec-list-title">{entry.group}</h4>
+              <ul class="tb-list tb-exec-narrative-list">
+                {entry.bullets.map((item) => (
+                  <li key={`${entry.group}:${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with OCI GenAI...</p> : null}
+          {!completedWorkLoading && completedWorkDraft.length === 0 ? (
+            <p class="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
+          ) : null}
+        </div>
+        <hr class="tb-section-divider" />
+        <div class="tb-exec-summary-meta">
+          <span>Generated with OCI GenAI</span>
+          <span>Model: {completedWorkModelId ?? "default"}</span>
+          <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
+          <span>{completedWorkWordCount} words</span>
         </div>
       </section>
 
