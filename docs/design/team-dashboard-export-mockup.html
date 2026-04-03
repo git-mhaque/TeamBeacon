@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Team Dashboard Export Mockup</title>
+    <style>
+      :root {
+        --ink: #16233b;
+        --muted: #536481;
+        --line: #d9e2f0;
+        --surface: #ffffff;
+        --surface-alt: #f8fbff;
+        --surface-accent: #f0f6ff;
+        --brand: #1f4f95;
+        --good: #1f8f63;
+        --warn: #b77700;
+        --risk: #c2372e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "Oracle Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(145deg, #f1f6ff 0%, #e7f0ff 46%, #f8fbff 100%);
+      }
+
+      .page {
+        width: min(1120px, 100%);
+        margin: 0 auto;
+        padding: 28px 24px 36px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: linear-gradient(130deg, #ffffff 0%, #f2f7ff 54%, #ecf3ff 100%);
+        padding: 22px;
+        box-shadow: 0 18px 34px rgba(17, 38, 77, 0.12);
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 28px;
+        color: #16315a;
+        letter-spacing: 0.02em;
+      }
+
+      .hero p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero-mode {
+        margin-top: 10px;
+        color: #2a4b76;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .meta {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid #c8d7f1;
+        border-radius: 999px;
+        background: #eef4ff;
+        color: #1f4f95;
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 16px;
+        box-shadow: 0 12px 24px rgba(17, 38, 77, 0.08);
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        color: #203f6b;
+      }
+
+      h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #274b7a;
+      }
+
+      h4 {
+        margin: 0;
+        font-size: 13px;
+        color: #2f5586;
+      }
+
+      .summary {
+        color: #233c60;
+        line-height: 1.58;
+        font-size: 14px;
+        margin: 0;
+      }
+
+      .grid-2 {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .section-block {
+        border-top: 1px solid #e5ecf8;
+        padding-top: 10px;
+      }
+
+      .section-block:first-child {
+        border-top: none;
+        padding-top: 0;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: #304c76;
+        line-height: 1.5;
+      }
+
+      .signals {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .metric {
+        border: 1px solid #d2def0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ffffff 0%, var(--surface-alt) 100%);
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .metric .label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .metric .value {
+        margin-top: 6px;
+        font-size: 24px;
+        font-weight: 700;
+        color: #1e457b;
+      }
+
+      .metric-emphasis {
+        border-left: 4px solid var(--brand);
+        background: linear-gradient(90deg, rgba(46, 100, 179, 0.1) 0%, #ffffff 45%);
+      }
+
+      .rag-metric {
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+
+      .rag-donut {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: conic-gradient(#1f8f63 0% 60%, #b77700 60% 80%, #c2372e 80% 100%);
+        border: 1px solid #ccd8ea;
+        display: grid;
+        place-items: center;
+      }
+
+      .rag-donut-hole {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid #d6e2f2;
+        display: grid;
+        place-items: center;
+        color: #203f6b;
+        font-weight: 700;
+        font-size: 12px;
+      }
+
+      .rag-legend {
+        display: grid;
+        gap: 5px;
+        font-size: 12px;
+      }
+
+      .rag-legend-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #2a456d;
+      }
+
+      .rag-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .rag-dot-green {
+        background: var(--good);
+      }
+
+      .rag-dot-amber {
+        background: var(--warn);
+      }
+
+      .rag-dot-red {
+        background: var(--risk);
+      }
+
+      .rag-bar {
+        margin-top: 10px;
+        height: 9px;
+        border: 1px solid #d1deef;
+        border-radius: 999px;
+        overflow: hidden;
+        display: flex;
+      }
+
+      .rag-bar-green {
+        background: var(--good);
+        width: 60%;
+      }
+
+      .rag-bar-amber {
+        background: var(--warn);
+        width: 20%;
+      }
+
+      .rag-bar-red {
+        background: var(--risk);
+        width: 20%;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      thead th {
+        text-align: left;
+        background: #edf4ff;
+        color: #21426f;
+        border-bottom: 1px solid #d2def0;
+        padding: 8px 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 11px;
+      }
+
+      tbody td {
+        border-bottom: 1px solid #e0e8f5;
+        padding: 8px 9px;
+        color: #284264;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .progress-cell {
+        display: grid;
+        gap: 4px;
+      }
+
+      .progress-label {
+        font-size: 11px;
+        color: #31507b;
+      }
+
+      .progress-track {
+        height: 8px;
+        border-radius: 999px;
+        background: #e0e8f6;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        display: block;
+      }
+
+      .progress-green {
+        background: linear-gradient(90deg, #1f8f63 0%, #33aa7a 100%);
+      }
+
+      .progress-amber {
+        background: linear-gradient(90deg, #b77700 0%, #d19319 100%);
+      }
+
+      .progress-red {
+        background: linear-gradient(90deg, #c2372e 0%, #d74d45 100%);
+      }
+
+      .rag-green-text {
+        color: var(--good);
+        font-weight: 700;
+      }
+
+      .rag-amber-text {
+        color: var(--warn);
+        font-weight: 700;
+      }
+
+      .rag-red-text {
+        color: var(--risk);
+        font-weight: 700;
+      }
+
+      .mix-bar-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mix-bar-track {
+        flex: 1 1 auto;
+        height: 8px;
+        border-radius: 999px;
+        background: #e2eaf6;
+        overflow: hidden;
+      }
+
+      .mix-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+      }
+
+      .mix-bar-value {
+        min-width: 45px;
+        text-align: right;
+        color: #2a486f;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .footer {
+        color: #5b6f90;
+        font-size: 11px;
+        text-align: right;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+
+      @media print {
+        * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        body {
+          background: #ffffff;
+        }
+
+        .page {
+          width: 100%;
+          margin: 0;
+          padding: 0;
+          gap: 10mm;
+        }
+
+        .hero,
+        .panel {
+          box-shadow: none;
+          break-inside: avoid-page;
+          page-break-inside: avoid;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .signals {
+          grid-template-columns: 1fr;
+        }
+
+        .rag-metric {
+          grid-template-columns: 1fr;
+        }
+
+        .rag-donut {
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>Team Dashboard Export</h1>
+        <p>Leadership-ready export generated from TeamBeacon Team Dashboard.</p>
+        <p class="hero-mode">Interactive HTML export for browser review and sharing.</p>
+        <div class="meta">
+          <span class="chip">Reporting Period: Mar 24 - Mar 30, 2026</span>
+          <span class="chip">7 day(s) | Australia/Melbourne</span>
+          <span class="chip">Generated: Apr 3, 2026, 9:35 AM</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Executive Summary</h2>
+        <p class="summary">
+          Delivery advanced across selected initiatives with stronger momentum in platform automation and steady risk
+          reduction in reliability hardening. Completed outcomes in this period improved reporting consistency,
+          production confidence, and decision readiness for engineering leaders.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Completed Work Summary</h2>
+        <div class="section-stack">
+          <section class="section-block">
+            <h4>Core Platform</h4>
+            <ul>
+              <li>Automated executive dashboard summary workflow for weekly leadership reporting.</li>
+              <li>Published export-ready report template for structured review sessions.</li>
+            </ul>
+          </section>
+          <section class="section-block">
+            <h4>Operations</h4>
+            <ul>
+              <li>Improved risk signal validation coverage against release cadence checkpoints.</li>
+              <li>Closed workflow gaps in readiness checks used during dashboard reviews.</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Wins and Risks</h2>
+        <div class="grid-2">
+          <section>
+            <h3>Wins</h3>
+            <ul>
+              <li>Platform automation delivered repeatable executive reporting outcomes in-period.</li>
+              <li>Report handoff quality improved through standardized export structure.</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Risks</h3>
+            <ul>
+              <li>Reliability hardening still needs sustained throughput to protect timeline confidence.</li>
+              <li>Automation dependencies need continued alignment to avoid slippage.</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Report Signals</h2>
+        <div class="signals">
+          <article class="metric">
+            <div class="label">Selected Initiatives</div>
+            <div class="value">5</div>
+          </article>
+          <article class="metric">
+            <div class="label">Completed Cards</div>
+            <div class="value">11</div>
+          </article>
+          <article class="metric metric-emphasis">
+            <div class="label">RAG Mix</div>
+            <div class="rag-metric">
+              <div class="rag-donut"><span class="rag-donut-hole">5</span></div>
+              <div class="rag-legend">
+                <div class="rag-legend-row"><span class="rag-dot rag-dot-green"></span><span>Green: 3</span></div>
+                <div class="rag-legend-row"><span class="rag-dot rag-dot-amber"></span><span>Amber: 1</span></div>
+                <div class="rag-legend-row"><span class="rag-dot rag-dot-red"></span><span>Red: 1</span></div>
+              </div>
+            </div>
+            <div class="rag-bar">
+              <span class="rag-bar-green"></span>
+              <span class="rag-bar-amber"></span>
+              <span class="rag-bar-red"></span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Progress for Key Initiatives</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Initiative</th>
+              <th>Period Progress</th>
+              <th>Overall Progress</th>
+              <th>RAG</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Core Platform</td>
+              <td>Executive reporting automation</td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">5/30 cards (16.7%)</span>
+                  <span class="progress-track"><span class="progress-fill progress-green" style="width: 16.7%"></span></span>
+                </div>
+              </td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">60%</span>
+                  <span class="progress-track"><span class="progress-fill progress-green" style="width: 60%"></span></span>
+                </div>
+              </td>
+              <td class="rag-green-text">Green</td>
+            </tr>
+            <tr>
+              <td>Operations</td>
+              <td>Risk reporting hardening</td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">2/20 cards (10%)</span>
+                  <span class="progress-track"><span class="progress-fill progress-amber" style="width: 10%"></span></span>
+                </div>
+              </td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">45%</span>
+                  <span class="progress-track"><span class="progress-fill progress-amber" style="width: 45%"></span></span>
+                </div>
+              </td>
+              <td class="rag-amber-text">Amber</td>
+            </tr>
+            <tr>
+              <td>Experience</td>
+              <td>Insights interaction polish</td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">4/18 cards (22.2%)</span>
+                  <span class="progress-track"><span class="progress-fill progress-red" style="width: 22.2%"></span></span>
+                </div>
+              </td>
+              <td>
+                <div class="progress-cell">
+                  <span class="progress-label">73%</span>
+                  <span class="progress-track"><span class="progress-fill progress-red" style="width: 73%"></span></span>
+                </div>
+              </td>
+              <td class="rag-red-text">Red</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Work Mix by Group and Type</h2>
+        <div class="grid-2">
+          <section>
+            <h3>By Group</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>Completed</th>
+                  <th>Mix Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Core Platform</td>
+                  <td>6</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 54.5%; background: #1f8f63"></span></span>
+                      <span class="mix-bar-value">54.5%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Operations</td>
+                  <td>3</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 27.3%; background: #0f5570"></span></span>
+                      <span class="mix-bar-value">27.3%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Experience</td>
+                  <td>2</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 18.2%; background: #b77700"></span></span>
+                      <span class="mix-bar-value">18.2%</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <section>
+            <h3>By Type</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Completed</th>
+                  <th>Mix Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Feature</td>
+                  <td>7</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 63.6%; background: #1f8f63"></span></span>
+                      <span class="mix-bar-value">63.6%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Reliability</td>
+                  <td>3</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 27.3%; background: #0f5570"></span></span>
+                      <span class="mix-bar-value">27.3%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Tech Debt</td>
+                  <td>1</td>
+                  <td>
+                    <div class="mix-bar-cell">
+                      <span class="mix-bar-track"><span class="mix-bar-fill" style="width: 9.1%; background: #b77700"></span></span>
+                      <span class="mix-bar-value">9.1%</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </section>
+
+      <p class="footer">Generated by TeamBeacon Team Dashboard Export Mockup</p>
+    </main>
+  </body>
+</html>

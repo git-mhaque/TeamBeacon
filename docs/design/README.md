@@ -4,6 +4,7 @@ This folder contains Oracle JET-oriented screen mockups for the desktop-first Te
 
 ## Files
 - `teambeacon-ojet-mockups.html`: visual prototype for current TeamBeacon screens.
+- `team-dashboard-export-mockup.html`: professional Team Dashboard export mockup with colorful indicators and print-ready styling.
 
 ## Included Screens
 1. Settings
@@ -18,6 +19,10 @@ Open the HTML file in any browser:
 
 ```bash
 open docs/design/teambeacon-ojet-mockups.html
+```
+
+```bash
+open docs/design/team-dashboard-export-mockup.html
 ```
 
 or

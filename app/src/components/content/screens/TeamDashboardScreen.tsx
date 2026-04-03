@@ -50,6 +50,7 @@ const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibl
 const REPORTING_PERIOD_SELECTION_KEY = "teambeacon.executive.reporting.period";
 export const OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT = "teambeacon:team-dashboard-open-initiative-config";
 export const OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT = "teambeacon:team-dashboard-open-reporting-period";
+export const EXPORT_TEAM_DASHBOARD_HTML_EVENT = "teambeacon:team-dashboard-export-html";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -247,6 +248,717 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
 
 function formatPercent(value: number): string {
   return `${value.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+type DashboardExportMode = "interactive" | "print";
+
+type SaveFilePickerHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob | BufferSource | string) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName?: string;
+    excludeAcceptAllOption?: boolean;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<SaveFilePickerHandle>;
+};
+
+async function saveHtmlWithDialogOrDownload(html: string, fileName: string): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
+
+  if (typeof picker === "function") {
+    try {
+      const handle = await picker({
+        suggestedName: fileName,
+        types: [
+          {
+            description: "HTML Document",
+            accept: { "text/html": [".html"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      // Fall back to browser download handling when save-picker write fails.
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 0);
+}
+
+function buildTeamDashboardExportHtml(params: {
+  mode: DashboardExportMode;
+  generatedAt: string;
+  reportingPeriodLabel: string;
+  reportingPeriodDays: number;
+  timezone: string;
+  executiveSummary: string;
+  completedWork: CompletedWorkSummaryGroup[];
+  wins: string[];
+  risks: string[];
+  totalInitiatives: number;
+  totalCompletedInPeriod: number;
+  greenCount: number;
+  amberCount: number;
+  redCount: number;
+  progressRows: Array<{
+    group: string;
+    initiative: string;
+    periodProgressLabel: string;
+    periodProgressPercent: number;
+    overallProgressLabel: string;
+    overallProgressPercent: number;
+    rag: RagLabel;
+  }>;
+  groupMixRows: Array<{
+    name: string;
+    completedInPeriod: number;
+    percent: number;
+  }>;
+  typeMixRows: Array<{
+    name: string;
+    completedInPeriod: number;
+    percent: number;
+  }>;
+}): string {
+  const completedSections = params.completedWork.length > 0
+    ? params.completedWork.map((entry) => `
+        <section class="section-block">
+          <h4>${escapeHtml(entry.group)}</h4>
+          <ul>
+            ${entry.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+          </ul>
+        </section>
+      `).join("")
+    : `
+      <section class="section-block">
+        <h4>No Completed Work</h4>
+        <ul><li>No completed work summary is available for this period.</li></ul>
+      </section>
+    `;
+
+  const winsList = (params.wins.length > 0 ? params.wins : ["No wins were generated for this reporting period."])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const risksList = (params.risks.length > 0 ? params.risks : ["No risks were generated for this reporting period."])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+
+  const groupRows = params.groupMixRows.length > 0
+    ? params.groupMixRows.map((row, index) => `
+        <tr>
+          <td>${escapeHtml(row.name)}</td>
+          <td>${row.completedInPeriod}</td>
+          <td>
+            <div class="mix-bar-cell">
+              <span class="mix-bar-track">
+                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+              </span>
+              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+            </div>
+          </td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="3" class="empty">No group mix data available.</td></tr>`;
+
+  const typeRows = params.typeMixRows.length > 0
+    ? params.typeMixRows.map((row, index) => `
+        <tr>
+          <td>${escapeHtml(row.name)}</td>
+          <td>${row.completedInPeriod}</td>
+          <td>
+            <div class="mix-bar-cell">
+              <span class="mix-bar-track">
+                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+              </span>
+              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+            </div>
+          </td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="3" class="empty">No work-type mix data available.</td></tr>`;
+
+  const ragCountTotal = params.greenCount + params.amberCount + params.redCount;
+  const ragTotal = Math.max(1, ragCountTotal);
+  const greenWidth = ((params.greenCount / ragTotal) * 100).toFixed(1);
+  const amberWidth = ((params.amberCount / ragTotal) * 100).toFixed(1);
+  const redWidth = ((params.redCount / ragTotal) * 100).toFixed(1);
+
+  const ragSlices = [
+    { label: "Green", count: params.greenCount, color: "#1f8f63" },
+    { label: "Amber", count: params.amberCount, color: "#b77700" },
+    { label: "Red", count: params.redCount, color: "#c2372e" },
+  ];
+  let ragCursor = 0;
+  const ragStops = ragSlices.map((slice) => {
+    const start = ragCursor;
+    ragCursor += (slice.count / ragTotal) * 100;
+    return `${slice.color} ${start.toFixed(2)}% ${ragCursor.toFixed(2)}%`;
+  });
+  const ragDonutBackground = ragCountTotal > 0 ? `conic-gradient(${ragStops.join(", ")})` : "#e2e9f4";
+  const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
+  const modeLabel = params.mode === "print" ? "Print-ready HTML export for PDF generation." : "Interactive HTML export for browser review and sharing.";
+
+  const progressRows = params.progressRows.length > 0
+    ? params.progressRows.map((row) => {
+      const ragClass = `rag-${row.rag.toLowerCase()}`;
+      return `
+        <tr>
+          <td>${escapeHtml(row.group)}</td>
+          <td>${escapeHtml(row.initiative)}</td>
+          <td>
+            <div class="progress-cell">
+              <span class="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
+              <span class="progress-track">
+                <span class="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
+              </span>
+            </div>
+          </td>
+          <td>
+            <div class="progress-cell">
+              <span class="progress-label">${escapeHtml(row.overallProgressLabel)}</span>
+              <span class="progress-track">
+                <span class="progress-fill progress-overall ${ragClass}" style="width:${clampPercent(row.overallProgressPercent).toFixed(1)}%;"></span>
+              </span>
+            </div>
+          </td>
+          <td class="${ragClass}">${escapeHtml(row.rag)}</td>
+        </tr>
+      `;
+    }).join("")
+    : `<tr><td colspan="5" class="empty">No initiatives selected for this export.</td></tr>`;
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Team Dashboard Export</title>
+    <style>
+      :root {
+        --ink: #16233b;
+        --muted: #536481;
+        --line: #d9e2f0;
+        --surface: #ffffff;
+        --surface-alt: #f8fbff;
+        --surface-accent: #f0f6ff;
+        --brand: #1f4f95;
+        --brand-soft: #eef4ff;
+        --brand-strong: #1c3e78;
+        --good: #1f8f63;
+        --warn: #b77700;
+        --risk: #c2372e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "Oracle Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(145deg, #f1f6ff 0%, #e7f0ff 46%, #f8fbff 100%);
+      }
+      .mode-print {
+        background: #ffffff;
+      }
+      .mode-print .page {
+        width: calc(100% - 3px);
+        margin: 0 auto;
+        gap: 10px;
+      }
+      .mode-print .hero {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: none;
+        background: #ffffff;
+        padding: 16px;
+        margin: 0;
+      }
+      .mode-print .panel {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: none;
+        background: #ffffff;
+        padding: 14px;
+        margin: 0;
+      }
+      .mode-print table {
+        table-layout: fixed;
+      }
+      .mode-print th,
+      .mode-print td {
+        overflow-wrap: anywhere;
+      }
+      .mode-print .signals {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .mode-print .metric {
+        border: 1px solid #d2def0;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #ffffff 0%, var(--surface-alt) 100%);
+      }
+      .mode-print .metric-emphasis {
+        border-left: 4px solid var(--brand);
+      }
+      .page {
+        width: min(1120px, 100%);
+        margin: 0 auto;
+        padding: 28px 24px 36px;
+        display: grid;
+        gap: 16px;
+      }
+      .hero {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: linear-gradient(130deg, #ffffff 0%, #f2f7ff 54%, #ecf3ff 100%);
+        padding: 22px;
+        box-shadow: 0 18px 34px rgba(17, 38, 77, 0.12);
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: 28px;
+        color: #16315a;
+        letter-spacing: 0.02em;
+      }
+      .hero p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .hero-mode {
+        margin-top: 10px;
+        color: #2a4b76;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .meta {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        border: 1px solid #c8d7f1;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: #1f4f95;
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 16px;
+        box-shadow: 0 12px 24px rgba(17, 38, 77, 0.08);
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        color: #203f6b;
+      }
+      h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #274b7a;
+      }
+      h4 {
+        margin: 0;
+        font-size: 13px;
+        color: #2f5586;
+      }
+      .summary {
+        color: #233c60;
+        line-height: 1.58;
+        font-size: 14px;
+        margin: 0;
+      }
+      .grid-2 {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .section-stack {
+        display: grid;
+        gap: 10px;
+      }
+      .section-block {
+        border-top: 1px solid #e5ecf8;
+        padding-top: 10px;
+      }
+      .section-block:first-child {
+        border-top: none;
+        padding-top: 0;
+      }
+      ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: #304c76;
+        line-height: 1.5;
+      }
+      .signals {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .metric {
+        border: 1px solid #d2def0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ffffff 0%, var(--surface-alt) 100%);
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+      .metric .label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .metric .value {
+        margin-top: 6px;
+        font-size: 24px;
+        font-weight: 700;
+        color: #1e457b;
+      }
+      .metric-emphasis {
+        border-left: 4px solid var(--brand);
+        background: linear-gradient(90deg, rgba(46, 100, 179, 0.1) 0%, #ffffff 45%);
+      }
+      .rag-metric {
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+      .rag-donut {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        border: 1px solid #ccd8ea;
+      }
+      .rag-donut-hole {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid #d6e2f2;
+        display: grid;
+        place-items: center;
+        color: #203f6b;
+        font-weight: 700;
+        font-size: 12px;
+      }
+      .rag-legend {
+        display: grid;
+        gap: 5px;
+        font-size: 12px;
+      }
+      .rag-legend-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #2a456d;
+      }
+      .rag-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .rag-dot-green { background: var(--good); }
+      .rag-dot-amber { background: var(--warn); }
+      .rag-dot-red { background: var(--risk); }
+      .rag-bar {
+        margin-top: 10px;
+        height: 9px;
+        border: 1px solid #d1deef;
+        border-radius: 999px;
+        overflow: hidden;
+        display: flex;
+      }
+      .rag-bar-green { background: var(--good); width: ${greenWidth}%; }
+      .rag-bar-amber { background: var(--warn); width: ${amberWidth}%; }
+      .rag-bar-red { background: var(--risk); width: ${redWidth}%; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      thead th {
+        text-align: left;
+        background: #edf4ff;
+        color: #21426f;
+        border-bottom: 1px solid #d2def0;
+        padding: 8px 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 11px;
+      }
+      tbody td {
+        border-bottom: 1px solid #e0e8f5;
+        padding: 8px 9px;
+        color: #284264;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      td.empty {
+        color: #5a6d8c;
+        font-style: italic;
+      }
+      td.rag-green { color: var(--good); font-weight: 700; }
+      td.rag-amber { color: var(--warn); font-weight: 700; }
+      td.rag-red { color: var(--risk); font-weight: 700; }
+      .progress-cell {
+        display: grid;
+        gap: 4px;
+      }
+      .progress-label {
+        font-size: 11px;
+        color: #31507b;
+      }
+      .progress-track {
+        height: 8px;
+        border-radius: 999px;
+        background: #e0e8f6;
+        overflow: hidden;
+      }
+      .progress-fill {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+      }
+      .progress-period.rag-green, .progress-overall.rag-green { background: linear-gradient(90deg, #1f8f63 0%, #33aa7a 100%); }
+      .progress-period.rag-amber, .progress-overall.rag-amber { background: linear-gradient(90deg, #b77700 0%, #d19319 100%); }
+      .progress-period.rag-red, .progress-overall.rag-red { background: linear-gradient(90deg, #c2372e 0%, #d74d45 100%); }
+      .mix-bar-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mix-bar-track {
+        flex: 1 1 auto;
+        height: 8px;
+        border-radius: 999px;
+        background: #e2eaf6;
+        overflow: hidden;
+      }
+      .mix-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        display: block;
+      }
+      .mix-bar-value {
+        min-width: 45px;
+        text-align: right;
+        color: #2a486f;
+        font-variant-numeric: tabular-nums;
+      }
+      .footer {
+        color: #5b6f90;
+        font-size: 11px;
+        text-align: right;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+      @media print {
+        * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        body {
+          background: #ffffff;
+        }
+        .page {
+          width: calc(100% - 3px);
+          margin: 0;
+          padding: 0;
+          gap: 8mm;
+        }
+        .hero,
+        .panel {
+          break-inside: avoid-page;
+          page-break-inside: avoid;
+          box-shadow: none;
+        }
+        .mode-print .metric {
+          break-inside: avoid-page;
+          page-break-inside: avoid;
+        }
+      }
+      @media (max-width: 900px) {
+        .grid-2 { grid-template-columns: 1fr; }
+        .signals { grid-template-columns: 1fr; }
+        .rag-metric { grid-template-columns: 1fr; }
+        .rag-donut { margin: 0 auto; }
+      }
+    </style>
+  </head>
+  <body class="${modeClass}">
+    <main class="page">
+      <section class="hero">
+        <h1>Team Dashboard Export</h1>
+        <p>Leadership-ready export generated from TeamBeacon Team Dashboard.</p>
+        <p class="hero-mode">${escapeHtml(modeLabel)}</p>
+        <div class="meta">
+          <span class="chip">Reporting Period: ${escapeHtml(params.reportingPeriodLabel)}</span>
+          <span class="chip">${params.reportingPeriodDays} day(s) | ${escapeHtml(params.timezone)}</span>
+          <span class="chip">Generated: ${escapeHtml(formatDraftTimestamp(params.generatedAt))}</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Executive Summary</h2>
+        <p class="summary">${escapeHtml(params.executiveSummary)}</p>
+      </section>
+
+      <section class="panel">
+        <h2>Completed Work Summary</h2>
+        <div class="section-stack">${completedSections}</div>
+      </section>
+
+      <section class="panel">
+        <h2>Wins and Risks</h2>
+        <div class="grid-2">
+          <section>
+            <h3>Wins</h3>
+            <ul>${winsList}</ul>
+          </section>
+          <section>
+            <h3>Risks</h3>
+            <ul>${risksList}</ul>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Report Signals</h2>
+        <div class="signals">
+          <article class="metric">
+            <div class="label">Selected Initiatives</div>
+            <div class="value">${params.totalInitiatives}</div>
+          </article>
+          <article class="metric">
+            <div class="label">Completed Cards</div>
+            <div class="value">${params.totalCompletedInPeriod}</div>
+          </article>
+          <article class="metric metric-emphasis">
+            <div class="label">RAG Mix</div>
+            <div class="rag-metric">
+              <div class="rag-donut" style="background: ${ragDonutBackground};">
+                <span class="rag-donut-hole">${ragCountTotal}</span>
+              </div>
+              <div class="rag-legend">
+                <div class="rag-legend-row">
+                  <span class="rag-dot rag-dot-green"></span>
+                  <span>Green: ${params.greenCount}</span>
+                </div>
+                <div class="rag-legend-row">
+                  <span class="rag-dot rag-dot-amber"></span>
+                  <span>Amber: ${params.amberCount}</span>
+                </div>
+                <div class="rag-legend-row">
+                  <span class="rag-dot rag-dot-red"></span>
+                  <span>Red: ${params.redCount}</span>
+                </div>
+              </div>
+            </div>
+            <div class="rag-bar">
+              <span class="rag-bar-green" title="Green ${greenWidth}%"></span>
+              <span class="rag-bar-amber" title="Amber ${amberWidth}%"></span>
+              <span class="rag-bar-red" title="Red ${redWidth}%"></span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Progress for Key Initiatives</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Initiative</th>
+              <th>Period Progress</th>
+              <th>Overall Progress</th>
+              <th>RAG</th>
+            </tr>
+          </thead>
+          <tbody>${progressRows}</tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Work Mix by Group and Type</h2>
+        <div class="grid-2">
+          <section>
+            <h3>By Group</h3>
+            <table>
+              <thead>
+                <tr><th>Group</th><th>Completed</th><th>%</th></tr>
+              </thead>
+              <tbody>${groupRows}</tbody>
+            </table>
+          </section>
+          <section>
+            <h3>By Type</h3>
+            <table>
+              <thead>
+                <tr><th>Type</th><th>Completed</th><th>%</th></tr>
+              </thead>
+              <tbody>${typeRows}</tbody>
+            </table>
+          </section>
+        </div>
+      </section>
+
+      <p class="footer">Generated by TeamBeacon Team Dashboard Export</p>
+    </main>
+  </body>
+</html>`;
 }
 
 const DISTRIBUTION_COLORS = [
@@ -1276,6 +1988,74 @@ export function TeamDashboardScreen() {
   const refreshCompletedWorkSummary = useCallback(() => {
     setCompletedWorkRefreshNonce((previous) => previous + 1);
   }, []);
+
+  const exportDashboardHtml = useCallback(async () => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const generatedAt = new Date().toISOString();
+    const progressRows = visibleInitiativeRows.map((row, index) => ({
+      group: row.groupText,
+      initiative: buildSimplifiedInitiativeName(row.epicName || row.epicKey, buildInitiativeAlias(index)),
+      periodProgressLabel: `${row.completedInPeriodValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})`,
+      periodProgressPercent: row.deltaPercentValue,
+      overallProgressLabel: formatPercent(row.completionPercent),
+      overallProgressPercent: row.completionPercent,
+      rag: row.rag,
+    }));
+
+    const html = buildTeamDashboardExportHtml({
+      mode: "interactive",
+      generatedAt,
+      reportingPeriodLabel,
+      reportingPeriodDays,
+      timezone: effectivePeriodTimezone,
+      executiveSummary: executiveSummaryDraft,
+      completedWork: completedWorkDraft,
+      wins: winsDraft,
+      risks: risksDraft,
+      totalInitiatives: visibleInitiativeSignals.totalEpics,
+      totalCompletedInPeriod: visibleInitiativeSignals.totalCompletedInPeriod,
+      greenCount: visibleInitiativeSignals.greenCount,
+      amberCount: visibleInitiativeSignals.amberCount,
+      redCount: visibleInitiativeSignals.redCount,
+      progressRows,
+      groupMixRows: groupDistributionRows,
+      typeMixRows: typeDistributionRows,
+    });
+
+    const fileDate = effectivePeriodEnd || generatedAt.slice(0, 10);
+    const safeFileDate = fileDate.replace(/[^0-9-]/g, "");
+    const fileName = `team-dashboard-export-${safeFileDate || "latest"}.html`;
+    await saveHtmlWithDialogOrDownload(html, fileName);
+  }, [
+    completedWorkDraft,
+    effectivePeriodEnd,
+    effectivePeriodTimezone,
+    executiveSummaryDraft,
+    groupDistributionRows,
+    reportingPeriodDays,
+    reportingPeriodLabel,
+    risksDraft,
+    typeDistributionRows,
+    visibleInitiativeRows,
+    visibleInitiativeSignals.amberCount,
+    visibleInitiativeSignals.greenCount,
+    visibleInitiativeSignals.redCount,
+    visibleInitiativeSignals.totalCompletedInPeriod,
+    visibleInitiativeSignals.totalEpics,
+    winsDraft,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleExport = () => {
+      void exportDashboardHtml();
+    };
+    window.addEventListener(EXPORT_TEAM_DASHBOARD_HTML_EVENT, handleExport);
+    return () => {
+      window.removeEventListener(EXPORT_TEAM_DASHBOARD_HTML_EVENT, handleExport);
+    };
+  }, [exportDashboardHtml]);
 
   useEffect(() => {
     if (loading) {

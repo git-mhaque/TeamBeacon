@@ -8,6 +8,7 @@
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import {
+  EXPORT_TEAM_DASHBOARD_HTML_EVENT,
   OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
   OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
   TeamDashboardScreen,
@@ -149,8 +150,12 @@ export function Content({ appName }: Props) {
               >
                 Configure Initiatives
               </button>
-              <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={() => window.print()}>
-                Print
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                onClick={() => window.dispatchEvent(new CustomEvent(EXPORT_TEAM_DASHBOARD_HTML_EVENT))}
+              >
+                Export Dashboard
               </button>
             </div>
           ) : null}
