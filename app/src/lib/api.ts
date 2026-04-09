@@ -53,6 +53,31 @@ export type OciGenAiIntegrationStatus = {
   error?: string | null;
 };
 
+export type AiProvider = "oci" | "ollama" | "openai";
+
+export type AiIntegrationStatus = {
+  source: "oci_genai" | "ollama" | "openai";
+  provider?: AiProvider;
+  configuredProvider?: AiProvider;
+  supportedProviders?: AiProvider[];
+  connected: boolean;
+  checkedAt: string;
+  config: {
+    compartmentId?: string;
+    endpoint?: string;
+    baseUrl?: string;
+    modelId?: string;
+    configProfile?: string;
+    configFile?: string;
+    timeoutSeconds?: {
+      connect?: number;
+      read?: number;
+    };
+  };
+  checks: IntegrationCheck[];
+  error?: string | null;
+};
+
 export type ConfluenceIntegrationStatus = {
   source: "confluence";
   connected: boolean;
@@ -70,7 +95,9 @@ export type ConfluenceIntegrationStatus = {
 };
 
 export type OciGenAiChatResponse = {
-  source: "oci_genai";
+  source: "oci_genai" | "ollama" | "openai";
+  provider?: AiProvider;
+  configuredProvider?: AiProvider;
   modelId: string;
   response: {
     text: string;
@@ -400,6 +427,24 @@ export async function fetchOciGenAiIntegrationStatus(): Promise<OciGenAiIntegrat
   return (await response.json()) as OciGenAiIntegrationStatus;
 }
 
+export async function fetchAiIntegrationStatus(provider?: AiProvider): Promise<AiIntegrationStatus> {
+  const params = new URLSearchParams();
+  if (provider) {
+    params.set("provider", provider);
+  }
+  const query = params.toString();
+  const suffix = query ? `?${query}` : "";
+
+  const response = await fetch(`${API_BASE}/api/integrations/ai/status${suffix}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `AI status request failed (${response.status})`);
+  }
+  return (await response.json()) as AiIntegrationStatus;
+}
+
 export async function fetchConfluenceIntegrationStatus(): Promise<ConfluenceIntegrationStatus> {
   const response = await fetch(`${API_BASE}/api/integrations/confluence/status`, {
     method: "GET",
@@ -413,6 +458,7 @@ export async function fetchConfluenceIntegrationStatus(): Promise<ConfluenceInte
 
 export async function chatWithOciGenAi(payload: {
   message: string;
+  provider?: AiProvider;
   modelId?: string;
   maxTokens?: number;
   temperature?: number;
@@ -426,7 +472,7 @@ export async function chatWithOciGenAi(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw await parseError(response, `OCI GenAI chat request failed (${response.status})`);
+    throw await parseError(response, `AI chat request failed (${response.status})`);
   }
   return (await response.json()) as OciGenAiChatResponse;
 }

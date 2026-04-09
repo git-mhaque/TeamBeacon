@@ -33,10 +33,15 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - OCI SDK availability
     - `~/.oci/config` profile readability
     - Required OCI GenAI environment variables
+- `GET /api/integrations/ai/status`
+  - Provider-agnostic status for active intelligence provider (or explicit query override).
+  - Optional query:
+    - `provider=oci|ollama|openai`
 - `POST /api/ai/chat`
   - Body:
     - `message` (required string)
-    - `modelId` (optional string; defaults from `OCI_GENAI_MODEL_ID`)
+    - `provider` (optional string; `oci`, `ollama`, `openai`; defaults from `INTELLIGENCE_PROVIDER`)
+    - `modelId` (optional string; defaults from provider-specific model env)
     - `maxTokens` (optional integer)
     - `temperature` (optional number)
     - `topP` (optional number)
@@ -104,7 +109,10 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 ## Notes
 - The JIRA status endpoint reads `config/.env` (or process env vars).
 - The Confluence status endpoint reads `config/.env` (or process env vars).
-- OCI GenAI endpoints read `config/.env` (or process env vars) and require the OCI Python SDK (`python3 -m pip install oci`).
+- AI endpoints read `config/.env` (or process env vars) and route by `INTELLIGENCE_PROVIDER`:
+  - `oci`: requires OCI Python SDK (`python3 -m pip install oci`)
+  - `ollama`: requires local Ollama API (default `http://127.0.0.1:11434`)
+  - `openai`: requires `OPENAI_API_KEY`
 - JIRA sync persists board/sprint/issue/changelog data to local SQLite (`teambeacon.db` by default).
 - Parent-child lineage is stored on `issues.parent_issue_key`; epic linkage is stored on `issues.epic_key`.
 - Epic metadata is persisted across:

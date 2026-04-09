@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import {
   chatWithOciGenAi,
   EpicSummaryReportingPeriod,
+  fetchAiIntegrationStatus,
   fetchConfiguredEpicsCompletedCards,
   fetchConfiguredEpicSummary,
   fetchJiraIntegrationStatus,
@@ -1132,13 +1133,13 @@ function parseWinsRisksDraft(text: string): { wins: string[]; risks: string[] } 
   }
 
   if (!parsed) {
-    throw new Error("OCI GenAI did not return valid JSON for wins and risks.");
+    throw new Error("AI provider did not return valid JSON for wins and risks.");
   }
 
   const wins = normalizeDraftBullets(parsed.wins);
   const risks = normalizeDraftBullets(parsed.risks);
   if (wins.length === 0 || risks.length === 0) {
-    throw new Error("OCI GenAI response did not include wins/risks lists.");
+    throw new Error("AI provider response did not include wins/risks lists.");
   }
 
   return { wins, risks };
@@ -1149,6 +1150,7 @@ function buildWinsRisksPrompt(params: {
   reportingPeriodDays: number;
   timezone: string;
   rows: ExecutiveRow[];
+  maxCompletedCards?: number;
   completedCards: Array<{
     initiativeName: string;
     status: string;
@@ -1176,7 +1178,8 @@ function buildWinsRisksPrompt(params: {
   const truncationNote = params.rows.length > promptRows.length
     ? `Only the first ${promptRows.length} selected initiatives are listed in this prompt.`
     : "";
-  const promptCards = params.completedCards.slice(0, 180);
+  const completedCardsLimit = params.maxCompletedCards ?? 180;
+  const promptCards = params.completedCards.slice(0, completedCardsLimit);
   const completedCardLines = promptCards.map((card, index) => (
     `${index + 1}. ${card.initiativeName}` +
     ` | Status: ${card.status}` +
@@ -1224,9 +1227,10 @@ function buildCompletedWorkSummaryPrompt(params: {
   selectedInitiatives: number;
   completedCardsCount: number;
   groupCounts: Array<{ name: string; count: number }>;
+  maxCards?: number;
   cards: Array<{ group: string; initiativeAlias: string; status: string; completedAt: string; outcome: string }>;
 }): string {
-  const promptCards = params.cards.slice(0, 220);
+  const promptCards = params.cards.slice(0, params.maxCards ?? 220);
   const cardLines = promptCards.map((card, index) => (
     `${index + 1}. Group: ${card.group}` +
     ` | Initiative: ${card.initiativeAlias}` +
@@ -1305,7 +1309,7 @@ function parseCompletedWorkSummaryDraft(
   }
 
   if (!parsed) {
-    throw new Error("OCI GenAI did not return valid JSON for completed work summary.");
+    throw new Error("AI provider did not return valid JSON for completed work summary.");
   }
 
   const normalizedItems: Array<{ group: string; bullet: string }> = [];
@@ -1354,7 +1358,7 @@ function parseCompletedWorkSummaryDraft(
 
   const scopedItems = normalizedItems.slice(0, options.expectedCount);
   if (scopedItems.length === 0) {
-    throw new Error("OCI GenAI response did not include completed work bullets.");
+    throw new Error("AI provider response did not include completed work bullets.");
   }
 
   const grouped = new Map<string, string[]>();
@@ -1373,6 +1377,14 @@ function ragToneClass(value: RagLabel): string {
   return "is-risk";
 }
 
+function formatAiProviderName(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "oci" || normalized === "oci-genai" || normalized === "oci_genai") return "OCI";
+  if (normalized === "ollama") return "Ollama";
+  if (normalized === "openai") return "OpenAI";
+  return "AI";
+}
+
 export function TeamDashboardScreen() {
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(() => readPersistedReportingSelection(initialRange), [initialRange]);
@@ -1386,6 +1398,7 @@ export function TeamDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
+  const [aiProviderName, setAiProviderName] = useState("AI");
   const [resolvedReportingPeriod, setResolvedReportingPeriod] = useState<EpicSummaryReportingPeriod | null>(null);
 
   const [selectedInitiativeEpicKeys, setSelectedInitiativeEpicKeys] = useState<string[]>([]);
@@ -1442,13 +1455,14 @@ export function TeamDashboardScreen() {
     setError(null);
 
     try {
-      const [summaryResult, jiraStatusResult] = await Promise.allSettled([
+      const [summaryResult, jiraStatusResult, aiStatusResult] = await Promise.allSettled([
         fetchConfiguredEpicSummary(200, {
           periodStart: range.startDate,
           periodEnd: range.endDate,
           timezone: browserTimezone,
         }),
         fetchJiraIntegrationStatus(),
+        fetchAiIntegrationStatus(),
       ]);
 
       if (summaryResult.status === "rejected") {
@@ -1512,11 +1526,22 @@ export function TeamDashboardScreen() {
       } else {
         setJiraBaseUrl(null);
       }
+
+      if (aiStatusResult.status === "fulfilled") {
+        setAiProviderName(
+          formatAiProviderName(
+            aiStatusResult.value.provider ?? aiStatusResult.value.configuredProvider ?? aiStatusResult.value.source,
+          ),
+        );
+      } else {
+        setAiProviderName("AI");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown executive report load failure.";
       setError(message);
       setRows([]);
       setJiraBaseUrl(null);
+      setAiProviderName("AI");
       setResolvedReportingPeriod(null);
     } finally {
       setLoading(false);
@@ -2064,7 +2089,7 @@ export function TeamDashboardScreen() {
 
     chatWithOciGenAi({
       message: prompt,
-      maxTokens: 260,
+      maxTokens: aiProviderName === "Ollama" ? 200 : 260,
       temperature: 0.2,
       topP: 0.8,
       topK: 0,
@@ -2074,18 +2099,19 @@ export function TeamDashboardScreen() {
         if (summaryRequestSequence.current !== requestId) return;
         const text = response.response.text?.trim();
         if (!text) {
-          throw new Error("OCI GenAI returned an empty summary draft.");
+          throw new Error("AI provider returned an empty summary draft.");
         }
         const sanitized = sanitizeNarrativeText(text, executiveSummaryReplacements);
-        setExecutiveSummaryDraft(sanitized || "Unable to generate executive summary draft from OCI GenAI.");
+        setExecutiveSummaryDraft(sanitized || "Unable to generate executive summary draft from AI provider.");
         setExecutiveSummaryModelId(response.modelId ?? null);
+        setAiProviderName(formatAiProviderName(response.provider ?? response.configuredProvider ?? response.source));
         setExecutiveSummaryGeneratedAt(new Date().toISOString());
       })
       .catch((err) => {
         if (summaryRequestSequence.current !== requestId) return;
-        const message = err instanceof Error ? err.message : "Unknown OCI GenAI summary failure.";
+        const message = err instanceof Error ? err.message : "Unknown AI summary failure.";
         setExecutiveSummaryError(message);
-        setExecutiveSummaryDraft("Unable to generate executive summary draft from OCI GenAI.");
+        setExecutiveSummaryDraft("Unable to generate executive summary draft from AI provider.");
         setExecutiveSummaryModelId(null);
         setExecutiveSummaryGeneratedAt(null);
       })
@@ -2101,6 +2127,7 @@ export function TeamDashboardScreen() {
     reportingPeriodDays,
     reportingPeriodLabel,
     summaryRefreshNonce,
+    aiProviderName,
     executiveSummaryReplacements,
     visibleInitiativeRows,
     visibleInitiativeSignals.amberCount,
@@ -2205,12 +2232,13 @@ export function TeamDashboardScreen() {
           reportingPeriodDays,
           timezone: effectivePeriodTimezone,
           rows: visibleInitiativeRows,
+          maxCompletedCards: aiProviderName === "Ollama" ? 80 : 180,
           completedCards: completedPromptRows,
         });
 
         const response = await chatWithOciGenAi({
           message: winsRisksPrompt,
-          maxTokens: 520,
+          maxTokens: aiProviderName === "Ollama" ? 320 : 520,
           temperature: 0.2,
           topP: 0.8,
           topK: 0,
@@ -2239,13 +2267,14 @@ export function TeamDashboardScreen() {
         setWinsDraft(sanitizedWins.length > 0 ? sanitizedWins : ["Wins summary unavailable from current completed-card data."]);
         setRisksDraft(sanitizedRisks.length > 0 ? sanitizedRisks : ["Risk summary unavailable from current completed-card data."]);
         setWinsRisksModelId(response.modelId ?? null);
+        setAiProviderName(formatAiProviderName(response.provider ?? response.configuredProvider ?? response.source));
         setWinsRisksGeneratedAt(new Date().toISOString());
       } catch (err) {
         if (winsRisksRequestSequence.current !== requestId) return;
-        const message = err instanceof Error ? err.message : "Unknown OCI GenAI wins/risks failure.";
+        const message = err instanceof Error ? err.message : "Unknown AI wins/risks failure.";
         setWinsRisksError(message);
-        setWinsDraft(["Unable to generate wins draft from OCI GenAI."]);
-        setRisksDraft(["Unable to generate risks draft from OCI GenAI."]);
+        setWinsDraft(["Unable to generate wins draft from AI provider."]);
+        setRisksDraft(["Unable to generate risks draft from AI provider."]);
         setWinsRisksModelId(null);
         setWinsRisksGeneratedAt(null);
       } finally {
@@ -2263,6 +2292,7 @@ export function TeamDashboardScreen() {
     loading,
     reportingPeriodDays,
     reportingPeriodLabel,
+    aiProviderName,
     risksReplacements,
     winsReplacements,
     winsRisksRefreshNonce,
@@ -2400,12 +2430,13 @@ export function TeamDashboardScreen() {
           selectedInitiatives: visibleInitiativeRows.length,
           completedCardsCount: scopedCards.length,
           groupCounts: sortedGroupCounts,
+          maxCards: aiProviderName === "Ollama" ? 90 : 220,
           cards: scopedCards,
         });
 
         const response = await chatWithOciGenAi({
           message: prompt,
-          maxTokens: 1500,
+          maxTokens: aiProviderName === "Ollama" ? 700 : 1500,
           temperature: 0.15,
           topP: 0.8,
           topK: 0,
@@ -2424,15 +2455,16 @@ export function TeamDashboardScreen() {
         });
         setCompletedWorkDraft(parsed);
         setCompletedWorkModelId(response.modelId ?? null);
+        setAiProviderName(formatAiProviderName(response.provider ?? response.configuredProvider ?? response.source));
         setCompletedWorkGeneratedAt(new Date().toISOString());
       } catch (err) {
         if (completedWorkRequestSequence.current !== requestId) return;
-        const message = err instanceof Error ? err.message : "Unknown OCI GenAI completed-work summary failure.";
+        const message = err instanceof Error ? err.message : "Unknown AI completed-work summary failure.";
         setCompletedWorkError(message);
         setCompletedWorkDraft([
           {
             group: "Summary Unavailable",
-            bullets: ["Unable to generate completed work summary draft from OCI GenAI."],
+            bullets: ["Unable to generate completed work summary draft from AI provider."],
           },
         ]);
         setCompletedWorkModelId(null);
@@ -2453,6 +2485,7 @@ export function TeamDashboardScreen() {
     loading,
     reportingPeriodDays,
     reportingPeriodLabel,
+    aiProviderName,
     completedWorkReplacements,
     visibleInitiativeRows,
   ]);
@@ -2578,14 +2611,14 @@ export function TeamDashboardScreen() {
 
         <div class={`tb-summary tb-summary-plain${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
           {executiveSummaryLoading ? (
-            <p>Generating executive summary with OCI GenAI...</p>
+            <p>Generating executive summary with {aiProviderName}...</p>
           ) : (
             <p>{executiveSummaryDraft}</p>
           )}
         </div>
         <hr class="tb-section-divider" />
         <div class="tb-exec-summary-meta">
-          <span>Generated with OCI GenAI</span>
+          <span>Generated with {aiProviderName}</span>
           <span>Model: {executiveSummaryModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
           <span>{executiveSummaryWordCount} words</span>
@@ -2620,7 +2653,7 @@ export function TeamDashboardScreen() {
               {winsDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
-              {winsRisksLoading ? <li>Generating wins with OCI GenAI...</li> : null}
+              {winsRisksLoading ? <li>Generating wins with {aiProviderName}...</li> : null}
               {!winsRisksLoading && winsDraft.length === 0 ? <li>Wins will appear once configured epic data is available.</li> : null}
             </ul>
           </div>
@@ -2630,14 +2663,14 @@ export function TeamDashboardScreen() {
               {risksDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
-              {winsRisksLoading ? <li>Generating risks with OCI GenAI...</li> : null}
+              {winsRisksLoading ? <li>Generating risks with {aiProviderName}...</li> : null}
               {!winsRisksLoading && risksDraft.length === 0 ? <li>Risks will appear once configured epic data is available.</li> : null}
               </ul>
           </div>
         </div>
         <hr class="tb-section-divider" />
         <div class="tb-exec-summary-meta">
-          <span>Generated with OCI GenAI</span>
+          <span>Generated with {aiProviderName}</span>
           <span>Model: {winsRisksModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(winsRisksGeneratedAt)}</span>
           <span>{winsRisksWordCount} words</span>
@@ -2898,14 +2931,14 @@ export function TeamDashboardScreen() {
               </ul>
             </div>
           ))}
-          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with OCI GenAI...</p> : null}
+          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with {aiProviderName}...</p> : null}
           {!completedWorkLoading && completedWorkDraft.length === 0 ? (
             <p class="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
           ) : null}
         </div>
         <hr class="tb-section-divider" />
         <div class="tb-exec-summary-meta">
-          <span>Generated with OCI GenAI</span>
+          <span>Generated with {aiProviderName}</span>
           <span>Model: {completedWorkModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
           <span>{completedWorkWordCount} words</span>

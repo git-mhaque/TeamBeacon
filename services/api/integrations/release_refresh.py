@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 from packages.connectors.confluence_config import ConfluenceRuntimeConfig
 from packages.connectors.jira_config import load_env_files
-from services.api.integrations.oci_genai_chat import chat_with_oci_genai
+from services.api.integrations.intelligence_chat import chat_with_intelligence
 
 ReleaseRefreshState = Literal["idle", "running", "completed", "failed"]
 ReleaseSourceState = Literal["queued", "fetching", "processing", "completed", "failed"]
@@ -143,10 +143,10 @@ def _normalize_text(value: str, limit: int) -> str:
 def _extract_response_text(payload: dict[str, Any]) -> str:
     response = payload.get("response")
     if not isinstance(response, dict):
-        raise RuntimeError("OCI GenAI response payload is missing response data.")
+        raise RuntimeError("AI provider response payload is missing response data.")
     text = response.get("text")
     if not isinstance(text, str) or not text.strip():
-        raise RuntimeError("OCI GenAI returned an empty response.")
+        raise RuntimeError("AI provider returned an empty response.")
     return text.strip()
 
 
@@ -362,7 +362,7 @@ class ReleaseRefreshManager:
     def __init__(
         self,
         *,
-        chat_provider: ChatProvider = chat_with_oci_genai,
+        chat_provider: ChatProvider = chat_with_intelligence,
         runtime_loader: RuntimeLoader = _load_confluence_runtime,
         page_fetcher: PageFetcher = fetch_release_source_page,
     ) -> None:

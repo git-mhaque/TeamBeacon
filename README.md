@@ -6,7 +6,7 @@ TeamBeacon is a local-first engineering intelligence app that sits on top of exi
 - Local-first workflow on the manager's machine.
 - Non-destructive integration model (does not modify upstream source data).
 - Metadata-driven insight layer (Group/Type/Epic configuration).
-- AI-powered executive reporting with OCI GenAI integration.
+- AI-powered executive reporting with pluggable provider support (OCI, Ollama, OpenAI).
 
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, and metadata configuration.
@@ -66,7 +66,7 @@ TeamBeacon/                  # Repository root
 - `sqlite3` CLI (mandatory) for applying local schema migrations and ad-hoc DB checks.
 - Rust toolchain (`rustup`, `cargo`, `rustc`) for Tauri desktop commands.
 - Tauri CLI via cargo: `cargo install tauri-cli`
-- OCI Python SDK (required only for OCI GenAI endpoints): `python3 -m pip install oci`
+- OCI Python SDK (required only when `INTELLIGENCE_PROVIDER=oci`): `python3 -m pip install oci`
 - Platform prerequisites for Tauri desktop builds (macOS): Xcode Command Line Tools (`xcode-select --install`)
 
 ## 🚀 Quick Start

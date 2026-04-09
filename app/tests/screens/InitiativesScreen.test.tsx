@@ -49,6 +49,21 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
       config: { baseUrl: "https://jira.example.com", projectKey: "CEG" },
       checks: [{ name: "auth", ok: true, detail: "reachable" }],
     },
+    "/api/integrations/ai/status": {
+      source: "ollama",
+      provider: "ollama",
+      configuredProvider: "ollama",
+      connected: true,
+      checkedAt: "2026-03-30T09:15:00Z",
+      config: {
+        baseUrl: "http://127.0.0.1:11434",
+        modelId: "gemma4:e2b",
+      },
+      checks: [
+        { name: "ollama_api", ok: true, detail: "reachable" },
+        { name: "configured_model", ok: true, detail: "loaded" },
+      ],
+    },
     "/api/metadata/epics/candidates": {
       epics: [
         { epicKey: "CEG-888", epicName: "Fraud signal hardening" },
@@ -142,8 +157,10 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
       },
     },
     "/api/ai/chat": {
-      source: "oci_genai",
-      modelId: "cohere.command-r-08-2024",
+      source: "ollama",
+      provider: "ollama",
+      configuredProvider: "ollama",
+      modelId: "gemma4:e2b",
       response: {
         text: "Completed cards concentrated on resilience hardening and latency closure, indicating delivery momentum with clear operational stabilization in the reporting period.",
       },
@@ -283,7 +300,7 @@ describe("InitiativesScreen", () => {
     expect(await screen.findByText(/delivery momentum with clear operational stabilization/i)).toBeInTheDocument();
     expect(await screen.findByText(/CEG-1001.*Done.*SP 5/i)).toBeInTheDocument();
     expect(await screen.findByText(/CEG-1002.*Closed.*SP 3/i)).toBeInTheDocument();
-    expect(screen.getByText(/Generated with OCI GenAI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generated with Ollama/i)).toBeInTheDocument();
   });
 
   it("opens configured completed-in-period summary from top card", async () => {

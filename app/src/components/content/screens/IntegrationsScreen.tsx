@@ -3,21 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import {
   addEpicGroup,
   addWorkType,
+  AiIntegrationStatus,
   ConfluenceIntegrationStatus,
   deleteEpicGroup,
   deleteWorkType,
   EpicLookupConfig,
+  fetchAiIntegrationStatus,
   fetchConfluenceIntegrationStatus,
   fetchEpicLookupConfig,
   fetchJiraIntegrationStatus,
   fetchJiraSyncHistory,
   fetchJiraSyncStatus,
-  fetchOciGenAiIntegrationStatus,
   JiraIntegrationStatus,
   JiraSyncHistoryEntry,
   JiraSyncMode,
   JiraSyncStatus,
-  OciGenAiIntegrationStatus,
   startJiraSync,
   updateEpicGroup,
   updateWorkType,
@@ -53,6 +53,14 @@ function formatSyncMode(mode: JiraSyncMode | null | undefined, requestedSince?: 
   return mode === "since_last" ? "Since Last" : "Full";
 }
 
+function formatAiProviderName(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "oci" || normalized === "oci-genai" || normalized === "oci_genai") return "OCI";
+  if (normalized === "ollama") return "Ollama";
+  if (normalized === "openai") return "OpenAI";
+  return "AI";
+}
+
 type PendingLookupDelete = {
   type: "group" | "workType";
   id: number;
@@ -67,13 +75,13 @@ export function IntegrationsScreen() {
   }, []);
 
   const [jiraStatus, setJiraStatus] = useState<JiraIntegrationStatus | null>(null);
-  const [ociStatus, setOciStatus] = useState<OciGenAiIntegrationStatus | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiIntegrationStatus | null>(null);
   const [confluenceStatus, setConfluenceStatus] = useState<ConfluenceIntegrationStatus | null>(null);
   const [jiraSyncStatus, setJiraSyncStatus] = useState<JiraSyncStatus | null>(null);
   const [jiraSyncHistory, setJiraSyncHistory] = useState<JiraSyncHistoryEntry[]>([]);
 
   const [jiraError, setJiraError] = useState<string | null>(null);
-  const [ociError, setOciError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [confluenceError, setConfluenceError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -81,7 +89,7 @@ export function IntegrationsScreen() {
   const [metaSuccess, setMetaSuccess] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [ociLoading, setOciLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(true);
   const [confluenceLoading, setConfluenceLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -116,18 +124,18 @@ export function IntegrationsScreen() {
     }
   }, []);
 
-  const loadOciStatus = useCallback(async () => {
-    setOciLoading(true);
-    setOciError(null);
+  const loadAiStatus = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
     try {
-      const status = await fetchOciGenAiIntegrationStatus();
-      setOciStatus(status);
+      const status = await fetchAiIntegrationStatus();
+      setAiStatus(status);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown OCI GenAI status failure.";
-      setOciError(message);
-      setOciStatus(null);
+      const message = err instanceof Error ? err.message : "Unknown AI status failure.";
+      setAiError(message);
+      setAiStatus(null);
     } finally {
-      setOciLoading(false);
+      setAiLoading(false);
     }
   }, []);
 
@@ -189,13 +197,13 @@ export function IntegrationsScreen() {
     loadJiraStatus().catch(() => {
       // loadJiraStatus updates local state.
     });
-    loadOciStatus().catch(() => {
-      // loadOciStatus updates local state.
+    loadAiStatus().catch(() => {
+      // loadAiStatus updates local state.
     });
     loadConfluenceStatus().catch(() => {
       // loadConfluenceStatus updates local state.
     });
-  }, [loadConfluenceStatus, loadJiraStatus, loadOciStatus]);
+  }, [loadAiStatus, loadConfluenceStatus, loadJiraStatus]);
 
   const triggerJiraSync = useCallback(async (mode: JiraSyncMode, sinceDate?: string) => {
     setSyncError(null);
@@ -214,8 +222,8 @@ export function IntegrationsScreen() {
     loadJiraStatus().catch(() => {
       // loadJiraStatus updates local state.
     });
-    loadOciStatus().catch(() => {
-      // loadOciStatus updates local state.
+    loadAiStatus().catch(() => {
+      // loadAiStatus updates local state.
     });
     loadConfluenceStatus().catch(() => {
       // loadConfluenceStatus updates local state.
@@ -226,7 +234,7 @@ export function IntegrationsScreen() {
     loadEpicMetadataConfig().catch(() => {
       // loadEpicMetadataConfig updates local state.
     });
-  }, [loadConfluenceStatus, loadEpicMetadataConfig, loadJiraStatus, loadJiraSyncStatus, loadOciStatus]);
+  }, [loadAiStatus, loadConfluenceStatus, loadEpicMetadataConfig, loadJiraStatus, loadJiraSyncStatus]);
 
   useEffect(() => {
     if (jiraSyncStatus?.state !== "running") {
@@ -448,11 +456,11 @@ export function IntegrationsScreen() {
     return jiraStatus?.connected ? "Connected" : "Check Required";
   }, [jiraError, jiraStatus, loading]);
 
-  const ociValue = useMemo(() => {
-    if (ociError) return "Unavailable";
-    if (ociLoading) return "Checking...";
-    return ociStatus?.connected ? "Connected" : "Check Required";
-  }, [ociError, ociLoading, ociStatus]);
+  const aiValue = useMemo(() => {
+    if (aiError) return "Unavailable";
+    if (aiLoading) return "Checking...";
+    return aiStatus?.connected ? "Connected" : "Check Required";
+  }, [aiError, aiLoading, aiStatus]);
 
   const confluenceValue = useMemo(() => {
     if (confluenceError) return "Unavailable";
@@ -461,7 +469,7 @@ export function IntegrationsScreen() {
   }, [confluenceError, confluenceLoading, confluenceStatus]);
 
   const jiraToneClass = jiraError ? "tb-value-risk" : jiraStatus?.connected ? "tb-value-good" : "tb-value-warn";
-  const ociToneClass = ociError ? "tb-value-risk" : ociStatus?.connected ? "tb-value-good" : "tb-value-warn";
+  const aiToneClass = aiError ? "tb-value-risk" : aiStatus?.connected ? "tb-value-good" : "tb-value-warn";
   const confluenceToneClass = confluenceError
     ? "tb-value-risk"
     : confluenceStatus?.connected
@@ -476,13 +484,28 @@ export function IntegrationsScreen() {
     return checksSummary(jiraStatus.checks);
   }, [jiraError, jiraStatus, loading]);
 
-  const ociHint = useMemo(() => {
-    if (ociError) return ociError;
-    if (ociLoading) return "Testing OCI GenAI endpoint and OCI profile access.";
-    if (!ociStatus) return "Status not loaded.";
-    if (ociStatus.error) return ociStatus.error;
-    return checksSummary(ociStatus.checks);
-  }, [ociError, ociLoading, ociStatus]);
+  const aiProviderName = useMemo(
+    () => formatAiProviderName(aiStatus?.provider ?? aiStatus?.configuredProvider ?? aiStatus?.source),
+    [aiStatus?.configuredProvider, aiStatus?.provider, aiStatus?.source],
+  );
+  const aiModelName = useMemo(() => {
+    const raw = aiStatus?.config?.modelId;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    return "n/a";
+  }, [aiStatus?.config?.modelId]);
+
+  const aiHint = useMemo(() => {
+    if (aiError) return aiError;
+    if (aiLoading) {
+      if (aiProviderName === "OCI") return "Testing OCI GenAI endpoint and OCI profile access.";
+      if (aiProviderName === "Ollama") return "Testing Ollama endpoint and configured model access.";
+      if (aiProviderName === "OpenAI") return "Testing OpenAI endpoint and configured model access.";
+      return "Testing AI provider connectivity.";
+    }
+    if (!aiStatus) return "Status not loaded.";
+    if (aiStatus.error) return aiStatus.error;
+    return checksSummary(aiStatus.checks);
+  }, [aiError, aiLoading, aiProviderName, aiStatus]);
 
   const confluenceHint = useMemo(() => {
     if (confluenceError) return confluenceError;
@@ -581,7 +604,7 @@ export function IntegrationsScreen() {
             <p class="tb-muted-note">Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
           </div>
           <button type="button" class="tb-btn tb-btn-primary" onClick={checkSourceConnections}>
-            {loading || ociLoading || confluenceLoading ? "Checking..." : "Check Now"}
+            {loading || aiLoading || confluenceLoading ? "Checking..." : "Check Now"}
           </button>
         </header>
         <div class="tb-metrics-grid tb-three-up">
@@ -654,10 +677,12 @@ export function IntegrationsScreen() {
           </article>
 
           <article class="tb-metric-card">
-            <h4>OCI GenAI Connection</h4>
-            <strong class={`tb-value ${ociToneClass}`}>{ociValue}</strong>
-            <p>{ociHint}</p>
-            <p>Last checked: {formatCheckedAt(ociStatus?.checkedAt)}</p>
+            <h4>AI Model Connection</h4>
+            <strong class={`tb-value ${aiToneClass}`}>{aiValue}</strong>
+            <p>{aiHint}</p>
+            <p>Last checked: {formatCheckedAt(aiStatus?.checkedAt)}</p>
+            <p>Provider: {aiProviderName}</p>
+            <p>Model: {aiModelName}</p>
           </article>
         </div>
       </section>

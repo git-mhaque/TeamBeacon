@@ -23,18 +23,19 @@ describe("Content", () => {
           { name: "project", ok: true, detail: "resolved" },
         ],
       },
-      "/api/integrations/oci-genai/status": {
-        source: "oci_genai",
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
         connected: true,
         checkedAt: "2026-03-30T09:15:00Z",
         config: {
-          endpoint: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
-          modelId: "cohere.command-r-08-2024",
-          configProfile: "DEFAULT",
+          baseUrl: "http://127.0.0.1:11434",
+          modelId: "gemma4:e2b",
         },
         checks: [
-          { name: "auth", ok: true, detail: "reachable" },
-          { name: "inference", ok: true, detail: "responding" },
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
         ],
       },
       "/api/integrations/confluence/status": {

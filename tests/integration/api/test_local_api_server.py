@@ -29,6 +29,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
         self.epic_completed_cards_calls: list[tuple[str, int, str | None, str | None, str | None]] = []
         self.configured_completed_cards_calls: list[tuple[int, str | None, str | None, str | None]] = []
+        self.ai_status_calls: list[str | None] = []
         self.oci_chat_calls: list[dict[str, object]] = []
         self.release_refresh_start_calls: list[dict[str, object]] = []
 
@@ -238,6 +239,108 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             return {
                 "source": "oci_genai",
                 "modelId": model_id or "cohere.command-r-08-2024",
+                "response": {"text": "TeamBeacon can summarize sprint risk weekly."},
+                "request": {
+                    "message": message,
+                    "maxTokens": max_tokens if max_tokens is not None else 600,
+                    "temperature": temperature if temperature is not None else 1.0,
+                    "topP": top_p if top_p is not None else 0.75,
+                    "topK": top_k if top_k is not None else 0,
+                    "frequencyPenalty": frequency_penalty if frequency_penalty is not None else 0.0,
+                },
+                "error": None,
+            }
+
+        def fake_ai_status(*, provider=None):  # noqa: ANN001
+            self.ai_status_calls.append(provider)
+            selected = provider or "oci"
+            if selected == "ollama":
+                return {
+                    "source": "ollama",
+                    "provider": "ollama",
+                    "configuredProvider": "oci",
+                    "supportedProviders": ["oci", "ollama", "openai"],
+                    "connected": True,
+                    "checkedAt": "2026-03-25T00:00:00+00:00",
+                    "config": {
+                        "baseUrl": "http://127.0.0.1:11434",
+                        "modelId": "gemma4:e2b",
+                    },
+                    "checks": [{"name": "ollama_api", "ok": True, "detail": "Ollama API is reachable."}],
+                    "error": None,
+                }
+            if selected == "openai":
+                return {
+                    "source": "openai",
+                    "provider": "openai",
+                    "configuredProvider": "oci",
+                    "supportedProviders": ["oci", "ollama", "openai"],
+                    "connected": True,
+                    "checkedAt": "2026-03-25T00:00:00+00:00",
+                    "config": {
+                        "baseUrl": "https://api.openai.com/v1",
+                        "modelId": "gpt-4o-mini",
+                    },
+                    "checks": [{"name": "openai_api", "ok": True, "detail": "OpenAI API is reachable."}],
+                    "error": None,
+                }
+            return {
+                "source": "oci_genai",
+                "provider": "oci",
+                "configuredProvider": "oci",
+                "supportedProviders": ["oci", "ollama", "openai"],
+                "connected": True,
+                "checkedAt": "2026-03-25T00:00:00+00:00",
+                "config": {
+                    "endpoint": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+                    "modelId": "cohere.command-r-08-2024",
+                },
+                "checks": [
+                    {"name": "oci_sdk", "ok": True, "detail": "OCI Python SDK is available."},
+                    {"name": "oci_profile", "ok": True, "detail": "Profile DEFAULT loaded."},
+                ],
+                "error": None,
+            }
+
+        def fake_ai_chat(
+            *,
+            message,  # noqa: ANN001
+            provider=None,  # noqa: ANN001
+            model_id=None,  # noqa: ANN001
+            max_tokens=None,  # noqa: ANN001
+            temperature=None,  # noqa: ANN001
+            top_p=None,  # noqa: ANN001
+            top_k=None,  # noqa: ANN001
+            frequency_penalty=None,  # noqa: ANN001
+        ):
+            self.oci_chat_calls.append(
+                {
+                    "message": message,
+                    "provider": provider,
+                    "model_id": model_id,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "frequency_penalty": frequency_penalty,
+                }
+            )
+
+            selected = provider or "oci"
+            response_source = "oci_genai"
+            default_model = "cohere.command-r-08-2024"
+            if selected == "ollama":
+                response_source = "ollama"
+                default_model = "gemma4:e2b"
+            elif selected == "openai":
+                response_source = "openai"
+                default_model = "gpt-4o-mini"
+
+            return {
+                "source": response_source,
+                "provider": selected,
+                "configuredProvider": "oci",
+                "modelId": model_id or default_model,
                 "response": {"text": "TeamBeacon can summarize sprint risk weekly."},
                 "request": {
                     "message": message,
@@ -675,8 +778,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_upsert_epic_provider=fake_upsert_epic,
             metadata_delete_epic_provider=fake_delete_epic,
             confluence_status_provider=fake_confluence_status,
+            ai_status_provider=fake_ai_status,
+            ai_chat_provider=fake_ai_chat,
             oci_genai_status_provider=fake_oci_status,
-            oci_genai_chat_provider=fake_oci_chat,
             release_refresh_status_provider=fake_release_refresh_status,
             release_refresh_result_provider=fake_release_refresh_result,
             release_refresh_start_provider=fake_release_refresh_start,
@@ -706,6 +810,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["openapi"], "3.0.3")
         self.assertEqual(body["info"]["title"], "TeamBeacon Local API")
         self.assertIn("/api/ai/chat", body["paths"])
+        self.assertIn("/api/integrations/ai/status", body["paths"])
         self.assertIn("/api/integrations/confluence/status", body["paths"])
         self.assertIn("/api/releases/refresh/start", body["paths"])
         self.assertIn("/api/releases/refresh/status", body["paths"])
@@ -808,6 +913,22 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["config"]["modelId"], "cohere.command-r-08-2024")
         self.assertEqual(len(body["checks"]), 2)
 
+    def test_ai_status_endpoint_uses_configured_provider_by_default(self) -> None:
+        with urlopen(f"{self.base_url}/api/integrations/ai/status", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "oci_genai")
+        self.assertEqual(body["provider"], "oci")
+        self.assertEqual(self.ai_status_calls[-1], None)
+
+    def test_ai_status_endpoint_supports_provider_override(self) -> None:
+        with urlopen(f"{self.base_url}/api/integrations/ai/status?provider=ollama", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "ollama")
+        self.assertEqual(body["provider"], "ollama")
+        self.assertEqual(self.ai_status_calls[-1], "ollama")
+
     def test_confluence_status_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/integrations/confluence/status", timeout=5) as response:  # noqa: S310
             self.assertEqual(response.status, 200)
@@ -908,6 +1029,27 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.oci_chat_calls[-1]["top_p"], 0.8)
         self.assertEqual(self.oci_chat_calls[-1]["top_k"], 5)
         self.assertEqual(self.oci_chat_calls[-1]["frequency_penalty"], 0.2)
+        self.assertEqual(self.oci_chat_calls[-1]["provider"], None)
+
+    def test_ai_chat_endpoint_supports_provider_override(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/ai/chat",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "provider": "ollama",
+                    "message": "Summarize blockers from this sprint.",
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "ollama")
+        self.assertEqual(body["provider"], "ollama")
+        self.assertEqual(self.oci_chat_calls[-1]["provider"], "ollama")
 
     def test_oci_genai_chat_endpoint_rejects_non_numeric_temperature(self) -> None:
         request = Request(

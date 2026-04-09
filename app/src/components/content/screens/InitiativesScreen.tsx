@@ -8,6 +8,7 @@ import {
   EpicLookupConfig,
   InitiativeEpicSummary,
   deleteEpicMetadata,
+  fetchAiIntegrationStatus,
   fetchConfiguredEpicsCompletedCards,
   fetchEpicCompletedCards,
   fetchConfiguredEpicSummary,
@@ -173,6 +174,14 @@ function ragToneClass(label: RagLabel): string {
   if (label === "Red") return "is-red";
   if (label === "Amber") return "is-amber";
   return "is-green";
+}
+
+function formatAiProviderName(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "oci" || normalized === "oci-genai" || normalized === "oci_genai") return "OCI";
+  if (normalized === "ollama") return "Ollama";
+  if (normalized === "openai") return "OpenAI";
+  return "AI";
 }
 
 function formatPercent(value: number): string {
@@ -342,6 +351,7 @@ export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
+  const [aiProviderName, setAiProviderName] = useState("AI");
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -409,9 +419,10 @@ export function InitiativesScreen() {
     setError(null);
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
-      const [summaryResult, jiraResult] = await Promise.allSettled([
+      const [summaryResult, jiraResult, aiStatusResult] = await Promise.allSettled([
         fetchConfiguredEpicSummary(100, { timezone }),
         fetchJiraIntegrationStatus(),
+        fetchAiIntegrationStatus(),
       ]);
 
       if (summaryResult.status === "rejected") {
@@ -430,12 +441,23 @@ export function InitiativesScreen() {
       } else {
         setJiraBaseUrl(null);
       }
+
+      if (aiStatusResult.status === "fulfilled") {
+        setAiProviderName(
+          formatAiProviderName(
+            aiStatusResult.value.provider ?? aiStatusResult.value.configuredProvider ?? aiStatusResult.value.source,
+          ),
+        );
+      } else {
+        setAiProviderName("AI");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown initiative summary request failure.";
       setError(message);
       setEpicSummary([]);
       setReportingPeriod(undefined);
       setJiraBaseUrl(null);
+      setAiProviderName("AI");
     } finally {
       setLoading(false);
     }
@@ -941,15 +963,18 @@ export function InitiativesScreen() {
       try {
         const aiPayload = await chatWithOciGenAi({
           message: prompt,
-          maxTokens: 420,
+          maxTokens: aiProviderName === "Ollama" ? 280 : 420,
           temperature: 0.2,
           topP: 0.8,
           topK: 0,
           frequencyPenalty: 0,
         });
+        setAiProviderName(
+          formatAiProviderName(aiPayload.provider ?? aiPayload.configuredProvider ?? aiPayload.source),
+        );
         const summaryText = aiPayload.response?.text?.trim();
         if (!summaryText) {
-          throw new Error("OCI GenAI returned an empty completed-card summary.");
+          throw new Error("AI provider returned an empty completed-card summary.");
         }
         setCompletedSummaryText(summaryText);
         setCompletedSummaryModelId(aiPayload.modelId);
@@ -957,7 +982,7 @@ export function InitiativesScreen() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to generate completed-card summary.";
         setCompletedSummaryTextError(message);
-        setCompletedSummaryText("Unable to generate completed-card summary from OCI GenAI.");
+        setCompletedSummaryText("Unable to generate completed-card summary from AI provider.");
       } finally {
         setCompletedSummaryTextLoading(false);
       }
@@ -967,7 +992,7 @@ export function InitiativesScreen() {
     } finally {
       setCompletedSummaryLoading(false);
     }
-  }, [reportingPeriod]);
+  }, [reportingPeriod, aiProviderName]);
 
   const openConfiguredCompletedSummary = useCallback(async () => {
     setCompletedSummaryContext({ scope: "configured" });
@@ -1020,15 +1045,18 @@ export function InitiativesScreen() {
       try {
         const aiPayload = await chatWithOciGenAi({
           message: prompt,
-          maxTokens: 500,
+          maxTokens: aiProviderName === "Ollama" ? 320 : 500,
           temperature: 0.2,
           topP: 0.8,
           topK: 0,
           frequencyPenalty: 0,
         });
+        setAiProviderName(
+          formatAiProviderName(aiPayload.provider ?? aiPayload.configuredProvider ?? aiPayload.source),
+        );
         const summaryText = aiPayload.response?.text?.trim();
         if (!summaryText) {
-          throw new Error("OCI GenAI returned an empty completed-card summary.");
+          throw new Error("AI provider returned an empty completed-card summary.");
         }
         setCompletedSummaryText(summaryText);
         setCompletedSummaryModelId(aiPayload.modelId);
@@ -1036,7 +1064,7 @@ export function InitiativesScreen() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to generate completed-card summary.";
         setCompletedSummaryTextError(message);
-        setCompletedSummaryText("Unable to generate completed-card summary from OCI GenAI.");
+        setCompletedSummaryText("Unable to generate completed-card summary from AI provider.");
       } finally {
         setCompletedSummaryTextLoading(false);
       }
@@ -1046,7 +1074,7 @@ export function InitiativesScreen() {
     } finally {
       setCompletedSummaryLoading(false);
     }
-  }, [reportingPeriod]);
+  }, [reportingPeriod, aiProviderName]);
 
   return (
     <div class="tb-screen-grid">
@@ -1537,7 +1565,7 @@ export function InitiativesScreen() {
             <section>
               <h4 class="tb-initiative-completed-section-title">AI Summary</h4>
               {completedSummaryLoading ? <p class="tb-muted-note">Loading completed cards...</p> : null}
-              {completedSummaryTextLoading ? <p class="tb-muted-note">Generating summary with OCI GenAI...</p> : null}
+              {completedSummaryTextLoading ? <p class="tb-muted-note">Generating summary with {aiProviderName}...</p> : null}
               {completedSummaryTextError ? <p class="tb-error-note">{completedSummaryTextError}</p> : null}
               {completedSummaryText ? (
                 <div class="tb-summary">
@@ -1546,7 +1574,7 @@ export function InitiativesScreen() {
               ) : null}
               {(completedSummaryModelId || completedSummaryGeneratedAt) && !completedSummaryTextLoading ? (
                 <p class="tb-muted-note">
-                  Generated with OCI GenAI
+                  Generated with {aiProviderName}
                   {completedSummaryModelId ? ` | Model: ${completedSummaryModelId}` : ""}
                   {completedSummaryGeneratedAt ? ` | Updated: ${formatTimestamp(completedSummaryGeneratedAt)}` : ""}
                 </p>

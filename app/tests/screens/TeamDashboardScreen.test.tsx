@@ -86,6 +86,24 @@ describe("TeamDashboardScreen", () => {
         });
       }
 
+      if (url.includes("/api/integrations/ai/status")) {
+        return jsonResponse({
+          source: "ollama",
+          provider: "ollama",
+          configuredProvider: "ollama",
+          connected: true,
+          checkedAt: "2026-03-30T09:15:00Z",
+          config: {
+            baseUrl: "http://127.0.0.1:11434",
+            modelId: "gemma4:e2b",
+          },
+          checks: [
+            { name: "ollama_api", ok: true, detail: "reachable" },
+            { name: "configured_model", ok: true, detail: "loaded" },
+          ],
+        });
+      }
+
       if (url.includes("/api/metadata/epics/completed-cards/configured")) {
         return jsonResponse({
           source: "local",
@@ -139,8 +157,10 @@ describe("TeamDashboardScreen", () => {
         const bodyText = typeof init?.body === "string" ? init.body : "";
         if (bodyText.includes("Draft a completed-work summary grouped by initiative group for engineering leaders.")) {
           return jsonResponse({
-            source: "oci_genai",
-            modelId: "cohere.command-r-08-2024",
+            source: "ollama",
+            provider: "ollama",
+            configuredProvider: "ollama",
+            modelId: "gemma4:e2b",
             response: {
               text: JSON.stringify({
                 groups: [
@@ -165,8 +185,10 @@ describe("TeamDashboardScreen", () => {
 
         if (bodyText.includes("Return JSON only with this schema")) {
           return jsonResponse({
-            source: "oci_genai",
-            modelId: "cohere.command-r-08-2024",
+            source: "ollama",
+            provider: "ollama",
+            configuredProvider: "ollama",
+            modelId: "gemma4:e2b",
             response: {
               text: JSON.stringify({
                 wins: [
@@ -185,8 +207,10 @@ describe("TeamDashboardScreen", () => {
         }
 
         return jsonResponse({
-          source: "oci_genai",
-          modelId: "cohere.command-r-08-2024",
+          source: "ollama",
+          provider: "ollama",
+          configuredProvider: "ollama",
+          modelId: "gemma4:e2b",
           response: {
             text: "The selected initiatives advanced during the reporting period with stronger momentum in core platform delivery while reliability work still requires focused risk mitigation.",
           },
@@ -231,7 +255,7 @@ describe("TeamDashboardScreen", () => {
       throw new Error("Wins and Risks section not found.");
     }
     const scopedWinsRisks = within(winsRisksPanel);
-    expect(scopedWinsRisks.getByText("Generated with OCI GenAI")).toBeInTheDocument();
+    expect(scopedWinsRisks.getByText("Generated with Ollama")).toBeInTheDocument();
     expect(scopedWinsRisks.getByText(/Model:/i)).toBeInTheDocument();
     expect(scopedWinsRisks.getByText(/Updated:/i)).toBeInTheDocument();
     expect(scopedWinsRisks.getByText(/words/i)).toBeInTheDocument();

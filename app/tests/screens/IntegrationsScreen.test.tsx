@@ -5,7 +5,7 @@ import { IntegrationsScreen } from "../../src/components/content/screens/Integra
 import { setupFetchMock } from "../utils/fetchMock";
 
 describe("IntegrationsScreen", () => {
-  it("renders JIRA and OCI GenAI connectivity status from the backend", async () => {
+  it("renders JIRA and active AI provider connectivity status from the backend", async () => {
     const fetchSpy = setupFetchMock({
       "/api/integrations/jira/status": {
         source: "jira",
@@ -25,18 +25,19 @@ describe("IntegrationsScreen", () => {
         ],
         sampleIssueKey: "CEG-100",
       },
-      "/api/integrations/oci-genai/status": {
-        source: "oci_genai",
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
         connected: true,
         checkedAt: "2026-03-30T09:15:00Z",
         config: {
-          endpoint: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
-          modelId: "cohere.command-r-08-2024",
-          configProfile: "DEFAULT",
+          baseUrl: "http://127.0.0.1:11434",
+          modelId: "gemma4:e2b",
         },
         checks: [
-          { name: "auth", ok: true, detail: "reachable" },
-          { name: "inference", ok: true, detail: "responding" },
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
         ],
       },
       "/api/integrations/confluence/status": {
@@ -79,8 +80,10 @@ describe("IntegrationsScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Source Connections" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "JIRA Connection" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "OCI GenAI Connection" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI Model Connection" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Confluence Connection" })).toBeInTheDocument();
+    expect(await screen.findByText("Provider: Ollama")).toBeInTheDocument();
+    expect(await screen.findByText("Model: gemma4:e2b")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(5);
@@ -125,18 +128,19 @@ describe("IntegrationsScreen", () => {
           { name: "project", ok: true, detail: "resolved" },
         ],
       },
-      "/api/integrations/oci-genai/status": {
-        source: "oci_genai",
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
         connected: true,
         checkedAt: "2026-03-30T09:15:00Z",
         config: {
-          endpoint: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
-          modelId: "cohere.command-r-08-2024",
-          configProfile: "DEFAULT",
+          baseUrl: "http://127.0.0.1:11434",
+          modelId: "gemma4:e2b",
         },
         checks: [
-          { name: "auth", ok: true, detail: "reachable" },
-          { name: "inference", ok: true, detail: "responding" },
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
         ],
       },
       "/api/integrations/confluence/status": {
@@ -223,14 +227,16 @@ describe("IntegrationsScreen", () => {
           { name: "project", ok: true, detail: "resolved" },
         ],
       },
-      "/api/integrations/oci-genai/status": {
-        source: "oci_genai",
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
         connected: true,
         checkedAt: "2026-03-30T09:15:00Z",
-        config: { modelId: "cohere.command-r-08-2024" },
+        config: { modelId: "gemma4:e2b", baseUrl: "http://127.0.0.1:11434" },
         checks: [
-          { name: "auth", ok: true, detail: "reachable" },
-          { name: "inference", ok: true, detail: "responding" },
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
         ],
       },
       "/api/integrations/confluence/status": {

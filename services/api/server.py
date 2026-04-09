@@ -17,7 +17,8 @@ from services.api.integrations.jira_sync import (
     get_jira_sync_status,
     start_jira_sync,
 )
-from services.api.integrations.oci_genai_chat import chat_with_oci_genai, get_oci_genai_status
+from services.api.integrations.intelligence_chat import chat_with_intelligence, get_intelligence_status
+from services.api.integrations.oci_genai_chat import get_oci_genai_status
 from services.api.integrations.release_refresh import (
     get_release_refresh_result,
     get_release_refresh_status,
@@ -59,8 +60,9 @@ MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
 MetadataEpicCompletedCardsProvider = Callable[..., dict[str, Any]]
 ConfluenceStatusProvider = Callable[[], dict[str, Any]]
+AiStatusProvider = Callable[..., dict[str, Any]]
+AiChatProvider = Callable[..., dict[str, Any]]
 OciGenAiStatusProvider = Callable[[], dict[str, Any]]
-OciGenAiChatProvider = Callable[..., dict[str, Any]]
 ReleaseRefreshStatusProvider = Callable[[], dict[str, Any]]
 ReleaseRefreshStartProvider = Callable[[Optional[list[dict[str, Any]]], Optional[str]], dict[str, Any]]
 ReleaseRefreshResultProvider = Callable[[], dict[str, Any]]
@@ -134,7 +136,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
             {"name": "integrations", "description": "Integration status and sync controls."},
             {"name": "issues", "description": "Issue and sprint-level views."},
             {"name": "metadata", "description": "Epic metadata and lookup configuration."},
-            {"name": "ai", "description": "OCI GenAI status and chat utilities."},
+            {"name": "ai", "description": "Provider-agnostic AI status and chat utilities."},
             {"name": "docs", "description": "OpenAPI and Swagger UI docs endpoints."},
         ],
         "paths": {
@@ -281,14 +283,33 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
             "/api/integrations/oci-genai/status": {
                 "get": {
                     "tags": ["ai"],
-                    "summary": "OCI GenAI integration status",
+                    "summary": "OCI GenAI integration status (legacy compatibility endpoint)",
                     "responses": {"200": {"description": "OCI GenAI status", "content": json_payload}},
+                }
+            },
+            "/api/integrations/ai/status": {
+                "get": {
+                    "tags": ["ai"],
+                    "summary": "Active AI provider integration status",
+                    "parameters": [
+                        {
+                            "name": "provider",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["oci", "ollama", "openai"]},
+                            "description": "Optional provider override. Defaults to INTELLIGENCE_PROVIDER.",
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "AI provider status", "content": json_payload},
+                        "400": error_payload,
+                    },
                 }
             },
             "/api/ai/chat": {
                 "post": {
                     "tags": ["ai"],
-                    "summary": "Send chat request to OCI GenAI",
+                    "summary": "Send chat request to active AI provider",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -298,6 +319,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                                     "required": ["message"],
                                     "properties": {
                                         "message": {"type": "string"},
+                                        "provider": {"type": "string", "enum": ["oci", "ollama", "openai"]},
                                         "modelId": {"type": "string"},
                                         "maxTokens": {"type": "integer"},
                                         "temperature": {"type": "number"},
@@ -310,9 +332,9 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         },
                     },
                     "responses": {
-                        "200": {"description": "OCI GenAI response", "content": json_payload},
+                        "200": {"description": "AI provider response", "content": json_payload},
                         "400": error_payload,
-                        "502": {"description": "OCI GenAI upstream error", "content": json_payload},
+                        "502": {"description": "AI provider upstream error", "content": json_payload},
                     },
                 }
             },
@@ -600,8 +622,9 @@ def build_handler(
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
     metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
     confluence_status_provider: ConfluenceStatusProvider = get_confluence_status,
+    ai_status_provider: AiStatusProvider = get_intelligence_status,
+    ai_chat_provider: AiChatProvider = chat_with_intelligence,
     oci_genai_status_provider: OciGenAiStatusProvider = get_oci_genai_status,
-    oci_genai_chat_provider: OciGenAiChatProvider = chat_with_oci_genai,
     release_refresh_status_provider: ReleaseRefreshStatusProvider = get_release_refresh_status,
     release_refresh_result_provider: ReleaseRefreshResultProvider = get_release_refresh_result,
     release_refresh_start_provider: ReleaseRefreshStartProvider = start_release_refresh,
@@ -696,6 +719,20 @@ def build_handler(
 
             if path == "/api/integrations/oci-genai/status":
                 payload = oci_genai_status_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/integrations/ai/status":
+                query = parse_qs(parsed.query)
+                provider_raw = query.get("provider", [None])[0]
+                provider = provider_raw.strip() if isinstance(provider_raw, str) else None
+                try:
+                    payload = ai_status_provider(provider=provider)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
@@ -966,6 +1003,13 @@ def build_handler(
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "message is required."}))
                     return
 
+                provider_raw = body_payload.get("provider")
+                if provider_raw is not None and not isinstance(provider_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "provider must be a string."}))
+                    return
+                provider = provider_raw if isinstance(provider_raw, str) else None
+
                 model_id_raw = body_payload.get("modelId")
                 if model_id_raw is not None and not isinstance(model_id_raw, str):
                     self._set_json_headers(400)
@@ -1013,8 +1057,9 @@ def build_handler(
                 )
 
                 try:
-                    payload = oci_genai_chat_provider(
+                    payload = ai_chat_provider(
                         message=message_raw,
+                        provider=provider,
                         model_id=model_id,
                         max_tokens=max_tokens,
                         temperature=temperature,
