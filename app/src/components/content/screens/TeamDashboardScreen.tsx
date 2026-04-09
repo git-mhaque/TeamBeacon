@@ -998,6 +998,35 @@ function applyTextReplacements(text: string, replacements: Map<string, string>):
   return next;
 }
 
+function stripIsoTimestamps(text: string): string {
+  return text
+    .replace(
+      /\b(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g,
+      "$1",
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function formatCompletedDateForPrompt(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "n/a";
+
+  const candidate = stripIsoTimestamps(trimmed);
+  const datePart = candidate.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  if (!datePart) return candidate;
+
+  const parsedUtcDay = parseIsoDateToUtcDay(datePart);
+  if (parsedUtcDay === null) return datePart;
+
+  return new Date(parsedUtcDay).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 function sanitizeNarrativeText(text: string, replacements?: Map<string, string>): string {
   let next = text
     .trim()
@@ -1024,7 +1053,7 @@ function clipWords(text: string, maxWords: number): string {
 }
 
 function buildCompletedCardFallbackBullet(outcome: string, replacements?: Map<string, string>): string {
-  const sanitized = sanitizeNarrativeText(outcome, replacements);
+  const sanitized = sanitizeNarrativeText(stripIsoTimestamps(outcome), replacements);
   if (!sanitized) {
     return "Completed delivery outcome captured for this reporting period.";
   }
@@ -1235,7 +1264,7 @@ function buildCompletedWorkSummaryPrompt(params: {
     `${index + 1}. Group: ${card.group}` +
     ` | Initiative: ${card.initiativeAlias}` +
     ` | Status: ${card.status}` +
-    ` | Completed: ${card.completedAt}` +
+    ` | Completed: ${formatCompletedDateForPrompt(card.completedAt)}` +
     ` | Outcome: ${card.outcome}`
   ));
   const groupLines = params.groupCounts
@@ -1256,7 +1285,7 @@ function buildCompletedWorkSummaryPrompt(params: {
     "- Use only provided data. Do not invent metrics, dependencies, or blockers.",
     "- Do not reference issue keys, ticket IDs, or story points (SP).",
     "- Do not use full initiative names literally; keep references generic or by initiative alias.",
-    "- Mention risk only if explicitly supported by outcome text or completion timing in provided data.",
+    "- Don't need to include any date or timestamp information in the bullet; the completedAt field is for context only.",
     "",
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     `Selected initiatives in scope: ${params.selectedInitiatives}`,
@@ -1319,7 +1348,7 @@ function parseCompletedWorkSummaryDraft(
     const group = typeof rawGroup === "string" && rawGroup.trim().length > 0
       ? rawGroup.trim().replace(/\s+/g, " ")
       : "Unassigned";
-    const sanitized = sanitizeNarrativeText(rawBullet, options.replacements);
+    const sanitized = sanitizeNarrativeText(stripIsoTimestamps(rawBullet), options.replacements);
     if (!sanitized) return;
     normalizedItems.push({
       group,
@@ -2394,8 +2423,8 @@ export function TeamDashboardScreen() {
 
           const groupName = row.groups[0]?.name?.trim() || "Unassigned";
           const status = card.status?.trim() || "Done";
-          const completedAt = card.completedAt?.trim() || "n/a";
-          const outcome = card.summary?.trim() || "No summary provided.";
+          const completedAt = formatCompletedDateForPrompt(card.completedAt?.trim() || "n/a");
+          const outcome = stripIsoTimestamps(card.summary?.trim() || "No summary provided.");
 
           scopedCards.push({
             group: groupName,
