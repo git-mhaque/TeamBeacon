@@ -1,12 +1,12 @@
 # TeamBeacon
 
-TeamBeacon is a local-first engineering intelligence app that sits on top of existing delivery data sources and helps Engineering Managers operate with clearer signals, lower cognitive load, and faster executive communication.
+TeamBeacon is a local-first engineering intelligence app that sits on top of existing delivery data sources and helps Engineering Managers operate with clearer signals, lower cognitive load, and better delivery outcomes.
 
 ## 🎯 Overview
 - Local-first workflow on the manager's machine.
 - Non-destructive integration model (does not modify upstream source data).
 - Metadata-driven insight layer (Group/Type/Epic configuration).
-- AI-powered executive reporting with pluggable provider support (OCI, Ollama, OpenAI).
+- AI-powered insights with pluggable provider support (OCI, Ollama, OpenAI).
 
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, and metadata configuration.
@@ -128,4 +128,4 @@ npm run desktop:build
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap
 - [docs/design/README.md](docs/design/README.md): design artifact overview
-- [docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI GenAI smoke test
+- [docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI-specific smoke test (use when `INTELLIGENCE_PROVIDER=oci`)

@@ -27,7 +27,7 @@
 - `CONFLUENCE_TIMEOUT_SECONDS` (default: `30`)
 
 ## Intelligence Provider
-- `INTELLIGENCE_PROVIDER` (default: `oci`; supported: `oci`, `ollama`, `openai`)
+- `INTELLIGENCE_PROVIDER` (default: `ollama`; supported: `oci`, `ollama`, `openai`)
 - `AI_PROVIDER` (optional alias for `INTELLIGENCE_PROVIDER`)
 
 ## OCI GenAI Variables
@@ -45,10 +45,10 @@
 - `OCI_GENAI_READ_TIMEOUT_SECONDS` (default: `240`)
 
 ## Ollama Variables
-- `OLLAMA_MODEL` or `OLLAMA_MODEL_ID` (required when `INTELLIGENCE_PROVIDER=ollama`)
+- `OLLAMA_MODEL` or `OLLAMA_MODEL_ID` (required when `INTELLIGENCE_PROVIDER=ollama`; default: `llama3.1:8b`)
 - `OLLAMA_BASE_URL` (default: `http://127.0.0.1:11434`)
-- `OLLAMA_NUM_CTX` (default: `8192`; increase for larger prompts)
-- `OLLAMA_MAX_TOKENS` (default: `600`)
+- `OLLAMA_NUM_CTX` (default: `12288`; increase for larger prompts)
+- `OLLAMA_MAX_TOKENS` (default: `1200`)
 - `OLLAMA_TEMPERATURE` (default: `1`)
 - `OLLAMA_TOP_P` (default: `0.75`)
 - `OLLAMA_TOP_K` (default: `0`)

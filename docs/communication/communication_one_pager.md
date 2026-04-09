@@ -79,7 +79,7 @@ Manager value:
 
 ### 4 Team Dashboard (Killer Feature)
 What is implemented today:
-- AI-generated Executive Summary using integrated OCI GenAI.
+- AI-generated Executive Summary using the configured AI provider (OCI, Ollama, or OpenAI).
 - AI-generated Wins and Risks using current configured initiative data.
 - Progress for key initiatives with RAG indicators and reporting-period progress.
 - Work mix by group and type for selected reporting-period output.
@@ -111,8 +111,8 @@ TeamBeacon is built as a local-first application with a practical, enterprise-re
 - Frontend: Oracle JET (OJET) for the manager-facing UI and workflow screens.
 - Backend: Python services for orchestration, local APIs, and data processing.
 - Source integration: JIRA integration for delivery and issue data sync.
-- Cloud SDK integration: OCI Python SDK for OCI service connectivity.
-- AI capabilities: OCI GenAI service integration for AI-augmented application features.
+- Cloud SDK integration: OCI Python SDK for OCI connectivity when OCI is selected.
+- AI capabilities: pluggable provider layer supporting OCI GenAI, local Ollama models, and OpenAI.
 
 ## Try TeamBeacon
 You can try TeamBeacon from the GitHub repository:

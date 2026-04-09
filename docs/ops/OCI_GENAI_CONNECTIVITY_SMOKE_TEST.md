@@ -23,7 +23,19 @@ Required keys:
 - `OCI_GENAI_ENDPOINT`
 - `OCI_GENAI_MODEL_ID`
 
-3. Confirm OCI profile exists:
+3. Ensure OCI is selected as the active AI provider:
+
+```bash
+grep '^INTELLIGENCE_PROVIDER=' config/.env
+```
+
+Expected:
+
+```text
+INTELLIGENCE_PROVIDER=oci
+```
+
+4. Confirm OCI profile exists:
 
 ```bash
 grep '^\[DEFAULT\]' ~/.oci/config

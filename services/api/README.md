@@ -29,6 +29,7 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `/rest/api/space?limit=1` query
     - Required Confluence environment variables
 - `GET /api/integrations/oci-genai/status`
+  - OCI-specific status endpoint (legacy compatibility).
   - Validates local OCI GenAI wiring:
     - OCI SDK availability
     - `~/.oci/config` profile readability
