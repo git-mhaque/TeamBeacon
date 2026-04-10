@@ -470,6 +470,10 @@ body {
   font-size: 0.78rem;
 }
 
+.tb-trend-window-note {
+  margin-bottom: 0.56rem;
+}
+
 .tb-bars {
   display: grid;
   gap: 0.44rem;

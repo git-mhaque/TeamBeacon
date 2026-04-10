@@ -345,6 +345,49 @@ export type CurrentSprintChangesResponse = {
   error?: string | null;
 };
 
+export type TeamInsightTrendPoint = {
+  sprintId: number;
+  sprintName: string;
+  state?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  committedStoryPoints: number;
+  completedStoryPoints: number;
+  avgCycleTimeDays?: number | null;
+  completionRatioPercent: number;
+  carryoverPercent: number;
+};
+
+export type TeamInsightWorkMixSlice = {
+  label: string;
+  count: number;
+  percent: number;
+};
+
+export type TeamInsightsResponse = {
+  source: "local";
+  generatedAt?: string | null;
+  windowSize?: number;
+  metrics: {
+    avgCommittedStoryPoints: number;
+    avgCompletedStoryPoints: number;
+    completionRatioPercent: number;
+    carryoverPercent: number;
+    avgCycleTimeDays?: number | null;
+    maxCycleTimeDays?: number | null;
+    medianCycleTimeDays?: number | null;
+  };
+  trend: TeamInsightTrendPoint[];
+  workMix: {
+    sprintId?: number | null;
+    sprintName?: string | null;
+    totalIssues: number;
+    slices: TeamInsightWorkMixSlice[];
+  };
+  summary: string;
+  error?: string | null;
+};
+
 export type ReleaseRefreshState = "idle" | "running" | "completed" | "failed";
 export type ReleaseRefreshSourceState = "queued" | "fetching" | "processing" | "completed" | "failed";
 
@@ -786,6 +829,19 @@ export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesR
     throw await parseError(response, `Current sprint changes request failed (${response.status})`);
   }
   return (await response.json()) as CurrentSprintChangesResponse;
+}
+
+export async function fetchTeamInsights(sprintLimit = 6): Promise<TeamInsightsResponse> {
+  const params = new URLSearchParams();
+  params.set("sprintLimit", String(sprintLimit));
+  const response = await fetch(`${API_BASE}/api/team/insights?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Team insights request failed (${response.status})`);
+  }
+  return (await response.json()) as TeamInsightsResponse;
 }
 
 export async function startReleaseRefresh(payload: {

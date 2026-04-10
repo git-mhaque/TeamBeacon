@@ -17,6 +17,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.current_sprint_calls: list[bool] = []
         self.current_sprint_changes_calls: list[bool] = []
         self.current_sprint_work_calls: list[bool] = []
+        self.team_insights_calls: list[int] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
         self.group_update_calls: list[tuple[int, str]] = []
@@ -537,6 +538,48 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
+        def fake_team_insights(*, sprint_limit=6):  # noqa: ANN001
+            self.team_insights_calls.append(sprint_limit)
+            return {
+                "source": "local",
+                "generatedAt": "2026-03-25T00:00:00+00:00",
+                "windowSize": sprint_limit,
+                "metrics": {
+                    "avgCommittedStoryPoints": 84.0,
+                    "avgCompletedStoryPoints": 75.5,
+                    "completionRatioPercent": 89.88,
+                    "carryoverPercent": 10.12,
+                    "avgCycleTimeDays": 4.2,
+                    "maxCycleTimeDays": 15.4,
+                    "medianCycleTimeDays": 3.8,
+                },
+                "trend": [
+                    {
+                        "sprintId": 55419,
+                        "sprintName": "CEGBU Polaris Sprint 43",
+                        "state": "closed",
+                        "startDate": "2026-02-20T00:00:00+00:00",
+                        "endDate": "2026-03-05T00:00:00+00:00",
+                        "committedStoryPoints": 88.0,
+                        "completedStoryPoints": 80.0,
+                        "avgCycleTimeDays": 3.6,
+                        "completionRatioPercent": 90.91,
+                        "carryoverPercent": 9.09,
+                    }
+                ],
+                "workMix": {
+                    "sprintId": 55421,
+                    "sprintName": "CEGBU Polaris Sprint 45",
+                    "totalIssues": 3,
+                    "slices": [
+                        {"label": "Feature", "count": 2, "percent": 66.67},
+                        {"label": "Ops", "count": 1, "percent": 33.33},
+                    ],
+                },
+                "summary": "Work mix is currently Feature 67%, Ops 33%.",
+                "error": None,
+            }
+
         def fake_metadata_lookup():
             return {
                 "groups": [{"id": 1, "name": "Platform"}],
@@ -763,6 +806,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             current_sprint_provider=fake_current_sprint,
             current_sprint_changes_provider=fake_current_sprint_changes,
             current_sprint_work_provider=fake_current_sprint_work,
+            team_insights_provider=fake_team_insights,
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
             metadata_add_work_type_provider=fake_add_work_type,
@@ -815,6 +859,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/releases/refresh/start", body["paths"])
         self.assertIn("/api/releases/refresh/status", body["paths"])
         self.assertIn("/api/releases/refresh/result", body["paths"])
+        self.assertIn("/api/team/insights", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards/configured", body["paths"])
@@ -1157,6 +1202,29 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["status"], "Blocked")
         self.assertEqual(body["changes"]["blockedCards"]["issueCards"][0]["statusCategory"], "In Progress")
         self.assertEqual(len(self.current_sprint_changes_calls), 1)
+
+    def test_team_insights_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/team/insights", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["windowSize"], 6)
+        self.assertEqual(body["metrics"]["avgCommittedStoryPoints"], 84.0)
+        self.assertEqual(body["metrics"]["avgCycleTimeDays"], 4.2)
+        self.assertEqual(body["metrics"]["maxCycleTimeDays"], 15.4)
+        self.assertEqual(body["workMix"]["sprintId"], 55421)
+        self.assertEqual(body["trend"][0]["sprintName"], "CEGBU Polaris Sprint 43")
+        self.assertEqual(body["trend"][0]["avgCycleTimeDays"], 3.6)
+        self.assertEqual(self.team_insights_calls[-1], 6)
+
+    def test_team_insights_endpoint_supports_sprint_limit(self) -> None:
+        with urlopen(f"{self.base_url}/api/team/insights?sprintLimit=4", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["windowSize"], 4)
+        self.assertEqual(self.team_insights_calls[-1], 4)
 
     def test_metadata_lookup_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310

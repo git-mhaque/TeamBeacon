@@ -4,7 +4,7 @@ import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
 
 describe("Content", () => {
-  it("renders construction markers for static screens in sidebar", async () => {
+  it("renders construction markers only for static screens in sidebar", async () => {
     setupFetchMock({
       "/api/integrations/jira/status": {
         source: "jira",
@@ -74,14 +74,13 @@ describe("Content", () => {
       "Settings",
     ]);
 
-    expect(screen.getByLabelText("Team Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Release Insights is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
-    expect(screen.getByText("Cycle Time / Sprint Trend / Work Mix")).toBeInTheDocument();
+    expect(screen.getByText("Sprint Trend / Cycle Time")).toBeInTheDocument();
     expect(screen.getByText("Scan / Vulnerability Posture")).toBeInTheDocument();
     expect(screen.getByText("Incidents / DR / Observability")).toBeInTheDocument();
     expect(screen.getByText("Cadence / Release Notes")).toBeInTheDocument();
@@ -89,6 +88,7 @@ describe("Content", () => {
     expect(screen.getByText("Connections / Metadata Configuration")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Team Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();

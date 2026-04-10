@@ -10,6 +10,7 @@ from services.api.issues.current_sprint import get_current_sprint
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
 from services.api.issues.current_sprint_work import get_current_sprint_work
 from services.api.issues.query import search_synced_issues
+from services.api.issues.team_insights import get_team_insights
 from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
 from services.api.integrations.jira_sync import (
@@ -49,6 +50,7 @@ IssueSearchProvider = Callable[..., dict[str, Any]]
 CurrentSprintProvider = Callable[..., dict[str, Any]]
 CurrentSprintWorkProvider = Callable[..., dict[str, Any]]
 CurrentSprintChangesProvider = Callable[..., dict[str, Any]]
+TeamInsightsProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
 MetadataCreateProvider = Callable[[str], dict[str, Any]]
 MetadataUpdateProvider = Callable[[int, str], dict[str, Any]]
@@ -377,6 +379,22 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "responses": {"200": {"description": "Current sprint changes", "content": json_payload}},
                 }
             },
+            "/api/team/insights": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Team sprint trend and work-mix insights",
+                    "parameters": [
+                        {
+                            "name": "sprintLimit",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer", "default": 6},
+                            "description": "Number of recent sprints to include (max 12).",
+                        }
+                    ],
+                    "responses": {"200": {"description": "Team insights payload", "content": json_payload}},
+                }
+            },
             "/api/metadata/lookup": {
                 "get": {
                     "tags": ["metadata"],
@@ -607,6 +625,7 @@ def build_handler(
     current_sprint_provider: CurrentSprintProvider = get_current_sprint,
     current_sprint_work_provider: CurrentSprintWorkProvider = get_current_sprint_work,
     current_sprint_changes_provider: CurrentSprintChangesProvider = get_current_sprint_changes,
+    team_insights_provider: TeamInsightsProvider = get_team_insights,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
@@ -782,6 +801,18 @@ def build_handler(
 
             if path == "/api/sprints/current/changes":
                 payload = current_sprint_changes_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/team/insights":
+                query = parse_qs(parsed.query)
+                sprint_limit_raw = query.get("sprintLimit", ["6"])[0]
+                try:
+                    sprint_limit = int(sprint_limit_raw)
+                except ValueError:
+                    sprint_limit = 6
+                payload = team_insights_provider(sprint_limit=sprint_limit)
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return
