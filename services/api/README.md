@@ -28,6 +28,14 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
   - Validates Confluence REST reachability with PAT/basic auth:
     - `/rest/api/space?limit=1` query
     - Required Confluence environment variables
+- `GET /api/releases/refresh/status`
+  - Returns current Release Insights refresh state.
+- `GET /api/releases/refresh/result`
+  - Returns the latest Release Insights summary payload.
+- `POST /api/releases/refresh/start`
+  - Body:
+    - `sources` (required array; each source supports `confluenceUrl` and optional `prompt`)
+    - `overallPrompt` (optional string)
 - `GET /api/integrations/oci-genai/status`
   - OCI-specific status endpoint (legacy compatibility).
   - Validates local OCI GenAI wiring:
@@ -63,6 +71,21 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
   - Returns active sprint work buckets:
     - `done`, `inProgress`, `planned`
     - Includes `totals` per bucket and aggregate `total`
+- `GET /api/sprints/current/changes`
+  - Returns active sprint change visibility:
+    - `addedAfterStart`, `removedAfterStart`, `blockedCards`
+- `GET /api/team/insights?sprintLimit=6`
+  - Team sprint trend, cycle-time metrics, and work-mix summary.
+  - Optional query:
+    - `sprintLimit` (1-12; UI defaults to `6`)
+  - Trend payload includes:
+    - `completedStoryPoints` per sprint
+    - `avgCycleTimeDays` per sprint
+    - sprint metadata (`sprintName`, `state`, `startDate`, `endDate`)
+  - Cycle-time semantics:
+    - Start = first status transition to an in-progress state
+    - End = resolved timestamp
+    - Epics are excluded from cycle-time calculations
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:
     - `groups` (epic groups)
@@ -103,9 +126,16 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `successCriteria` (string array)
     - `groupIds` (int array)
     - `workTypeIds` (int array)
+    - `timelineEnabled` (optional boolean)
+    - `timelineStartDate` (optional ISO date)
+    - `targetCompletionDate` (optional ISO date)
 - `POST /api/metadata/epics/delete`
   - Body:
     - `epicKey` (required)
+- `GET /api/metadata/epics/completed-cards?epicKey=<key>&limit=200`
+  - Returns completed cards for a single epic in a selected reporting period.
+- `GET /api/metadata/epics/completed-cards/configured?limit=300`
+  - Returns completed cards across all configured epics in a selected reporting period.
 
 ## Notes
 - The JIRA status endpoint reads `config/.env` (or process env vars).

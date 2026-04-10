@@ -46,6 +46,7 @@ TeamBeacon helps Engineering Managers:
 What is implemented today:
 - JIRA sync modes: incremental/since last, custom date, and full sync.
 - Epic Group and Work Type configuration for local metadata enrichment.
+- AI Model Connection with active provider/model status and health check.
 
 Manager value:
 - Fast refresh of relevant data without heavy manual steps.
@@ -77,7 +78,19 @@ Manager value:
 - More meaningful coaching and operational improvement discussions.
 - Faster adaptation during weekly execution cycles.
 
-### 4 Team Dashboard (Killer Feature)
+### 4 Team Insights
+What is implemented today:
+- Sprint Trend with selectable trend window (`Last 4/6/8/10/12 sprints`).
+- Side-by-side bars for completed story points and average cycle time per sprint.
+- Aggregate trend cards (median/average/max cycle time and average completed SP).
+- Active sprint indicator and sprint date ranges in chart labels.
+
+Manager value:
+- Fast, repeatable trend reading across recent sprints.
+- Better planning and coaching based on throughput and flow-time signals.
+- Clearer signal quality for retrospective and forecast conversations.
+
+### 5 Team Dashboard (Killer Feature)
 What is implemented today:
 - AI-generated Executive Summary using the configured AI provider (OCI, Ollama, or OpenAI).
 - AI-generated Wins and Risks using current configured initiative data.
@@ -102,7 +115,7 @@ Manager value:
 - Quarterly review prep: show trend-backed narrative with clear RAG signals.
 
 ## Typical Usage Rhythm
-- Weekly: Sprint Insights plus Initiative Insights plus AI draft update.
+- Weekly: Team Insights plus Sprint Insights plus Initiative Insights plus AI draft update.
 - Monthly: executive summary and risk posture review.
 - Quarterly: progress narrative with initiative-level RAG and trends.
 

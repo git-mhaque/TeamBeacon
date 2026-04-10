@@ -35,3 +35,4 @@ xdg-open docs/design/teambeacon-ojet-mockups.html
 - This is a mockup, not production components.
 - Content and metrics are representative placeholders aligned to the product spec.
 - Layout includes responsive behavior for narrower widths to support desktop and tablet previews.
+- Team Insights in the shipped app now includes a dynamic sprint trend window and split SP/cycle-time charts; keep mockups aligned when design refreshes are made.

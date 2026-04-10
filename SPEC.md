@@ -12,6 +12,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 - Reduce manual reporting effort.
 - Generate consistent RAG status and executive summaries.
 - Enable configurable team- and project-specific definitions (custom fields, success criteria, aliases).
+- Support pluggable AI providers for intelligence workflows (`oci`, `ollama`, `openai`).
 
 ## 4. In Scope (MVP)
 - Initiative insights (epic-centric):
@@ -23,14 +24,17 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
     - one or more work types
   - Generate RAG status and explanation.
 - Team insights:
-  - Sprint committed vs completed story points.
-  - Average cycle time and trend.
+  - Sprint trend window controls (`Last 4/6/8/10/12 sprints`).
+  - Completed story points by sprint.
+  - Average cycle time by sprint plus aggregate cycle-time cards (median/avg/max).
+  - Sprint rows shown recent-to-old.
   - Custom JIRA field mapping.
 - Completed/In-progress work:
   - Sprint Insights board-style snapshot (`Done`, `In Progress`, `Planned`) with state breakdown and work mix breakdown.
 - Team Dashboard:
   - Summary since last report.
   - Initiative-level progress and risks.
+  - AI draft generation using selected provider/model from Settings.
 - UX mockups:
   - Maintain mockup coverage for current OJET screens in `docs/design/teambeacon-ojet-mockups.html`.
 
@@ -47,6 +51,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 5. Compute configurable metrics and RAG statuses.
 6. Generate exportable executive report (Markdown/PDF-ready format).
 7. Configure and persist epic metadata lookups (`epic groups`, `work types`) and per-epic assignments.
+8. Support runtime AI provider selection via `INTELLIGENCE_PROVIDER` with provider-specific configuration.
 
 ## 6.1 JIRA Sync Semantics (Current Behavior)
 - Sync modes:
@@ -94,6 +99,19 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - `epic_metadata_groups`
   - `epic_metadata_work_types`
 
+## 6.3 Team Insights Semantics (Current Behavior)
+- Trend window:
+  - API accepts `sprintLimit` in range 1-12.
+  - UI offers `4, 6, 8, 10, 12` and defaults to `6`.
+- Sprint trend ordering:
+  - Backend trend data is oldest->newest.
+  - UI renders recent sprint first for readability.
+- Cycle-time calculation:
+  - Start at the first changelog transition into an in-progress state.
+  - End at issue resolved timestamp.
+  - Include only completed cards.
+  - Exclude `Epic` issue type from cycle-time metrics.
+
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.
 - Resilient sync with retry/backoff and clear error states.
@@ -109,7 +127,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 ```text
 TeamBeacon/
   app/                     # Desktop UI (Oracle JET + Tauri)
-  services/api/            # FastAPI backend for sync + analytics
+  services/api/            # Python local API service for sync + analytics
   packages/connectors/     # JIRA + Confluence API clients
   docs/
     architecture/

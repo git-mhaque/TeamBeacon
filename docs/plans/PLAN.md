@@ -67,7 +67,7 @@ Exit criteria:
   - Mitigation: transparent metric formulas and drill-down links.
 
 ## 4. Immediate Next Tasks
-1. Finalize OJET desktop stack hardening (`Oracle JET + Tauri + FastAPI + SQLite`).
+1. Finalize OJET desktop stack hardening (`Oracle JET + Tauri + local Python API + SQLite`).
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.

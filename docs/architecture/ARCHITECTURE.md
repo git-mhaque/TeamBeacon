@@ -13,7 +13,7 @@ TeamBeacon is a local-first desktop analytics system:
 - UX reference: `docs/design/teambeacon-ojet-mockups.html`
 
 2. API (`services/api/`)
-- FastAPI service exposing internal endpoints for UI.
+- Python local HTTP service exposing internal endpoints, OpenAPI schema, and Swagger UI.
 - Orchestrates sync, metric calculation, and report generation.
 
 3. Shared packages
@@ -25,6 +25,10 @@ TeamBeacon is a local-first desktop analytics system:
 ## 3. External Integrations
 - JIRA (hosted, non-cloud): `/rest/api/2`, `/rest/agile/1.0`
 - Confluence (hosted, non-cloud): `/rest/api/content`
+- AI providers (pluggable by `INTELLIGENCE_PROVIDER`):
+  - OCI GenAI (OCI SDK-backed)
+  - Ollama local API
+  - OpenAI-compatible API
 - Auth: PAT tokens, stored in OS keychain; app references keychain entries only.
 
 ## 4. Core Data Model
@@ -38,12 +42,12 @@ TeamBeacon is a local-first desktop analytics system:
 - `report_runs`: generated outputs and baseline references.
 
 ## 5. Data Flow
-1. User configures integrations, field mappings, and epic metadata taxonomy.
+1. User configures integrations, field mappings, epic metadata taxonomy, and active AI provider/model.
 2. API sync logic pulls incremental issue/sprint/content changes.
 3. API normalizes and stores data.
-4. Metrics engine computes initiative/team/individual KPIs.
+4. Metrics engine computes initiative/team/individual KPIs (including sprint trend and cycle-time metrics).
 5. UI reads snapshots and renders dashboards.
-6. Reporting module compares current state with last report baseline.
+6. Reporting module compares current state with last report baseline and can generate AI-assisted narrative drafts.
 
 ## 6. RAG Determination (Initiatives)
 Composite score from configurable rules:
@@ -80,5 +84,6 @@ Default thresholds:
 - Interaction pattern:
   - Left rail for filters/context scope.
   - Main pane for KPI cards, trend widgets, and narrative insights.
+  - Team Insights trend window is selectable (`Last 4/6/8/10/12 sprints`) and renders recent sprint first.
 - Design source:
   - `docs/design/teambeacon-ojet-mockups.html` should be updated with major flow changes.

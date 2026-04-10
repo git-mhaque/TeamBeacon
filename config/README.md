@@ -29,6 +29,7 @@
 ## Intelligence Provider
 - `INTELLIGENCE_PROVIDER` (default: `ollama`; supported: `oci`, `ollama`, `openai`)
 - `AI_PROVIDER` (optional alias for `INTELLIGENCE_PROVIDER`)
+- Settings UI label: `AI Model Connection` (shows active provider/model and health status)
 
 ## OCI GenAI Variables
 - `OCI_GENAI_COMPARTMENT_ID` (required)
