@@ -2,6 +2,8 @@ import { h } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
 
+const TREND_WINDOW_OPTIONS = [4, 6, 8, 10, 12] as const;
+
 const EMPTY_INSIGHTS: TeamInsightsResponse = {
   source: "local",
   metrics: {
@@ -35,16 +37,37 @@ function formatDays(value: number | null | undefined): string {
   return `${value.toFixed(1).replace(/\.0$/, "")} d`;
 }
 
+function formatDate(value: string | null | undefined, monthStyle: "short" | "numeric"): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = monthStyle === "short"
+    ? parsed.toLocaleString("en-US", { month: "short", timeZone: "UTC" })
+    : String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(parsed.getUTCFullYear());
+  return `${day}-${month}-${year}`;
+}
+
+function formatSprintDateRange(startDate: string | null | undefined, endDate: string | null | undefined): string {
+  return `from ${formatDate(startDate, "short")} to ${formatDate(endDate, "short")}`;
+}
+
+function normalizeTrendWindow(value: number): number {
+  return TREND_WINDOW_OPTIONS.includes(value as typeof TREND_WINDOW_OPTIONS[number]) ? value : 6;
+}
+
 export function TeamInsightsScreen() {
   const [insights, setInsights] = useState<TeamInsightsResponse>(EMPTY_INSIGHTS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trendWindowSelection, setTrendWindowSelection] = useState<number>(6);
 
   const loadInsights = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const payload = await fetchTeamInsights();
+      const payload = await fetchTeamInsights(trendWindowSelection);
       setInsights(payload);
       if (payload.error) {
         setError(payload.error);
@@ -56,7 +79,7 @@ export function TeamInsightsScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [trendWindowSelection]);
 
   useEffect(() => {
     loadInsights().catch(() => {
@@ -68,12 +91,11 @@ export function TeamInsightsScreen() {
     if (insights.trend.length === 0) return 0;
     return Math.max(...insights.trend.map((point) => point.completedStoryPoints), 0);
   }, [insights.trend]);
+  const maxSprintAvgCycleTimeDays = useMemo(() => {
+    if (insights.trend.length === 0) return 0;
+    return Math.max(...insights.trend.map((point) => point.avgCycleTimeDays ?? 0), 0);
+  }, [insights.trend]);
   const trendRows = useMemo(() => [...insights.trend].reverse(), [insights.trend]);
-  const trendWindow = insights.windowSize && insights.windowSize > 0
-    ? insights.windowSize
-    : insights.trend.length > 0
-      ? insights.trend.length
-      : 6;
 
   return (
     <div class="tb-screen-grid">
@@ -82,9 +104,24 @@ export function TeamInsightsScreen() {
           <div>
             <h3>Sprint Trend</h3>
           </div>
-          <span class="tb-chip">Live</span>
         </header>
-        <p class="tb-muted-note tb-trend-window-note">Trend window: last {trendWindow} sprints including active sprint.</p>
+        <div class="tb-trend-window-inline">
+          <label for="tb-trend-window-select">Trend Window</label>
+          <select
+            id="tb-trend-window-select"
+            value={String(trendWindowSelection)}
+            onChange={(event) => {
+              const nextValue = Number.parseInt((event.currentTarget as HTMLSelectElement).value, 10);
+              setTrendWindowSelection(normalizeTrendWindow(nextValue));
+            }}
+          >
+            {TREND_WINDOW_OPTIONS.map((value) => (
+              <option key={value} value={String(value)}>
+                Last {value} sprints
+              </option>
+            ))}
+          </select>
+        </div>
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
             <h4>Median Cycle Time</h4>
@@ -107,25 +144,64 @@ export function TeamInsightsScreen() {
             <p>Average completed story points per sprint.</p>
           </article>
         </div>
-        <hr class="tb-section-divider" />
-        <p class="tb-muted-note">Completed story points per sprint.</p>
-        <div class="tb-bars">
-          {trendRows.map((point) => (
-            <div key={point.sprintId}>
-              <p class="tb-muted-note">
-                {point.sprintName}: {formatStoryPoints(point.completedStoryPoints)} SP
-                {" | "}
-                Avg cycle: {formatDays(point.avgCycleTimeDays)}
-              </p>
-              <div class="tb-bar">
-                <span
-                  style={{
-                    width: `${maxCompletedStoryPoints > 0 ? Math.max((point.completedStoryPoints / maxCompletedStoryPoints) * 100, 2) : 0}%`,
-                  }}
-                />
-              </div>
+        <p class="tb-muted-note tb-trend-order-note">Recent sprint is shown at the top of each chart.</p>
+        <div class="tb-metrics-grid tb-two-up">
+          <article class="tb-metric-card">
+            <h4>Avg Cycle Time by Sprint</h4>
+            <div class="tb-bars">
+              {trendRows.map((point) => {
+                const sprintAvgCycleTimeDays = point.avgCycleTimeDays ?? 0;
+                return (
+                  <div key={`cycle-${point.sprintId}`}>
+                    <p class="tb-sprint-bar-label">
+                      <span class="tb-sprint-bar-name">
+                        {point.state?.toLowerCase() === "active" ? (
+                          <span class="tb-sprint-active-icon" title="Active sprint" aria-hidden="true" />
+                        ) : null}
+                        {point.sprintName} ({formatSprintDateRange(point.startDate, point.endDate)})
+                      </span>
+                      <span class="tb-chip tb-sprint-bar-pill">{formatDays(point.avgCycleTimeDays)}</span>
+                    </p>
+                    <div class="tb-bar">
+                      <span
+                        style={{
+                          width: `${maxSprintAvgCycleTimeDays > 0
+                            ? Math.max((sprintAvgCycleTimeDays / maxSprintAvgCycleTimeDays) * 100, sprintAvgCycleTimeDays > 0 ? 2 : 0)
+                            : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </article>
+
+          <article class="tb-metric-card">
+            <h4>Completed SP by Sprint</h4>
+            <div class="tb-bars">
+              {trendRows.map((point) => (
+                <div key={`sp-${point.sprintId}`}>
+                  <p class="tb-sprint-bar-label">
+                    <span class="tb-sprint-bar-name">
+                      {point.state?.toLowerCase() === "active" ? (
+                        <span class="tb-sprint-active-icon" title="Active sprint" aria-hidden="true" />
+                      ) : null}
+                      {point.sprintName} ({formatSprintDateRange(point.startDate, point.endDate)})
+                    </span>
+                    <span class="tb-chip tb-sprint-bar-pill">{formatStoryPoints(point.completedStoryPoints)} SP</span>
+                  </p>
+                  <div class="tb-bar">
+                    <span
+                      style={{
+                        width: `${maxCompletedStoryPoints > 0 ? Math.max((point.completedStoryPoints / maxCompletedStoryPoints) * 100, 2) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
         </div>
         {loading ? <p class="tb-muted-note">Loading sprint trend...</p> : null}
         {error ?? insights.error ? <p class="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}

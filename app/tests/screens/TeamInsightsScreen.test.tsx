@@ -23,6 +23,8 @@ describe("TeamInsightsScreen", () => {
             sprintId: 4101,
             sprintName: "Sprint 41",
             state: "closed",
+            startDate: "2026-03-18T00:00:00+00:00",
+            endDate: "2026-04-01T00:00:00+00:00",
             committedStoryPoints: 88,
             completedStoryPoints: 80,
             avgCycleTimeDays: 4.7,
@@ -33,6 +35,8 @@ describe("TeamInsightsScreen", () => {
             sprintId: 4102,
             sprintName: "Sprint 42",
             state: "active",
+            startDate: "2026-04-02T00:00:00+00:00",
+            endDate: "2026-04-15T00:00:00+00:00",
             committedStoryPoints: 96,
             completedStoryPoints: 82,
             avgCycleTimeDays: 3.9,
@@ -59,6 +63,8 @@ describe("TeamInsightsScreen", () => {
     render(<TeamInsightsScreen />);
 
     expect(screen.getByRole("heading", { name: "Sprint Trend" })).toBeInTheDocument();
+    const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
+    expect(trendWindowSelect).toHaveValue("6");
     expect(screen.getByRole("heading", { name: "Avg Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Max Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Median Cycle Time" })).toBeInTheDocument();
@@ -67,10 +73,20 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByText("12.6 d")).toBeInTheDocument();
     expect(screen.getByText("3.4 d")).toBeInTheDocument();
     expect(screen.getByText("81 SP")).toBeInTheDocument();
-    expect(screen.getByText("Trend window: last 6 sprints including active sprint.")).toBeInTheDocument();
-    expect(await screen.findByText(/sprint 41: 80 sp \| avg cycle: 4\.7 d/i)).toBeInTheDocument();
-    expect(screen.getByText(/sprint 42: 82 sp \| avg cycle: 3\.9 d/i)).toBeInTheDocument();
-    expect(screen.getByText("Completed story points per sprint.")).toBeInTheDocument();
+    expect(screen.queryByText("Trend window: last 6 sprints including active sprint.")).not.toBeInTheDocument();
+    expect(screen.getByText("Recent sprint is shown at the top of each chart.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Completed SP by Sprint" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Avg Cycle Time by Sprint" })).toBeInTheDocument();
+    expect(screen.getAllByTitle("Active sprint").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Sprint 42 (from 02-Apr-2026 to 15-Apr-2026)")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sprint 41 (from 18-Mar-2026 to 01-Apr-2026)").length).toBeGreaterThan(0);
+    expect(screen.getByText("82 SP")).toBeInTheDocument();
+    expect(screen.getByText("80 SP")).toBeInTheDocument();
+    expect(screen.getByText("3.9 d")).toBeInTheDocument();
+    expect(screen.getByText("4.7 d")).toBeInTheDocument();
+    expect(screen.queryByText("Completed story points per sprint.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Average cycle time per sprint.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Trend Bars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
