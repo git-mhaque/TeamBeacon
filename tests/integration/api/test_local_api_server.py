@@ -567,6 +567,32 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "carryoverPercent": 9.09,
                     }
                 ],
+                "statusCycleTime": {
+                    "trackedIssues": 18,
+                    "totalDays": 57.2,
+                    "rows": [
+                        {
+                            "status": "In Progress",
+                            "issueCount": 18,
+                            "avgDays": 2.1,
+                            "medianDays": 1.8,
+                            "p85Days": 3.9,
+                            "maxDays": 8.2,
+                            "totalDays": 37.5,
+                            "percentOfCycleTime": 65.56,
+                        },
+                        {
+                            "status": "In Review",
+                            "issueCount": 11,
+                            "avgDays": 1.79,
+                            "medianDays": 1.4,
+                            "p85Days": 2.8,
+                            "maxDays": 5.1,
+                            "totalDays": 19.7,
+                            "percentOfCycleTime": 34.44,
+                        },
+                    ],
+                },
                 "workMix": {
                     "sprintId": 55421,
                     "sprintName": "CEGBU Polaris Sprint 45",
@@ -1213,6 +1239,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["metrics"]["avgCommittedStoryPoints"], 84.0)
         self.assertEqual(body["metrics"]["avgCycleTimeDays"], 4.2)
         self.assertEqual(body["metrics"]["maxCycleTimeDays"], 15.4)
+        self.assertEqual(body["statusCycleTime"]["trackedIssues"], 18)
+        self.assertEqual(body["statusCycleTime"]["rows"][0]["status"], "In Progress")
         self.assertEqual(body["workMix"]["sprintId"], 55421)
         self.assertEqual(body["trend"][0]["sprintName"], "CEGBU Polaris Sprint 43")
         self.assertEqual(body["trend"][0]["avgCycleTimeDays"], 3.6)

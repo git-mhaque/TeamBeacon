@@ -16,6 +16,11 @@ const EMPTY_INSIGHTS: TeamInsightsResponse = {
     medianCycleTimeDays: null,
   },
   trend: [],
+  statusCycleTime: {
+    trackedIssues: 0,
+    totalDays: 0,
+    rows: [],
+  },
   workMix: {
     sprintId: null,
     sprintName: null,
@@ -37,6 +42,11 @@ function formatDays(value: number | null | undefined): string {
   return `${value.toFixed(1).replace(/\.0$/, "")} d`;
 }
 
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  return `${value.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
 function formatDate(value: string | null | undefined, monthStyle: "short" | "numeric"): string {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -51,6 +61,22 @@ function formatDate(value: string | null | undefined, monthStyle: "short" | "num
 
 function formatSprintDateRange(startDate: string | null | undefined, endDate: string | null | undefined): string {
   return `from ${formatDate(startDate, "short")} to ${formatDate(endDate, "short")}`;
+}
+
+function isInProgressRelatedStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized.includes("in progress")) return true;
+  if (normalized.startsWith("qa")) return true;
+  return [
+    "analysis",
+    "in review",
+    "testing",
+    "blocked",
+    "awaiting cab approval",
+    "kickoff",
+    "release ready",
+  ].includes(normalized);
 }
 
 function normalizeTrendWindow(value: number): number {
@@ -95,6 +121,14 @@ export function TeamInsightsScreen() {
     if (insights.trend.length === 0) return 0;
     return Math.max(...insights.trend.map((point) => point.avgCycleTimeDays ?? 0), 0);
   }, [insights.trend]);
+  const inProgressStatusCycleRows = useMemo(
+    () => insights.statusCycleTime.rows.filter((row) => isInProgressRelatedStatus(row.status)),
+    [insights.statusCycleTime.rows],
+  );
+  const maxStatusCycleTotalDays = useMemo(() => {
+    if (inProgressStatusCycleRows.length === 0) return 0;
+    return Math.max(...inProgressStatusCycleRows.map((row) => row.totalDays), 0);
+  }, [inProgressStatusCycleRows]);
   const trendRows = useMemo(() => [...insights.trend].reverse(), [insights.trend]);
 
   return (
@@ -206,6 +240,50 @@ export function TeamInsightsScreen() {
         {loading ? <p class="tb-muted-note">Loading sprint trend...</p> : null}
         {error ?? insights.error ? <p class="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}
         {!loading && insights.trend.length === 0 ? <p class="tb-muted-note">No recent sprint trend data found.</p> : null}
+      </section>
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
+            <h3>Status-Level Cycle Time (Last {trendWindowSelection} sprints)</h3>
+          </div>
+        </header>
+        <p class="tb-muted-note">Time spent in in-progress workflow statuses across completed cards in the selected trend window.</p>
+        <p class="tb-muted-note">Tracked completed cards: {insights.statusCycleTime.trackedIssues}</p>
+        {loading ? <p class="tb-muted-note">Loading status-level cycle time...</p> : null}
+        {!loading && inProgressStatusCycleRows.length === 0 ? (
+          <p class="tb-muted-note">No in-progress status cycle-time data found for completed cards.</p>
+        ) : null}
+        {inProgressStatusCycleRows.length > 0 ? (
+          <article class="tb-metric-card">
+            <div class="tb-bars">
+              {inProgressStatusCycleRows.map((row) => (
+                <div key={`status-cycle-${row.status}`}>
+                  <p class="tb-sprint-bar-label">
+                    <span class="tb-sprint-bar-name tb-status-cycle-name">{row.status}</span>
+                    <span class="tb-status-cycle-pill-wrap">
+                      <span class="tb-chip tb-sprint-bar-pill">{formatDays(row.avgDays)} avg</span>
+                      <span class="tb-chip tb-sprint-bar-pill">{formatDays(row.totalDays)} total</span>
+                      <span class="tb-chip tb-sprint-bar-pill">{formatPercent(row.percentOfCycleTime)}</span>
+                    </span>
+                  </p>
+                  <div class="tb-bar">
+                    <span
+                      style={{
+                        width: `${maxStatusCycleTotalDays > 0
+                          ? Math.max((row.totalDays / maxStatusCycleTotalDays) * 100, row.totalDays > 0 ? 2 : 0)
+                          : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <p class="tb-muted-note tb-status-cycle-meta">
+                    {row.issueCount} card{row.issueCount === 1 ? "" : "s"} · median {formatDays(row.medianDays)} · p85{" "}
+                    {formatDays(row.p85Days)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : null}
       </section>
     </div>
   );

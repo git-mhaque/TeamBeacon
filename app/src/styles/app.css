@@ -546,8 +546,26 @@ body {
   white-space: nowrap;
 }
 
+.tb-status-cycle-pill-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.26rem;
+}
+
+.tb-status-cycle-name {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
 .tb-sprint-bar-label + .tb-bar {
   margin-top: 0.3rem;
+}
+
+.tb-status-cycle-meta {
+  margin-top: 0.24rem;
 }
 
 .tb-bar {

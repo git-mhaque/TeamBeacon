@@ -111,6 +111,9 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - End at issue resolved timestamp.
   - Include only completed cards.
   - Exclude `Epic` issue type from cycle-time metrics.
+- Status-level cycle-time visibility:
+  - Track per-status dwell time across completed cards in the selected sprint window.
+  - Surface per-status aggregate metrics (`avg`, `median`, `p85`, `max`, total share).
 
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.

@@ -44,6 +44,42 @@ describe("TeamInsightsScreen", () => {
             carryoverPercent: 14.58,
           },
         ],
+        statusCycleTime: {
+          trackedIssues: 13,
+          totalDays: 29.6,
+          rows: [
+            {
+              status: "In Progress",
+              issueCount: 13,
+              avgDays: 1.5,
+              medianDays: 1.2,
+              p85Days: 2.4,
+              maxDays: 4.8,
+              totalDays: 19.4,
+              percentOfCycleTime: 65.54,
+            },
+            {
+              status: "In Review",
+              issueCount: 9,
+              avgDays: 1.1,
+              medianDays: 1.0,
+              p85Days: 1.8,
+              maxDays: 3.1,
+              totalDays: 10.2,
+              percentOfCycleTime: 34.46,
+            },
+            {
+              status: "Done",
+              issueCount: 13,
+              avgDays: 0.2,
+              medianDays: 0.1,
+              p85Days: 0.3,
+              maxDays: 0.6,
+              totalDays: 2.4,
+              percentOfCycleTime: 8.11,
+            },
+          ],
+        },
         workMix: {
           sprintId: 4102,
           sprintName: "Sprint 42",
@@ -90,5 +126,13 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Trend Bars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Status-Level Cycle Time (Last 6 sprints)" })).toBeInTheDocument();
+    expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
+    expect(screen.getByText("In Progress")).toBeInTheDocument();
+    expect(screen.getByText("In Review")).toBeInTheDocument();
+    expect(screen.getByText("1.5 d avg")).toBeInTheDocument();
+    expect(screen.getByText("19.4 d total")).toBeInTheDocument();
+    expect(screen.getByText("65.5%")).toBeInTheDocument();
+    expect(screen.queryByText("Done")).not.toBeInTheDocument();
   });
 });

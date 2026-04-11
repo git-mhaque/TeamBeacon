@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
+from math import ceil
 from statistics import median
 from typing import Any
 
@@ -51,6 +52,69 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
 
 def _round_metric(value: float) -> float:
     return round(value, 2)
+
+
+def _status_key(value: str | None) -> str:
+    normalized = _normalize(value)
+    return normalized if normalized else "unknown"
+
+
+def _status_label(status_key: str) -> str:
+    if status_key == "unknown":
+        return "Unknown"
+    return " ".join(token.capitalize() for token in status_key.split())
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        raise ValueError("Cannot calculate percentile of an empty list.")
+    sorted_values = sorted(values)
+    rank = max(1, int(ceil(percentile * len(sorted_values))))
+    return sorted_values[min(rank - 1, len(sorted_values) - 1)]
+
+
+def _build_issue_status_cycle_days(
+    *,
+    cycle_started_at: datetime,
+    cycle_ended_at: datetime,
+    status_changes: list[tuple[datetime, str]],
+) -> dict[str, float]:
+    if cycle_ended_at <= cycle_started_at:
+        return {}
+
+    sorted_changes = sorted(status_changes, key=lambda item: item[0])
+    current_status_key: str | None = None
+    for changed_at, status_key in sorted_changes:
+        if changed_at <= cycle_started_at:
+            current_status_key = status_key
+            continue
+        break
+
+    # The cycle always starts when work first enters an in-progress state.
+    if current_status_key is None:
+        current_status_key = _status_key("In Progress")
+
+    cursor = cycle_started_at
+    issue_status_cycle_days: dict[str, float] = defaultdict(float)
+
+    for changed_at, status_key in sorted_changes:
+        if changed_at <= cycle_started_at:
+            continue
+        if changed_at > cycle_ended_at:
+            break
+        if changed_at > cursor:
+            duration_days = (changed_at - cursor).total_seconds() / 86400.0
+            if duration_days > 0:
+                issue_status_cycle_days[current_status_key] += duration_days
+        current_status_key = status_key
+        cursor = changed_at
+
+    if cycle_ended_at > cursor:
+        duration_days = (cycle_ended_at - cursor).total_seconds() / 86400.0
+        if duration_days > 0:
+            issue_status_cycle_days[current_status_key] += duration_days
+
+    return dict(issue_status_cycle_days)
 
 
 def _resolve_configured_board_id() -> int | None:
@@ -118,6 +182,11 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
             "medianCycleTimeDays": None,
         },
         "trend": [],
+        "statusCycleTime": {
+            "trackedIssues": 0,
+            "totalDays": 0.0,
+            "rows": [],
+        },
         "workMix": {
             "sprintId": None,
             "sprintName": None,
@@ -193,6 +262,7 @@ def get_team_insights(
             ).fetchall()
 
         first_in_progress_by_issue_key: dict[str, datetime] = {}
+        status_changes_by_issue_key: dict[str, list[tuple[datetime, str]]] = defaultdict(list)
         issue_keys = sorted({str(row["issue_key"]).strip() for row in issue_rows if row["issue_key"] is not None})
         if issue_keys:
             issue_placeholders = ",".join("?" for _ in issue_keys)
@@ -214,12 +284,15 @@ def get_team_insights(
                 if issue_key_raw is None:
                     continue
                 issue_key = str(issue_key_raw).strip()
-                if not issue_key or issue_key in first_in_progress_by_issue_key:
-                    continue
-                if not _is_in_progress_status(changelog_row["to_value"]):
+                if not issue_key:
                     continue
                 changed_at = _parse_iso_datetime(changelog_row["changed_at"])
                 if changed_at is None:
+                    continue
+                status_changes_by_issue_key[issue_key].append((changed_at, _status_key(changelog_row["to_value"])))
+                if issue_key in first_in_progress_by_issue_key:
+                    continue
+                if not _is_in_progress_status(changelog_row["to_value"]):
                     continue
                 first_in_progress_by_issue_key[issue_key] = changed_at
 
@@ -232,6 +305,10 @@ def get_team_insights(
 
         trend: list[dict[str, Any]] = []
         cycle_time_days: list[float] = []
+        status_cycle_total_days_by_status: dict[str, float] = defaultdict(float)
+        status_cycle_issue_days_by_status: dict[str, list[float]] = defaultdict(list)
+        status_cycle_issue_keys_by_status: dict[str, set[str]] = defaultdict(set)
+        tracked_cycle_issues = 0
         total_committed_story_points = 0.0
         total_completed_story_points = 0.0
         total_committed_cards = 0
@@ -270,6 +347,19 @@ def get_team_insights(
                         duration_days = (resolved_at - in_progress_at).total_seconds() / 86400.0
                         cycle_time_days.append(duration_days)
                         sprint_cycle_time_days.append(duration_days)
+                        tracked_cycle_issues += 1
+
+                        issue_status_cycle_days = _build_issue_status_cycle_days(
+                            cycle_started_at=in_progress_at,
+                            cycle_ended_at=resolved_at,
+                            status_changes=status_changes_by_issue_key.get(issue_key, []),
+                        )
+                        for status_key, issue_days in issue_status_cycle_days.items():
+                            if issue_days <= 0:
+                                continue
+                            status_cycle_total_days_by_status[status_key] += issue_days
+                            status_cycle_issue_days_by_status[status_key].append(issue_days)
+                            status_cycle_issue_keys_by_status[status_key].add(issue_key)
 
             completion_ratio_percent = _completion_ratio_percent(
                 committed_story_points=committed_story_points,
@@ -321,6 +411,27 @@ def get_team_insights(
         avg_cycle_time_days = _round_metric(sum(cycle_time_days) / len(cycle_time_days)) if cycle_time_days else None
         max_cycle_time_days = _round_metric(max(cycle_time_days)) if cycle_time_days else None
         median_cycle_time_days = _round_metric(float(median(cycle_time_days))) if cycle_time_days else None
+        total_status_cycle_days = sum(status_cycle_total_days_by_status.values())
+        status_cycle_rows = []
+        for status_key, total_days in status_cycle_total_days_by_status.items():
+            issue_days = status_cycle_issue_days_by_status.get(status_key, [])
+            if not issue_days:
+                continue
+            status_cycle_rows.append(
+                {
+                    "status": _status_label(status_key),
+                    "issueCount": len(status_cycle_issue_keys_by_status.get(status_key, set())),
+                    "avgDays": _round_metric(sum(issue_days) / len(issue_days)),
+                    "medianDays": _round_metric(float(median(issue_days))),
+                    "p85Days": _round_metric(_percentile(issue_days, 0.85)),
+                    "maxDays": _round_metric(max(issue_days)),
+                    "totalDays": _round_metric(total_days),
+                    "percentOfCycleTime": (
+                        _round_metric((total_days / total_status_cycle_days) * 100.0) if total_status_cycle_days > 0 else 0.0
+                    ),
+                }
+            )
+        status_cycle_rows.sort(key=lambda item: (-item["totalDays"], item["status"].lower()))
 
         latest_active_sprint = next((row for row in sprint_rows if _normalize(row["state"]) == "active"), None)
         work_mix_sprint = latest_active_sprint or sprint_rows[0]
@@ -408,6 +519,11 @@ def get_team_insights(
             "medianCycleTimeDays": median_cycle_time_days,
         },
         "trend": trend,
+        "statusCycleTime": {
+            "trackedIssues": tracked_cycle_issues,
+            "totalDays": _round_metric(total_status_cycle_days),
+            "rows": status_cycle_rows,
+        },
         "workMix": {
             "sprintId": work_mix_sprint_id,
             "sprintName": work_mix_sprint["name"],

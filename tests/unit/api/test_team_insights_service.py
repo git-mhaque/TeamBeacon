@@ -284,6 +284,19 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertAlmostEqual(metrics["maxCycleTimeDays"], 5.0, places=2)
             self.assertAlmostEqual(metrics["medianCycleTimeDays"], 3.0, places=2)
 
+            status_cycle = payload["statusCycleTime"]
+            self.assertEqual(status_cycle["trackedIssues"], 4)
+            self.assertAlmostEqual(status_cycle["totalDays"], 12.0, places=2)
+            self.assertEqual(len(status_cycle["rows"]), 1)
+            self.assertEqual(status_cycle["rows"][0]["status"], "In Progress")
+            self.assertEqual(status_cycle["rows"][0]["issueCount"], 4)
+            self.assertAlmostEqual(status_cycle["rows"][0]["avgDays"], 3.0, places=2)
+            self.assertAlmostEqual(status_cycle["rows"][0]["medianDays"], 3.0, places=2)
+            self.assertAlmostEqual(status_cycle["rows"][0]["p85Days"], 5.0, places=2)
+            self.assertAlmostEqual(status_cycle["rows"][0]["maxDays"], 5.0, places=2)
+            self.assertAlmostEqual(status_cycle["rows"][0]["totalDays"], 12.0, places=2)
+            self.assertAlmostEqual(status_cycle["rows"][0]["percentOfCycleTime"], 100.0, places=2)
+
             work_mix = payload["workMix"]
             self.assertEqual(work_mix["sprintId"], 2003)
             self.assertEqual(work_mix["sprintName"], "Sprint 03")
@@ -307,6 +320,8 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["source"], "local")
             self.assertEqual(payload["windowSize"], 0)
             self.assertEqual(payload["trend"], [])
+            self.assertEqual(payload["statusCycleTime"]["trackedIssues"], 0)
+            self.assertEqual(payload["statusCycleTime"]["rows"], [])
             self.assertEqual(payload["workMix"]["totalIssues"], 0)
             self.assertEqual(payload["summary"], "Work mix will appear once sprint data is synced.")
             self.assertEqual(payload["error"], "No sprint history found in local data.")
@@ -421,6 +436,9 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertAlmostEqual(metrics["avgCycleTimeDays"], 2.0, places=2)
             self.assertAlmostEqual(metrics["maxCycleTimeDays"], 2.0, places=2)
             self.assertAlmostEqual(metrics["medianCycleTimeDays"], 2.0, places=2)
+            self.assertEqual(payload["statusCycleTime"]["trackedIssues"], 1)
+            self.assertEqual(payload["statusCycleTime"]["rows"][0]["status"], "In Progress")
+            self.assertAlmostEqual(payload["statusCycleTime"]["rows"][0]["totalDays"], 2.0, places=2)
 
 
 if __name__ == "__main__":

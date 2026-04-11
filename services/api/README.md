@@ -82,6 +82,9 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
     - `completedStoryPoints` per sprint
     - `avgCycleTimeDays` per sprint
     - sprint metadata (`sprintName`, `state`, `startDate`, `endDate`)
+  - Status-level cycle-time payload includes:
+    - `statusCycleTime.trackedIssues` (completed cards with measurable cycle time)
+    - `statusCycleTime.rows[]` with per-status `avgDays`, `medianDays`, `p85Days`, `maxDays`, `totalDays`, and `percentOfCycleTime`
   - Cycle-time semantics:
     - Start = first status transition to an in-progress state
     - End = resolved timestamp

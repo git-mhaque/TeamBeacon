@@ -364,6 +364,17 @@ export type TeamInsightWorkMixSlice = {
   percent: number;
 };
 
+export type TeamInsightStatusCycleRow = {
+  status: string;
+  issueCount: number;
+  avgDays: number;
+  medianDays: number;
+  p85Days: number;
+  maxDays: number;
+  totalDays: number;
+  percentOfCycleTime: number;
+};
+
 export type TeamInsightsResponse = {
   source: "local";
   generatedAt?: string | null;
@@ -378,6 +389,11 @@ export type TeamInsightsResponse = {
     medianCycleTimeDays?: number | null;
   };
   trend: TeamInsightTrendPoint[];
+  statusCycleTime: {
+    trackedIssues: number;
+    totalDays: number;
+    rows: TeamInsightStatusCycleRow[];
+  };
   workMix: {
     sprintId?: number | null;
     sprintName?: string | null;
