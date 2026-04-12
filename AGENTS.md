@@ -58,10 +58,16 @@ When FastAPI/Tauri projects are bootstrapped, add runnable commands to `README.m
 - Enforce `>=90%` coverage across touched modules using unit + integration tests. If coverage tooling is missing for a component, add it in the same change before merging.
 
 ## Commit & Pull Request Guidelines
-Use Conventional Commits. Current history follows:
-- `docs: ...`
-- `chore: ...`
-- `feat: ...`
+Use Conventional Commits for every commit message.
+- Required subject format: `<type>(<scope>): <imperative summary>`
+- Scope is optional when a concise scope does not help: `<type>: <imperative summary>`
+- Preferred types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+- Subject style: imperative mood, lower-case after colon, no trailing period, ~72 chars max.
+- Examples:
+  - `feat(team-insights): add 1/2/3 sprint trend window options`
+  - `fix(api): validate sprintLimit bounds in openapi spec`
+  - `docs(agents): clarify conventional commit format`
+- Keep commits focused and atomic (one logical change per commit).
 
 Strict pre-commit quality gate:
 - Run and pass unit and integration tests for impacted areas.
