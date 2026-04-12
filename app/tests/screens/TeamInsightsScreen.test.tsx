@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { TeamInsightsScreen } from "../../src/components/content/screens/TeamInsightsScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
@@ -127,12 +127,27 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Status-Level Cycle Time (Last 6 sprints)" })).toBeInTheDocument();
+    expect(screen.getByText("% Cycle Time is normalized within visible in-progress statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
-    expect(screen.getByText("In Progress")).toBeInTheDocument();
-    expect(screen.getByText("In Review")).toBeInTheDocument();
-    expect(screen.getByText("1.5 d avg")).toBeInTheDocument();
-    expect(screen.getByText("19.4 d total")).toBeInTheDocument();
+
+    const statusCycleTable = screen.getByRole("table", { name: "Status cycle time table" });
+    const initialRows = within(statusCycleTable).getAllByRole("row");
+    expect(within(initialRows[1]).getByText("In Progress")).toBeInTheDocument();
+    expect(within(initialRows[2]).getByText("In Review")).toBeInTheDocument();
+    expect(screen.getByText("1.5 d")).toBeInTheDocument();
+    expect(screen.getByText("19.4 d")).toBeInTheDocument();
     expect(screen.getByText("65.5%")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "In Progress cycle-time share 65.5%" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));
+    const avgAscRows = within(statusCycleTable).getAllByRole("row");
+    expect(within(avgAscRows[1]).getByText("In Review")).toBeInTheDocument();
+    expect(within(avgAscRows[2]).getByText("In Progress")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Issue Count/i }));
+    const headerSortedRows = within(statusCycleTable).getAllByRole("row");
+    expect(within(headerSortedRows[1]).getByText("In Progress")).toBeInTheDocument();
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
   });
 });

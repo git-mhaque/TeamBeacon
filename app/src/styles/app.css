@@ -546,26 +546,101 @@ body {
   white-space: nowrap;
 }
 
-.tb-status-cycle-pill-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.26rem;
-}
-
 .tb-status-cycle-name {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 700;
 }
 
-.tb-sprint-bar-label + .tb-bar {
-  margin-top: 0.3rem;
+.tb-status-cycle-table-wrap {
+  margin-top: 0.24rem;
+  border: 1px solid var(--tb-line);
+  border-radius: 0.82rem;
+  background: #fff;
+  overflow: auto;
 }
 
-.tb-status-cycle-meta {
-  margin-top: 0.24rem;
+.tb-status-cycle-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tb-status-cycle-table th {
+  border-bottom: 1px solid #cfdbee;
+  background: #f0f6ff;
+  color: #264977;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0.52rem 0.56rem;
+}
+
+.tb-status-cycle-table th.is-numeric {
+  text-align: right;
+}
+
+.tb-status-cycle-table th.is-numeric .tb-table-sort {
+  margin-left: auto;
+}
+
+.tb-status-cycle-table td {
+  border-bottom: 1px solid #d8e2f2;
+  color: #22384f;
+  font-size: 0.79rem;
+  padding: 0.48rem 0.56rem;
+  vertical-align: middle;
+}
+
+.tb-status-cycle-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tb-status-cycle-cell-numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tb-status-cycle-percent-cell {
+  min-width: 9.5rem;
+}
+
+.tb-status-cycle-progress {
+  display: grid;
+  grid-template-columns: minmax(5.2rem, 1fr) auto;
+  align-items: center;
+  gap: 0.46rem;
+}
+
+.tb-status-cycle-progress-track {
+  height: 0.62rem;
+  border: 1px solid #cfdbee;
+  border-radius: 999px;
+  background: #e8effc;
+  overflow: hidden;
+}
+
+.tb-status-cycle-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2e79d8 0%, #0f60c9 100%);
+}
+
+.tb-status-cycle-progress-value {
+  color: #22384f;
+  font-size: 0.77rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tb-sprint-bar-label + .tb-bar {
+  margin-top: 0.3rem;
 }
 
 .tb-bar {
