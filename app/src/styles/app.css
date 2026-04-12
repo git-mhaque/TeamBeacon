@@ -508,6 +508,35 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.tb-trend-order-pill {
+  margin: 0.5rem 0;
+  display: inline-block;
+  border: 1px solid #b7caeb;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #204b90;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0.22rem 0.62rem;
+}
+
+.tb-status-cycle-info-pill {
+  margin: 0.24rem 0 0.52rem;
+  display: grid;
+  gap: 0.08rem;
+  border-radius: 0.76rem;
+  max-width: 100%;
+}
+
+.tb-status-cycle-info-pill p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
 .tb-bars {
   display: grid;
   gap: 0.44rem;
@@ -548,8 +577,21 @@ body {
 
 .tb-status-cycle-name {
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.tb-status-cycle-layout {
+  margin-top: 0.24rem;
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: minmax(0, 13fr) minmax(0, 7fr);
+  align-items: start;
+}
+
+.tb-status-cycle-layout .tb-status-cycle-table-wrap {
+  margin-top: 0;
 }
 
 .tb-status-cycle-table-wrap {
@@ -560,24 +602,99 @@ body {
   overflow: auto;
 }
 
+.tb-status-cycle-pie-card {
+  border: 1px solid var(--tb-line);
+  border-radius: 0.82rem;
+  background: var(--tb-surface-alt);
+  padding: 0.62rem;
+}
+
+.tb-status-cycle-pie-card h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #294b79;
+}
+
+.tb-status-cycle-pie-wrap {
+  margin-top: 0.52rem;
+  display: grid;
+  gap: 0.62rem;
+}
+
+.tb-status-cycle-pie {
+  width: min(100%, 11.5rem);
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  border: 1px solid #c7d6eb;
+  justify-self: center;
+}
+
+.tb-status-cycle-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.36rem;
+}
+
+.tb-status-cycle-pie-legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.38rem;
+  text-transform: uppercase;
+}
+
+.tb-status-cycle-pie-legend-dot {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+}
+
+.tb-status-cycle-pie-legend-label {
+  color: #22384f;
+  font-size: 0.76rem;
+}
+
+.tb-status-cycle-pie-legend-value {
+  color: #22384f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .tb-status-cycle-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+.tb-status-cycle-table th:first-child {
+  width: 42%;
+}
+
+.tb-status-cycle-table th:nth-child(2) {
+  width: 14%;
+}
+
+.tb-status-cycle-table th:nth-child(3),
+.tb-status-cycle-table th:nth-child(4) {
+  width: 22%;
 }
 
 .tb-status-cycle-table th {
   border-bottom: 1px solid #cfdbee;
   background: #f0f6ff;
   color: #264977;
-  font-size: 0.73rem;
+  font-size: 0.71rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
-  padding: 0.52rem 0.56rem;
+  padding: 0.44rem 0.44rem;
 }
 
 .tb-status-cycle-table th.is-numeric {
@@ -591,8 +708,8 @@ body {
 .tb-status-cycle-table td {
   border-bottom: 1px solid #d8e2f2;
   color: #22384f;
-  font-size: 0.79rem;
-  padding: 0.48rem 0.56rem;
+  font-size: 0.77rem;
+  padding: 0.42rem 0.44rem;
   vertical-align: middle;
 }
 
@@ -601,40 +718,6 @@ body {
 }
 
 .tb-status-cycle-cell-numeric {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.tb-status-cycle-percent-cell {
-  min-width: 9.5rem;
-}
-
-.tb-status-cycle-progress {
-  display: grid;
-  grid-template-columns: minmax(5.2rem, 1fr) auto;
-  align-items: center;
-  gap: 0.46rem;
-}
-
-.tb-status-cycle-progress-track {
-  height: 0.62rem;
-  border: 1px solid #cfdbee;
-  border-radius: 999px;
-  background: #e8effc;
-  overflow: hidden;
-}
-
-.tb-status-cycle-progress-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #2e79d8 0%, #0f60c9 100%);
-}
-
-.tb-status-cycle-progress-value {
-  color: #22384f;
-  font-size: 0.77rem;
-  font-weight: 700;
   text-align: right;
   white-space: nowrap;
 }
@@ -2146,6 +2229,15 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .tb-status-cycle-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-status-cycle-pie-wrap {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
   .tb-exec-period-row.is-custom {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2184,6 +2276,14 @@ body {
 
   .tb-initiative-table {
     min-width: 760px;
+  }
+
+  .tb-status-cycle-table {
+    min-width: 0;
+  }
+
+  .tb-status-cycle-pie-wrap {
+    grid-template-columns: 1fr;
   }
 
   .tb-btn-row {

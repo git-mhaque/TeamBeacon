@@ -77,7 +77,7 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 - `GET /api/team/insights?sprintLimit=6`
   - Team sprint trend, cycle-time metrics, and work-mix summary.
   - Optional query:
-    - `sprintLimit` (1-12; UI defaults to `6`)
+    - `sprintLimit` (1-12; UI presets: `1/2/3/4/6/8/10/12`; default `6`)
   - Trend payload includes:
     - `completedStoryPoints` per sprint
     - `avgCycleTimeDays` per sprint

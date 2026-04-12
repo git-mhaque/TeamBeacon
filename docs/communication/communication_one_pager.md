@@ -80,7 +80,7 @@ Manager value:
 
 ### 4 Team Insights
 What is implemented today:
-- Sprint Trend with selectable trend window (`Last 4/6/8/10/12 sprints`).
+- Sprint Trend with selectable trend window (`1 sprint`, `Last 2 sprints`, `Last 3 sprints`, `Last 4/6/8/10/12 sprints`).
 - Side-by-side bars for completed story points and average cycle time per sprint.
 - Aggregate trend cards (median/average/max cycle time and average completed SP).
 - Active sprint indicator and sprint date ranges in chart labels.

@@ -101,6 +101,9 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByRole("heading", { name: "Sprint Trend" })).toBeInTheDocument();
     const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
     expect(trendWindowSelect).toHaveValue("6");
+    expect(screen.getByRole("option", { name: "1 sprint" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Last 2 sprints" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Last 3 sprints" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Avg Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Max Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Median Cycle Time" })).toBeInTheDocument();
@@ -110,7 +113,9 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByText("3.4 d")).toBeInTheDocument();
     expect(screen.getByText("81 SP")).toBeInTheDocument();
     expect(screen.queryByText("Trend window: last 6 sprints including active sprint.")).not.toBeInTheDocument();
-    expect(screen.getByText("Recent sprint is shown at the top of each chart.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Recent sprint is shown at the top of each chart. The green dot marks the active sprint.")
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Completed SP by Sprint" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Avg Cycle Time by Sprint" })).toBeInTheDocument();
     expect(screen.getAllByTitle("Active sprint").length).toBeGreaterThan(0);
@@ -126,7 +131,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Trend Bars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Status-Level Cycle Time (Last 6 sprints)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 6 sprints)" })).toBeInTheDocument();
     expect(screen.getByText("% Cycle Time is normalized within visible in-progress statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
 
@@ -135,9 +140,12 @@ describe("TeamInsightsScreen", () => {
     expect(within(initialRows[1]).getByText("In Progress")).toBeInTheDocument();
     expect(within(initialRows[2]).getByText("In Review")).toBeInTheDocument();
     expect(screen.getByText("1.5 d")).toBeInTheDocument();
-    expect(screen.getByText("19.4 d")).toBeInTheDocument();
-    expect(screen.getByText("65.5%")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "In Progress cycle-time share 65.5%" })).toBeInTheDocument();
+    expect(screen.getAllByText("65.5%").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Sort by Median Days/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by P85 Days/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Max Days/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Total Days/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Status cycle time share pie chart" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));
     fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));

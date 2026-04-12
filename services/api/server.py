@@ -388,8 +388,11 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "name": "sprintLimit",
                             "in": "query",
                             "required": False,
-                            "schema": {"type": "integer", "default": 6},
-                            "description": "Number of recent sprints to include (max 12).",
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 12, "default": 6},
+                            "description": (
+                                "Number of recent sprints to include. API accepts 1-12; "
+                                "UI presets are 1, 2, 3, 4, 6, 8, 10, and 12."
+                            ),
                         }
                     ],
                     "responses": {"200": {"description": "Team insights payload", "content": json_payload}},

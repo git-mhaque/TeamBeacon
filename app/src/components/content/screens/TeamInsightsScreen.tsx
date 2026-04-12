@@ -2,7 +2,7 @@ import { h } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
 
-const TREND_WINDOW_OPTIONS = [4, 6, 8, 10, 12] as const;
+const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
 
 const EMPTY_INSIGHTS: TeamInsightsResponse = {
   source: "local",
@@ -83,8 +83,24 @@ function normalizeTrendWindow(value: number): number {
   return TREND_WINDOW_OPTIONS.includes(value as typeof TREND_WINDOW_OPTIONS[number]) ? value : 6;
 }
 
-type StatusCycleSortField = "status" | "issueCount" | "avgDays" | "medianDays" | "p85Days" | "maxDays" | "totalDays" | "percentOfCycleTime";
+function formatTrendWindowLabel(value: number): string {
+  if (value === 1) return "1 sprint";
+  return `Last ${value} sprints`;
+}
+
+type StatusCycleSortField = "status" | "issueCount" | "avgDays" | "percentOfCycleTime";
 type StatusCycleSortDirection = "asc" | "desc";
+
+const STATUS_CYCLE_PIE_COLORS = [
+  "#2e79d8",
+  "#1f8f63",
+  "#b77700",
+  "#c2372e",
+  "#6c4ba6",
+  "#1c6f9a",
+  "#8a4f00",
+  "#4a6b2d",
+];
 
 function compareText(left: string, right: string): number {
   return left.localeCompare(right, undefined, { sensitivity: "base" });
@@ -108,7 +124,7 @@ export function TeamInsightsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trendWindowSelection, setTrendWindowSelection] = useState<number>(6);
-  const [statusCycleSortField, setStatusCycleSortField] = useState<StatusCycleSortField>("totalDays");
+  const [statusCycleSortField, setStatusCycleSortField] = useState<StatusCycleSortField>("percentOfCycleTime");
   const [statusCycleSortDirection, setStatusCycleSortDirection] = useState<StatusCycleSortDirection>("desc");
 
   const loadInsights = useCallback(async () => {
@@ -151,6 +167,30 @@ export function TeamInsightsScreen() {
       percentOfCycleTime: filteredTotalDays > 0 ? roundMetric((row.totalDays / filteredTotalDays) * 100.0) : 0,
     }));
   }, [insights.statusCycleTime.rows]);
+  const statusCyclePieSlices = useMemo(() => {
+    const rows = [...inProgressStatusCycleRows].sort((left, right) => right.percentOfCycleTime - left.percentOfCycleTime);
+    return rows.map((row, index) => ({
+      ...row,
+      color: STATUS_CYCLE_PIE_COLORS[index % STATUS_CYCLE_PIE_COLORS.length],
+    }));
+  }, [inProgressStatusCycleRows]);
+  const statusCyclePieGradient = useMemo(() => {
+    if (statusCyclePieSlices.length === 0) {
+      return "conic-gradient(#dfe8f8 0% 100%)";
+    }
+    let cursor = 0;
+    const segments: string[] = [];
+    for (const slice of statusCyclePieSlices) {
+      const start = cursor;
+      const end = Math.min(start + slice.percentOfCycleTime, 100);
+      segments.push(`${slice.color} ${start}% ${end}%`);
+      cursor = end;
+    }
+    if (cursor < 100) {
+      segments.push(`#dfe8f8 ${cursor}% 100%`);
+    }
+    return `conic-gradient(${segments.join(", ")})`;
+  }, [statusCyclePieSlices]);
   const sortedStatusCycleRows = useMemo(() => {
     const nextRows = [...inProgressStatusCycleRows];
     nextRows.sort((left, right) => {
@@ -164,18 +204,6 @@ export function TeamInsightsScreen() {
           break;
         case "avgDays":
           comparison = compareNumber(left.avgDays, right.avgDays);
-          break;
-        case "medianDays":
-          comparison = compareNumber(left.medianDays, right.medianDays);
-          break;
-        case "p85Days":
-          comparison = compareNumber(left.p85Days, right.p85Days);
-          break;
-        case "maxDays":
-          comparison = compareNumber(left.maxDays, right.maxDays);
-          break;
-        case "totalDays":
-          comparison = compareNumber(left.totalDays, right.totalDays);
           break;
         case "percentOfCycleTime":
           comparison = compareNumber(left.percentOfCycleTime, right.percentOfCycleTime);
@@ -228,7 +256,7 @@ export function TeamInsightsScreen() {
           >
             {TREND_WINDOW_OPTIONS.map((value) => (
               <option key={value} value={String(value)}>
-                Last {value} sprints
+                {formatTrendWindowLabel(value)}
               </option>
             ))}
           </select>
@@ -255,7 +283,9 @@ export function TeamInsightsScreen() {
             <p>Average completed story points per sprint.</p>
           </article>
         </div>
-        <p class="tb-muted-note tb-trend-order-note">Recent sprint is shown at the top of each chart.</p>
+        <p class="tb-trend-order-pill">
+          Recent sprint is shown at the top of each chart. The green dot marks the active sprint.
+        </p>
         <div class="tb-metrics-grid tb-two-up">
           <article class="tb-metric-card">
             <h4>Avg Cycle Time by Sprint</h4>
@@ -321,142 +351,102 @@ export function TeamInsightsScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Status-Level Cycle Time (Last {trendWindowSelection} sprints)</h3>
+            <h3>Cycle Time Breakdown ({formatTrendWindowLabel(trendWindowSelection)})</h3>
           </div>
         </header>
-        <p class="tb-muted-note">Time spent in in-progress workflow statuses across completed cards in the selected trend window.</p>
-        <p class="tb-muted-note">% Cycle Time is normalized within visible in-progress statuses.</p>
-        <p class="tb-muted-note">Tracked completed cards: {insights.statusCycleTime.trackedIssues}</p>
+        <div class="tb-trend-order-pill tb-status-cycle-info-pill">
+          <p>Time spent in in-progress workflow statuses across completed cards in the selected trend window.</p>
+          <p>% Cycle Time is normalized within visible in-progress statuses.</p>
+          <p>Tracked completed cards: {insights.statusCycleTime.trackedIssues}</p>
+        </div>
         {loading ? <p class="tb-muted-note">Loading status-level cycle time...</p> : null}
         {!loading && inProgressStatusCycleRows.length === 0 ? (
           <p class="tb-muted-note">No in-progress status cycle-time data found for completed cards.</p>
         ) : null}
         {sortedStatusCycleRows.length > 0 ? (
-          <div class="tb-status-cycle-table-wrap">
-            <table class="tb-status-cycle-table" aria-label="Status cycle time table">
-              <thead>
-                <tr>
-                  <th>
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "status" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("status")}
-                      aria-label={`Sort by Status (${statusCycleSortField === "status" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Status</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("status")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "issueCount" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("issueCount")}
-                      aria-label={`Sort by Issue Count (${statusCycleSortField === "issueCount" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Cards</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("issueCount")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "avgDays" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("avgDays")}
-                      aria-label={`Sort by Avg Days (${statusCycleSortField === "avgDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Avg Days</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("avgDays")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "medianDays" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("medianDays")}
-                      aria-label={`Sort by Median Days (${statusCycleSortField === "medianDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Median Days</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("medianDays")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "p85Days" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("p85Days")}
-                      aria-label={`Sort by P85 Days (${statusCycleSortField === "p85Days" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>P85 Days</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("p85Days")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "maxDays" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("maxDays")}
-                      aria-label={`Sort by Max Days (${statusCycleSortField === "maxDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Max Days</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("maxDays")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "totalDays" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("totalDays")}
-                      aria-label={`Sort by Total Days (${statusCycleSortField === "totalDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>Total Days</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("totalDays")}</span>
-                    </button>
-                  </th>
-                  <th class="is-numeric">
-                    <button
-                      type="button"
-                      class={`tb-table-sort${statusCycleSortField === "percentOfCycleTime" ? " is-active" : ""}`}
-                      onClick={() => handleStatusCycleSortHeaderClick("percentOfCycleTime")}
-                      aria-label={`Sort by Percent Of Cycle Time (${statusCycleSortField === "percentOfCycleTime" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
-                    >
-                      <span>% Cycle Time</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("percentOfCycleTime")}</span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedStatusCycleRows.map((row) => (
-                  <tr key={`status-cycle-${row.status}`}>
-                    <td class="tb-status-cycle-name">{row.status}</td>
-                    <td class="tb-status-cycle-cell-numeric">{row.issueCount}</td>
-                    <td class="tb-status-cycle-cell-numeric">{formatDays(row.avgDays)}</td>
-                    <td class="tb-status-cycle-cell-numeric">{formatDays(row.medianDays)}</td>
-                    <td class="tb-status-cycle-cell-numeric">{formatDays(row.p85Days)}</td>
-                    <td class="tb-status-cycle-cell-numeric">{formatDays(row.maxDays)}</td>
-                    <td class="tb-status-cycle-cell-numeric">{formatDays(row.totalDays)}</td>
-                    <td class="tb-status-cycle-percent-cell">
-                      <div
-                        class="tb-status-cycle-progress"
-                        role="img"
-                        aria-label={`${row.status} cycle-time share ${formatPercent(row.percentOfCycleTime)}`}
+          <div class="tb-status-cycle-layout">
+            <div class="tb-status-cycle-table-wrap">
+              <table class="tb-status-cycle-table" aria-label="Status cycle time table">
+                <thead>
+                  <tr>
+                    <th>
+                      <button
+                        type="button"
+                        class={`tb-table-sort${statusCycleSortField === "status" ? " is-active" : ""}`}
+                        onClick={() => handleStatusCycleSortHeaderClick("status")}
+                        aria-label={`Sort by Status (${statusCycleSortField === "status" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
-                        <div class="tb-status-cycle-progress-track" aria-hidden="true">
-                          <span
-                            class="tb-status-cycle-progress-fill"
-                            style={{
-                              width: `${Math.max(0, Math.min(row.percentOfCycleTime, 100))}%`,
-                            }}
-                          />
-                        </div>
-                        <span class="tb-status-cycle-progress-value">{formatPercent(row.percentOfCycleTime)}</span>
-                      </div>
-                    </td>
+                        <span>Status</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("status")}</span>
+                      </button>
+                    </th>
+                    <th class="is-numeric">
+                      <button
+                        type="button"
+                        class={`tb-table-sort${statusCycleSortField === "issueCount" ? " is-active" : ""}`}
+                        onClick={() => handleStatusCycleSortHeaderClick("issueCount")}
+                        aria-label={`Sort by Issue Count (${statusCycleSortField === "issueCount" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Cards</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("issueCount")}</span>
+                      </button>
+                    </th>
+                    <th class="is-numeric">
+                      <button
+                        type="button"
+                        class={`tb-table-sort${statusCycleSortField === "avgDays" ? " is-active" : ""}`}
+                        onClick={() => handleStatusCycleSortHeaderClick("avgDays")}
+                        aria-label={`Sort by Avg Days (${statusCycleSortField === "avgDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Avg Days</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("avgDays")}</span>
+                      </button>
+                    </th>
+                    <th class="is-numeric">
+                      <button
+                        type="button"
+                        class={`tb-table-sort${statusCycleSortField === "percentOfCycleTime" ? " is-active" : ""}`}
+                        onClick={() => handleStatusCycleSortHeaderClick("percentOfCycleTime")}
+                        aria-label={`Sort by Percent Of Cycle Time (${statusCycleSortField === "percentOfCycleTime" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>% Cycle Time</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("percentOfCycleTime")}</span>
+                      </button>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedStatusCycleRows.map((row) => (
+                    <tr key={`status-cycle-${row.status}`}>
+                      <td class="tb-status-cycle-name">{row.status}</td>
+                      <td class="tb-status-cycle-cell-numeric">{row.issueCount}</td>
+                      <td class="tb-status-cycle-cell-numeric">{formatDays(row.avgDays)}</td>
+                      <td class="tb-status-cycle-cell-numeric">{formatPercent(row.percentOfCycleTime)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <aside class="tb-status-cycle-pie-card">
+              <h4>% Cycle Time Breakdown</h4>
+              <div class="tb-status-cycle-pie-wrap">
+                <div
+                  class="tb-status-cycle-pie"
+                  role="img"
+                  aria-label="Status cycle time share pie chart"
+                  style={{ background: statusCyclePieGradient }}
+                />
+                <ul class="tb-status-cycle-pie-legend">
+                  {statusCyclePieSlices.map((slice) => (
+                    <li key={`pie-${slice.status}`}>
+                      <span class="tb-status-cycle-pie-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
+                      <span class="tb-status-cycle-pie-legend-label">{slice.status}</span>
+                      <span class="tb-status-cycle-pie-legend-value">{formatPercent(slice.percentOfCycleTime)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </aside>
           </div>
         ) : null}
       </section>

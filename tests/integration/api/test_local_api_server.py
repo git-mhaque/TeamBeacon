@@ -891,6 +891,19 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/metadata/epics/completed-cards/configured", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
+        team_insights_get = body["paths"]["/api/team/insights"]["get"]
+        sprint_limit_param = next(
+            (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "sprintLimit"),
+            None,
+        )
+        self.assertIsNotNone(sprint_limit_param)
+        sprint_limit_schema = sprint_limit_param["schema"]
+        self.assertEqual(sprint_limit_schema["type"], "integer")
+        self.assertEqual(sprint_limit_schema["minimum"], 1)
+        self.assertEqual(sprint_limit_schema["maximum"], 12)
+        self.assertEqual(sprint_limit_schema["default"], 6)
+        self.assertIn("UI presets are 1, 2, 3, 4, 6, 8, 10, and 12.", sprint_limit_param["description"])
+
     def test_docs_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/docs", timeout=5) as response:  # noqa: S310
             self.assertEqual(response.status, 200)

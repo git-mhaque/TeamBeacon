@@ -84,6 +84,6 @@ Default thresholds:
 - Interaction pattern:
   - Left rail for filters/context scope.
   - Main pane for KPI cards, trend widgets, and narrative insights.
-  - Team Insights trend window is selectable (`Last 4/6/8/10/12 sprints`) and renders recent sprint first.
+  - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
 - Design source:
   - `docs/design/teambeacon-ojet-mockups.html` should be updated with major flow changes.

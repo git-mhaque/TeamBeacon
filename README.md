@@ -11,7 +11,7 @@ TeamBeacon is a local-first engineering intelligence app that sits on top of exi
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, metadata configuration, and AI Model Connection status (provider + model).
 - Initiative Insights: progress matrix, filters, and RAG visibility.
-- Team Insights: sprint trend window controls (4/6/8/10/12), completed story points, and cycle-time trend metrics.
+- Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Team Dashboard: AI-generated summary, wins/risks, initiative progress, and work-mix visibility for leadership updates.
 
