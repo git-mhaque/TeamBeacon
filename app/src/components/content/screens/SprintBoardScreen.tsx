@@ -340,15 +340,11 @@ export function SprintBoardScreen() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    await Promise.all([loadCurrentSprint(), loadCurrentSprintChanges(), loadCurrentSprintWork()]);
-  }, [loadCurrentSprint, loadCurrentSprintChanges, loadCurrentSprintWork]);
-
   useEffect(() => {
-    refresh().catch(() => {
-      // refresh already updates local state.
+    Promise.all([loadCurrentSprint(), loadCurrentSprintChanges(), loadCurrentSprintWork()]).catch(() => {
+      // Individual loaders already update local state.
     });
-  }, [refresh]);
+  }, [loadCurrentSprint, loadCurrentSprintChanges, loadCurrentSprintWork]);
 
   const remainingDaysToneClass = useMemo(
     () => resolveToneForRemainingDays(sprint?.remainingDays),
@@ -499,9 +495,6 @@ export function SprintBoardScreen() {
             <h3>Sprint Overview</h3>
             <p class="tb-muted-note">Active sprint metadata from local synced JIRA data.</p>
           </div>
-          <button type="button" class="tb-btn" onClick={() => refresh()}>
-            {sprintLoading || changesLoading || workLoading ? "Loading..." : "Refresh"}
-          </button>
         </header>
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">

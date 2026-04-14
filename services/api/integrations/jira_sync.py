@@ -805,6 +805,150 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
         )
 
 
+def _active_sprint_ids(sprints: list[SprintRecord]) -> list[int]:
+    active_ids: set[int] = set()
+    for sprint in sprints:
+        state = str(sprint.state or "").strip().lower()
+        if state == "active":
+            active_ids.add(int(sprint.external_sprint_id))
+    return sorted(active_ids)
+
+
+def _fetch_live_issue_keys_for_sprint(
+    connector: JiraRestConnector,
+    sprint_id: int,
+) -> set[str]:
+    live_issue_keys: set[str] = set()
+    start_at = 0
+    max_results = 100
+    jql = f"sprint = {sprint_id} ORDER BY updated ASC"
+
+    while True:
+        issues, batch = connector.search_issues(
+            jql=jql,
+            start_at=start_at,
+            max_results=max_results,
+        )
+        for issue in issues:
+            issue_key = str(issue.issue_key or "").strip()
+            if issue_key:
+                live_issue_keys.add(issue_key)
+
+        if not batch.has_more or batch.next_cursor is None:
+            break
+        try:
+            start_at = int(batch.next_cursor)
+        except (TypeError, ValueError):
+            break
+
+    return live_issue_keys
+
+
+def _sanitize_raw_json_sprint_fields(
+    raw_json: str | None,
+    sprint_field_candidates: tuple[str, ...],
+) -> str | None:
+    if not raw_json:
+        return raw_json
+    try:
+        payload = json.loads(raw_json)
+    except (TypeError, ValueError):
+        return raw_json
+    if not isinstance(payload, dict):
+        return raw_json
+
+    fields = payload.get("fields")
+    if not isinstance(fields, dict):
+        return raw_json
+
+    field_names: list[str] = []
+    for candidate in sprint_field_candidates:
+        trimmed = candidate.strip()
+        if trimmed and trimmed not in field_names:
+            field_names.append(trimmed)
+    if "sprint" not in field_names:
+        field_names.append("sprint")
+
+    changed = False
+    for field_name in field_names:
+        if field_name in fields:
+            fields.pop(field_name, None)
+            changed = True
+    if not changed:
+        return raw_json
+    try:
+        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError):
+        return raw_json
+
+
+def _reconcile_active_sprint_membership(
+    conn: sqlite3.Connection,
+    connector: JiraRestConnector,
+    active_sprint_ids: list[int],
+    sprint_field_candidates: tuple[str, ...],
+) -> int:
+    stale_links_cleared = 0
+
+    for sprint_id in active_sprint_ids:
+        live_issue_keys = _fetch_live_issue_keys_for_sprint(connector, sprint_id)
+        rows = conn.execute(
+            """
+            SELECT issue_key, raw_json
+            FROM issues
+            WHERE sprint_external_id = ?
+            """,
+            (sprint_id,),
+        ).fetchall()
+        if not rows:
+            continue
+
+        local_issue_keys = {
+            str(row[0]).strip()
+            for row in rows
+            if row[0] is not None and str(row[0]).strip()
+        }
+        stale_issue_keys = sorted(local_issue_keys - live_issue_keys)
+        if not stale_issue_keys:
+            continue
+
+        raw_json_by_issue_key: dict[str, str | None] = {
+            str(row[0]).strip(): row[1] if isinstance(row[1], str) else None
+            for row in rows
+            if row[0] is not None and str(row[0]).strip()
+        }
+
+        for issue_key in stale_issue_keys:
+            current_raw_json = raw_json_by_issue_key.get(issue_key)
+            sanitized_raw_json = _sanitize_raw_json_sprint_fields(current_raw_json, sprint_field_candidates)
+            if sanitized_raw_json != current_raw_json:
+                result = conn.execute(
+                    """
+                    UPDATE issues
+                    SET sprint_external_id = NULL,
+                        raw_json = ?,
+                        synced_at = CURRENT_TIMESTAMP
+                    WHERE issue_key = ?
+                      AND sprint_external_id = ?
+                    """,
+                    (sanitized_raw_json, issue_key, sprint_id),
+                )
+            else:
+                result = conn.execute(
+                    """
+                    UPDATE issues
+                    SET sprint_external_id = NULL,
+                        synced_at = CURRENT_TIMESTAMP
+                    WHERE issue_key = ?
+                      AND sprint_external_id = ?
+                    """,
+                    (issue_key, sprint_id),
+                )
+            stale_links_cleared += int(result.rowcount or 0)
+
+    return stale_links_cleared
+
+
 def _replace_issue_changelog(
     conn: sqlite3.Connection,
     issue_key: str,
@@ -1000,6 +1144,7 @@ def run_jira_sync_once(
         downloaded = 0
         changelog_entries_synced = 0
         total_issues: int | None = None
+        stale_sprint_links_cleared = 0
         if incremental_since_utc is not None:
             count_incremental = getattr(connector, "count_incremental_issues", None)
             if callable(count_incremental):
@@ -1077,6 +1222,16 @@ def run_jira_sync_once(
                 break
             start_at = int(batch.next_cursor)
 
+        active_sprint_ids = _active_sprint_ids(sprints)
+        if active_sprint_ids:
+            stale_sprint_links_cleared = _reconcile_active_sprint_membership(
+                conn,
+                connector,
+                active_sprint_ids,
+                runtime.sprint_field_candidates,
+            )
+            conn.commit()
+
         if total_issues is None:
             total_issues = downloaded
 
@@ -1113,6 +1268,7 @@ def run_jira_sync_once(
             "syncMode": effective_mode,
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
+            "staleSprintLinksCleared": stale_sprint_links_cleared,
             "error": None,
             "message": "Sync complete.",
         }

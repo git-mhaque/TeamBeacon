@@ -6,6 +6,7 @@ import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 from packages.connectors.jira_config import JiraRuntimeConfig
 from packages.connectors.models import ChangelogItemRecord, BoardRecord, IssueRecord, SprintRecord, SyncBatch
@@ -63,6 +64,37 @@ class _SuccessfulConnectorStub:
             resolved_at_source=None,
             raw={"id": "2", "key": "CEGBUPOL-2"},
         )
+        self.issues_by_key: dict[str, IssueRecord] = {
+            self.issue_1.issue_key: self.issue_1,
+            self.issue_2.issue_key: self.issue_2,
+        }
+        self.live_sprint_issue_keys: dict[int, list[str]] = {
+            901: ["CEGBUPOL-1", "CEGBUPOL-2"],
+        }
+
+    def search_issues(
+        self,
+        jql: str,
+        start_at: int = 0,
+        max_results: int = 100,
+    ) -> tuple[list[IssueRecord], SyncBatch]:
+        sprint_match = re.search(r"sprint\s*=\s*(\d+)", jql, flags=re.IGNORECASE)
+        if sprint_match is None:
+            return [], SyncBatch(next_cursor=None, has_more=False)
+        sprint_id = int(sprint_match.group(1))
+        all_issue_keys = self.live_sprint_issue_keys.get(sprint_id, [])
+        if start_at >= len(all_issue_keys):
+            return [], SyncBatch(next_cursor=None, has_more=False)
+
+        batch_issue_keys = all_issue_keys[start_at:start_at + max_results]
+        batch_issues = [
+            self.issues_by_key[issue_key]
+            for issue_key in batch_issue_keys
+            if issue_key in self.issues_by_key
+        ]
+        next_cursor = start_at + len(batch_issue_keys)
+        has_more = next_cursor < len(all_issue_keys)
+        return batch_issues, SyncBatch(next_cursor=str(next_cursor) if has_more else None, has_more=has_more)
 
     def get_board(self, board_id: int) -> BoardRecord:
         return BoardRecord(
@@ -277,6 +309,47 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(run_history[4], 1)
             self.assertEqual(run_history[5], 2)
             self.assertEqual(run_history[6], "completed")
+
+    def test_run_sync_reconciles_active_sprint_membership_without_hard_delete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            connector = _SuccessfulConnectorStub()
+            connector.live_sprint_issue_keys = {901: ["CEGBUPOL-1"]}
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=self._runtime(),
+                connector=connector,
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertEqual(summary["staleSprintLinksCleared"], 1)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                issue_1 = conn.execute(
+                    """
+                    SELECT issue_key, sprint_external_id
+                    FROM issues
+                    WHERE issue_key = 'CEGBUPOL-1'
+                    """
+                ).fetchone()
+                issue_2 = conn.execute(
+                    """
+                    SELECT issue_key, sprint_external_id
+                    FROM issues
+                    WHERE issue_key = 'CEGBUPOL-2'
+                    """
+                ).fetchone()
+                issue_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertEqual(issue_count, 2)
+            self.assertEqual(issue_1[0], "CEGBUPOL-1")
+            self.assertEqual(issue_1[1], 901)
+            self.assertEqual(issue_2[0], "CEGBUPOL-2")
+            self.assertIsNone(issue_2[1])
 
     def test_run_sync_since_last_uses_last_synced_cursor_without_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
