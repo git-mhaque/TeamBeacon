@@ -60,6 +60,7 @@ body {
 .tb-brand-mark {
   width: 2.5rem;
   height: 2.5rem;
+  flex: 0 0 2.5rem;
   border-radius: 999px;
   display: grid;
   place-items: center;
