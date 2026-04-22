@@ -53,6 +53,28 @@ class JiraConfigUnitTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             JiraRuntimeConfig.from_env(env={})
 
+    def test_load_env_files_overrides_existing_env_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = Path(tmpdir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "JIRA_BASE_URL=https://jira-file.example.com",
+                        "JIRA_PAT=file-token",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            os.environ["JIRA_BASE_URL"] = "https://jira-shell.example.com"
+            os.environ["JIRA_PAT"] = "shell-token"
+
+            load_env_files(paths=[env_path])
+            runtime = JiraRuntimeConfig.from_env()
+
+            self.assertEqual(runtime.base_url, "https://jira-file.example.com")
+            self.assertEqual(runtime.pat_token, "file-token")
+
 
 if __name__ == "__main__":
     unittest.main()

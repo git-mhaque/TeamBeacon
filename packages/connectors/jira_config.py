@@ -15,7 +15,7 @@ from .jira_rest_stub import (
 DEFAULT_ENV_PATHS = (Path("config/.env"), Path(".env"))
 
 
-def load_env_files(paths: Iterable[Path] = DEFAULT_ENV_PATHS, override: bool = False) -> None:
+def load_env_files(paths: Iterable[Path] = DEFAULT_ENV_PATHS, override: bool = True) -> None:
     for path in paths:
         if not path.exists():
             continue
