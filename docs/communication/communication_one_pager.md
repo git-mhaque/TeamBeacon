@@ -135,3 +135,8 @@ You can try TeamBeacon from the GitHub repository:
   1. Clone the repo and configure `config/.env`.
   2. Run mandatory DB setup from repo root: `test -f teambeacon.db || sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql`
   3. Start the app: `cd app && npm install && npm run dev`.
+
+## Internal Updates
+For internal TeamBeacon updates, follow the Slack channel `#team-beacon-updates`.
+
+This channel is used to post new feature announcements, product updates, and other noteworthy TeamBeacon changes.
