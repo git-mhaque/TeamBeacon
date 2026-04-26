@@ -67,3 +67,17 @@
 - `OPENAI_FREQUENCY_PENALTY` (default: `0`)
 - `OPENAI_CONNECT_TIMEOUT_SECONDS` (default: `10`)
 - `OPENAI_READ_TIMEOUT_SECONDS` (default: `240`)
+
+## Docker Runtime Notes (Ollama and OCI)
+### Ollama in Docker
+- Keep `OLLAMA_BASE_URL` for local (non-Docker) development (`http://localhost:11434`).
+- Use `OLLAMA_BASE_URL_DOCKER` for container runtime (set in `config/.env`).
+- Docker default is `http://host.docker.internal:11434`.
+- Rancher Desktop typically uses `http://host.rancher-desktop.internal:11434`.
+
+### OCI in Docker
+- Compose mounts `${HOME}/.oci` into the container at `/home/teambeacon/.oci` (read-only).
+- Compose also mounts `${HOME}/.oci` at the same absolute host-style path inside the container (for configs that reference `/Users/<name>/.oci/...` directly).
+- Default `OCI_GENAI_CONFIG_FILE` is `/home/teambeacon/.oci/config` in container mode.
+- Ensure your `config/.env` includes `INTELLIGENCE_PROVIDER=oci` and required OCI variables.
+- If your OCI config lives elsewhere, override with `OCI_GENAI_CONFIG_FILE=/path/in/container/config`.
