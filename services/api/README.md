@@ -6,7 +6,13 @@ Lightweight local API endpoints used by the desktop/web shell.
 From repository root:
 
 ```bash
-python3 -m services.api.server --host 127.0.0.1 --port 8000
+python3 -m services.api.server --host localhost --port 8000
+```
+
+Serve built web assets from the API process (useful in Docker runtime):
+
+```bash
+python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
 ```
 
 ## Endpoints
@@ -145,7 +151,7 @@ python3 -m services.api.server --host 127.0.0.1 --port 8000
 - The Confluence status endpoint reads `config/.env` (or process env vars).
 - AI endpoints read `config/.env` (or process env vars) and route by `INTELLIGENCE_PROVIDER`:
   - `oci`: requires OCI Python SDK (`python3 -m pip install oci`)
-  - `ollama`: requires local Ollama API (default `http://127.0.0.1:11434`)
+  - `ollama`: requires local Ollama API (default local runtime `http://localhost:11434`; Docker runtime `http://host.docker.internal:11434`)
   - `openai`: requires `OPENAI_API_KEY`
 - JIRA sync persists board/sprint/issue/changelog data to local SQLite (`teambeacon.db` by default).
 - Parent-child lineage is stored on `issues.parent_issue_key`; epic linkage is stored on `issues.epic_key`.

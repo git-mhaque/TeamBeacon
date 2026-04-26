@@ -62,6 +62,7 @@ TeamBeacon/                  # Repository root
 
 ## 🛠️ Prerequisites
 - `git` for cloning and collaboration.
+- `docker` (recommended for zero local npm/python setup).
 - `python3` (3.11+ recommended) for API/runtime and backend tests.
 - `node` and `npm` (Node 22 recommended, aligned with CI) for frontend build/test.
 - `sqlite3` CLI (mandatory) for applying local schema migrations and ad-hoc DB checks.
@@ -76,10 +77,12 @@ TeamBeacon/                  # Repository root
 cp config/.env.example config/.env
 ```
 Configuration details are documented in [config/README.md](config/README.md).
+By default this uses `TEAMBEACON_DB_PATH=data/teambeacon.db`.
 
 2. Apply local database schema (mandatory before first run):
 ```bash
-test -f teambeacon.db || sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql
+mkdir -p data
+test -f data/teambeacon.db || sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql
 ```
 
 3. Start frontend + local API:
@@ -88,10 +91,10 @@ cd app
 npm install
 npm run dev
 ```
-- Frontend: `http://127.0.0.1:5174`
-- API: `http://127.0.0.1:8000`
-- API Swagger UI: `http://127.0.0.1:8000/docs`
-- API OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
+- Frontend: `http://localhost:5174`
+- API: `http://localhost:8000`
+- API Swagger UI: `http://localhost:8000/docs`
+- API OpenAPI schema: `http://localhost:8000/openapi.json`
 
 4. Run backend tests:
 ```bash
@@ -106,6 +109,37 @@ npm run build
 npm run test:coverage
 ```
 
+## 🐳 Docker Quick Start (No Local npm/Python Setup)
+1. Copy configuration template:
+```bash
+cp config/.env.example config/.env
+```
+
+2. Start TeamBeacon using local image mode:
+```bash
+docker compose up -d --build
+
+# Or choose a host port:
+TEAMBEACON_HOST_PORT=19000 docker compose up -d --build
+```
+This builds from the local `Dockerfile` and starts `teambeacon` with Compose.
+
+3. Open TeamBeacon:
+- App + API: `http://localhost:18000`
+- Swagger UI: `http://localhost:18000/docs`
+
+4. Ollama in Docker:
+- Keep `OLLAMA_BASE_URL` for local (non-Docker) development (`http://localhost:11434`).
+- Use `OLLAMA_BASE_URL_DOCKER` for container runtime (set in `config/.env`).
+- Docker default is `http://host.docker.internal:11434`; Rancher Desktop typically uses `http://host.rancher-desktop.internal:11434`.
+
+5. OCI in Docker:
+- Compose mounts `${HOME}/.oci` into the container at `/home/teambeacon/.oci` (read-only).
+- Compose also mounts `${HOME}/.oci` at the same absolute host-style path inside the container (for configs that reference `/Users/<name>/.oci/...` directly).
+- Default `OCI_GENAI_CONFIG_FILE` is `/home/teambeacon/.oci/config` in container mode.
+- Ensure your `config/.env` includes `INTELLIGENCE_PROVIDER=oci` and required OCI variables.
+- If your OCI config lives elsewhere, override with `OCI_GENAI_CONFIG_FILE=/path/in/container/config`.
+
 ## 🖥️ Desktop Shell (Tauri)
 From `app/`:
 ```bash
@@ -119,6 +153,7 @@ npm run desktop:build
   - Backend unit tests
   - Backend API integration tests
   - Frontend (OJET) build + coverage tests: `cd app && npm ci && npm run build && npm run test:coverage`
+  - Docker image build validation (local build only; no registry publish)
 
 ## 📚 Documentation
 - [TeamBeacon Communication One-Pager](docs/communication/communication_one_pager.md): product narrative, value framing, and screenshots

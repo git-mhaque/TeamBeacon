@@ -46,13 +46,13 @@ If using a different profile, check that section name instead of `DEFAULT`.
 ## 2. Start Local API
 
 ```bash
-python3 -m services.api.server --host 127.0.0.1 --port 8000
+python3 -m services.api.server --host localhost --port 8000
 ```
 
 In a separate terminal:
 
 ```bash
-curl -sS http://127.0.0.1:8000/health
+curl -sS http://localhost:8000/health
 ```
 
 Expected response:
@@ -64,7 +64,7 @@ Expected response:
 ## 3. Smoke Test: OCI Integration Status
 
 ```bash
-curl -sS http://127.0.0.1:8000/api/integrations/oci-genai/status
+curl -sS http://localhost:8000/api/integrations/oci-genai/status
 ```
 
 Expected key checks:
@@ -77,7 +77,7 @@ Expected key checks:
 ## 4. Smoke Test: OCI Chat Request
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8000/api/ai/chat \
+curl -sS -X POST http://localhost:8000/api/ai/chat \
   -H 'Content-Type: application/json' \
   -d '{
     "message":"Write one short update about TeamBeacon delivery health.",

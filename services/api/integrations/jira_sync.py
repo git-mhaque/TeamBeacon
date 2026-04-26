@@ -31,6 +31,7 @@ def _repo_root() -> Path:
 
 
 def _resolve_db_path() -> str:
+    load_env_files()
     configured = os.getenv("TEAMBEACON_DB_PATH")
     if configured:
         return configured

@@ -31,14 +31,16 @@ Tooling is minimal right now. Use:
 - `cp config/.env.example config/.env` to initialize local connector config.
 - `cd app && npm run dev` to run OJET UI plus local API for integration endpoints.
 - `cd app && npm run desktop:dev` to run the Tauri desktop shell (auto-loads `~/.cargo/env` if needed).
-- `python3 -m services.api.server --host 127.0.0.1 --port 8000` to run API separately (optional).
-- `sqlite3 teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
+- `python3 -m services.api.server --host localhost --port 8000` to run API separately (optional).
+- `mkdir -p data && sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
 - `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
 - `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v` for local API integration tests.
 - `RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v` for live integration tests.
 - `cd app && npm run build` for production build validation.
 - `cd app && npm run test:coverage` for frontend coverage validation.
+- `docker compose up -d --build` to run the containerized web+API stack (local image mode; builds from `Dockerfile`).
+- `docker build -t teambeacon:local .` to build the distributable TeamBeacon image.
 - `open docs/design/teambeacon-ojet-mockups.html` to review current UI/UX mockups.
 - `git log --oneline -n 10` to review recent commit conventions.
 

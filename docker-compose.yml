@@ -1,0 +1,20 @@
+services:
+  teambeacon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: teambeacon:local
+    ports:
+      - "${TEAMBEACON_HOST_PORT:-18000}:8000"
+    env_file:
+      - ./config/.env
+    environment:
+      TEAMBEACON_DB_PATH: /data/teambeacon.db
+      TEAMBEACON_HOST_PORT: ${TEAMBEACON_HOST_PORT:-18000}
+      OCI_GENAI_CONFIG_FILE: ${OCI_GENAI_CONFIG_FILE:-/home/teambeacon/.oci/config}
+    volumes:
+      - ./data:/data
+      - ${HOME}/.oci:/home/teambeacon/.oci:ro
+      - ${HOME}/.oci:${HOME}/.oci:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

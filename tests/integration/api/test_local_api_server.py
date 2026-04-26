@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -1567,6 +1569,55 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             self.epic_summary_calls[-1],
             (30, "2026-03-01", "2026-03-30", "Australia/Melbourne"),
         )
+
+
+class LocalApiStaticWebIntegrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self.web_root = Path(self._temp_dir.name)
+        (self.web_root / "index.html").write_text(
+            "<!doctype html><html><body><app-root>TeamBeacon</app-root></body></html>",
+            encoding="utf-8",
+        )
+        assets_dir = self.web_root / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        (assets_dir / "app.js").write_text("console.log('teambeacon');", encoding="utf-8")
+
+        handler = build_handler(web_dir=self.web_root)
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.server_port = self.httpd.server_address[1]
+        self.base_url = f"http://127.0.0.1:{self.server_port}"
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.thread.join(timeout=2)
+        self._temp_dir.cleanup()
+
+    def test_serves_index_at_root(self) -> None:
+        with urlopen(f"{self.base_url}/", timeout=5) as response:  # noqa: S310
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("<app-root>TeamBeacon</app-root>", body)
+
+    def test_serves_static_asset(self) -> None:
+        with urlopen(f"{self.base_url}/assets/app.js", timeout=5) as response:  # noqa: S310
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("teambeacon", body)
+
+    def test_spa_fallback_serves_index_html(self) -> None:
+        with urlopen(f"{self.base_url}/initiative-insights", timeout=5) as response:  # noqa: S310
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("<app-root>TeamBeacon</app-root>", body)
+
+    def test_unknown_api_path_still_returns_404(self) -> None:
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(f"{self.base_url}/api/unknown", timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 404)
 
 
 if __name__ == "__main__":

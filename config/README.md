@@ -47,7 +47,7 @@
 
 ## Ollama Variables
 - `OLLAMA_MODEL` or `OLLAMA_MODEL_ID` (required when `INTELLIGENCE_PROVIDER=ollama`; default: `llama3.1:8b`)
-- `OLLAMA_BASE_URL` (default: `http://127.0.0.1:11434`)
+- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
 - `OLLAMA_NUM_CTX` (default: `12288`; increase for larger prompts)
 - `OLLAMA_MAX_TOKENS` (default: `1200`)
 - `OLLAMA_TEMPERATURE` (default: `1`)

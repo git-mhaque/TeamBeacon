@@ -64,3 +64,27 @@ jobs:
       - name: Run OJET unit tests with coverage
         working-directory: app
         run: npm run test:coverage
+
+  docker-image:
+    name: Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - backend-tests
+      - frontend-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: teambeacon:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

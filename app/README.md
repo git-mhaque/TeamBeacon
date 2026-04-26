@@ -12,8 +12,8 @@ npm install
 ```bash
 npm run dev
 ```
-- OJET dev server: `http://127.0.0.1:5174`
-- Local API: `http://127.0.0.1:8000`
+- OJET dev server: `http://localhost:5174`
+- Local API: `http://localhost:8000`
 
 If you only need the backend API:
 ```bash

@@ -449,8 +449,30 @@ export type ReleaseRefreshResult = {
   error?: string | null;
 };
 
-const API_BASE = (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE
-  ?? "http://127.0.0.1:8000";
+function resolveApiBase(): string {
+  const configured = (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE;
+  if (typeof configured === "string" && configured.trim()) {
+    return configured.trim().replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined" && typeof window.location.origin === "string" && window.location.origin) {
+    const { hostname, origin, port, protocol } = window.location;
+    const normalizedOrigin = origin.replace(/\/+$/, "");
+    const isLocalHost = hostname === "127.0.0.1" || hostname === "localhost";
+    const isLocalWebDevServer = isLocalHost && (port === "5174" || port === "5173");
+    const isTauriShell = protocol === "tauri:";
+
+    // Local OJET/Tauri dev shells call the API on :8000, not the frontend dev server origin.
+    if (isLocalWebDevServer || isTauriShell) {
+      return "http://127.0.0.1:8000";
+    }
+    return normalizedOrigin;
+  }
+
+  return "http://127.0.0.1:8000";
+}
+
+const API_BASE = resolveApiBase();
 
 async function parseError(response: Response, fallback: string): Promise<Error> {
   try {

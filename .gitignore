@@ -23,6 +23,8 @@ app/*.tsbuildinfo
 teambeacon.db
 teambeacon.db-shm
 teambeacon.db-wal
+data/*
+!data/.gitkeep
 
 # macOS
 .DS_Store

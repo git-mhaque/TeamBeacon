@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, Callable, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from services.api.issues.current_sprint import get_current_sprint
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
@@ -76,6 +79,45 @@ def _json_bytes(payload: dict[str, Any]) -> bytes:
 
 def _text_bytes(payload: str) -> bytes:
     return payload.encode("utf-8")
+
+
+def _resolve_static_file(web_root: Optional[Path], request_path: str) -> Optional[Path]:
+    if web_root is None:
+        return None
+    if not web_root.exists() or not web_root.is_dir():
+        return None
+
+    path_only = request_path.split("?", 1)[0]
+    cleaned_path = unquote(path_only).split("#", 1)[0].strip()
+    if cleaned_path in {"", "/"}:
+        candidate_rel = Path("index.html")
+    else:
+        candidate_rel = Path(cleaned_path.lstrip("/"))
+
+    try:
+        candidate = (web_root / candidate_rel).resolve()
+        candidate.relative_to(web_root)
+    except (ValueError, OSError):
+        return None
+
+    if candidate.is_file():
+        return candidate
+
+    # For SPA paths (for example "/team-insights"), return index.html fallback.
+    if candidate.suffix:
+        return None
+
+    fallback = (web_root / "index.html").resolve()
+    try:
+        fallback.relative_to(web_root)
+    except (ValueError, OSError):
+        return None
+    return fallback if fallback.is_file() else None
+
+
+def _guess_content_type(path: Path) -> str:
+    guessed, _ = mimetypes.guess_type(str(path))
+    return guessed or "application/octet-stream"
 
 
 def _swagger_ui_html(openapi_url: str = "/openapi.json") -> str:
@@ -650,7 +692,10 @@ def build_handler(
     release_refresh_status_provider: ReleaseRefreshStatusProvider = get_release_refresh_status,
     release_refresh_result_provider: ReleaseRefreshResultProvider = get_release_refresh_result,
     release_refresh_start_provider: ReleaseRefreshStartProvider = start_release_refresh,
+    web_dir: str | Path | None = None,
 ) -> type[BaseHTTPRequestHandler]:
+    web_root = Path(web_dir).expanduser().resolve() if web_dir is not None else None
+
     class TeamBeaconHandler(BaseHTTPRequestHandler):
         def _set_headers(self, content_type: str, status_code: int = 200) -> None:
             self.send_response(status_code)
@@ -666,6 +711,16 @@ def build_handler(
 
         def _set_html_headers(self, status_code: int = 200) -> None:
             self._set_headers("text/html; charset=utf-8", status_code)
+
+        def _set_binary_headers(self, content_type: str, content_length: int, status_code: int = 200) -> None:
+            self.send_response(status_code)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Content-Length", str(content_length))
+            self.end_headers()
 
         def _public_server_url(self) -> str:
             host = (self.headers.get("Host") or "127.0.0.1:8000").strip()
@@ -950,6 +1005,13 @@ def build_handler(
                 payload = metadata_search_epics_provider(query=candidate_query, limit=limit)
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
+                return
+
+            static_file = _resolve_static_file(web_root, path)
+            if static_file is not None and path != "/api" and not path.startswith("/api/"):
+                content = static_file.read_bytes()
+                self._set_binary_headers(_guess_content_type(static_file), len(content), 200)
+                self.wfile.write(content)
                 return
 
             self._set_json_headers(404)
@@ -1346,10 +1408,18 @@ def build_handler(
     return TeamBeaconHandler
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
-    handler = build_handler()
+def run_server(host: str = "127.0.0.1", port: int = 8000, web_dir: str | Path | None = None) -> None:
+    handler = build_handler(web_dir=web_dir)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"TeamBeacon API listening on http://{host}:{port}")
+    published_port_raw = os.getenv("TEAMBEACON_HOST_PORT", "").strip()
+    if published_port_raw:
+        try:
+            published_port = int(published_port_raw)
+        except ValueError:
+            published_port = None
+        if published_port is not None and published_port > 0 and published_port <= 65535:
+            print(f"TeamBeacon host URL (Docker port mapping): http://127.0.0.1:{published_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1362,8 +1432,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run TeamBeacon local API server.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--web-dir",
+        default=None,
+        help="Optional path to a built web directory (for example app/web) to serve static assets.",
+    )
     args = parser.parse_args()
-    run_server(host=args.host, port=args.port)
+    run_server(host=args.host, port=args.port, web_dir=args.web_dir)
 
 
 if __name__ == "__main__":
