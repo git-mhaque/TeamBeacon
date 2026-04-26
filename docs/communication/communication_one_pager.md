@@ -131,10 +131,16 @@ TeamBeacon is built as a local-first application with a practical, enterprise-re
 You can try TeamBeacon from the GitHub repository:
 - SSH: `git@github.com:git-mhaque/TeamBeacon.git`
 - HTTPS: `https://github.com/git-mhaque/TeamBeacon`
-- Suggested quick start:
-  1. Clone the repo and configure `config/.env`.
-  2. Run mandatory DB setup from repo root: `mkdir -p data && test -f data/teambeacon.db || sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql`
-  3. Start the app: `cd app && npm install && npm run dev`.
+- Try now (fastest path for new users, Docker Compose):
+  1. Clone and enter the repository: `git clone https://github.com/git-mhaque/TeamBeacon && cd TeamBeacon`
+  2. Copy environment template: `cp config/.env.example config/.env`
+  3. Start TeamBeacon: `docker compose up -d --build`
+  4. Open TeamBeacon: `http://localhost:18000` (Swagger: `http://localhost:18000/docs`)
+  5. Optional custom port: `TEAMBEACON_HOST_PORT=19000 docker compose up -d --build`
+  6. Stop when finished: `docker compose down`
+- Local development (optional advanced path):
+  1. Run DB setup from repo root: `mkdir -p data && test -f data/teambeacon.db || sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql`
+  2. Start the app: `cd app && npm install && npm run dev`
 
 ## Internal Updates
 For internal TeamBeacon updates, follow the Slack channel `#team-beacon-updates`.
