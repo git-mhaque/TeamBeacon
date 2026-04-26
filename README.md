@@ -72,13 +72,18 @@ TeamBeacon/                  # Repository root
 - Platform prerequisites for Tauri desktop builds (macOS): Xcode Command Line Tools (`xcode-select --install`)
 
 ## 🚀 Quick Start (Docker Compose)
-1. Configure environment variables:
+1. Clone and enter the repository:
+```bash
+git clone https://github.com/git-mhaque/TeamBeacon && cd TeamBeacon
+```
+
+2. Configure environment variables:
 ```bash
 cp config/.env.example config/.env
 ```
 Configuration details are documented in [config/README.md](config/README.md).
 
-2. Start TeamBeacon:
+3. Start TeamBeacon:
 ```bash
 docker compose up -d --build
 
@@ -86,22 +91,27 @@ docker compose up -d --build
 TEAMBEACON_HOST_PORT=19000 docker compose up -d --build
 ```
 
-3. Access TeamBeacon:
+4. Access TeamBeacon:
 - `http://localhost:18000`
 
 ## 🧪 Local Development (Optional)
-1. Configure environment variables:
+1. Clone and enter the repository:
+```bash
+git clone https://github.com/git-mhaque/TeamBeacon && cd TeamBeacon
+```
+
+2. Configure environment variables:
 ```bash
 cp config/.env.example config/.env
 ```
 Configuration details are documented in [config/README.md](config/README.md).
 
-2. Apply local database schema (mandatory before first local run):
+3. Apply local database schema (mandatory before first local run):
 ```bash
 test -f data/teambeacon.db || sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql
 ```
 
-3. Start frontend + local API:
+4. Start frontend + local API:
 ```bash
 cd app
 npm install
@@ -112,13 +122,13 @@ npm run dev
 - API Swagger UI: `http://localhost:8000/docs`
 - API OpenAPI schema: `http://localhost:8000/openapi.json`
 
-4. Run backend tests:
+5. Run backend tests:
 ```bash
 python3 -m unittest discover -s tests/unit -p "test_*.py" -v
 python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```
 
-5. Run frontend checks:
+6. Run frontend checks:
 ```bash
 cd app
 npm run build
