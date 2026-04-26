@@ -153,7 +153,7 @@ npm run desktop:build
   - Backend unit tests
   - Backend API integration tests
   - Frontend (OJET) build + coverage tests: `cd app && npm ci && npm run build && npm run test:coverage`
-  - Docker image build validation (local build only; no registry publish)
+  - Docker image build on PRs; build + publish to GHCR on `main`
 
 ## 📚 Documentation
 - [TeamBeacon Communication One-Pager](docs/communication/communication_one_pager.md): product narrative, value framing, and screenshots
