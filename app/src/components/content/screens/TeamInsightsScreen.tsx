@@ -275,9 +275,6 @@ export function TeamInsightsScreen() {
   }, [statusCycleSortDirection, statusCycleSortField]);
 
   const trendRows = insights.trend;
-  const selectedTrendChartHeading = selectedTrendChart === "cycleTime"
-    ? "Avg Cycle Time by Sprint"
-    : "Completed SP by Sprint";
   const selectedTrendAxis = selectedTrendChart === "cycleTime" ? cycleTimeAxis : completedStoryPointsAxis;
   const selectedTrendChartAriaLabel = selectedTrendChart === "cycleTime"
     ? "Average cycle time sprint bar chart"
@@ -330,9 +327,6 @@ export function TeamInsightsScreen() {
             <p>Average completed story points per sprint.</p>
           </article>
         </div>
-        <p class="tb-trend-order-pill">
-          Older sprints are shown on the left and recent sprints on the right. The green dot marks the active sprint.
-        </p>
         <article class="tb-metric-card tb-trend-tab-card">
           <div class="tb-trend-tabs" role="tablist" aria-label="Sprint trend charts">
             <button
@@ -367,7 +361,6 @@ export function TeamInsightsScreen() {
               role="tabpanel"
               aria-labelledby="tb-trend-tab-cycle-time"
             >
-              <h4>{selectedTrendChartHeading}</h4>
               <div class="tb-trend-chart-frame">
                 <div class="tb-trend-chart" role="img" aria-label={selectedTrendChartAriaLabel}>
                   <div class="tb-trend-y-axis" aria-hidden="true">
@@ -426,7 +419,6 @@ export function TeamInsightsScreen() {
               role="tabpanel"
               aria-labelledby="tb-trend-tab-completed-sp"
             >
-              <h4>{selectedTrendChartHeading}</h4>
               <div class="tb-trend-chart-frame">
                 <div class="tb-trend-chart" role="img" aria-label={selectedTrendChartAriaLabel}>
                   <div class="tb-trend-y-axis" aria-hidden="true">
@@ -479,6 +471,9 @@ export function TeamInsightsScreen() {
             </section>
           )}
         </article>
+        <p class="tb-trend-order-pill tb-trend-chart-note">
+          Older sprints are shown on the left and recent sprints on the right. The green dot marks the active sprint.
+        </p>
         {loading ? <p class="tb-muted-note">Loading sprint trend...</p> : null}
         {error ?? insights.error ? <p class="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}
         {!loading && insights.trend.length === 0 ? <p class="tb-muted-note">No recent sprint trend data found.</p> : null}

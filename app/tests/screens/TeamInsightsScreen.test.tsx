@@ -125,7 +125,7 @@ describe("TeamInsightsScreen", () => {
     const completedStoryPointsTab = screen.getByRole("tab", { name: "Completed SP" });
     expect(cycleTimeTab).toHaveAttribute("aria-selected", "true");
     expect(completedStoryPointsTab).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByRole("heading", { name: "Avg Cycle Time by Sprint" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByText("Sprints (old to new)")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe("TeamInsightsScreen", () => {
     fireEvent.click(completedStoryPointsTab);
     expect(cycleTimeTab).toHaveAttribute("aria-selected", "false");
     expect(completedStoryPointsTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Completed SP by Sprint" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Completed story points sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Average cycle time sprint bar chart" })).not.toBeInTheDocument();
@@ -174,7 +174,7 @@ describe("TeamInsightsScreen", () => {
     fireEvent.click(cycleTimeTab);
     expect(cycleTimeTab).toHaveAttribute("aria-selected", "true");
     expect(completedStoryPointsTab).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByRole("heading", { name: "Avg Cycle Time by Sprint" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByText("3.9 d")).toBeInTheDocument();
 

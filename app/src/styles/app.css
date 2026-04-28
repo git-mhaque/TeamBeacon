@@ -523,6 +523,7 @@ body {
 }
 
 .tb-trend-tab-card {
+  margin-top: 0.88rem;
   padding: 0.42rem;
 }
 
@@ -567,12 +568,15 @@ body {
 }
 
 .tb-trend-tab-panel {
-  margin-top: 0.62rem;
+  margin-top: 0.82rem;
 }
 
-.tb-trend-tab-panel h4 {
-  margin-top: 0.44rem;
-  margin-bottom: 0.88rem;
+.tb-trend-chart-note {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 0.82rem;
+  margin-bottom: 0.12rem;
 }
 
 .tb-trend-chart-frame {
