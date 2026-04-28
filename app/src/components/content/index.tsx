@@ -19,7 +19,7 @@ import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
-import { TeamInsightsScreen } from "./screens/TeamInsightsScreen";
+import { OPEN_TEAM_INSIGHTS_SETTINGS_EVENT, TeamInsightsScreen } from "./screens/TeamInsightsScreen";
 
 type ScreenId =
   | "integrations"
@@ -134,6 +134,18 @@ export function Content({ appName }: Props) {
       <main class="tb-main">
         <header class="tb-topbar">
           <h2>{heading}</h2>
+          {active === "team" ? (
+            <div class="tb-topbar-actions">
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                aria-label="Team Insights Settings"
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT))}
+              >
+                Settings
+              </button>
+            </div>
+          ) : null}
           {active === "executive" ? (
             <div class="tb-topbar-actions">
               <button

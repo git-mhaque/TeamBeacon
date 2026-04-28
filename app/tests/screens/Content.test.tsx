@@ -51,6 +51,74 @@ describe("Content", () => {
           { name: "space_query", ok: true, detail: "responding" },
         ],
       },
+      "/api/team/insights": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        windowSize: 6,
+        metrics: {
+          avgCommittedStoryPoints: 92,
+          avgCompletedStoryPoints: 81,
+          completionRatioPercent: 88.04,
+          carryoverPercent: 11.96,
+          avgCycleTimeDays: 4.1,
+          cycleTimeStdDevDays: 2.7,
+          medianCycleTimeDays: 3.4,
+        },
+        trend: [
+          {
+            sprintId: 4101,
+            sprintName: "Sprint 41 (Q4 FY26)",
+            state: "closed",
+            startDate: "2026-03-18T00:00:00+00:00",
+            endDate: "2026-04-01T00:00:00+00:00",
+            committedStoryPoints: 88,
+            completedStoryPoints: 80,
+            avgCycleTimeDays: 4.7,
+            completionRatioPercent: 90.91,
+            carryoverPercent: 9.09,
+          },
+          {
+            sprintId: 4102,
+            sprintName: "Sprint 42 (Q4 FY26)",
+            state: "active",
+            startDate: "2026-04-02T00:00:00+00:00",
+            endDate: "2026-04-15T00:00:00+00:00",
+            committedStoryPoints: 96,
+            completedStoryPoints: 82,
+            avgCycleTimeDays: 3.9,
+            completionRatioPercent: 85.42,
+            carryoverPercent: 14.58,
+          },
+        ],
+        statusCycleTime: {
+          trackedIssues: 13,
+          totalDays: 29.6,
+          rows: [
+            {
+              status: "In Progress",
+              issueCount: 13,
+              avgDays: 1.5,
+              medianDays: 1.2,
+              p85Days: 2.4,
+              maxDays: 4.8,
+              totalDays: 19.4,
+              percentOfCycleTime: 65.54,
+            },
+          ],
+        },
+        workMix: {
+          sprintId: 4102,
+          sprintName: "Sprint 42",
+          totalIssues: 20,
+          slices: [
+            { label: "Feature", count: 12, percent: 60 },
+            { label: "Ops", count: 5, percent: 25 },
+            { label: "Security", count: 3, percent: 15 },
+          ],
+        },
+        summary: "Work mix is currently Feature 60%, Ops 25%, Security 15%.",
+        error: null,
+      },
     });
 
     render(<Content appName="TeamBeacon" />);
@@ -93,10 +161,20 @@ describe("Content", () => {
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Team Insights/ }));
+    expect(await screen.findByRole("heading", { name: "Team Insights" })).toBeInTheDocument();
+    const teamSettingsButton = screen.getByRole("button", { name: "Team Insights Settings" });
+    fireEvent.click(teamSettingsButton);
+    expect(await screen.findByRole("dialog", { name: "Team Insights Settings" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Security Insights/ }));
     expect(await screen.findByRole("heading", { name: "Security Insights" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Security Posture Snapshot" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();

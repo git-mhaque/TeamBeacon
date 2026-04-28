@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { vi } from "vitest";
-import { TeamInsightsScreen } from "../../src/components/content/screens/TeamInsightsScreen";
+import {
+  OPEN_TEAM_INSIGHTS_SETTINGS_EVENT,
+  TeamInsightsScreen,
+} from "../../src/components/content/screens/TeamInsightsScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
 describe("TeamInsightsScreen", () => {
@@ -130,6 +133,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Completed story points sprint bar chart" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("62.5%");
     expect(screen.getAllByTitle("Active sprint").length).toBeGreaterThan(0);
     const firstCycleSprint = await screen.findByText("Sprint 1");
     const secondCycleSprint = screen.getByText("Sprint 2");
@@ -156,6 +160,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Completed story points sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Average cycle time sprint bar chart" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
     expect(screen.getByText("Sprints (old to new)")).toBeInTheDocument();
     expect(screen.getByText("82 SP")).toBeInTheDocument();
     expect(screen.getByText("80 SP")).toBeInTheDocument();
@@ -177,6 +182,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByText("3.9 d")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("62.5%");
 
     expect(screen.queryByText("Completed story points per sprint.")).not.toBeInTheDocument();
     expect(screen.queryByText("Average cycle time per sprint.")).not.toBeInTheDocument();
@@ -297,6 +303,142 @@ describe("TeamInsightsScreen", () => {
       const sprintLimitSixCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes("sprintLimit=6"));
       expect(sprintLimitSixCalls.length).toBeGreaterThan(1);
     });
+  });
+
+  it("opens the settings overlay from the global action and applies chart preferences", async () => {
+    const fetchSpy = setupFetchMock({
+      "/api/team/insights": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        windowSize: 6,
+        metrics: {
+          avgCommittedStoryPoints: 92,
+          avgCompletedStoryPoints: 81,
+          completionRatioPercent: 88.04,
+          carryoverPercent: 11.96,
+          avgCycleTimeDays: 4.1,
+          cycleTimeStdDevDays: 2.7,
+          medianCycleTimeDays: 3.4,
+        },
+        trend: [
+          {
+            sprintId: 4101,
+            sprintName: "Sprint 41 (Q4 FY26)",
+            state: "closed",
+            startDate: "2026-03-18T00:00:00+00:00",
+            endDate: "2026-04-01T00:00:00+00:00",
+            committedStoryPoints: 88,
+            completedStoryPoints: 80,
+            avgCycleTimeDays: 4.7,
+            completionRatioPercent: 90.91,
+            carryoverPercent: 9.09,
+          },
+          {
+            sprintId: 4102,
+            sprintName: "Sprint 42 (Q4 FY26)",
+            state: "active",
+            startDate: "2026-04-02T00:00:00+00:00",
+            endDate: "2026-04-15T00:00:00+00:00",
+            committedStoryPoints: 96,
+            completedStoryPoints: 82,
+            avgCycleTimeDays: 3.9,
+            completionRatioPercent: 85.42,
+            carryoverPercent: 14.58,
+          },
+        ],
+        statusCycleTime: {
+          trackedIssues: 13,
+          totalDays: 29.6,
+          rows: [
+            {
+              status: "In Progress",
+              issueCount: 13,
+              avgDays: 1.5,
+              medianDays: 1.2,
+              p85Days: 2.4,
+              maxDays: 4.8,
+              totalDays: 19.4,
+              percentOfCycleTime: 65.54,
+            },
+          ],
+        },
+        workMix: {
+          sprintId: 4102,
+          sprintName: "Sprint 42",
+          totalIssues: 20,
+          slices: [
+            { label: "Feature", count: 12, percent: 60 },
+            { label: "Ops", count: 5, percent: 25 },
+            { label: "Security", count: 3, percent: 15 },
+          ],
+        },
+        summary: "Work mix is currently Feature 60%, Ops 25%, Security 15%.",
+        error: null,
+      },
+    });
+
+    render(<TeamInsightsScreen />);
+    expect(await screen.findByText("4.1 d")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Completed SP" }));
+    expect(screen.getByRole("tab", { name: "Completed SP" })).toHaveAttribute("aria-selected", "true");
+    const fetchCallCountBeforeSettings = fetchSpy.mock.calls.length;
+
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT));
+
+    const dialog = await screen.findByRole("dialog", { name: "Team Insights Settings" });
+    const dialogScope = within(dialog);
+
+    expect(dialogScope.queryByRole("combobox", { name: "Trend Window" })).not.toBeInTheDocument();
+    expect(dialogScope.queryByRole("combobox", { name: "Visible Trend Chart" })).not.toBeInTheDocument();
+    expect(dialogScope.getByLabelText("Show SP chart")).toBeChecked();
+    expect(dialogScope.getByLabelText("Show target cycle time")).toBeChecked();
+    expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeEnabled();
+    expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toHaveValue(5);
+
+    fireEvent.click(dialogScope.getByLabelText("Show target cycle time"));
+    expect(dialogScope.getByLabelText("Show target cycle time")).not.toBeChecked();
+    expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeDisabled();
+
+    fireEvent.click(dialogScope.getByLabelText("Show target cycle time"));
+    expect(dialogScope.getByLabelText("Show target cycle time")).toBeChecked();
+    expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeEnabled();
+
+    fireEvent.click(dialogScope.getByLabelText("Show SP chart"));
+    fireEvent.input(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" }), {
+      target: { value: "6.5" },
+    });
+    fireEvent.click(dialogScope.getByLabelText("Show bar value labels"));
+    fireEvent.click(dialogScope.getByLabelText("Show active sprint marker"));
+    fireEvent.click(dialogScope.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("combobox", { name: "Trend Window" })).toHaveValue("6");
+    expect(fetchSpy.mock.calls).toHaveLength(fetchCallCountBeforeSettings);
+    expect(screen.getByRole("tab", { name: "Avg Cycle Time" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Completed story points sprint bar chart" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("81.25%");
+    expect(screen.queryByText("82 SP")).not.toBeInTheDocument();
+    expect(screen.queryByText("80 SP")).not.toBeInTheDocument();
+    expect(screen.queryAllByTitle("Active sprint")).toHaveLength(0);
+
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT));
+
+    const secondDialog = await screen.findByRole("dialog", { name: "Team Insights Settings" });
+    const secondDialogScope = within(secondDialog);
+
+    fireEvent.click(secondDialogScope.getByLabelText("Show target cycle time"));
+    expect(secondDialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeDisabled();
+    fireEvent.click(secondDialogScope.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
   });
 
   it("renders fallback chart labels and stable status sorting for atypical sprint data", async () => {
