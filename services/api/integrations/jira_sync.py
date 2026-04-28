@@ -815,11 +815,12 @@ def _active_sprint_ids(sprints: list[SprintRecord]) -> list[int]:
     return sorted(active_ids)
 
 
-def _fetch_live_issue_keys_for_sprint(
+def _fetch_live_issues_for_sprint(
     connector: JiraRestConnector,
     sprint_id: int,
-) -> set[str]:
-    live_issue_keys: set[str] = set()
+) -> list[IssueRecord]:
+    live_issues: list[IssueRecord] = []
+    seen_issue_keys: set[str] = set()
     start_at = 0
     max_results = 100
     jql = f"sprint = {sprint_id} ORDER BY updated ASC"
@@ -832,8 +833,14 @@ def _fetch_live_issue_keys_for_sprint(
         )
         for issue in issues:
             issue_key = str(issue.issue_key or "").strip()
-            if issue_key:
-                live_issue_keys.add(issue_key)
+            if not issue_key or issue_key in seen_issue_keys:
+                continue
+            # Sprint-scoped search guarantees membership even if sprint fields are missing.
+            issue.issue_key = issue_key
+            issue.sprint_external_id = sprint_id
+            issue.sprint_field_present = True
+            live_issues.append(issue)
+            seen_issue_keys.add(issue_key)
 
         if not batch.has_more or batch.next_cursor is None:
             break
@@ -842,7 +849,76 @@ def _fetch_live_issue_keys_for_sprint(
         except (TypeError, ValueError):
             break
 
-    return live_issue_keys
+    return live_issues
+
+
+def _fetch_live_issue_keys_for_sprint(
+    connector: JiraRestConnector,
+    sprint_id: int,
+) -> set[str]:
+    return {issue.issue_key for issue in _fetch_live_issues_for_sprint(connector, sprint_id)}
+
+
+def _sync_active_sprint_issues(
+    conn: sqlite3.Connection,
+    connector: JiraRestConnector,
+    active_sprint_ids: list[int],
+) -> tuple[int, int, dict[int, set[str]]]:
+    active_sprint_issues_hydrated = 0
+    active_sprint_changelog_entries_synced = 0
+    live_issue_keys_by_sprint: dict[int, set[str]] = {}
+
+    for sprint_id in active_sprint_ids:
+        live_issues = _fetch_live_issues_for_sprint(connector, sprint_id)
+        live_issue_keys = {issue.issue_key for issue in live_issues if issue.issue_key}
+        live_issue_keys_by_sprint[sprint_id] = live_issue_keys
+        if not live_issue_keys:
+            continue
+
+        placeholders = ",".join("?" for _ in live_issue_keys)
+        existing_rows = conn.execute(
+            f"""
+            SELECT issue_key, sprint_external_id
+            FROM issues
+            WHERE issue_key IN ({placeholders})
+            """,
+            tuple(live_issue_keys),
+        ).fetchall()
+
+        existing_sprint_external_ids: dict[str, int | None] = {}
+        for issue_key_raw, sprint_external_id_raw in existing_rows:
+            issue_key = str(issue_key_raw or "").strip()
+            if not issue_key:
+                continue
+            if sprint_external_id_raw is None:
+                existing_sprint_external_ids[issue_key] = None
+                continue
+            try:
+                existing_sprint_external_ids[issue_key] = int(sprint_external_id_raw)
+            except (TypeError, ValueError):
+                existing_sprint_external_ids[issue_key] = None
+
+        issues_to_hydrate: list[IssueRecord] = []
+        for issue in live_issues:
+            if existing_sprint_external_ids.get(issue.issue_key) == sprint_id:
+                continue
+            issues_to_hydrate.append(issue)
+
+        if not issues_to_hydrate:
+            continue
+
+        _upsert_issues(conn, issues_to_hydrate)
+        for issue in issues_to_hydrate:
+            changelog_items = connector.get_issue_changelog(issue.issue_key)
+            _replace_issue_changelog(conn, issue.issue_key, changelog_items)
+            active_sprint_changelog_entries_synced += len(changelog_items)
+        active_sprint_issues_hydrated += len(issues_to_hydrate)
+
+    return (
+        active_sprint_issues_hydrated,
+        active_sprint_changelog_entries_synced,
+        live_issue_keys_by_sprint,
+    )
 
 
 def _sanitize_raw_json_sprint_fields(
@@ -888,11 +964,15 @@ def _reconcile_active_sprint_membership(
     connector: JiraRestConnector,
     active_sprint_ids: list[int],
     sprint_field_candidates: tuple[str, ...],
+    live_issue_keys_by_sprint: dict[int, set[str]] | None = None,
 ) -> int:
     stale_links_cleared = 0
 
     for sprint_id in active_sprint_ids:
-        live_issue_keys = _fetch_live_issue_keys_for_sprint(connector, sprint_id)
+        if live_issue_keys_by_sprint is not None and sprint_id in live_issue_keys_by_sprint:
+            live_issue_keys = set(live_issue_keys_by_sprint[sprint_id])
+        else:
+            live_issue_keys = _fetch_live_issue_keys_for_sprint(connector, sprint_id)
         rows = conn.execute(
             """
             SELECT issue_key, raw_json
@@ -1146,6 +1226,8 @@ def run_jira_sync_once(
         changelog_entries_synced = 0
         total_issues: int | None = None
         stale_sprint_links_cleared = 0
+        active_sprint_issues_hydrated = 0
+        active_sprint_changelog_entries_synced = 0
         if incremental_since_utc is not None:
             count_incremental = getattr(connector, "count_incremental_issues", None)
             if callable(count_incremental):
@@ -1224,12 +1306,46 @@ def run_jira_sync_once(
             start_at = int(batch.next_cursor)
 
         active_sprint_ids = _active_sprint_ids(sprints)
+        live_issue_keys_by_sprint: dict[int, set[str]] | None = None
         if active_sprint_ids:
+            (
+                active_sprint_issues_hydrated,
+                active_sprint_changelog_entries_synced,
+                live_issue_keys_by_sprint,
+            ) = _sync_active_sprint_issues(
+                conn,
+                connector,
+                active_sprint_ids,
+            )
+            if active_sprint_issues_hydrated > 0:
+                changelog_entries_synced += active_sprint_changelog_entries_synced
+                _update_sync_run(
+                    conn,
+                    sync_run_id,
+                    issues_synced=downloaded,
+                    total_issues=total_issues,
+                )
+                conn.commit()
+                emit(
+                    {
+                        "phase": "issues",
+                        "boardsSynced": 1,
+                        "sprintsSynced": len(sprints),
+                        "downloadedIssues": downloaded,
+                        "totalIssues": total_issues,
+                        "percent": _safe_percent(downloaded, total_issues),
+                        "message": (
+                            f"Hydrated {active_sprint_issues_hydrated} active sprint issues; "
+                            f"{changelog_entries_synced} changelog events synced"
+                        ),
+                    }
+                )
             stale_sprint_links_cleared = _reconcile_active_sprint_membership(
                 conn,
                 connector,
                 active_sprint_ids,
                 runtime.sprint_field_candidates,
+                live_issue_keys_by_sprint=live_issue_keys_by_sprint,
             )
             conn.commit()
 
@@ -1270,8 +1386,14 @@ def run_jira_sync_once(
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
             "staleSprintLinksCleared": stale_sprint_links_cleared,
+            "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
+            "activeSprintChangelogEntriesSynced": active_sprint_changelog_entries_synced,
             "error": None,
-            "message": "Sync complete.",
+            "message": (
+                "Sync complete."
+                if active_sprint_issues_hydrated <= 0
+                else f"Sync complete. Hydrated {active_sprint_issues_hydrated} active sprint issues."
+            ),
         }
     except Exception as exc:  # noqa: BLE001
         try:

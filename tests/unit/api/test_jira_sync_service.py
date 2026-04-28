@@ -212,6 +212,20 @@ class _FailingConnectorStub:
         return []
 
 
+class _IncrementalMissingActiveIssueConnectorStub(_SuccessfulConnectorStub):
+    def incremental_issues(
+        self,
+        updated_since: datetime | None,
+        start_at: int = 0,
+        max_results: int = 100,
+    ) -> tuple[list[IssueRecord], SyncBatch]:
+        _ = max_results
+        self.incremental_cursor = updated_since
+        if start_at == 0:
+            return [self.issue_1], SyncBatch(next_cursor=None, has_more=False)
+        return [], SyncBatch(next_cursor=None, has_more=False)
+
+
 class JiraSyncServiceUnitTests(unittest.TestCase):
     def _runtime(self) -> JiraRuntimeConfig:
         return JiraRuntimeConfig(
@@ -457,6 +471,67 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 conn.close()
             self.assertIsNotNone(sync_mode)
             self.assertEqual(sync_mode[0], "since_last")
+
+    def test_run_sync_since_last_backfills_missing_active_sprint_issues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute("DELETE FROM issues WHERE issue_key = 'CEGBUPOL-2'")
+                conn.execute("DELETE FROM issue_changelog WHERE issue_key = 'CEGBUPOL-2'")
+                conn.execute(
+                    """
+                    UPDATE sync_checkpoints
+                    SET last_synced_at = '2026-03-25T12:00:00+00:00', status = 'idle', error_message = NULL
+                    WHERE source_type = 'jira' AND scope_key = 'board:27193'
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            connector = _IncrementalMissingActiveIssueConnectorStub()
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=connector,
+                sync_mode="since_last",
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertEqual(summary["activeSprintIssuesHydrated"], 1)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                issue_row = conn.execute(
+                    """
+                    SELECT issue_key, sprint_external_id
+                    FROM issues
+                    WHERE issue_key = 'CEGBUPOL-2'
+                    """
+                ).fetchone()
+                changelog_count = conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM issue_changelog
+                    WHERE issue_key = 'CEGBUPOL-2'
+                    """
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertIsNotNone(issue_row)
+            self.assertEqual(issue_row[0], "CEGBUPOL-2")
+            self.assertEqual(issue_row[1], 901)
+            self.assertEqual(changelog_count, 2)
 
     def test_run_sync_since_date_uses_explicit_cursor(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
