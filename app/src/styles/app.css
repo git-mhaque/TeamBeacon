@@ -2114,7 +2114,7 @@ body {
 }
 
 .tb-modal-team-settings {
-  width: min(100%, 38rem);
+  width: min(100%, 56rem);
 }
 
 .tb-modal-reporting {
@@ -2201,6 +2201,269 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 0.44rem;
+}
+
+.tb-team-settings-panel {
+  border: 1px solid #d6e0ef;
+  border-radius: 0.82rem;
+  background: linear-gradient(180deg, #f9fbff 0%, #f4f8ff 100%);
+  padding: 0.86rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.76rem;
+  height: 100%;
+  align-content: start;
+  min-height: 0;
+}
+
+.tb-team-settings-panel h4,
+.tb-cycle-status-group h5 {
+  margin: 0;
+}
+
+.tb-team-settings-intro {
+  margin: 0;
+}
+
+.tb-team-settings-grid {
+  display: grid;
+  gap: 0.68rem;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr);
+  align-items: stretch;
+}
+
+.tb-team-settings-card {
+  border: 1px solid #d6e0ef;
+  border-radius: 0.82rem;
+  background: linear-gradient(180deg, #fbfdff 0%, #f6faff 100%);
+  padding: 0.82rem;
+  display: grid;
+  gap: 0.72rem;
+  height: 100%;
+  align-content: start;
+}
+
+.tb-team-settings-card h4,
+.tb-team-settings-panel h4 {
+  margin: 0;
+  color: #294b79;
+  font-size: 0.82rem;
+}
+
+.tb-team-settings-card-head p {
+  margin: 0.24rem 0 0;
+}
+
+.tb-team-settings-toggle-list,
+.tb-team-settings-target-grid {
+  display: grid;
+  gap: 0.58rem;
+}
+
+.tb-team-settings-divider {
+  height: 1px;
+  background: #dbe5f4;
+  margin: -0.06rem 0 0.02rem;
+}
+
+.tb-team-settings-subsection {
+  display: grid;
+  gap: 0.58rem;
+}
+
+.tb-team-settings-subsection-head h5 {
+  margin: 0;
+  color: #294b79;
+  font-size: 0.76rem;
+}
+
+.tb-team-settings-subsection-head p {
+  margin: 0.22rem 0 0;
+}
+
+.tb-team-settings-toggle-row {
+  border: 1px solid #dce6f5;
+  border-radius: 0.72rem;
+  background: #fff;
+  padding: 0.58rem 0.62rem;
+}
+
+.tb-team-settings-toggle-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.tb-team-settings-toggle-copy .tb-modal-check {
+  align-items: flex-start;
+}
+
+.tb-team-settings-toggle-copy .tb-muted-note {
+  margin: 0 0 0 1.46rem;
+}
+
+.tb-team-settings-field {
+  gap: 0.4rem;
+}
+
+.tb-team-settings-number-input {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+}
+
+.tb-team-settings-number-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tb-team-settings-input-suffix {
+  border: 1px solid #d2ddf0;
+  border-radius: 0.56rem;
+  background: #fff;
+  color: #3d5b85;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.48rem 0.62rem;
+  white-space: nowrap;
+}
+
+.tb-team-settings-field input:disabled + .tb-team-settings-input-suffix {
+  background: #eef3fb;
+  color: #7a8ca8;
+}
+
+.tb-team-settings-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.72rem;
+}
+
+.tb-team-settings-panel-copy {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.tb-team-settings-panel-head p,
+.tb-team-settings-panel-copy .tb-muted-note {
+  margin: 0;
+}
+
+.tb-team-settings-heading-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.58rem;
+}
+
+.tb-team-settings-count-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cdddf3;
+  border-radius: 999px;
+  background: #fff;
+  color: #2c507f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.18rem 0.52rem;
+}
+
+.tb-team-settings-warning {
+  margin: 0;
+  border: 1px solid #f0d7ad;
+  border-left: 4px solid var(--tb-warn);
+  border-radius: 0.72rem;
+  background: #fff8ed;
+  color: #875200;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0.58rem 0.68rem;
+}
+
+.tb-team-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.tb-team-settings-status-groups {
+  display: grid;
+  gap: 0.82rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 0.12rem;
+  align-content: start;
+}
+
+.tb-cycle-status-group {
+  display: grid;
+  gap: 0.52rem;
+  border: 1px solid #dde7f6;
+  border-radius: 0.76rem;
+  background: #fff;
+  padding: 0.68rem;
+}
+
+.tb-cycle-status-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.tb-cycle-status-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.42rem;
+  height: 1.42rem;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2b4f81;
+  font-size: 0.71rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 0.34rem;
+}
+
+.tb-cycle-status-group h5 {
+  color: #2b4f81;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tb-cycle-status-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.tb-cycle-status-option {
+  min-width: 0;
+  border: 1px solid #dce6f5;
+  border-radius: 0.68rem;
+  background: #f9fbff;
+  padding: 0.48rem 0.54rem;
+}
+
+.tb-cycle-status-option input {
+  margin: 0;
+}
+
+.tb-cycle-status-option span {
+  color: #244874;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tb-release-source-list {
@@ -2447,6 +2710,22 @@ body {
   }
 
   .tb-modal-two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-team-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-team-settings-panel-head {
+    flex-direction: column;
+  }
+
+  .tb-team-settings-actions {
+    justify-content: flex-start;
+  }
+
+  .tb-cycle-status-grid {
     grid-template-columns: 1fr;
   }
 

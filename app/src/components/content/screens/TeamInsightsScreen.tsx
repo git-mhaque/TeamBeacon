@@ -1,10 +1,12 @@
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { TeamInsightAvailableStatus, TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
+import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
 export const OPEN_TEAM_INSIGHTS_SETTINGS_EVENT = "teambeacon:team-insights-open-settings";
 const DEFAULT_TARGET_CYCLE_TIME_DAYS = 5;
+const TEAM_INSIGHTS_SETTINGS_KEY = "teambeacon.teamInsights.settings";
 
 const EMPTY_INSIGHTS: TeamInsightsResponse = {
   source: "local",
@@ -20,7 +22,12 @@ const EMPTY_INSIGHTS: TeamInsightsResponse = {
   trend: [],
   statusCycleTime: {
     trackedIssues: 0,
+    completedIssues: 0,
+    excludedIssues: 0,
     totalDays: 0,
+    appliedStatusKeys: [],
+    defaultStatusKeys: [],
+    availableStatuses: [],
     rows: [],
   },
   workMix: {
@@ -106,20 +113,41 @@ function calculateTrendAxisOffset(value: number, upperBound: number): string {
   return `${Math.min(roundMetric((value / upperBound) * 100), 100)}%`;
 }
 
-function isInProgressRelatedStatus(status: string | null | undefined): boolean {
-  const normalized = (status ?? "").trim().toLowerCase();
-  if (!normalized) return false;
-  if (normalized.includes("in progress")) return true;
-  if (normalized.startsWith("qa")) return true;
-  return [
-    "analysis",
-    "in review",
-    "testing",
-    "blocked",
-    "awaiting cab approval",
-    "kickoff",
-    "release ready",
-  ].includes(normalized);
+function normalizeStatusKey(value: string | null | undefined): string | null {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized ? normalized : null;
+}
+
+function normalizeStatusSelection(
+  statusKeys: string[] | null | undefined,
+  availableStatuses: TeamInsightAvailableStatus[],
+): string[] {
+  if (!statusKeys || statusKeys.length === 0) return [];
+  const requested = new Set(
+    statusKeys
+      .map((statusKey) => normalizeStatusKey(statusKey))
+      .filter((statusKey): statusKey is string => statusKey !== null),
+  );
+  return availableStatuses
+    .map((status) => status.statusKey)
+    .filter((statusKey) => requested.has(statusKey));
+}
+
+function selectionsMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function resolveDefaultCycleTimeStatusKeys(
+  availableStatuses: TeamInsightAvailableStatus[],
+  explicitDefaultStatusKeys?: string[],
+): string[] {
+  if (explicitDefaultStatusKeys !== undefined) {
+    return normalizeStatusSelection(explicitDefaultStatusKeys, availableStatuses);
+  }
+  return availableStatuses
+    .filter((status) => status.defaultIncluded)
+    .map((status) => status.statusKey);
 }
 
 function normalizeTrendWindow(value: number): number {
@@ -134,6 +162,14 @@ function formatTrendWindowLabel(value: number): string {
 type StatusCycleSortField = "status" | "issueCount" | "avgDays" | "percentOfCycleTime";
 type StatusCycleSortDirection = "asc" | "desc";
 type TrendChartTab = "cycleTime" | "completedStoryPoints";
+type PersistedTeamInsightsSettings = {
+  targetCycleTimeDays: number;
+  showTargetCycleTime: boolean;
+  showCompletedStoryPointsChart: boolean;
+  showTrendValueLabels: boolean;
+  showActiveSprintMarker: boolean;
+  selectedCycleTimeStatusKeys: string[] | null;
+};
 
 const STATUS_CYCLE_PIE_COLORS = [
   "#2e79d8",
@@ -171,23 +207,106 @@ function defaultSortDirectionForStatusCycleField(field: StatusCycleSortField): S
   return field === "status" ? "asc" : "desc";
 }
 
+function normalizePersistedCycleTimeStatusKeys(
+  value: unknown,
+  fallback: string[] | null,
+): string[] | null {
+  if (value === null) return null;
+  if (!Array.isArray(value)) return fallback;
+  return Array.from(new Set(
+    value
+      .map((entry) => normalizeStatusKey(typeof entry === "string" ? entry : null))
+      .filter((entry): entry is string => entry !== null),
+  ));
+}
+
+function nullableSelectionsMatch(left: string[] | null, right: string[] | null): boolean {
+  if (left === null || right === null) return left === right;
+  return selectionsMatch(left, right);
+}
+
+function parsePersistedTeamInsightsSettings(
+  raw: string | null,
+  fallback: PersistedTeamInsightsSettings,
+): PersistedTeamInsightsSettings {
+  try {
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<PersistedTeamInsightsSettings>;
+    return {
+      targetCycleTimeDays: normalizeTargetCycleTime(parsed.targetCycleTimeDays ?? fallback.targetCycleTimeDays),
+      showTargetCycleTime: (
+        typeof parsed.showTargetCycleTime === "boolean"
+          ? parsed.showTargetCycleTime
+          : fallback.showTargetCycleTime
+      ),
+      showCompletedStoryPointsChart: (
+        typeof parsed.showCompletedStoryPointsChart === "boolean"
+          ? parsed.showCompletedStoryPointsChart
+          : fallback.showCompletedStoryPointsChart
+      ),
+      showTrendValueLabels: (
+        typeof parsed.showTrendValueLabels === "boolean"
+          ? parsed.showTrendValueLabels
+          : fallback.showTrendValueLabels
+      ),
+      showActiveSprintMarker: (
+        typeof parsed.showActiveSprintMarker === "boolean"
+          ? parsed.showActiveSprintMarker
+          : fallback.showActiveSprintMarker
+      ),
+      selectedCycleTimeStatusKeys: normalizePersistedCycleTimeStatusKeys(
+        parsed.selectedCycleTimeStatusKeys,
+        fallback.selectedCycleTimeStatusKeys,
+      ),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function readPersistedTeamInsightsSettings(
+  fallback: PersistedTeamInsightsSettings,
+): PersistedTeamInsightsSettings {
+  return parsePersistedTeamInsightsSettings(getPreferenceSync(TEAM_INSIGHTS_SETTINGS_KEY), fallback);
+}
+
 export function TeamInsightsScreen() {
+  const initialSettings = useMemo(
+    () => readPersistedTeamInsightsSettings({
+      targetCycleTimeDays: DEFAULT_TARGET_CYCLE_TIME_DAYS,
+      showTargetCycleTime: true,
+      showCompletedStoryPointsChart: true,
+      showTrendValueLabels: true,
+      showActiveSprintMarker: true,
+      selectedCycleTimeStatusKeys: null,
+    }),
+    [],
+  );
+  const hasHydratedSettingsFromStore = useRef(false);
   const [insights, setInsights] = useState<TeamInsightsResponse>(EMPTY_INSIGHTS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trendWindowSelection, setTrendWindowSelection] = useState<number>(6);
   const [selectedTrendChart, setSelectedTrendChart] = useState<TrendChartTab>("cycleTime");
-  const [targetCycleTimeDays, setTargetCycleTimeDays] = useState<number>(DEFAULT_TARGET_CYCLE_TIME_DAYS);
-  const [showTargetCycleTime, setShowTargetCycleTime] = useState(true);
-  const [showCompletedStoryPointsChart, setShowCompletedStoryPointsChart] = useState(true);
-  const [showTrendValueLabels, setShowTrendValueLabels] = useState(true);
-  const [showActiveSprintMarker, setShowActiveSprintMarker] = useState(true);
+  const [targetCycleTimeDays, setTargetCycleTimeDays] = useState<number>(initialSettings.targetCycleTimeDays);
+  const [showTargetCycleTime, setShowTargetCycleTime] = useState(initialSettings.showTargetCycleTime);
+  const [showCompletedStoryPointsChart, setShowCompletedStoryPointsChart] = useState(initialSettings.showCompletedStoryPointsChart);
+  const [showTrendValueLabels, setShowTrendValueLabels] = useState(initialSettings.showTrendValueLabels);
+  const [showActiveSprintMarker, setShowActiveSprintMarker] = useState(initialSettings.showActiveSprintMarker);
+  const [selectedCycleTimeStatusKeys, setSelectedCycleTimeStatusKeys] = useState<string[] | null>(
+    initialSettings.selectedCycleTimeStatusKeys,
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [draftTargetCycleTimeInput, setDraftTargetCycleTimeInput] = useState(String(DEFAULT_TARGET_CYCLE_TIME_DAYS));
-  const [draftShowTargetCycleTime, setDraftShowTargetCycleTime] = useState(true);
-  const [draftShowCompletedStoryPointsChart, setDraftShowCompletedStoryPointsChart] = useState(true);
-  const [draftShowTrendValueLabels, setDraftShowTrendValueLabels] = useState(true);
-  const [draftShowActiveSprintMarker, setDraftShowActiveSprintMarker] = useState(true);
+  const [draftTargetCycleTimeInput, setDraftTargetCycleTimeInput] = useState(String(initialSettings.targetCycleTimeDays));
+  const [draftShowTargetCycleTime, setDraftShowTargetCycleTime] = useState(initialSettings.showTargetCycleTime);
+  const [draftShowCompletedStoryPointsChart, setDraftShowCompletedStoryPointsChart] = useState(
+    initialSettings.showCompletedStoryPointsChart,
+  );
+  const [draftShowTrendValueLabels, setDraftShowTrendValueLabels] = useState(initialSettings.showTrendValueLabels);
+  const [draftShowActiveSprintMarker, setDraftShowActiveSprintMarker] = useState(initialSettings.showActiveSprintMarker);
+  const [draftSelectedCycleTimeStatusKeys, setDraftSelectedCycleTimeStatusKeys] = useState(
+    initialSettings.selectedCycleTimeStatusKeys ?? [],
+  );
   const [statusCycleSortField, setStatusCycleSortField] = useState<StatusCycleSortField>("percentOfCycleTime");
   const [statusCycleSortDirection, setStatusCycleSortDirection] = useState<StatusCycleSortDirection>("desc");
 
@@ -195,7 +314,7 @@ export function TeamInsightsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const payload = await fetchTeamInsights(trendWindowSelection);
+      const payload = await fetchTeamInsights(trendWindowSelection, selectedCycleTimeStatusKeys);
       setInsights(payload);
       if (payload.error) {
         setError(payload.error);
@@ -207,7 +326,7 @@ export function TeamInsightsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [trendWindowSelection]);
+  }, [selectedCycleTimeStatusKeys, trendWindowSelection]);
 
   useEffect(() => {
     loadInsights().catch(() => {
@@ -215,14 +334,117 @@ export function TeamInsightsScreen() {
     });
   }, [loadInsights]);
 
+  useEffect(() => {
+    const payload: PersistedTeamInsightsSettings = {
+      targetCycleTimeDays,
+      showTargetCycleTime,
+      showCompletedStoryPointsChart,
+      showTrendValueLabels,
+      showActiveSprintMarker,
+      selectedCycleTimeStatusKeys,
+    };
+    void setPreference(TEAM_INSIGHTS_SETTINGS_KEY, JSON.stringify(payload));
+  }, [
+    selectedCycleTimeStatusKeys,
+    showActiveSprintMarker,
+    showCompletedStoryPointsChart,
+    showTargetCycleTime,
+    showTrendValueLabels,
+    targetCycleTimeDays,
+  ]);
+
+  useEffect(() => {
+    if (hasHydratedSettingsFromStore.current) return;
+    hasHydratedSettingsFromStore.current = true;
+
+    let cancelled = false;
+    const fallback: PersistedTeamInsightsSettings = {
+      targetCycleTimeDays: initialSettings.targetCycleTimeDays,
+      showTargetCycleTime: initialSettings.showTargetCycleTime,
+      showCompletedStoryPointsChart: initialSettings.showCompletedStoryPointsChart,
+      showTrendValueLabels: initialSettings.showTrendValueLabels,
+      showActiveSprintMarker: initialSettings.showActiveSprintMarker,
+      selectedCycleTimeStatusKeys: initialSettings.selectedCycleTimeStatusKeys,
+    };
+
+    void (async () => {
+      const raw = await getPreference(TEAM_INSIGHTS_SETTINGS_KEY);
+      if (cancelled) return;
+
+      const persisted = parsePersistedTeamInsightsSettings(raw, fallback);
+      const isSame = (
+        persisted.targetCycleTimeDays === targetCycleTimeDays
+        && persisted.showTargetCycleTime === showTargetCycleTime
+        && persisted.showCompletedStoryPointsChart === showCompletedStoryPointsChart
+        && persisted.showTrendValueLabels === showTrendValueLabels
+        && persisted.showActiveSprintMarker === showActiveSprintMarker
+        && nullableSelectionsMatch(persisted.selectedCycleTimeStatusKeys, selectedCycleTimeStatusKeys)
+      );
+      if (isSame) return;
+
+      setTargetCycleTimeDays(persisted.targetCycleTimeDays);
+      setDraftTargetCycleTimeInput(String(persisted.targetCycleTimeDays));
+      setShowTargetCycleTime(persisted.showTargetCycleTime);
+      setDraftShowTargetCycleTime(persisted.showTargetCycleTime);
+      setShowCompletedStoryPointsChart(persisted.showCompletedStoryPointsChart);
+      setDraftShowCompletedStoryPointsChart(persisted.showCompletedStoryPointsChart);
+      if (!persisted.showCompletedStoryPointsChart) {
+        setSelectedTrendChart("cycleTime");
+      }
+      setShowTrendValueLabels(persisted.showTrendValueLabels);
+      setDraftShowTrendValueLabels(persisted.showTrendValueLabels);
+      setShowActiveSprintMarker(persisted.showActiveSprintMarker);
+      setDraftShowActiveSprintMarker(persisted.showActiveSprintMarker);
+      setSelectedCycleTimeStatusKeys(persisted.selectedCycleTimeStatusKeys);
+      setDraftSelectedCycleTimeStatusKeys(persisted.selectedCycleTimeStatusKeys ?? []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    initialSettings,
+    selectedCycleTimeStatusKeys,
+    showActiveSprintMarker,
+    showCompletedStoryPointsChart,
+    showTargetCycleTime,
+    showTrendValueLabels,
+    targetCycleTimeDays,
+  ]);
+
+  const availableCycleTimeStatuses = useMemo(
+    () => insights.statusCycleTime.availableStatuses ?? [],
+    [insights.statusCycleTime.availableStatuses],
+  );
+  const defaultCycleTimeStatusKeys = useMemo(
+    () => resolveDefaultCycleTimeStatusKeys(availableCycleTimeStatuses, insights.statusCycleTime.defaultStatusKeys),
+    [availableCycleTimeStatuses, insights.statusCycleTime.defaultStatusKeys],
+  );
+  const appliedCycleTimeStatusKeys = useMemo(() => {
+    if (insights.statusCycleTime.appliedStatusKeys !== undefined) {
+      return normalizeStatusSelection(insights.statusCycleTime.appliedStatusKeys, availableCycleTimeStatuses);
+    }
+    if (selectedCycleTimeStatusKeys !== null) {
+      return normalizeStatusSelection(selectedCycleTimeStatusKeys, availableCycleTimeStatuses);
+    }
+    return defaultCycleTimeStatusKeys;
+  }, [
+    availableCycleTimeStatuses,
+    defaultCycleTimeStatusKeys,
+    insights.statusCycleTime.appliedStatusKeys,
+    selectedCycleTimeStatusKeys,
+  ]);
+
   const openSettings = useCallback(() => {
     setDraftTargetCycleTimeInput(String(targetCycleTimeDays));
     setDraftShowTargetCycleTime(showTargetCycleTime);
     setDraftShowCompletedStoryPointsChart(showCompletedStoryPointsChart);
     setDraftShowTrendValueLabels(showTrendValueLabels);
     setDraftShowActiveSprintMarker(showActiveSprintMarker);
+    setDraftSelectedCycleTimeStatusKeys(appliedCycleTimeStatusKeys);
     setIsSettingsOpen(true);
   }, [
+    appliedCycleTimeStatusKeys,
     showActiveSprintMarker,
     showCompletedStoryPointsChart,
     showTargetCycleTime,
@@ -236,6 +458,7 @@ export function TeamInsightsScreen() {
 
   const saveSettings = useCallback(() => {
     const nextTargetCycleTimeDays = normalizeTargetCycleTime(draftTargetCycleTimeInput);
+    const nextCycleTimeStatusKeys = normalizeStatusSelection(draftSelectedCycleTimeStatusKeys, availableCycleTimeStatuses);
     setTargetCycleTimeDays(nextTargetCycleTimeDays);
     setDraftTargetCycleTimeInput(String(nextTargetCycleTimeDays));
     setShowTargetCycleTime(draftShowTargetCycleTime);
@@ -245,8 +468,14 @@ export function TeamInsightsScreen() {
     }
     setShowTrendValueLabels(draftShowTrendValueLabels);
     setShowActiveSprintMarker(draftShowActiveSprintMarker);
+    setSelectedCycleTimeStatusKeys(
+      selectionsMatch(nextCycleTimeStatusKeys, defaultCycleTimeStatusKeys) ? null : nextCycleTimeStatusKeys,
+    );
     setIsSettingsOpen(false);
   }, [
+    availableCycleTimeStatuses,
+    defaultCycleTimeStatusKeys,
+    draftSelectedCycleTimeStatusKeys,
     draftTargetCycleTimeInput,
     draftShowCompletedStoryPointsChart,
     draftShowActiveSprintMarker,
@@ -275,21 +504,14 @@ export function TeamInsightsScreen() {
     [maxSprintAvgCycleTimeDays, showTargetCycleTime, targetCycleTimeDays]
   );
   const completedStoryPointsAxis = useMemo(() => buildTrendAxis(maxCompletedStoryPoints), [maxCompletedStoryPoints]);
-  const inProgressStatusCycleRows = useMemo(() => {
-    const filteredRows = insights.statusCycleTime.rows.filter((row) => isInProgressRelatedStatus(row.status));
-    const filteredTotalDays = filteredRows.reduce((sum, row) => sum + row.totalDays, 0);
-    return filteredRows.map((row) => ({
-      ...row,
-      percentOfCycleTime: filteredTotalDays > 0 ? roundMetric((row.totalDays / filteredTotalDays) * 100.0) : 0,
-    }));
-  }, [insights.statusCycleTime.rows]);
+  const selectedStatusCycleRows = useMemo(() => insights.statusCycleTime.rows, [insights.statusCycleTime.rows]);
   const statusCyclePieSlices = useMemo(() => {
-    const rows = [...inProgressStatusCycleRows].sort((left, right) => right.percentOfCycleTime - left.percentOfCycleTime);
+    const rows = [...selectedStatusCycleRows].sort((left, right) => right.percentOfCycleTime - left.percentOfCycleTime);
     return rows.map((row, index) => ({
       ...row,
       color: STATUS_CYCLE_PIE_COLORS[index % STATUS_CYCLE_PIE_COLORS.length],
     }));
-  }, [inProgressStatusCycleRows]);
+  }, [selectedStatusCycleRows]);
   const statusCyclePieGradient = useMemo(() => {
     if (statusCyclePieSlices.length === 0) {
       return "conic-gradient(#dfe8f8 0% 100%)";
@@ -308,7 +530,7 @@ export function TeamInsightsScreen() {
     return `conic-gradient(${segments.join(", ")})`;
   }, [statusCyclePieSlices]);
   const sortedStatusCycleRows = useMemo(() => {
-    const nextRows = [...inProgressStatusCycleRows];
+    const nextRows = [...selectedStatusCycleRows];
     nextRows.sort((left, right) => {
       let comparison = 0;
       switch (statusCycleSortField) {
@@ -332,7 +554,45 @@ export function TeamInsightsScreen() {
       return statusCycleSortDirection === "asc" ? comparison : -comparison;
     });
     return nextRows;
-  }, [inProgressStatusCycleRows, statusCycleSortDirection, statusCycleSortField]);
+  }, [selectedStatusCycleRows, statusCycleSortDirection, statusCycleSortField]);
+
+  const cycleTimeStatusGroups = useMemo(() => {
+    const categoryOrder = ["To Do", "In Progress", "Done", "Other"] as const;
+    return categoryOrder
+      .map((category) => ({
+        category,
+        statuses: availableCycleTimeStatuses.filter((status) => status.statusCategory === category),
+      }))
+      .filter((group) => group.statuses.length > 0);
+  }, [availableCycleTimeStatuses]);
+  const draftSelectedCycleTimeStatusCount = draftSelectedCycleTimeStatusKeys.length;
+  const availableCycleTimeStatusCount = availableCycleTimeStatuses.length;
+  const hasNoDraftCycleTimeStatuses = (
+    availableCycleTimeStatusCount > 0
+    && draftSelectedCycleTimeStatusCount === 0
+  );
+  const trackedCompletedIssueCount = insights.statusCycleTime.trackedIssues;
+  const excludedCompletedIssueCount = insights.statusCycleTime.excludedIssues ?? 0;
+
+  const toggleDraftCycleTimeStatus = useCallback((statusKey: string) => {
+    setDraftSelectedCycleTimeStatusKeys((current) => (
+      current.includes(statusKey)
+        ? current.filter((value) => value !== statusKey)
+        : [...current, statusKey]
+    ));
+  }, []);
+
+  const selectAllDraftCycleTimeStatuses = useCallback(() => {
+    setDraftSelectedCycleTimeStatusKeys(availableCycleTimeStatuses.map((status) => status.statusKey));
+  }, [availableCycleTimeStatuses]);
+
+  const clearDraftCycleTimeStatuses = useCallback(() => {
+    setDraftSelectedCycleTimeStatusKeys([]);
+  }, []);
+
+  const resetDraftCycleTimeStatuses = useCallback(() => {
+    setDraftSelectedCycleTimeStatusKeys(defaultCycleTimeStatusKeys);
+  }, [defaultCycleTimeStatusKeys]);
 
   const handleStatusCycleSortHeaderClick = useCallback((field: StatusCycleSortField) => {
     setStatusCycleSortField((current) => {
@@ -610,61 +870,167 @@ export function TeamInsightsScreen() {
                 </button>
               </header>
 
-              <p class="tb-muted-note">Tune the sprint trend chart display and markers shown on this screen.</p>
+              <p class="tb-muted-note tb-team-settings-intro">
+                Tune the sprint-trend display and decide exactly which workflow statuses count toward cycle time.
+              </p>
 
-              <div class="tb-modal-two-up">
-                <div class="tb-modal-field">
-                  <span>Visible Trend Charts</span>
-                  <p class="tb-muted-note tb-modal-field-note">Avg Cycle Time is always shown.</p>
-                  <label class="tb-modal-check">
-                    <input
-                      type="checkbox"
-                      checked={draftShowCompletedStoryPointsChart}
-                      onChange={(event) => setDraftShowCompletedStoryPointsChart((event.currentTarget as HTMLInputElement).checked)}
-                    />
-                    <span>Show SP chart</span>
-                  </label>
-                </div>
+              <div class="tb-team-settings-grid">
+                <section class="tb-team-settings-card" aria-label="Chart Display">
+                  <div class="tb-team-settings-card-head">
+                    <div>
+                      <h4>Chart Display</h4>
+                      <p class="tb-muted-note">Choose which helpers and charts appear in Sprint Trend.</p>
+                    </div>
+                  </div>
+                  <div class="tb-team-settings-toggle-list">
+                    <div class="tb-team-settings-toggle-row">
+                      <div class="tb-team-settings-toggle-copy">
+                        <label class="tb-modal-check">
+                          <input
+                            type="checkbox"
+                            checked={draftShowCompletedStoryPointsChart}
+                            onChange={(event) => setDraftShowCompletedStoryPointsChart((event.currentTarget as HTMLInputElement).checked)}
+                          />
+                          <span>Show SP chart</span>
+                        </label>
+                        <p class="tb-muted-note">Avg Cycle Time is always visible. This adds the completed story points tab.</p>
+                      </div>
+                    </div>
 
-                <div class="tb-modal-field">
-                  <span>Target Cycle Time</span>
-                  <label class="tb-modal-check">
-                    <input
-                      type="checkbox"
-                      checked={draftShowTargetCycleTime}
-                      onChange={(event) => setDraftShowTargetCycleTime((event.currentTarget as HTMLInputElement).checked)}
-                    />
-                    <span>Show target cycle time</span>
-                  </label>
-                  <input
-                    aria-label="Target Cycle Time"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    disabled={!draftShowTargetCycleTime}
-                    value={draftTargetCycleTimeInput}
-                    onInput={(event) => setDraftTargetCycleTimeInput((event.currentTarget as HTMLInputElement).value)}
-                  />
-                </div>
+                    <div class="tb-team-settings-toggle-row">
+                      <div class="tb-team-settings-toggle-copy">
+                        <label class="tb-modal-check">
+                          <input
+                            type="checkbox"
+                            checked={draftShowTrendValueLabels}
+                            onChange={(event) => setDraftShowTrendValueLabels((event.currentTarget as HTMLInputElement).checked)}
+                          />
+                          <span>Show bar value labels</span>
+                        </label>
+                        <p class="tb-muted-note">Show the exact value above each bar instead of extra chart labels.</p>
+                      </div>
+                    </div>
+
+                    <div class="tb-team-settings-toggle-row">
+                      <div class="tb-team-settings-toggle-copy">
+                        <label class="tb-modal-check">
+                          <input
+                            type="checkbox"
+                            checked={draftShowActiveSprintMarker}
+                            onChange={(event) => setDraftShowActiveSprintMarker((event.currentTarget as HTMLInputElement).checked)}
+                          />
+                          <span>Show active sprint marker</span>
+                        </label>
+                        <p class="tb-muted-note">Keep the green dot on the current sprint for quick orientation.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tb-team-settings-divider" />
+
+                  <section class="tb-team-settings-subsection" aria-label="Target Cycle Time">
+                    <div class="tb-team-settings-subsection-head">
+                      <h5>Target Cycle Time</h5>
+                      <p class="tb-muted-note">Add a target line behind the Avg Cycle Time bars.</p>
+                    </div>
+                    <div class="tb-team-settings-target-grid">
+                      <div class="tb-team-settings-toggle-row">
+                        <div class="tb-team-settings-toggle-copy">
+                          <label class="tb-modal-check">
+                            <input
+                              type="checkbox"
+                              checked={draftShowTargetCycleTime}
+                              onChange={(event) => setDraftShowTargetCycleTime((event.currentTarget as HTMLInputElement).checked)}
+                            />
+                            <span>Show target cycle time</span>
+                          </label>
+                          <p class="tb-muted-note">Use this to compare each sprint against a consistent cycle-time goal.</p>
+                        </div>
+                      </div>
+
+                      <label class="tb-modal-field tb-team-settings-field">
+                        <span>Target Cycle Time</span>
+                        <div class="tb-team-settings-number-input">
+                          <input
+                            aria-label="Target Cycle Time"
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            disabled={!draftShowTargetCycleTime}
+                            value={draftTargetCycleTimeInput}
+                            onInput={(event) => setDraftTargetCycleTimeInput((event.currentTarget as HTMLInputElement).value)}
+                          />
+                          <span class="tb-team-settings-input-suffix">days</span>
+                        </div>
+                      </label>
+                    </div>
+                  </section>
+                </section>
+
+                <section class="tb-team-settings-panel" aria-label="Cycle Time Definition">
+                  <div class="tb-team-settings-panel-head">
+                    <div class="tb-team-settings-panel-copy">
+                      <div class="tb-team-settings-heading-row">
+                        <h4>Cycle Time Definition</h4>
+                        {availableCycleTimeStatusCount > 0 ? (
+                          <span class="tb-team-settings-count-pill">
+                            {draftSelectedCycleTimeStatusCount} of {availableCycleTimeStatusCount} statuses selected
+                          </span>
+                        ) : null}
+                      </div>
+                      <p class="tb-muted-note">
+                        We sum time spent in the checked workflow statuses only. Completed cards with no time in checked
+                        statuses are excluded from cycle-time metrics.
+                      </p>
+                    </div>
+                    <div class="tb-team-settings-actions">
+                      <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftCycleTimeStatuses}>
+                        Select all
+                      </button>
+                      <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftCycleTimeStatuses}>
+                        Clear all
+                      </button>
+                      <button type="button" class="tb-btn tb-btn-sm" onClick={resetDraftCycleTimeStatuses}>
+                        Reset defaults
+                      </button>
+                    </div>
+                  </div>
+  
+                  {hasNoDraftCycleTimeStatuses ? (
+                    <p class="tb-team-settings-warning">
+                      No statuses are selected. Completed cards will be excluded from cycle-time metrics until at least
+                      one workflow status is checked.
+                    </p>
+                  ) : null}
+
+                  {cycleTimeStatusGroups.length === 0 ? (
+                    <p class="tb-muted-note">Workflow statuses will appear here once sprint history is available.</p>
+                  ) : (
+                    <div class="tb-team-settings-status-groups">
+                      {cycleTimeStatusGroups.map((group) => (
+                        <section key={group.category} class="tb-cycle-status-group">
+                          <header class="tb-cycle-status-group-head">
+                            <h5>{group.category}</h5>
+                            <span class="tb-cycle-status-group-count">{group.statuses.length}</span>
+                          </header>
+                          <div class="tb-cycle-status-grid">
+                            {group.statuses.map((status) => (
+                              <label key={status.statusKey} class="tb-modal-check tb-cycle-status-option">
+                                <input
+                                  type="checkbox"
+                                  checked={draftSelectedCycleTimeStatusKeys.includes(status.statusKey)}
+                                  onChange={() => toggleDraftCycleTimeStatus(status.statusKey)}
+                                />
+                                <span>{status.status}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  )}
+                </section>
               </div>
-
-              <label class="tb-modal-check">
-                <input
-                  type="checkbox"
-                  checked={draftShowTrendValueLabels}
-                  onChange={(event) => setDraftShowTrendValueLabels((event.currentTarget as HTMLInputElement).checked)}
-                />
-                <span>Show bar value labels</span>
-              </label>
-
-              <label class="tb-modal-check">
-                <input
-                  type="checkbox"
-                  checked={draftShowActiveSprintMarker}
-                  onChange={(event) => setDraftShowActiveSprintMarker((event.currentTarget as HTMLInputElement).checked)}
-                />
-                <span>Show active sprint marker</span>
-              </label>
 
               <footer class="tb-modal-actions">
                 <button type="button" class="tb-btn" onClick={closeSettings}>
@@ -685,13 +1051,14 @@ export function TeamInsightsScreen() {
           </div>
         </header>
         <div class="tb-trend-order-pill tb-status-cycle-info-pill">
-          <p>Time spent in in-progress workflow statuses across completed cards in the selected trend window.</p>
-          <p>% Cycle Time is normalized within visible in-progress statuses.</p>
-          <p>Tracked completed cards: {insights.statusCycleTime.trackedIssues}</p>
+          <p>Time spent in the selected workflow statuses across completed cards in the selected trend window.</p>
+          <p>% Cycle Time is normalized within the selected statuses.</p>
+          <p>Tracked completed cards: {trackedCompletedIssueCount}</p>
+          {excludedCompletedIssueCount > 0 ? <p>Excluded completed cards: {excludedCompletedIssueCount}</p> : null}
         </div>
         {loading ? <p class="tb-muted-note">Loading status-level cycle time...</p> : null}
-        {!loading && inProgressStatusCycleRows.length === 0 ? (
-          <p class="tb-muted-note">No in-progress status cycle-time data found for completed cards.</p>
+        {!loading && selectedStatusCycleRows.length === 0 ? (
+          <p class="tb-muted-note">No cycle-time data found for the selected workflow statuses.</p>
         ) : null}
         {sortedStatusCycleRows.length > 0 ? (
           <div class="tb-status-cycle-layout">

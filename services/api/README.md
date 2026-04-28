@@ -84,16 +84,22 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
   - Team sprint trend, cycle-time metrics, and work-mix summary.
   - Optional query:
     - `sprintLimit` (1-12; UI presets: `1/2/3/4/6/8/10/12`; default `6`)
+    - `cycleTimeStatusMode=custom` to use explicit workflow-status selection
+    - Repeated `cycleTimeStatus=<normalized-status-key>` params when `cycleTimeStatusMode=custom`
   - Trend payload includes:
     - `completedStoryPoints` per sprint
     - `avgCycleTimeDays` per sprint
     - sprint metadata (`sprintName`, `state`, `startDate`, `endDate`)
   - Status-level cycle-time payload includes:
     - `statusCycleTime.trackedIssues` (completed cards with measurable cycle time)
+    - `statusCycleTime.completedIssues` and `statusCycleTime.excludedIssues`
+    - `statusCycleTime.appliedStatusKeys` and `statusCycleTime.defaultStatusKeys`
+    - `statusCycleTime.availableStatuses[]` with `statusKey`, `status`, `statusCategory`, and `defaultIncluded`
     - `statusCycleTime.rows[]` with per-status `avgDays`, `medianDays`, `p85Days`, `maxDays`, `totalDays`, and `percentOfCycleTime`
   - Cycle-time semantics:
-    - Start = first status transition to an in-progress state
-    - End = resolved timestamp
+    - Default status selection excludes obvious backlog/to-do states
+    - Custom status mode sums the time spent in the selected workflow statuses from issue creation to resolution
+    - Completed cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from math import ceil
 from statistics import median, pstdev
@@ -73,50 +73,6 @@ def _percentile(values: list[float], percentile: float) -> float:
     return sorted_values[min(rank - 1, len(sorted_values) - 1)]
 
 
-def _build_issue_status_cycle_days(
-    *,
-    cycle_started_at: datetime,
-    cycle_ended_at: datetime,
-    status_changes: list[tuple[datetime, str]],
-) -> dict[str, float]:
-    if cycle_ended_at <= cycle_started_at:
-        return {}
-
-    sorted_changes = sorted(status_changes, key=lambda item: item[0])
-    current_status_key: str | None = None
-    for changed_at, status_key in sorted_changes:
-        if changed_at <= cycle_started_at:
-            current_status_key = status_key
-            continue
-        break
-
-    # The cycle always starts when work first enters an in-progress state.
-    if current_status_key is None:
-        current_status_key = _status_key("In Progress")
-
-    cursor = cycle_started_at
-    issue_status_cycle_days: dict[str, float] = defaultdict(float)
-
-    for changed_at, status_key in sorted_changes:
-        if changed_at <= cycle_started_at:
-            continue
-        if changed_at > cycle_ended_at:
-            break
-        if changed_at > cursor:
-            duration_days = (changed_at - cursor).total_seconds() / 86400.0
-            if duration_days > 0:
-                issue_status_cycle_days[current_status_key] += duration_days
-        current_status_key = status_key
-        cursor = changed_at
-
-    if cycle_ended_at > cursor:
-        duration_days = (cycle_ended_at - cursor).total_seconds() / 86400.0
-        if duration_days > 0:
-            issue_status_cycle_days[current_status_key] += duration_days
-
-    return dict(issue_status_cycle_days)
-
-
 def _resolve_configured_board_id() -> int | None:
     try:
         load_env_files()
@@ -132,6 +88,22 @@ def _is_done_status(status_category: str | None, status_name: str | None) -> boo
     if category == "done":
         return True
     return status in {"done", "closed", "resolved", "complete", "completed"}
+
+
+def _is_todo_status(status_category: str | None, status_name: str | None) -> bool:
+    category = _normalize(status_category)
+    status = _normalize(status_name)
+    if category in {"to do", "todo", "new"}:
+        return True
+    return status in {
+        "to do",
+        "todo",
+        "backlog",
+        "selected for development",
+        "open",
+        "new",
+        "ready for development",
+    }
 
 
 def _is_in_progress_status(status_name: str | None) -> bool:
@@ -151,6 +123,184 @@ def _is_in_progress_status(status_name: str | None) -> bool:
         "kickoff",
         "release ready",
     }
+
+
+def _status_category_label(status_key: str, status_category: str | None = None) -> str:
+    category = _normalize(status_category)
+    if category in {"to do", "todo", "new"} or _is_todo_status(status_category, status_key):
+        return "To Do"
+    if category == "done" or _is_done_status(status_category, status_key):
+        return "Done"
+    if category == "in progress" or _is_in_progress_status(status_key):
+        return "In Progress"
+    return "Other"
+
+
+def _default_include_cycle_time_status(status_key: str, status_category: str | None = None) -> bool:
+    return not _is_todo_status(status_category, status_key)
+
+
+def _preferred_status_label(label_counts: Counter[str]) -> str:
+    if not label_counts:
+        return "Unknown"
+    return sorted(label_counts.items(), key=lambda item: (-item[1], item[0].lower(), item[0]))[0][0]
+
+
+def _preferred_status_category(category_counts: Counter[str]) -> str | None:
+    if not category_counts:
+        return None
+    return sorted(category_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _record_status_catalog_entry(
+    *,
+    labels_by_key: dict[str, Counter[str]],
+    categories_by_key: dict[str, Counter[str]],
+    raw_status: str | None,
+    raw_category: str | None = None,
+) -> None:
+    status_key = _status_key(raw_status)
+    if status_key == "unknown":
+        return
+    status_label = str(raw_status).strip()
+    if status_label:
+        labels_by_key[status_key][status_label] += 1
+    normalized_category = _normalize(raw_category)
+    if normalized_category:
+        categories_by_key[status_key][normalized_category] += 1
+
+
+def _build_available_cycle_time_statuses(
+    conn: sqlite3.Connection,
+    *,
+    board_id: int | None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    labels_by_key: dict[str, Counter[str]] = defaultdict(Counter)
+    categories_by_key: dict[str, Counter[str]] = defaultdict(Counter)
+
+    issue_status_rows = conn.execute(
+        """
+        SELECT
+          i.status_name,
+          i.status_category
+        FROM issues i
+        LEFT JOIN sprints s ON s.external_sprint_id = i.sprint_external_id
+        WHERE (? IS NULL OR s.board_external_id = ?)
+        """,
+        (board_id, board_id),
+    ).fetchall()
+    for row in issue_status_rows:
+        _record_status_catalog_entry(
+            labels_by_key=labels_by_key,
+            categories_by_key=categories_by_key,
+            raw_status=row["status_name"],
+            raw_category=row["status_category"],
+        )
+
+    changelog_status_rows = conn.execute(
+        """
+        SELECT
+          c.from_value,
+          c.to_value
+        FROM issue_changelog c
+        JOIN issues i ON i.issue_key = c.issue_key
+        LEFT JOIN sprints s ON s.external_sprint_id = i.sprint_external_id
+        WHERE lower(c.field_name) = 'status'
+          AND (? IS NULL OR s.board_external_id = ?)
+        """,
+        (board_id, board_id),
+    ).fetchall()
+    for row in changelog_status_rows:
+        _record_status_catalog_entry(
+            labels_by_key=labels_by_key,
+            categories_by_key=categories_by_key,
+            raw_status=row["from_value"],
+        )
+        _record_status_catalog_entry(
+            labels_by_key=labels_by_key,
+            categories_by_key=categories_by_key,
+            raw_status=row["to_value"],
+        )
+
+    category_order = {"To Do": 0, "In Progress": 1, "Done": 2, "Other": 3}
+    statuses: list[dict[str, Any]] = []
+    default_status_keys: list[str] = []
+    for status_key in labels_by_key:
+        preferred_label = _preferred_status_label(labels_by_key[status_key])
+        preferred_category = _preferred_status_category(categories_by_key[status_key])
+        category_label = _status_category_label(preferred_label, preferred_category)
+        default_included = _default_include_cycle_time_status(preferred_label, preferred_category)
+        if default_included:
+            default_status_keys.append(status_key)
+        statuses.append(
+            {
+                "statusKey": status_key,
+                "status": preferred_label,
+                "statusCategory": category_label,
+                "defaultIncluded": default_included,
+            }
+        )
+
+    statuses.sort(key=lambda item: (category_order.get(item["statusCategory"], 99), item["status"].lower()))
+    return statuses, sorted(default_status_keys)
+
+
+def _build_issue_status_cycle_days(
+    *,
+    cycle_ended_at: datetime,
+    created_at: datetime | None,
+    current_status_name: str | None,
+    status_changes: list[tuple[datetime, str | None, str | None]],
+) -> dict[str, float]:
+    if not status_changes or cycle_ended_at is None:
+        return {}
+
+    sorted_changes = sorted(status_changes, key=lambda item: item[0])
+    current_status_key: str | None = None
+
+    if created_at is not None and created_at < cycle_ended_at:
+        timeline_start = created_at
+    else:
+        timeline_start = sorted_changes[0][0]
+
+    for changed_at, _from_key, to_key in sorted_changes:
+        if changed_at <= timeline_start:
+            if to_key is not None:
+                current_status_key = to_key
+            continue
+        break
+
+    if current_status_key is None:
+        for changed_at, from_key, _to_key in sorted_changes:
+            if changed_at > timeline_start and from_key is not None:
+                current_status_key = from_key
+                break
+
+    cursor = timeline_start
+    issue_status_cycle_days: dict[str, float] = defaultdict(float)
+
+    for changed_at, _from_key, to_key in sorted_changes:
+        if changed_at <= timeline_start:
+            continue
+        if changed_at > cycle_ended_at:
+            break
+        if current_status_key is not None and changed_at > cursor:
+            duration_days = (changed_at - cursor).total_seconds() / 86400.0
+            if duration_days > 0:
+                issue_status_cycle_days[current_status_key] += duration_days
+        if to_key is not None:
+            current_status_key = to_key
+        cursor = changed_at
+
+    if current_status_key is None and current_status_name is not None:
+        current_status_key = _status_key(current_status_name)
+
+    if current_status_key is not None and cycle_ended_at > cursor:
+        duration_days = (cycle_ended_at - cursor).total_seconds() / 86400.0
+        if duration_days > 0:
+            issue_status_cycle_days[current_status_key] += duration_days
+
+    return dict(issue_status_cycle_days)
 
 
 def _completion_ratio_percent(
@@ -184,7 +334,12 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
         "trend": [],
         "statusCycleTime": {
             "trackedIssues": 0,
+            "completedIssues": 0,
+            "excludedIssues": 0,
             "totalDays": 0.0,
+            "appliedStatusKeys": [],
+            "defaultStatusKeys": [],
+            "availableStatuses": [],
             "rows": [],
         },
         "workMix": {
@@ -201,6 +356,7 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
 def get_team_insights(
     *,
     sprint_limit: int = 6,
+    cycle_time_status_keys: list[str] | None = None,
     db_path: str | None = None,
     board_id: int | None = None,
 ) -> dict[str, Any]:
@@ -254,6 +410,7 @@ def get_team_insights(
                   status_name,
                   status_category,
                   story_points,
+                  created_at_source,
                   resolved_at_source
                 FROM issues
                 WHERE sprint_external_id IN ({placeholders})
@@ -261,8 +418,22 @@ def get_team_insights(
                 tuple(sprint_ids),
             ).fetchall()
 
-        first_in_progress_by_issue_key: dict[str, datetime] = {}
-        status_changes_by_issue_key: dict[str, list[tuple[datetime, str]]] = defaultdict(list)
+        available_statuses, default_cycle_time_status_keys = _build_available_cycle_time_statuses(
+            conn,
+            board_id=scoped_board_id,
+        )
+        requested_cycle_time_status_keys = (
+            sorted({_status_key(value) for value in cycle_time_status_keys if _status_key(value) != "unknown"})
+            if cycle_time_status_keys is not None
+            else default_cycle_time_status_keys
+        )
+        available_status_key_set = {entry["statusKey"] for entry in available_statuses}
+        applied_cycle_time_status_keys = [
+            status_key for status_key in requested_cycle_time_status_keys if status_key in available_status_key_set
+        ]
+        applied_cycle_time_status_key_set = set(applied_cycle_time_status_keys)
+
+        status_changes_by_issue_key: dict[str, list[tuple[datetime, str | None, str | None]]] = defaultdict(list)
         issue_keys = sorted({str(row["issue_key"]).strip() for row in issue_rows if row["issue_key"] is not None})
         if issue_keys:
             issue_placeholders = ",".join("?" for _ in issue_keys)
@@ -271,6 +442,7 @@ def get_team_insights(
                 SELECT
                   issue_key,
                   changed_at,
+                  from_value,
                   to_value
                 FROM issue_changelog
                 WHERE lower(field_name) = 'status'
@@ -289,12 +461,13 @@ def get_team_insights(
                 changed_at = _parse_iso_datetime(changelog_row["changed_at"])
                 if changed_at is None:
                     continue
-                status_changes_by_issue_key[issue_key].append((changed_at, _status_key(changelog_row["to_value"])))
-                if issue_key in first_in_progress_by_issue_key:
-                    continue
-                if not _is_in_progress_status(changelog_row["to_value"]):
-                    continue
-                first_in_progress_by_issue_key[issue_key] = changed_at
+                status_changes_by_issue_key[issue_key].append(
+                    (
+                        changed_at,
+                        _status_key(changelog_row["from_value"]) if changelog_row["from_value"] is not None else None,
+                        _status_key(changelog_row["to_value"]) if changelog_row["to_value"] is not None else None,
+                    )
+                )
 
         issues_by_sprint: dict[int, list[sqlite3.Row]] = defaultdict(list)
         for row in issue_rows:
@@ -309,6 +482,7 @@ def get_team_insights(
         status_cycle_issue_days_by_status: dict[str, list[float]] = defaultdict(list)
         status_cycle_issue_keys_by_status: dict[str, set[str]] = defaultdict(set)
         tracked_cycle_issues = 0
+        completed_cycle_issues = 0
         total_committed_story_points = 0.0
         total_completed_story_points = 0.0
         total_committed_cards = 0
@@ -340,21 +514,30 @@ def get_team_insights(
                     if issue_type == "epic":
                         continue
 
+                    completed_cycle_issues += 1
                     issue_key = str(issue_row["issue_key"]).strip()
-                    in_progress_at = first_in_progress_by_issue_key.get(issue_key)
+                    created_at = _parse_iso_datetime(issue_row["created_at_source"])
                     resolved_at = _parse_iso_datetime(issue_row["resolved_at_source"])
-                    if in_progress_at is not None and resolved_at is not None and resolved_at >= in_progress_at:
-                        duration_days = (resolved_at - in_progress_at).total_seconds() / 86400.0
+                    if resolved_at is not None:
+                        issue_status_cycle_days = _build_issue_status_cycle_days(
+                            cycle_ended_at=resolved_at,
+                            created_at=created_at,
+                            current_status_name=issue_row["status_name"],
+                            status_changes=status_changes_by_issue_key.get(issue_key, []),
+                        )
+                        selected_issue_status_days = {
+                            status_key: issue_days
+                            for status_key, issue_days in issue_status_cycle_days.items()
+                            if status_key in applied_cycle_time_status_key_set and issue_days > 0
+                        }
+                        duration_days = sum(selected_issue_status_days.values())
+                        if duration_days <= 0:
+                            continue
                         cycle_time_days.append(duration_days)
                         sprint_cycle_time_days.append(duration_days)
                         tracked_cycle_issues += 1
 
-                        issue_status_cycle_days = _build_issue_status_cycle_days(
-                            cycle_started_at=in_progress_at,
-                            cycle_ended_at=resolved_at,
-                            status_changes=status_changes_by_issue_key.get(issue_key, []),
-                        )
-                        for status_key, issue_days in issue_status_cycle_days.items():
+                        for status_key, issue_days in selected_issue_status_days.items():
                             if issue_days <= 0:
                                 continue
                             status_cycle_total_days_by_status[status_key] += issue_days
@@ -412,6 +595,10 @@ def get_team_insights(
         cycle_time_std_dev_days = _round_metric(float(pstdev(cycle_time_days))) if cycle_time_days else None
         median_cycle_time_days = _round_metric(float(median(cycle_time_days))) if cycle_time_days else None
         total_status_cycle_days = sum(status_cycle_total_days_by_status.values())
+        available_status_label_by_key = {
+            entry["statusKey"]: entry["status"]
+            for entry in available_statuses
+        }
         status_cycle_rows = []
         for status_key, total_days in status_cycle_total_days_by_status.items():
             issue_days = status_cycle_issue_days_by_status.get(status_key, [])
@@ -419,7 +606,7 @@ def get_team_insights(
                 continue
             status_cycle_rows.append(
                 {
-                    "status": _status_label(status_key),
+                    "status": available_status_label_by_key.get(status_key, _status_label(status_key)),
                     "issueCount": len(status_cycle_issue_keys_by_status.get(status_key, set())),
                     "avgDays": _round_metric(sum(issue_days) / len(issue_days)),
                     "medianDays": _round_metric(float(median(issue_days))),
@@ -521,7 +708,12 @@ def get_team_insights(
         "trend": trend,
         "statusCycleTime": {
             "trackedIssues": tracked_cycle_issues,
+            "completedIssues": completed_cycle_issues,
+            "excludedIssues": max(0, completed_cycle_issues - tracked_cycle_issues),
             "totalDays": _round_metric(total_status_cycle_days),
+            "appliedStatusKeys": applied_cycle_time_status_keys,
+            "defaultStatusKeys": default_cycle_time_status_keys,
+            "availableStatuses": available_statuses,
             "rows": status_cycle_rows,
         },
         "workMix": {

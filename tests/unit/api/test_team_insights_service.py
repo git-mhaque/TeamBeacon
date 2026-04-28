@@ -440,6 +440,114 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["statusCycleTime"]["rows"][0]["status"], "In Progress")
             self.assertAlmostEqual(payload["statusCycleTime"]["rows"][0]["totalDays"], 2.0, places=2)
 
+    def test_get_team_insights_supports_custom_cycle_time_status_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            self._init_db(db_path)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO sprints (
+                      external_sprint_id,
+                      board_external_id,
+                      name,
+                      state,
+                      start_date,
+                      end_date
+                    ) VALUES (4001, 27193, 'Sprint Custom Cycle', 'closed', '2026-03-01T00:00:00+00:00', '2026-03-14T00:00:00+00:00')
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      story_points,
+                      sprint_external_id,
+                      created_at_source,
+                      resolved_at_source
+                    ) VALUES (
+                      'TEAM-200',
+                      '200',
+                      'TEAM',
+                      'Story',
+                      'Custom cycle-time story',
+                      'Done',
+                      'Done',
+                      5.0,
+                      4001,
+                      '2026-03-01T00:00:00+00:00',
+                      '2026-03-04T00:00:00+00:00'
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO issue_changelog (
+                      issue_key,
+                      history_id,
+                      changed_at,
+                      author_account_id,
+                      field_name,
+                      from_value,
+                      to_value,
+                      raw_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "TEAM-200",
+                            "c1",
+                            "2026-03-02T00:00:00+00:00",
+                            None,
+                            "status",
+                            "To Do",
+                            "In Progress",
+                            "{}",
+                        ),
+                        (
+                            "TEAM-200",
+                            "c2",
+                            "2026-03-03T00:00:00+00:00",
+                            None,
+                            "status",
+                            "In Progress",
+                            "Done",
+                            "{}",
+                        ),
+                    ],
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            payload = get_team_insights(
+                db_path=str(db_path),
+                board_id=27193,
+                sprint_limit=6,
+                cycle_time_status_keys=["to do", "in progress"],
+            )
+
+            self.assertAlmostEqual(payload["metrics"]["avgCycleTimeDays"], 2.0, places=2)
+            self.assertAlmostEqual(payload["trend"][0]["avgCycleTimeDays"], 2.0, places=2)
+            self.assertEqual(payload["statusCycleTime"]["trackedIssues"], 1)
+            self.assertEqual(payload["statusCycleTime"]["completedIssues"], 1)
+            self.assertEqual(payload["statusCycleTime"]["excludedIssues"], 0)
+            self.assertEqual(payload["statusCycleTime"]["appliedStatusKeys"], ["in progress", "to do"])
+            self.assertEqual(
+                [row["status"] for row in payload["statusCycleTime"]["rows"]],
+                ["In Progress", "To Do"],
+            )
+            self.assertAlmostEqual(payload["statusCycleTime"]["rows"][0]["totalDays"], 1.0, places=2)
+            self.assertAlmostEqual(payload["statusCycleTime"]["rows"][1]["totalDays"], 1.0, places=2)
+
 
 if __name__ == "__main__":
     unittest.main()

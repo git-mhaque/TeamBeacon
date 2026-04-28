@@ -19,7 +19,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.current_sprint_calls: list[bool] = []
         self.current_sprint_changes_calls: list[bool] = []
         self.current_sprint_work_calls: list[bool] = []
-        self.team_insights_calls: list[int] = []
+        self.team_insights_calls: list[tuple[int, list[str] | None]] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
         self.group_update_calls: list[tuple[int, str]] = []
@@ -540,8 +540,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
-        def fake_team_insights(*, sprint_limit=6):  # noqa: ANN001
-            self.team_insights_calls.append(sprint_limit)
+        def fake_team_insights(*, sprint_limit=6, cycle_time_status_keys=None):  # noqa: ANN001
+            self.team_insights_calls.append((sprint_limit, cycle_time_status_keys))
             return {
                 "source": "local",
                 "generatedAt": "2026-03-25T00:00:00+00:00",
@@ -571,7 +571,25 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ],
                 "statusCycleTime": {
                     "trackedIssues": 18,
+                    "completedIssues": 18,
+                    "excludedIssues": 0,
                     "totalDays": 57.2,
+                    "appliedStatusKeys": ["in progress", "in review"],
+                    "defaultStatusKeys": ["in progress", "in review"],
+                    "availableStatuses": [
+                        {
+                            "statusKey": "in progress",
+                            "status": "In Progress",
+                            "statusCategory": "In Progress",
+                            "defaultIncluded": True,
+                        },
+                        {
+                            "statusKey": "in review",
+                            "status": "In Review",
+                            "statusCategory": "In Progress",
+                            "defaultIncluded": True,
+                        },
+                    ],
                     "rows": [
                         {
                             "status": "In Progress",
@@ -898,7 +916,17 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "sprintLimit"),
             None,
         )
+        cycle_time_mode_param = next(
+            (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "cycleTimeStatusMode"),
+            None,
+        )
+        cycle_time_status_param = next(
+            (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "cycleTimeStatus"),
+            None,
+        )
         self.assertIsNotNone(sprint_limit_param)
+        self.assertIsNotNone(cycle_time_mode_param)
+        self.assertIsNotNone(cycle_time_status_param)
         sprint_limit_schema = sprint_limit_param["schema"]
         self.assertEqual(sprint_limit_schema["type"], "integer")
         self.assertEqual(sprint_limit_schema["minimum"], 1)
@@ -1259,7 +1287,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["workMix"]["sprintId"], 55421)
         self.assertEqual(body["trend"][0]["sprintName"], "CEGBU Polaris Sprint 43")
         self.assertEqual(body["trend"][0]["avgCycleTimeDays"], 3.6)
-        self.assertEqual(self.team_insights_calls[-1], 6)
+        self.assertEqual(self.team_insights_calls[-1], (6, None))
 
     def test_team_insights_endpoint_supports_sprint_limit(self) -> None:
         with urlopen(f"{self.base_url}/api/team/insights?sprintLimit=4", timeout=5) as response:  # noqa: S310
@@ -1267,7 +1295,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             body = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(body["windowSize"], 4)
-        self.assertEqual(self.team_insights_calls[-1], 4)
+        self.assertEqual(self.team_insights_calls[-1], (4, None))
 
     def test_metadata_lookup_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310

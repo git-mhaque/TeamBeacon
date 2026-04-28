@@ -435,7 +435,29 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                                 "Number of recent sprints to include. API accepts 1-12; "
                                 "UI presets are 1, 2, 3, 4, 6, 8, 10, and 12."
                             ),
-                        }
+                        },
+                        {
+                            "name": "cycleTimeStatusMode",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["default", "custom"], "default": "default"},
+                            "description": (
+                                "When set to custom, calculate cycle time from the explicitly selected workflow "
+                                "statuses instead of the default status set."
+                            ),
+                        },
+                        {
+                            "name": "cycleTimeStatus",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "array", "items": {"type": "string"}},
+                            "style": "form",
+                            "explode": True,
+                            "description": (
+                                "Normalized workflow status keys to include in cycle-time calculations when "
+                                "cycleTimeStatusMode=custom."
+                            ),
+                        },
                     ],
                     "responses": {"200": {"description": "Team insights payload", "content": json_payload}},
                 }
@@ -870,7 +892,12 @@ def build_handler(
                     sprint_limit = int(sprint_limit_raw)
                 except ValueError:
                     sprint_limit = 6
-                payload = team_insights_provider(sprint_limit=sprint_limit)
+                cycle_time_status_mode = query.get("cycleTimeStatusMode", ["default"])[0]
+                cycle_time_status_keys = query.get("cycleTimeStatus", []) if cycle_time_status_mode == "custom" else None
+                payload = team_insights_provider(
+                    sprint_limit=sprint_limit,
+                    cycle_time_status_keys=cycle_time_status_keys,
+                )
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

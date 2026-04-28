@@ -375,6 +375,13 @@ export type TeamInsightStatusCycleRow = {
   percentOfCycleTime: number;
 };
 
+export type TeamInsightAvailableStatus = {
+  statusKey: string;
+  status: string;
+  statusCategory: string;
+  defaultIncluded: boolean;
+};
+
 export type TeamInsightsResponse = {
   source: "local";
   generatedAt?: string | null;
@@ -391,7 +398,12 @@ export type TeamInsightsResponse = {
   trend: TeamInsightTrendPoint[];
   statusCycleTime: {
     trackedIssues: number;
+    completedIssues?: number;
+    excludedIssues?: number;
     totalDays: number;
+    appliedStatusKeys?: string[];
+    defaultStatusKeys?: string[];
+    availableStatuses?: TeamInsightAvailableStatus[];
     rows: TeamInsightStatusCycleRow[];
   };
   workMix: {
@@ -869,9 +881,18 @@ export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesR
   return (await response.json()) as CurrentSprintChangesResponse;
 }
 
-export async function fetchTeamInsights(sprintLimit = 6): Promise<TeamInsightsResponse> {
+export async function fetchTeamInsights(
+  sprintLimit = 6,
+  cycleTimeStatusKeys?: string[] | null,
+): Promise<TeamInsightsResponse> {
   const params = new URLSearchParams();
   params.set("sprintLimit", String(sprintLimit));
+  if (cycleTimeStatusKeys !== undefined && cycleTimeStatusKeys !== null) {
+    params.set("cycleTimeStatusMode", "custom");
+    for (const statusKey of cycleTimeStatusKeys) {
+      params.append("cycleTimeStatus", statusKey);
+    }
+  }
   const response = await fetch(`${API_BASE}/api/team/insights?${params.toString()}`, {
     method: "GET",
     headers: { Accept: "application/json" },

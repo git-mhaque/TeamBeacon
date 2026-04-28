@@ -4,9 +4,16 @@ import {
   OPEN_TEAM_INSIGHTS_SETTINGS_EVENT,
   TeamInsightsScreen,
 } from "../../src/components/content/screens/TeamInsightsScreen";
+import * as persistence from "../../src/lib/persistence";
 import { setupFetchMock } from "../utils/fetchMock";
 
 describe("TeamInsightsScreen", () => {
+  beforeEach(() => {
+    vi.spyOn(persistence, "getPreferenceSync").mockReturnValue(null);
+    vi.spyOn(persistence, "getPreference").mockResolvedValue(null);
+    vi.spyOn(persistence, "setPreference").mockResolvedValue();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -54,7 +61,31 @@ describe("TeamInsightsScreen", () => {
         ],
         statusCycleTime: {
           trackedIssues: 13,
+          completedIssues: 13,
+          excludedIssues: 0,
           totalDays: 29.6,
+          appliedStatusKeys: ["in progress", "in review"],
+          defaultStatusKeys: ["in progress", "in review"],
+          availableStatuses: [
+            {
+              statusKey: "to do",
+              status: "To Do",
+              statusCategory: "To Do",
+              defaultIncluded: false,
+            },
+            {
+              statusKey: "in progress",
+              status: "In Progress",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "in review",
+              status: "In Review",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+          ],
           rows: [
             {
               status: "In Progress",
@@ -75,16 +106,6 @@ describe("TeamInsightsScreen", () => {
               maxDays: 3.1,
               totalDays: 10.2,
               percentOfCycleTime: 34.46,
-            },
-            {
-              status: "Done",
-              issueCount: 13,
-              avgDays: 0.2,
-              medianDays: 0.1,
-              p85Days: 0.3,
-              maxDays: 0.6,
-              totalDays: 2.4,
-              percentOfCycleTime: 8.11,
             },
           ],
         },
@@ -191,7 +212,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 6 sprints)" })).toBeInTheDocument();
-    expect(screen.getByText("% Cycle Time is normalized within visible in-progress statuses.")).toBeInTheDocument();
+    expect(screen.getByText("% Cycle Time is normalized within the selected statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
 
     const statusCycleTable = screen.getByRole("table", { name: "Status cycle time table" });
@@ -259,6 +280,8 @@ describe("TeamInsightsScreen", () => {
         ],
         statusCycleTime: {
           trackedIssues: 1,
+          completedIssues: 1,
+          excludedIssues: 0,
           totalDays: 1.5,
           rows: [
             {
@@ -348,7 +371,37 @@ describe("TeamInsightsScreen", () => {
         ],
         statusCycleTime: {
           trackedIssues: 13,
+          completedIssues: 13,
+          excludedIssues: 0,
           totalDays: 29.6,
+          appliedStatusKeys: ["in progress", "in review", "done"],
+          defaultStatusKeys: ["in progress", "in review", "done"],
+          availableStatuses: [
+            {
+              statusKey: "to do",
+              status: "To Do",
+              statusCategory: "To Do",
+              defaultIncluded: false,
+            },
+            {
+              statusKey: "in progress",
+              status: "In Progress",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "in review",
+              status: "In Review",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "done",
+              status: "Done",
+              statusCategory: "Done",
+              defaultIncluded: true,
+            },
+          ],
           rows: [
             {
               status: "In Progress",
@@ -391,10 +444,16 @@ describe("TeamInsightsScreen", () => {
 
     expect(dialogScope.queryByRole("combobox", { name: "Trend Window" })).not.toBeInTheDocument();
     expect(dialogScope.queryByRole("combobox", { name: "Visible Trend Chart" })).not.toBeInTheDocument();
+    expect(dialogScope.getByRole("heading", { name: "Chart Display" })).toBeInTheDocument();
+    expect(dialogScope.getByRole("heading", { name: "Target Cycle Time" })).toBeInTheDocument();
     expect(dialogScope.getByLabelText("Show SP chart")).toBeChecked();
     expect(dialogScope.getByLabelText("Show target cycle time")).toBeChecked();
     expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeEnabled();
     expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toHaveValue(5);
+    expect(dialogScope.getByText("Cycle Time Definition")).toBeInTheDocument();
+    expect(dialogScope.getByText("3 of 4 statuses selected")).toBeInTheDocument();
+    expect(dialogScope.getByLabelText("In Progress")).toBeChecked();
+    expect(dialogScope.getByLabelText("Done")).toBeChecked();
 
     fireEvent.click(dialogScope.getByLabelText("Show target cycle time"));
     expect(dialogScope.getByLabelText("Show target cycle time")).not.toBeChecked();
@@ -484,6 +543,8 @@ describe("TeamInsightsScreen", () => {
         ],
         statusCycleTime: {
           trackedIssues: 3,
+          completedIssues: 3,
+          excludedIssues: 0,
           totalDays: 3,
           rows: [
             {
@@ -549,6 +610,118 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByRole("img", { name: "Status cycle time share pie chart" })).toBeInTheDocument();
   });
 
+  it("refetches team insights with a custom cycle-time status selection", async () => {
+    const fetchSpy = setupFetchMock({
+      "/api/team/insights": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        windowSize: 2,
+        metrics: {
+          avgCommittedStoryPoints: 92,
+          avgCompletedStoryPoints: 81,
+          completionRatioPercent: 88.04,
+          carryoverPercent: 11.96,
+          avgCycleTimeDays: 4.1,
+          cycleTimeStdDevDays: 2.7,
+          medianCycleTimeDays: 3.4,
+        },
+        trend: [
+          {
+            sprintId: 4101,
+            sprintName: "Sprint 41",
+            state: "closed",
+            startDate: "2026-03-18T00:00:00+00:00",
+            endDate: "2026-04-01T00:00:00+00:00",
+            committedStoryPoints: 88,
+            completedStoryPoints: 80,
+            avgCycleTimeDays: 4.7,
+            completionRatioPercent: 90.91,
+            carryoverPercent: 9.09,
+          },
+        ],
+        statusCycleTime: {
+          trackedIssues: 13,
+          completedIssues: 13,
+          excludedIssues: 0,
+          totalDays: 29.6,
+          appliedStatusKeys: ["in progress", "in review", "done"],
+          defaultStatusKeys: ["in progress", "in review", "done"],
+          availableStatuses: [
+            {
+              statusKey: "to do",
+              status: "To Do",
+              statusCategory: "To Do",
+              defaultIncluded: false,
+            },
+            {
+              statusKey: "in progress",
+              status: "In Progress",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "in review",
+              status: "In Review",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "done",
+              status: "Done",
+              statusCategory: "Done",
+              defaultIncluded: true,
+            },
+          ],
+          rows: [
+            {
+              status: "In Progress",
+              issueCount: 13,
+              avgDays: 1.5,
+              medianDays: 1.2,
+              p85Days: 2.4,
+              maxDays: 4.8,
+              totalDays: 19.4,
+              percentOfCycleTime: 65.54,
+            },
+          ],
+        },
+        workMix: {
+          sprintId: 4102,
+          sprintName: "Sprint 42",
+          totalIssues: 20,
+          slices: [{ label: "Feature", count: 20, percent: 100 }],
+        },
+        summary: "Work mix summary.",
+        error: null,
+      },
+    });
+
+    render(<TeamInsightsScreen />);
+    expect(await screen.findByText("4.1 d")).toBeInTheDocument();
+
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT));
+
+    const dialog = await screen.findByRole("dialog", { name: "Team Insights Settings" });
+    const dialogScope = within(dialog);
+    fireEvent.click(dialogScope.getByRole("button", { name: "Select all" }));
+    expect(dialogScope.getByLabelText("Done")).toBeChecked();
+    fireEvent.click(dialogScope.getByLabelText("Done"));
+    expect(dialogScope.getByLabelText("Done")).not.toBeChecked();
+    fireEvent.click(dialogScope.getByLabelText("To Do"));
+    expect(dialogScope.getByLabelText("To Do")).not.toBeChecked();
+    expect(dialogScope.getByText("2 of 4 statuses selected")).toBeInTheDocument();
+    fireEvent.click(dialogScope.getByRole("button", { name: "Save" }));
+
+    let customRequestUrl: URL | null = null;
+    await waitFor(() => {
+      const customRequest = fetchSpy.mock.calls.find(([input]) => String(input).includes("cycleTimeStatusMode=custom"));
+      expect(customRequest).toBeDefined();
+      customRequestUrl = new URL(String(customRequest?.[0]));
+    });
+    expect(customRequestUrl).not.toBeNull();
+    expect(customRequestUrl?.searchParams.getAll("cycleTimeStatus")).toEqual(["in progress", "in review"]);
+  });
+
   it("shows empty-state fallbacks when the team insights request fails", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network down"));
 
@@ -556,9 +729,116 @@ describe("TeamInsightsScreen", () => {
 
     expect(await screen.findByText("Team insights error: Network down")).toBeInTheDocument();
     expect(screen.getByText("No recent sprint trend data found.")).toBeInTheDocument();
-    expect(screen.getByText("No in-progress status cycle-time data found for completed cards.")).toBeInTheDocument();
+    expect(screen.getByText("No cycle-time data found for the selected workflow statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 0")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
     expect(screen.getByText("4 d")).toBeInTheDocument();
+  });
+
+  it("hydrates persisted Team Insights settings from preferences", async () => {
+    const persistedSettings = JSON.stringify({
+      targetCycleTimeDays: 6.5,
+      showTargetCycleTime: false,
+      showCompletedStoryPointsChart: false,
+      showTrendValueLabels: false,
+      showActiveSprintMarker: false,
+      selectedCycleTimeStatusKeys: ["done"],
+    });
+    vi.mocked(persistence.getPreferenceSync).mockReturnValue(persistedSettings);
+    vi.mocked(persistence.getPreference).mockResolvedValue(persistedSettings);
+
+    const fetchSpy = setupFetchMock({
+      "/api/team/insights": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        windowSize: 2,
+        metrics: {
+          avgCommittedStoryPoints: 92,
+          avgCompletedStoryPoints: 81,
+          completionRatioPercent: 88.04,
+          carryoverPercent: 11.96,
+          avgCycleTimeDays: 4.1,
+          cycleTimeStdDevDays: 2.7,
+          medianCycleTimeDays: 3.4,
+        },
+        trend: [
+          {
+            sprintId: 4101,
+            sprintName: "Sprint 41 (Q4 FY26)",
+            state: "active",
+            startDate: "2026-03-18T00:00:00+00:00",
+            endDate: "2026-04-01T00:00:00+00:00",
+            committedStoryPoints: 88,
+            completedStoryPoints: 80,
+            avgCycleTimeDays: 4.7,
+            completionRatioPercent: 90.91,
+            carryoverPercent: 9.09,
+          },
+        ],
+        statusCycleTime: {
+          trackedIssues: 13,
+          completedIssues: 13,
+          excludedIssues: 0,
+          totalDays: 29.6,
+          appliedStatusKeys: ["done"],
+          defaultStatusKeys: ["in progress", "in review", "done"],
+          availableStatuses: [
+            {
+              statusKey: "in progress",
+              status: "In Progress",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "in review",
+              status: "In Review",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+            {
+              statusKey: "done",
+              status: "Done",
+              statusCategory: "Done",
+              defaultIncluded: true,
+            },
+          ],
+          rows: [
+            {
+              status: "Done",
+              issueCount: 13,
+              avgDays: 0.8,
+              medianDays: 0.7,
+              p85Days: 1.0,
+              maxDays: 1.2,
+              totalDays: 10.4,
+              percentOfCycleTime: 100,
+            },
+          ],
+        },
+        workMix: {
+          sprintId: 4102,
+          sprintName: "Sprint 42",
+          totalIssues: 20,
+          slices: [{ label: "Feature", count: 20, percent: 100 }],
+        },
+        summary: "Persisted settings payload.",
+        error: null,
+      },
+    });
+
+    render(<TeamInsightsScreen />);
+
+    expect(await screen.findByText("4.1 d")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
+    expect(screen.queryByText("4.7 d")).not.toBeInTheDocument();
+    expect(screen.queryAllByTitle("Active sprint")).toHaveLength(0);
+
+    await waitFor(() => {
+      expect(fetchSpy.mock.calls.some(([input]) => (
+        String(input).includes("cycleTimeStatusMode=custom")
+        && String(input).includes("cycleTimeStatus=done")
+      ))).toBe(true);
+    });
   });
 });
