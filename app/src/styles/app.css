@@ -522,6 +522,212 @@ body {
   padding: 0.22rem 0.62rem;
 }
 
+.tb-trend-tab-card {
+  padding: 0.42rem;
+}
+
+.tb-trend-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.24rem;
+  max-width: 100%;
+  border: 1px solid #c7d6eb;
+  border-radius: 0.92rem;
+  background: linear-gradient(145deg, #f8fbff 0%, #eaf2ff 100%);
+  padding: 0.24rem;
+}
+
+.tb-trend-tab {
+  border: none;
+  border-radius: 0.72rem;
+  background: transparent;
+  color: #294b79;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 700;
+  line-height: 1.15;
+  padding: 0.5rem 0.76rem;
+  transition: background 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+.tb-trend-tab:hover {
+  color: #1b427a;
+}
+
+.tb-trend-tab:focus-visible {
+  outline: 2px solid #78a5e8;
+  outline-offset: 2px;
+}
+
+.tb-trend-tab.is-active {
+  background: linear-gradient(145deg, #2e79d8 0%, #135ab7 100%);
+  box-shadow: 0 0.35rem 0.85rem rgba(19, 90, 183, 0.22);
+  color: #fff;
+}
+
+.tb-trend-tab-panel {
+  margin-top: 0.62rem;
+}
+
+.tb-trend-tab-panel h4 {
+  margin-top: 0.44rem;
+  margin-bottom: 0.88rem;
+}
+
+.tb-trend-chart-frame {
+  display: grid;
+  gap: 0.52rem;
+}
+
+.tb-trend-chart {
+  --tb-trend-plot-height: 11rem;
+  --tb-trend-label-space: 1.95rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.62rem;
+  align-items: end;
+}
+
+.tb-trend-y-axis {
+  min-height: calc(var(--tb-trend-plot-height) + var(--tb-trend-label-space));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: var(--tb-trend-label-space);
+}
+
+.tb-trend-y-axis-label {
+  color: var(--tb-muted);
+  font-size: 0.67rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(50%);
+}
+
+.tb-trend-plot {
+  position: relative;
+  min-height: calc(var(--tb-trend-plot-height) + var(--tb-trend-label-space));
+  padding-left: 0.42rem;
+}
+
+.tb-trend-plot::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: var(--tb-trend-label-space);
+  width: 1px;
+  background: #bfd0e8;
+}
+
+.tb-trend-columns-wrap {
+  overflow-x: auto;
+  padding-bottom: 0.16rem;
+}
+
+.tb-trend-columns {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(3.75rem, 1fr);
+  align-items: end;
+  gap: 0.68rem;
+  min-width: max-content;
+  min-height: calc(var(--tb-trend-plot-height) + var(--tb-trend-label-space));
+}
+
+.tb-trend-columns::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--tb-trend-label-space);
+  height: 1px;
+  background: #bfd0e8;
+}
+
+.tb-trend-column {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: var(--tb-trend-plot-height) auto;
+  gap: 0.36rem;
+  justify-items: center;
+  align-items: end;
+}
+
+.tb-trend-column-value {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #2b5f9f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tb-trend-column-stage {
+  position: relative;
+  width: 100%;
+  height: var(--tb-trend-plot-height);
+  min-height: var(--tb-trend-plot-height);
+  overflow: visible;
+}
+
+.tb-trend-column-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: block;
+  transform: translateX(-50%);
+  width: 0.72rem;
+  min-height: 0;
+  border-radius: 0.28rem 0.28rem 0 0;
+  background: linear-gradient(180deg, #67a7ef 0%, #1b68cc 100%);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.tb-trend-column-bar.is-active {
+  box-shadow:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 2px rgba(31, 143, 99, 0.18);
+}
+
+.tb-trend-column-meta {
+  min-height: var(--tb-trend-label-space);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.1rem;
+}
+
+.tb-trend-column-name {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  color: #2a456d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tb-trend-x-axis-label {
+  margin: 0;
+  color: #4a658d;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .tb-status-cycle-info-pill {
   margin: 0.24rem 0 0.52rem;
   display: grid;
@@ -538,28 +744,6 @@ body {
   line-height: inherit;
 }
 
-.tb-bars {
-  display: grid;
-  gap: 0.44rem;
-}
-
-.tb-sprint-bar-label {
-  margin: 0.2rem 0 0.22rem;
-  color: var(--tb-muted);
-  font-size: 0.78rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.tb-sprint-bar-name {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-}
-
 .tb-sprint-active-icon {
   width: 0.52rem;
   height: 0.52rem;
@@ -567,13 +751,6 @@ body {
   background: #1f8f63;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92), 0 0 0 2px rgba(31, 143, 99, 0.26);
   flex: 0 0 auto;
-}
-
-.tb-sprint-bar-pill {
-  padding: 0.12rem 0.52rem;
-  font-weight: 700;
-  line-height: 1.1;
-  white-space: nowrap;
 }
 
 .tb-status-cycle-name {
@@ -721,25 +898,6 @@ body {
 .tb-status-cycle-cell-numeric {
   text-align: right;
   white-space: nowrap;
-}
-
-.tb-sprint-bar-label + .tb-bar {
-  margin-top: 0.3rem;
-}
-
-.tb-bar {
-  height: 0.62rem;
-  border-radius: 999px;
-  border: 1px solid #cfdbee;
-  background: #e8effc;
-  overflow: hidden;
-}
-
-.tb-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #2e79d8 0%, #0f60c9 100%);
 }
 
 .tb-kanban {
@@ -2285,6 +2443,37 @@ body {
 
   .tb-status-cycle-pie-wrap {
     grid-template-columns: 1fr;
+  }
+
+  .tb-trend-tabs {
+    display: grid;
+    width: 100%;
+  }
+
+  .tb-trend-chart {
+    --tb-trend-plot-height: 9.5rem;
+    --tb-trend-label-space: 1.75rem;
+  }
+
+  .tb-trend-columns {
+    grid-auto-columns: minmax(3.2rem, 1fr);
+    gap: 0.5rem;
+  }
+
+  .tb-trend-y-axis-label {
+    font-size: 0.63rem;
+  }
+
+  .tb-trend-column-value {
+    font-size: 0.72rem;
+  }
+
+  .tb-trend-column-name {
+    font-size: 0.68rem;
+  }
+
+  .tb-trend-x-axis-label {
+    font-size: 0.68rem;
   }
 
   .tb-btn-row {
