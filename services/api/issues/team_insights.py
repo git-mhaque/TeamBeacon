@@ -4,7 +4,7 @@ import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
 from math import ceil
-from statistics import median
+from statistics import median, pstdev
 from typing import Any
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
@@ -178,7 +178,7 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
             "completionRatioPercent": 0.0,
             "carryoverPercent": 0.0,
             "avgCycleTimeDays": None,
-            "maxCycleTimeDays": None,
+            "cycleTimeStdDevDays": None,
             "medianCycleTimeDays": None,
         },
         "trend": [],
@@ -409,7 +409,7 @@ def get_team_insights(
             else 0.0
         )
         avg_cycle_time_days = _round_metric(sum(cycle_time_days) / len(cycle_time_days)) if cycle_time_days else None
-        max_cycle_time_days = _round_metric(max(cycle_time_days)) if cycle_time_days else None
+        cycle_time_std_dev_days = _round_metric(float(pstdev(cycle_time_days))) if cycle_time_days else None
         median_cycle_time_days = _round_metric(float(median(cycle_time_days))) if cycle_time_days else None
         total_status_cycle_days = sum(status_cycle_total_days_by_status.values())
         status_cycle_rows = []
@@ -515,7 +515,7 @@ def get_team_insights(
             "completionRatioPercent": overall_completion_ratio_percent,
             "carryoverPercent": overall_carryover_percent,
             "avgCycleTimeDays": avg_cycle_time_days,
-            "maxCycleTimeDays": max_cycle_time_days,
+            "cycleTimeStdDevDays": cycle_time_std_dev_days,
             "medianCycleTimeDays": median_cycle_time_days,
         },
         "trend": trend,

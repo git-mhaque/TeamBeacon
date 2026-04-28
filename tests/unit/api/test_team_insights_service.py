@@ -281,7 +281,7 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertAlmostEqual(metrics["completionRatioPercent"], 64.86, places=2)
             self.assertAlmostEqual(metrics["carryoverPercent"], 35.14, places=2)
             self.assertAlmostEqual(metrics["avgCycleTimeDays"], 3.0, places=2)
-            self.assertAlmostEqual(metrics["maxCycleTimeDays"], 5.0, places=2)
+            self.assertAlmostEqual(metrics["cycleTimeStdDevDays"], 1.58, places=2)
             self.assertAlmostEqual(metrics["medianCycleTimeDays"], 3.0, places=2)
 
             status_cycle = payload["statusCycleTime"]
@@ -434,7 +434,7 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
 
             metrics = payload["metrics"]
             self.assertAlmostEqual(metrics["avgCycleTimeDays"], 2.0, places=2)
-            self.assertAlmostEqual(metrics["maxCycleTimeDays"], 2.0, places=2)
+            self.assertAlmostEqual(metrics["cycleTimeStdDevDays"], 0.0, places=2)
             self.assertAlmostEqual(metrics["medianCycleTimeDays"], 2.0, places=2)
             self.assertEqual(payload["statusCycleTime"]["trackedIssues"], 1)
             self.assertEqual(payload["statusCycleTime"]["rows"][0]["status"], "In Progress")

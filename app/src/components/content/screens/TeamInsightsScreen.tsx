@@ -12,7 +12,7 @@ const EMPTY_INSIGHTS: TeamInsightsResponse = {
     completionRatioPercent: 0,
     carryoverPercent: 0,
     avgCycleTimeDays: null,
-    maxCycleTimeDays: null,
+    cycleTimeStdDevDays: null,
     medianCycleTimeDays: null,
   },
   trend: [],
@@ -308,18 +308,18 @@ export function TeamInsightsScreen() {
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
             <h4>Median Cycle Time</h4>
-            <strong class="tb-value">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
+            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
             <p>Middle cycle-time value across completed cards.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg Cycle Time</h4>
-            <strong class="tb-value">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
+            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
             <p>Average across completed cards in trend window.</p>
           </article>
           <article class="tb-metric-card">
-            <h4>Max Cycle Time</h4>
-            <strong class="tb-value">{formatDays(insights.metrics.maxCycleTimeDays)}</strong>
-            <p>Longest completed-card cycle time in trend window.</p>
+            <h4>Cycle Time Std Dev</h4>
+            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.cycleTimeStdDevDays)}</strong>
+            <p>Variation across completed-card cycle times in trend window.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg SP</h4>

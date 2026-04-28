@@ -20,7 +20,7 @@ describe("TeamInsightsScreen", () => {
           completionRatioPercent: 88.04,
           carryoverPercent: 11.96,
           avgCycleTimeDays: 4.1,
-          maxCycleTimeDays: 12.6,
+          cycleTimeStdDevDays: 2.7,
           medianCycleTimeDays: 3.4,
         },
         trend: [
@@ -110,11 +110,11 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByRole("option", { name: "Last 2 sprints" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Last 3 sprints" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Avg Cycle Time" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Max Cycle Time" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cycle Time Std Dev" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Median Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Avg SP" })).toBeInTheDocument();
     expect(await screen.findByText("4.1 d")).toBeInTheDocument();
-    expect(screen.getByText("12.6 d")).toBeInTheDocument();
+    expect(screen.getByText("2.7 d")).toBeInTheDocument();
     expect(screen.getByText("3.4 d")).toBeInTheDocument();
     expect(screen.getByText("81 SP")).toBeInTheDocument();
     expect(screen.queryByText("Trend window: last 6 sprints including active sprint.")).not.toBeInTheDocument();
@@ -234,7 +234,7 @@ describe("TeamInsightsScreen", () => {
           completionRatioPercent: 88.04,
           carryoverPercent: 11.96,
           avgCycleTimeDays: 4.1,
-          maxCycleTimeDays: 12.6,
+          cycleTimeStdDevDays: 2.7,
           medianCycleTimeDays: 3.4,
         },
         trend: [
@@ -311,7 +311,7 @@ describe("TeamInsightsScreen", () => {
           completionRatioPercent: 66.67,
           carryoverPercent: 33.33,
           avgCycleTimeDays: 7.2,
-          maxCycleTimeDays: 7.2,
+          cycleTimeStdDevDays: 1.9,
           medianCycleTimeDays: null,
         },
         trend: [

@@ -385,7 +385,7 @@ export type TeamInsightsResponse = {
     completionRatioPercent: number;
     carryoverPercent: number;
     avgCycleTimeDays?: number | null;
-    maxCycleTimeDays?: number | null;
+    cycleTimeStdDevDays?: number | null;
     medianCycleTimeDays?: number | null;
   };
   trend: TeamInsightTrendPoint[];

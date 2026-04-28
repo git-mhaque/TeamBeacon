@@ -552,7 +552,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                     "completionRatioPercent": 89.88,
                     "carryoverPercent": 10.12,
                     "avgCycleTimeDays": 4.2,
-                    "maxCycleTimeDays": 15.4,
+                    "cycleTimeStdDevDays": 4.6,
                     "medianCycleTimeDays": 3.8,
                 },
                 "trend": [
@@ -1253,7 +1253,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["windowSize"], 6)
         self.assertEqual(body["metrics"]["avgCommittedStoryPoints"], 84.0)
         self.assertEqual(body["metrics"]["avgCycleTimeDays"], 4.2)
-        self.assertEqual(body["metrics"]["maxCycleTimeDays"], 15.4)
+        self.assertEqual(body["metrics"]["cycleTimeStdDevDays"], 4.6)
         self.assertEqual(body["statusCycleTime"]["trackedIssues"], 18)
         self.assertEqual(body["statusCycleTime"]["rows"][0]["status"], "In Progress")
         self.assertEqual(body["workMix"]["sprintId"], 55421)
