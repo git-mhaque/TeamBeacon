@@ -76,6 +76,20 @@ function formatSprintSequenceLabel(position: number): string {
   return `Sprint ${position + 1}`;
 }
 
+function resolveSprintChartLabel(
+  sprintName: string | null | undefined,
+  position: number,
+  showSprintNames: boolean,
+): string {
+  if (showSprintNames) {
+    const trimmedName = sprintName?.trim();
+    if (trimmedName) {
+      return trimmedName;
+    }
+  }
+  return formatSprintSequenceLabel(position);
+}
+
 function computeNiceAxisStep(rawStep: number): number {
   if (!Number.isFinite(rawStep) || rawStep <= 0) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
@@ -165,6 +179,7 @@ type PersistedTeamInsightsSettings = {
   showCompletedStoryPointsChart: boolean;
   showTrendValueLabels: boolean;
   showActiveSprintMarker: boolean;
+  showSprintNames: boolean;
   selectedCycleTimeStatusKeys: string[] | null;
 };
 
@@ -251,6 +266,11 @@ function parsePersistedTeamInsightsSettings(
           ? parsed.showActiveSprintMarker
           : fallback.showActiveSprintMarker
       ),
+      showSprintNames: (
+        typeof parsed.showSprintNames === "boolean"
+          ? parsed.showSprintNames
+          : fallback.showSprintNames
+      ),
       selectedCycleTimeStatusKeys: normalizePersistedCycleTimeStatusKeys(
         parsed.selectedCycleTimeStatusKeys,
         fallback.selectedCycleTimeStatusKeys,
@@ -275,6 +295,7 @@ export function TeamInsightsScreen() {
       showCompletedStoryPointsChart: true,
       showTrendValueLabels: true,
       showActiveSprintMarker: true,
+      showSprintNames: true,
       selectedCycleTimeStatusKeys: null,
     }),
     [],
@@ -290,6 +311,7 @@ export function TeamInsightsScreen() {
   const [showCompletedStoryPointsChart, setShowCompletedStoryPointsChart] = useState(initialSettings.showCompletedStoryPointsChart);
   const [showTrendValueLabels, setShowTrendValueLabels] = useState(initialSettings.showTrendValueLabels);
   const [showActiveSprintMarker, setShowActiveSprintMarker] = useState(initialSettings.showActiveSprintMarker);
+  const [showSprintNames, setShowSprintNames] = useState(initialSettings.showSprintNames);
   const [selectedCycleTimeStatusKeys, setSelectedCycleTimeStatusKeys] = useState<string[] | null>(
     initialSettings.selectedCycleTimeStatusKeys,
   );
@@ -301,6 +323,7 @@ export function TeamInsightsScreen() {
   );
   const [draftShowTrendValueLabels, setDraftShowTrendValueLabels] = useState(initialSettings.showTrendValueLabels);
   const [draftShowActiveSprintMarker, setDraftShowActiveSprintMarker] = useState(initialSettings.showActiveSprintMarker);
+  const [draftShowSprintNames, setDraftShowSprintNames] = useState(initialSettings.showSprintNames);
   const [draftSelectedCycleTimeStatusKeys, setDraftSelectedCycleTimeStatusKeys] = useState(
     initialSettings.selectedCycleTimeStatusKeys ?? [],
   );
@@ -338,6 +361,7 @@ export function TeamInsightsScreen() {
       showCompletedStoryPointsChart,
       showTrendValueLabels,
       showActiveSprintMarker,
+      showSprintNames,
       selectedCycleTimeStatusKeys,
     };
     void setPreference(TEAM_INSIGHTS_SETTINGS_KEY, JSON.stringify(payload));
@@ -345,6 +369,7 @@ export function TeamInsightsScreen() {
     selectedCycleTimeStatusKeys,
     showActiveSprintMarker,
     showCompletedStoryPointsChart,
+    showSprintNames,
     showTargetCycleTime,
     showTrendValueLabels,
     targetCycleTimeDays,
@@ -361,6 +386,7 @@ export function TeamInsightsScreen() {
       showCompletedStoryPointsChart: initialSettings.showCompletedStoryPointsChart,
       showTrendValueLabels: initialSettings.showTrendValueLabels,
       showActiveSprintMarker: initialSettings.showActiveSprintMarker,
+      showSprintNames: initialSettings.showSprintNames,
       selectedCycleTimeStatusKeys: initialSettings.selectedCycleTimeStatusKeys,
     };
 
@@ -375,6 +401,7 @@ export function TeamInsightsScreen() {
         && persisted.showCompletedStoryPointsChart === showCompletedStoryPointsChart
         && persisted.showTrendValueLabels === showTrendValueLabels
         && persisted.showActiveSprintMarker === showActiveSprintMarker
+        && persisted.showSprintNames === showSprintNames
         && nullableSelectionsMatch(persisted.selectedCycleTimeStatusKeys, selectedCycleTimeStatusKeys)
       );
       if (isSame) return;
@@ -392,6 +419,8 @@ export function TeamInsightsScreen() {
       setDraftShowTrendValueLabels(persisted.showTrendValueLabels);
       setShowActiveSprintMarker(persisted.showActiveSprintMarker);
       setDraftShowActiveSprintMarker(persisted.showActiveSprintMarker);
+      setShowSprintNames(persisted.showSprintNames);
+      setDraftShowSprintNames(persisted.showSprintNames);
       setSelectedCycleTimeStatusKeys(persisted.selectedCycleTimeStatusKeys);
       setDraftSelectedCycleTimeStatusKeys(persisted.selectedCycleTimeStatusKeys ?? []);
     })();
@@ -404,6 +433,7 @@ export function TeamInsightsScreen() {
     selectedCycleTimeStatusKeys,
     showActiveSprintMarker,
     showCompletedStoryPointsChart,
+    showSprintNames,
     showTargetCycleTime,
     showTrendValueLabels,
     targetCycleTimeDays,
@@ -438,12 +468,14 @@ export function TeamInsightsScreen() {
     setDraftShowCompletedStoryPointsChart(showCompletedStoryPointsChart);
     setDraftShowTrendValueLabels(showTrendValueLabels);
     setDraftShowActiveSprintMarker(showActiveSprintMarker);
+    setDraftShowSprintNames(showSprintNames);
     setDraftSelectedCycleTimeStatusKeys(appliedCycleTimeStatusKeys);
     setIsSettingsOpen(true);
   }, [
     appliedCycleTimeStatusKeys,
     showActiveSprintMarker,
     showCompletedStoryPointsChart,
+    showSprintNames,
     showTargetCycleTime,
     showTrendValueLabels,
     targetCycleTimeDays,
@@ -465,6 +497,7 @@ export function TeamInsightsScreen() {
     }
     setShowTrendValueLabels(draftShowTrendValueLabels);
     setShowActiveSprintMarker(draftShowActiveSprintMarker);
+    setShowSprintNames(draftShowSprintNames);
     setSelectedCycleTimeStatusKeys(
       selectionsMatch(nextCycleTimeStatusKeys, defaultCycleTimeStatusKeys) ? null : nextCycleTimeStatusKeys,
     );
@@ -476,6 +509,7 @@ export function TeamInsightsScreen() {
     draftTargetCycleTimeInput,
     draftShowCompletedStoryPointsChart,
     draftShowActiveSprintMarker,
+    draftShowSprintNames,
     draftShowTargetCycleTime,
     draftShowTrendValueLabels,
   ]);
@@ -614,23 +648,23 @@ export function TeamInsightsScreen() {
   );
   const cycleTimeTrendPoints = useMemo<TrendBarChartPoint[]>(
     () => trendRows.map((point, index) => ({
-      label: formatSprintSequenceLabel(index),
+      label: resolveSprintChartLabel(point.sprintName, index, showSprintNames),
       tooltipLabel: formatSprintDateRange(point.startDate, point.endDate),
       value: point.avgCycleTimeDays ?? 0,
       valueLabel: formatDays(point.avgCycleTimeDays),
       isActive: point.state?.toLowerCase() === "active",
     })),
-    [trendRows]
+    [showSprintNames, trendRows]
   );
   const completedStoryPointsTrendPoints = useMemo<TrendBarChartPoint[]>(
     () => trendRows.map((point, index) => ({
-      label: formatSprintSequenceLabel(index),
+      label: resolveSprintChartLabel(point.sprintName, index, showSprintNames),
       tooltipLabel: formatSprintDateRange(point.startDate, point.endDate),
       value: point.completedStoryPoints,
       valueLabel: `${formatStoryPoints(point.completedStoryPoints)} SP`,
       isActive: point.state?.toLowerCase() === "active",
     })),
-    [trendRows]
+    [showSprintNames, trendRows]
   );
   const trendChartNote = showActiveSprintMarker
     ? "Older sprints are shown on the left and recent sprints on the right. The green dot marks the active sprint."
@@ -788,6 +822,20 @@ export function TeamInsightsScreen() {
                     </div>
                   </div>
                   <div class="tb-team-settings-toggle-list">
+                    <div class="tb-team-settings-toggle-row">
+                      <div class="tb-team-settings-toggle-copy">
+                        <label class="tb-modal-check">
+                          <input
+                            type="checkbox"
+                            checked={draftShowSprintNames}
+                            onChange={(event) => setDraftShowSprintNames((event.currentTarget as HTMLInputElement).checked)}
+                          />
+                          <span>Show sprint names on charts</span>
+                        </label>
+                        <p class="tb-muted-note">Use the Jira sprint name on the x-axis instead of Sprint 1, Sprint 2, and so on.</p>
+                      </div>
+                    </div>
+
                     <div class="tb-team-settings-toggle-row">
                       <div class="tb-team-settings-toggle-copy">
                         <label class="tb-modal-check">

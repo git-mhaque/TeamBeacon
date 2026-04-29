@@ -37,6 +37,7 @@ const DEFAULT_TARGET_LINE_COLOR = "#d97706";
 const CHART_BOUNDARY_COLOR = "#bfd0e8";
 const AXIS_LABEL_COLOR = "#2a456d";
 const VALUE_LABEL_COLOR = "#1f8f63";
+const ANGLED_TICK_ROTATION = 38;
 
 type ChartConstructor = new (
   item: HTMLCanvasElement,
@@ -58,6 +59,10 @@ function getBarDatasetIndex(chart: { data?: { datasets?: Array<{ type?: string }
 
 function clampLabelPosition(value: number, minimum: number): number {
   return value < minimum ? minimum : value;
+}
+
+function shouldAngleXAxisLabels(labels: string[]): boolean {
+  return labels.some((label) => label.trim().length > 12);
 }
 
 function createChartBoundaryPlugin(): Plugin<"bar"> {
@@ -164,6 +169,7 @@ export function TrendBarChart({
   const labels = useMemo(() => points.map((point) => point.label), [points]);
   const tooltipLabels = useMemo(() => points.map((point) => point.tooltipLabel), [points]);
   const valueLabels = useMemo(() => points.map((point) => point.valueLabel), [points]);
+  const useAngledXAxisLabels = useMemo(() => shouldAngleXAxisLabels(labels), [labels]);
 
   const plugins = useMemo(
     () => {
@@ -239,6 +245,8 @@ export function TrendBarChart({
             },
             ticks: {
               autoSkip: false,
+              minRotation: useAngledXAxisLabels ? ANGLED_TICK_ROTATION : 0,
+              maxRotation: useAngledXAxisLabels ? ANGLED_TICK_ROTATION : 0,
               color: (context: any) => (
                 showActiveSprintMarker && points[context.index]?.isActive
                   ? activeTickColor
@@ -248,7 +256,7 @@ export function TrendBarChart({
                 size: 11,
                 weight: "700",
               }),
-              padding: 10,
+              padding: useAngledXAxisLabels ? 4 : 10,
               callback: (_value: unknown, index: number) => {
                 const point = points[index];
                 if (!point) return "";
@@ -302,6 +310,7 @@ export function TrendBarChart({
     plugins,
     points,
     showActiveSprintMarker,
+    useAngledXAxisLabels,
     showValueLabels,
     tooltipLabels,
   ]);

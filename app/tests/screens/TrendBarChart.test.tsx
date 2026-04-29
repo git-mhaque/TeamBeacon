@@ -48,14 +48,14 @@ describe("TrendBarChart", () => {
         ariaLabel="Cycle chart"
         points={[
           {
-            label: "Sprint 1",
+            label: "Sprint 41 (Q4 FY26)",
             tooltipLabel: "From 01-Jan-2026 to 14-Jan-2026",
             value: 4.2,
             valueLabel: "4.2 d",
             isActive: false,
           },
           {
-            label: "Sprint 2",
+            label: "Sprint 42 (Q4 FY26)",
             tooltipLabel: "From 15-Jan-2026 to 28-Jan-2026",
             value: 5.1,
             valueLabel: "5.1 d",
@@ -74,7 +74,7 @@ describe("TrendBarChart", () => {
 
     const chartCall = getLatestChartCall();
     expect(chartCall.canvas.getAttribute("aria-label")).toBe("Cycle chart");
-    expect(chartCall.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+    expect(chartCall.config.data.labels).toEqual(["Sprint 41 (Q4 FY26)", "Sprint 42 (Q4 FY26)"]);
     expect(chartCall.config.data.datasets).toHaveLength(1);
     expect(chartCall.config.data.datasets[0].type).toBe("bar");
     expect(chartCall.config.data.datasets[0].data).toEqual([4.2, 5.1]);
@@ -84,7 +84,9 @@ describe("TrendBarChart", () => {
     expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 1 })).toBe(
       "From 15-Jan-2026 to 28-Jan-2026"
     );
-    expect(chartCall.config.options.scales.x.ticks.callback(undefined, 1)).toEqual(["Sprint 2", "●"]);
+    expect(chartCall.config.options.scales.x.ticks.minRotation).toBe(38);
+    expect(chartCall.config.options.scales.x.ticks.maxRotation).toBe(38);
+    expect(chartCall.config.options.scales.x.ticks.callback(undefined, 1)).toEqual(["Sprint 42 (Q4 FY26)", "●"]);
     expect(chartCall.config.options.scales.x.ticks.color({ index: 1 })).toBe("#1f8f63");
     expect(chartCall.config.options.scales.y.ticks.callback(6)).toBe("6 d");
 
@@ -185,6 +187,8 @@ describe("TrendBarChart", () => {
 
     const chartCall = getLatestChartCall();
     expect(chartCall.config.data.datasets).toHaveLength(1);
+    expect(chartCall.config.options.scales.x.ticks.minRotation).toBe(0);
+    expect(chartCall.config.options.scales.x.ticks.maxRotation).toBe(0);
     expect(chartCall.config.options.scales.x.ticks.callback(undefined, 0)).toBe("Sprint 1");
     expect(chartCall.config.options.scales.x.ticks.callback(undefined, 99)).toBe("");
     expect(chartCall.config.options.scales.x.ticks.color({ index: 0 })).toBe("#2a456d");

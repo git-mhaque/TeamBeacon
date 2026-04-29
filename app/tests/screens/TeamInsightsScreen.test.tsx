@@ -216,13 +216,15 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("img", { name: "Completed story points sprint bar chart" })).not.toBeInTheDocument();
     await waitFor(() => {
       const cycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
-      expect(cycleTimeChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(cycleTimeChart.config.data.labels).toEqual(["Sprint 41 (Q4 FY26)", "Sprint 42 (Q4 FY26)"]);
+      expect(cycleTimeChart.config.options.scales.x.ticks.minRotation).toBe(38);
+      expect(cycleTimeChart.config.options.scales.x.ticks.maxRotation).toBe(38);
       expect(getBarDataset(cycleTimeChart).data).toEqual([4.7, 3.9]);
       expect(getTargetLinePlugin(cycleTimeChart)?.targetValue).toBe(5);
       expect(getTooltipLabel(cycleTimeChart, 0)).toBe("From 18-Mar-2026 to 01-Apr-2026");
       expect(getTooltipLabel(cycleTimeChart, 1)).toBe("From 02-Apr-2026 to 15-Apr-2026");
-      expect(getTickLabel(cycleTimeChart, 0)).toBe("Sprint 1");
-      expect(getTickLabel(cycleTimeChart, 1)).toEqual(["Sprint 2", "●"]);
+      expect(getTickLabel(cycleTimeChart, 0)).toBe("Sprint 41 (Q4 FY26)");
+      expect(getTickLabel(cycleTimeChart, 1)).toEqual(["Sprint 42 (Q4 FY26)", "●"]);
       expect(getTickColor(cycleTimeChart, 1)).toBe("#1f8f63");
       expect(hasValueLabelPlugin(cycleTimeChart)).toBe(true);
     });
@@ -237,12 +239,12 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByText("Sprints (old to new)")).toBeInTheDocument();
     await waitFor(() => {
       const completedStoryPointsChart = getLatestChartCall("Completed story points sprint bar chart");
-      expect(completedStoryPointsChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(completedStoryPointsChart.config.data.labels).toEqual(["Sprint 41 (Q4 FY26)", "Sprint 42 (Q4 FY26)"]);
       expect(getBarDataset(completedStoryPointsChart).data).toEqual([80, 82]);
       expect(getTargetLinePlugin(completedStoryPointsChart)).toBeUndefined();
       expect(getTooltipLabel(completedStoryPointsChart, 0)).toBe("From 18-Mar-2026 to 01-Apr-2026");
       expect(getTooltipLabel(completedStoryPointsChart, 1)).toBe("From 02-Apr-2026 to 15-Apr-2026");
-      expect(getTickLabel(completedStoryPointsChart, 1)).toEqual(["Sprint 2", "●"]);
+      expect(getTickLabel(completedStoryPointsChart, 1)).toEqual(["Sprint 42 (Q4 FY26)", "●"]);
       expect(hasValueLabelPlugin(completedStoryPointsChart)).toBe(true);
     });
 
@@ -499,6 +501,7 @@ describe("TeamInsightsScreen", () => {
     expect(dialogScope.getByRole("heading", { name: "Chart Display" })).toBeInTheDocument();
     expect(dialogScope.getByRole("heading", { name: "Target Cycle Time" })).toBeInTheDocument();
     expect(dialogScope.getByLabelText("Show SP chart")).toBeChecked();
+    expect(dialogScope.getByLabelText("Show sprint names on charts")).toBeChecked();
     expect(dialogScope.getByLabelText("Show target cycle time")).toBeChecked();
     expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeEnabled();
     expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toHaveValue(5);
@@ -516,6 +519,7 @@ describe("TeamInsightsScreen", () => {
     expect(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" })).toBeEnabled();
 
     fireEvent.click(dialogScope.getByLabelText("Show SP chart"));
+    fireEvent.click(dialogScope.getByLabelText("Show sprint names on charts"));
     fireEvent.input(dialogScope.getByRole("spinbutton", { name: "Target Cycle Time" }), {
       target: { value: "6.5" },
     });
@@ -536,6 +540,8 @@ describe("TeamInsightsScreen", () => {
       const updatedCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
       expect(getTargetLinePlugin(updatedCycleTimeChart)?.targetValue).toBe(6.5);
       expect(hasValueLabelPlugin(updatedCycleTimeChart)).toBe(false);
+      expect(updatedCycleTimeChart.config.options.scales.x.ticks.minRotation).toBe(0);
+      expect(updatedCycleTimeChart.config.options.scales.x.ticks.maxRotation).toBe(0);
       expect(getTickLabel(updatedCycleTimeChart, 1)).toBe("Sprint 2");
     });
     expect(screen.getByText("Older sprints are shown on the left and recent sprints on the right.")).toBeInTheDocument();
@@ -558,7 +564,7 @@ describe("TeamInsightsScreen", () => {
     });
   });
 
-  it("renders fallback chart labels and stable status sorting for atypical sprint data", async () => {
+  it("renders sprint-name chart labels with numbering fallback for atypical sprint data", async () => {
     setupFetchMock({
       "/api/team/insights": {
         source: "local",
@@ -653,7 +659,7 @@ describe("TeamInsightsScreen", () => {
     await screen.findByText("7.2 d");
     await waitFor(() => {
       const fallbackCycleChart = getLatestChartCall("Average cycle time sprint bar chart");
-      expect(fallbackCycleChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(fallbackCycleChart.config.data.labels).toEqual(["Planning Window", "Sprint 2"]);
       expect(getTooltipLabel(fallbackCycleChart, 0)).toBe("From - to -");
       expect(getTooltipLabel(fallbackCycleChart, 1)).toBe("From - to -");
     });
@@ -805,6 +811,7 @@ describe("TeamInsightsScreen", () => {
       showCompletedStoryPointsChart: false,
       showTrendValueLabels: false,
       showActiveSprintMarker: false,
+      showSprintNames: false,
       selectedCycleTimeStatusKeys: ["done"],
     });
     vi.mocked(persistence.getPreferenceSync).mockReturnValue(persistedSettings);
