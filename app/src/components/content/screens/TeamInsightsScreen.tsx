@@ -587,10 +587,6 @@ export function TeamInsightsScreen() {
     setDraftSelectedCycleTimeStatusKeys([]);
   }, []);
 
-  const resetDraftCycleTimeStatuses = useCallback(() => {
-    setDraftSelectedCycleTimeStatusKeys(defaultCycleTimeStatusKeys);
-  }, [defaultCycleTimeStatusKeys]);
-
   const handleStatusCycleSortHeaderClick = useCallback((field: StatusCycleSortField) => {
     setStatusCycleSortField((current) => {
       if (current === field) {
@@ -898,9 +894,6 @@ export function TeamInsightsScreen() {
                       </button>
                       <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftCycleTimeStatuses}>
                         Clear all
-                      </button>
-                      <button type="button" class="tb-btn tb-btn-sm" onClick={resetDraftCycleTimeStatuses}>
-                        Reset defaults
                       </button>
                     </div>
                   </div>

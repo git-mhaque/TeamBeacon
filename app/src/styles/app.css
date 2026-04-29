@@ -1952,7 +1952,7 @@ body {
 }
 
 .tb-modal-team-settings {
-  width: min(100%, 56rem);
+  width: min(100%, 58rem);
 }
 
 .tb-modal-reporting {
@@ -2045,10 +2045,10 @@ body {
   border: 1px solid #d6e0ef;
   border-radius: 0.82rem;
   background: linear-gradient(180deg, #f9fbff 0%, #f4f8ff 100%);
-  padding: 0.86rem;
+  padding: 0.72rem;
   display: flex;
   flex-direction: column;
-  gap: 0.76rem;
+  gap: 0.62rem;
   height: 100%;
   align-content: start;
   min-height: 0;
@@ -2065,8 +2065,8 @@ body {
 
 .tb-team-settings-grid {
   display: grid;
-  gap: 0.68rem;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr);
+  gap: 0.58rem;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1.22fr);
   align-items: stretch;
 }
 
@@ -2074,9 +2074,9 @@ body {
   border: 1px solid #d6e0ef;
   border-radius: 0.82rem;
   background: linear-gradient(180deg, #fbfdff 0%, #f6faff 100%);
-  padding: 0.82rem;
+  padding: 0.72rem;
   display: grid;
-  gap: 0.72rem;
+  gap: 0.58rem;
   height: 100%;
   align-content: start;
 }
@@ -2089,24 +2089,25 @@ body {
 }
 
 .tb-team-settings-card-head p {
-  margin: 0.24rem 0 0;
+  margin: 0.18rem 0 0;
+  line-height: 1.32;
 }
 
 .tb-team-settings-toggle-list,
 .tb-team-settings-target-grid {
   display: grid;
-  gap: 0.58rem;
+  gap: 0.46rem;
 }
 
 .tb-team-settings-divider {
   height: 1px;
   background: #dbe5f4;
-  margin: -0.06rem 0 0.02rem;
+  margin: -0.02rem 0 0;
 }
 
 .tb-team-settings-subsection {
   display: grid;
-  gap: 0.58rem;
+  gap: 0.46rem;
 }
 
 .tb-team-settings-subsection-head h5 {
@@ -2116,19 +2117,20 @@ body {
 }
 
 .tb-team-settings-subsection-head p {
-  margin: 0.22rem 0 0;
+  margin: 0.16rem 0 0;
+  line-height: 1.3;
 }
 
 .tb-team-settings-toggle-row {
   border: 1px solid #dce6f5;
   border-radius: 0.72rem;
   background: #fff;
-  padding: 0.58rem 0.62rem;
+  padding: 0.46rem 0.54rem;
 }
 
 .tb-team-settings-toggle-copy {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.12rem;
 }
 
 .tb-team-settings-toggle-copy .tb-modal-check {
@@ -2136,17 +2138,19 @@ body {
 }
 
 .tb-team-settings-toggle-copy .tb-muted-note {
-  margin: 0 0 0 1.46rem;
+  margin: 0 0 0 1.34rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 .tb-team-settings-field {
-  gap: 0.4rem;
+  gap: 0.28rem;
 }
 
 .tb-team-settings-number-input {
   display: flex;
   align-items: center;
-  gap: 0.48rem;
+  gap: 0.36rem;
 }
 
 .tb-team-settings-number-input input {
@@ -2159,10 +2163,10 @@ body {
   border-radius: 0.56rem;
   background: #fff;
   color: #3d5b85;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1;
-  padding: 0.48rem 0.62rem;
+  padding: 0.42rem 0.56rem;
   white-space: nowrap;
 }
 
@@ -2172,28 +2176,27 @@ body {
 }
 
 .tb-team-settings-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.72rem;
+  display: grid;
+  gap: 0.44rem;
 }
 
 .tb-team-settings-panel-copy {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.3rem;
   min-width: 0;
 }
 
 .tb-team-settings-panel-head p,
 .tb-team-settings-panel-copy .tb-muted-note {
   margin: 0;
+  line-height: 1.32;
 }
 
 .tb-team-settings-heading-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.58rem;
+  gap: 0.28rem 0.46rem;
 }
 
 .tb-team-settings-count-pill {
@@ -2206,7 +2209,7 @@ body {
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1.2;
-  padding: 0.18rem 0.52rem;
+  padding: 0.14rem 0.46rem;
 }
 
 .tb-team-settings-warning {
@@ -2219,19 +2222,26 @@ body {
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.4;
-  padding: 0.58rem 0.68rem;
+  padding: 0.48rem 0.58rem;
 }
 
 .tb-team-settings-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.tb-team-settings-actions .tb-btn-sm {
+  padding: 0.24rem 0.48rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .tb-team-settings-status-groups {
   display: grid;
-  gap: 0.82rem;
+  gap: 0.64rem;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -2241,11 +2251,11 @@ body {
 
 .tb-cycle-status-group {
   display: grid;
-  gap: 0.52rem;
+  gap: 0.42rem;
   border: 1px solid #dde7f6;
   border-radius: 0.76rem;
   background: #fff;
-  padding: 0.68rem;
+  padding: 0.56rem;
 }
 
 .tb-cycle-status-group-head {
@@ -2259,8 +2269,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.42rem;
-  height: 1.42rem;
+  min-width: 1.28rem;
+  height: 1.28rem;
   border-radius: 999px;
   background: #eef4ff;
   color: #2b4f81;
@@ -2280,7 +2290,7 @@ body {
 
 .tb-cycle-status-grid {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.38rem;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
 }
 
@@ -2289,7 +2299,7 @@ body {
   border: 1px solid #dce6f5;
   border-radius: 0.68rem;
   background: #f9fbff;
-  padding: 0.48rem 0.54rem;
+  padding: 0.38rem 0.46rem;
 }
 
 .tb-cycle-status-option input {
