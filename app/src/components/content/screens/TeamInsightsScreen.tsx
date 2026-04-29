@@ -2,10 +2,12 @@ import { h } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { TeamInsightAvailableStatus, TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
+import { TrendBarChart, type TrendBarChartPoint } from "./TrendBarChart";
 
 const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
 export const OPEN_TEAM_INSIGHTS_SETTINGS_EVENT = "teambeacon:team-insights-open-settings";
 const DEFAULT_TARGET_CYCLE_TIME_DAYS = 5;
+const DEFAULT_TREND_WINDOW = 12;
 const TEAM_INSIGHTS_SETTINGS_KEY = "teambeacon.teamInsights.settings";
 
 const EMPTY_INSIGHTS: TeamInsightsResponse = {
@@ -103,16 +105,6 @@ function formatTrendAxisValue(value: number, chart: TrendChartTab): string {
   return formatDays(value);
 }
 
-function calculateTrendBarHeight(value: number, upperBound: number): string {
-  if (upperBound <= 0 || value <= 0) return "0%";
-  return `${Math.min(roundMetric((value / upperBound) * 100), 100)}%`;
-}
-
-function calculateTrendAxisOffset(value: number, upperBound: number): string {
-  if (upperBound <= 0 || value <= 0) return "0%";
-  return `${Math.min(roundMetric((value / upperBound) * 100), 100)}%`;
-}
-
 function normalizeStatusKey(value: string | null | undefined): string | null {
   const normalized = (value ?? "").trim().toLowerCase();
   return normalized ? normalized : null;
@@ -151,12 +143,17 @@ function resolveDefaultCycleTimeStatusKeys(
 }
 
 function normalizeTrendWindow(value: number): number {
-  return TREND_WINDOW_OPTIONS.includes(value as typeof TREND_WINDOW_OPTIONS[number]) ? value : 6;
+  return TREND_WINDOW_OPTIONS.includes(value as typeof TREND_WINDOW_OPTIONS[number]) ? value : DEFAULT_TREND_WINDOW;
 }
 
 function formatTrendWindowLabel(value: number): string {
   if (value === 1) return "1 sprint";
   return `Last ${value} sprints`;
+}
+
+function getTrendAxisStep(ticks: number[]): number {
+  if (ticks.length < 2) return 1;
+  return roundMetric(ticks[1] - ticks[0]) || 1;
 }
 
 type StatusCycleSortField = "status" | "issueCount" | "avgDays" | "percentOfCycleTime";
@@ -286,7 +283,7 @@ export function TeamInsightsScreen() {
   const [insights, setInsights] = useState<TeamInsightsResponse>(EMPTY_INSIGHTS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trendWindowSelection, setTrendWindowSelection] = useState<number>(6);
+  const [trendWindowSelection, setTrendWindowSelection] = useState<number>(DEFAULT_TREND_WINDOW);
   const [selectedTrendChart, setSelectedTrendChart] = useState<TrendChartTab>("cycleTime");
   const [targetCycleTimeDays, setTargetCycleTimeDays] = useState<number>(initialSettings.targetCycleTimeDays);
   const [showTargetCycleTime, setShowTargetCycleTime] = useState(initialSettings.showTargetCycleTime);
@@ -614,21 +611,34 @@ export function TeamInsightsScreen() {
   const activeTrendChart = selectedTrendChart === "completedStoryPoints" && showCompletedStoryPointsChart
     ? "completedStoryPoints"
     : "cycleTime";
-  const selectedTrendAxis = activeTrendChart === "cycleTime" ? cycleTimeAxis : completedStoryPointsAxis;
-  const selectedTrendAxisTicks = useMemo(
-    () => [...selectedTrendAxis.ticks].reverse().map((tick) => ({
-      value: tick,
-      offset: calculateTrendAxisOffset(tick, selectedTrendAxis.upperBound),
+  const cycleTimeAxisStep = useMemo(() => getTrendAxisStep(cycleTimeAxis.ticks), [cycleTimeAxis.ticks]);
+  const completedStoryPointsAxisStep = useMemo(
+    () => getTrendAxisStep(completedStoryPointsAxis.ticks),
+    [completedStoryPointsAxis.ticks]
+  );
+  const cycleTimeTrendPoints = useMemo<TrendBarChartPoint[]>(
+    () => trendRows.map((point, index) => ({
+      label: formatSprintSequenceLabel(index),
+      tooltipLabel: formatSprintDateRange(point.startDate, point.endDate),
+      value: point.avgCycleTimeDays ?? 0,
+      valueLabel: formatDays(point.avgCycleTimeDays),
+      isActive: point.state?.toLowerCase() === "active",
     })),
-    [selectedTrendAxis]
+    [trendRows]
   );
-  const cycleTimeTargetLineOffset = useMemo(
-    () => calculateTrendAxisOffset(targetCycleTimeDays, cycleTimeAxis.upperBound),
-    [cycleTimeAxis.upperBound, targetCycleTimeDays]
+  const completedStoryPointsTrendPoints = useMemo<TrendBarChartPoint[]>(
+    () => trendRows.map((point, index) => ({
+      label: formatSprintSequenceLabel(index),
+      tooltipLabel: formatSprintDateRange(point.startDate, point.endDate),
+      value: point.completedStoryPoints,
+      valueLabel: `${formatStoryPoints(point.completedStoryPoints)} SP`,
+      isActive: point.state?.toLowerCase() === "active",
+    })),
+    [trendRows]
   );
-  const selectedTrendChartAriaLabel = activeTrendChart === "cycleTime"
-    ? "Average cycle time sprint bar chart"
-    : "Completed story points sprint bar chart";
+  const trendChartNote = showActiveSprintMarker
+    ? "Older sprints are shown on the left and recent sprints on the right. The green dot marks the active sprint."
+    : "Older sprints are shown on the left and recent sprints on the right.";
 
   return (
     <div class="tb-screen-grid">
@@ -714,72 +724,18 @@ export function TeamInsightsScreen() {
               aria-labelledby="tb-trend-tab-cycle-time"
             >
               <div class="tb-trend-chart-frame">
-                <div class="tb-trend-chart" role="img" aria-label={selectedTrendChartAriaLabel}>
-                  <div class="tb-trend-y-axis" aria-hidden="true">
-                    <div class="tb-trend-y-axis-scale">
-                      {selectedTrendAxisTicks.map(({ value, offset }) => (
-                        <div
-                          key={`cycle-axis-${value}`}
-                          class="tb-trend-y-axis-tick"
-                          style={{ bottom: offset }}
-                        >
-                          <span class="tb-trend-y-axis-label">{formatTrendAxisValue(value, "cycleTime")}</span>
-                          <span class="tb-trend-y-axis-marker" />
-                        </div>
-                      ))}
-                    </div>
-                    <div class="tb-trend-y-axis-spacer" />
-                  </div>
-                  <div class="tb-trend-plot">
-                    <div class="tb-trend-plot-scale" aria-hidden="true">
-                      {showTargetCycleTime ? (
-                        <div
-                          class="tb-trend-target-line"
-                          data-testid="cycle-time-target-line"
-                          style={{ bottom: cycleTimeTargetLineOffset }}
-                        />
-                      ) : null}
-                    </div>
-                    <div class="tb-trend-columns-wrap">
-                      <div class="tb-trend-columns">
-                        {trendRows.map((point, index) => {
-                          const sprintAvgCycleTimeDays = point.avgCycleTimeDays ?? 0;
-                          const isActiveSprint = point.state?.toLowerCase() === "active";
-                          const fullSprintRange = formatSprintDateRange(point.startDate, point.endDate);
-                          const displaySprintName = formatSprintSequenceLabel(index);
-                          const barHeight = calculateTrendBarHeight(sprintAvgCycleTimeDays, selectedTrendAxis.upperBound);
-                          return (
-                            <div
-                              key={`cycle-${point.sprintId}`}
-                              class="tb-trend-column"
-                              title={fullSprintRange}
-                            >
-                              <div class="tb-trend-column-stage">
-                                {showTrendValueLabels ? (
-                                  <span class="tb-trend-column-value" style={{ bottom: `calc(${barHeight} + 0.38rem)` }}>
-                                    {formatDays(point.avgCycleTimeDays)}
-                                  </span>
-                                ) : null}
-                                <span
-                                  class={`tb-trend-column-bar${isActiveSprint ? " is-active" : ""}`}
-                                  style={{ height: barHeight }}
-                                />
-                              </div>
-                              <div class="tb-trend-column-meta">
-                                <span class="tb-trend-column-name">
-                                  {showActiveSprintMarker && isActiveSprint ? (
-                                    <span class="tb-sprint-active-icon" title="Active sprint" aria-hidden="true" />
-                                  ) : null}
-                                  {displaySprintName}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <TrendBarChart
+                  ariaLabel="Average cycle time sprint bar chart"
+                  canvasTestId="cycle-time-trend-chart"
+                  points={cycleTimeTrendPoints}
+                  axisMax={cycleTimeAxis.upperBound}
+                  axisStepSize={cycleTimeAxisStep}
+                  formatYAxisTick={(value) => formatTrendAxisValue(value, "cycleTime")}
+                  showValueLabels={showTrendValueLabels}
+                  showActiveSprintMarker={showActiveSprintMarker}
+                  showTargetLine={showTargetCycleTime}
+                  targetValue={targetCycleTimeDays}
+                />
                 <p class="tb-trend-x-axis-label">Sprints (old to new)</p>
               </div>
             </section>
@@ -791,70 +747,23 @@ export function TeamInsightsScreen() {
               aria-labelledby="tb-trend-tab-completed-sp"
             >
               <div class="tb-trend-chart-frame">
-                <div class="tb-trend-chart" role="img" aria-label={selectedTrendChartAriaLabel}>
-                  <div class="tb-trend-y-axis" aria-hidden="true">
-                    <div class="tb-trend-y-axis-scale">
-                      {selectedTrendAxisTicks.map(({ value, offset }) => (
-                        <div
-                          key={`sp-axis-${value}`}
-                          class="tb-trend-y-axis-tick"
-                          style={{ bottom: offset }}
-                        >
-                          <span class="tb-trend-y-axis-label">{formatTrendAxisValue(value, "completedStoryPoints")}</span>
-                          <span class="tb-trend-y-axis-marker" />
-                        </div>
-                      ))}
-                    </div>
-                    <div class="tb-trend-y-axis-spacer" />
-                  </div>
-                  <div class="tb-trend-plot">
-                    <div class="tb-trend-plot-scale" aria-hidden="true" />
-                    <div class="tb-trend-columns-wrap">
-                      <div class="tb-trend-columns">
-                        {trendRows.map((point, index) => {
-                          const isActiveSprint = point.state?.toLowerCase() === "active";
-                          const fullSprintRange = formatSprintDateRange(point.startDate, point.endDate);
-                          const displaySprintName = formatSprintSequenceLabel(index);
-                          const barHeight = calculateTrendBarHeight(point.completedStoryPoints, selectedTrendAxis.upperBound);
-                          return (
-                            <div
-                              key={`sp-${point.sprintId}`}
-                              class="tb-trend-column"
-                              title={fullSprintRange}
-                            >
-                              <div class="tb-trend-column-stage">
-                                {showTrendValueLabels ? (
-                                  <span class="tb-trend-column-value" style={{ bottom: `calc(${barHeight} + 0.38rem)` }}>
-                                    {formatStoryPoints(point.completedStoryPoints)} SP
-                                  </span>
-                                ) : null}
-                                <span
-                                  class={`tb-trend-column-bar${isActiveSprint ? " is-active" : ""}`}
-                                  style={{ height: barHeight }}
-                                />
-                              </div>
-                              <div class="tb-trend-column-meta">
-                                <span class="tb-trend-column-name">
-                                  {showActiveSprintMarker && isActiveSprint ? (
-                                    <span class="tb-sprint-active-icon" title="Active sprint" aria-hidden="true" />
-                                  ) : null}
-                                  {displaySprintName}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <TrendBarChart
+                  ariaLabel="Completed story points sprint bar chart"
+                  canvasTestId="completed-story-points-trend-chart"
+                  points={completedStoryPointsTrendPoints}
+                  axisMax={completedStoryPointsAxis.upperBound}
+                  axisStepSize={completedStoryPointsAxisStep}
+                  formatYAxisTick={(value) => formatTrendAxisValue(value, "completedStoryPoints")}
+                  showValueLabels={showTrendValueLabels}
+                  showActiveSprintMarker={showActiveSprintMarker}
+                />
                 <p class="tb-trend-x-axis-label">Sprints (old to new)</p>
               </div>
             </section>
           )}
         </article>
         <p class="tb-trend-order-pill tb-trend-chart-note">
-          Older sprints are shown on the left and recent sprints on the right. The green dot marks the active sprint.
+          {trendChartNote}
         </p>
         {loading ? <p class="tb-muted-note">Loading sprint trend...</p> : null}
         {error ?? insights.error ? <p class="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}

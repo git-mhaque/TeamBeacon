@@ -363,6 +363,26 @@
         "cdnPath": "preact/devtools/dist/devtools.umd"
       }
     },
+    "chart.js/auto": {
+      "cdn": "3rdparty",
+      "cwd": "node_modules/chart.js/dist",
+      "debug": {
+        "src": [
+          "chart.umd.js",
+          "chart.umd.js.map"
+        ],
+        "path": "libs/chart.js/dist/chart.umd.js",
+        "cdnPath": "chart.js/dist/chart.umd"
+      },
+      "release": {
+        "src": [
+          "chart.umd.js",
+          "chart.umd.js.map"
+        ],
+        "path": "libs/chart.js/dist/chart.umd.js",
+        "cdnPath": "chart.js/dist/chart.umd"
+      }
+    },
     "css": {
       "cdn": "3rdparty",
       "cwd": "node_modules/require-css",

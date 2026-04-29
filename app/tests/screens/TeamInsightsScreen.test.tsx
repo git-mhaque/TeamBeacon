@@ -1,14 +1,74 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { vi } from "vitest";
+import * as persistence from "../../src/lib/persistence";
+import { setupFetchMock } from "../utils/fetchMock";
+
+type MockChartCall = {
+  canvas: HTMLCanvasElement;
+  config: any;
+  destroy: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+};
+
+const { chartCalls } = vi.hoisted(() => ({
+  chartCalls: [] as MockChartCall[],
+}));
+
+vi.mock("chart.js/auto", () => {
+  const Chart = vi.fn(function MockChart(this: unknown, canvas: HTMLCanvasElement, config: any) {
+    const chartCall: MockChartCall = {
+      canvas,
+      config,
+      destroy: vi.fn(),
+      update: vi.fn(),
+    };
+    chartCalls.push(chartCall);
+    return chartCall;
+  });
+
+  return {
+    default: Chart,
+  };
+});
+
 import {
   OPEN_TEAM_INSIGHTS_SETTINGS_EVENT,
   TeamInsightsScreen,
 } from "../../src/components/content/screens/TeamInsightsScreen";
-import * as persistence from "../../src/lib/persistence";
-import { setupFetchMock } from "../utils/fetchMock";
+
+function getLatestChartCall(ariaLabel: string): MockChartCall {
+  const matchingCalls = chartCalls.filter((chartCall) => chartCall.canvas.getAttribute("aria-label") === ariaLabel);
+  expect(matchingCalls.length).toBeGreaterThan(0);
+  return matchingCalls[matchingCalls.length - 1];
+}
+
+function getBarDataset(chartCall: MockChartCall): any {
+  return chartCall.config.data.datasets.find((dataset: any) => dataset.type !== "line");
+}
+
+function getTargetLinePlugin(chartCall: MockChartCall): any | undefined {
+  return chartCall.config.plugins.find((plugin: { id?: string }) => plugin.id === "tbTargetLine");
+}
+
+function getTooltipLabel(chartCall: MockChartCall, dataIndex: number): string {
+  return chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex });
+}
+
+function getTickLabel(chartCall: MockChartCall, index: number): string | string[] {
+  return chartCall.config.options.scales.x.ticks.callback(index, index);
+}
+
+function getTickColor(chartCall: MockChartCall, index: number): string {
+  return chartCall.config.options.scales.x.ticks.color({ index });
+}
+
+function hasValueLabelPlugin(chartCall: MockChartCall): boolean {
+  return chartCall.config.plugins.some((plugin: { id?: string }) => plugin.id === "tbTrendValueLabels");
+}
 
 describe("TeamInsightsScreen", () => {
   beforeEach(() => {
+    chartCalls.length = 0;
     vi.spyOn(persistence, "getPreferenceSync").mockReturnValue(null);
     vi.spyOn(persistence, "getPreference").mockResolvedValue(null);
     vi.spyOn(persistence, "setPreference").mockResolvedValue();
@@ -129,7 +189,7 @@ describe("TeamInsightsScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Sprint Trend" })).toBeInTheDocument();
     const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
-    expect(trendWindowSelect).toHaveValue("6");
+    expect(trendWindowSelect).toHaveValue("12");
     expect(screen.getByRole("option", { name: "1 sprint" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Last 2 sprints" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Last 3 sprints" })).toBeInTheDocument();
@@ -154,25 +214,18 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Completed story points sprint bar chart" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("62.5%");
-    expect(screen.getAllByTitle("Active sprint").length).toBeGreaterThan(0);
-    const firstCycleSprint = await screen.findByText("Sprint 1");
-    const secondCycleSprint = screen.getByText("Sprint 2");
-    expect(
-      firstCycleSprint.compareDocumentPosition(secondCycleSprint) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(firstCycleSprint.closest(".tb-trend-column")).toHaveAttribute(
-      "title",
-      "From 18-Mar-2026 to 01-Apr-2026"
-    );
-    expect(secondCycleSprint.closest(".tb-trend-column")).toHaveAttribute(
-      "title",
-      "From 02-Apr-2026 to 15-Apr-2026"
-    );
-    expect(screen.getByText("3.9 d")).toBeInTheDocument();
-    expect(screen.getByText("4.7 d")).toBeInTheDocument();
-    expect(screen.queryByText("82 SP")).not.toBeInTheDocument();
-    expect(screen.queryByText("80 SP")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const cycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(cycleTimeChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(getBarDataset(cycleTimeChart).data).toEqual([4.7, 3.9]);
+      expect(getTargetLinePlugin(cycleTimeChart)?.targetValue).toBe(5);
+      expect(getTooltipLabel(cycleTimeChart, 0)).toBe("From 18-Mar-2026 to 01-Apr-2026");
+      expect(getTooltipLabel(cycleTimeChart, 1)).toBe("From 02-Apr-2026 to 15-Apr-2026");
+      expect(getTickLabel(cycleTimeChart, 0)).toBe("Sprint 1");
+      expect(getTickLabel(cycleTimeChart, 1)).toEqual(["Sprint 2", "●"]);
+      expect(getTickColor(cycleTimeChart, 1)).toBe("#1f8f63");
+      expect(hasValueLabelPlugin(cycleTimeChart)).toBe(true);
+    });
 
     fireEvent.click(completedStoryPointsTab);
     expect(cycleTimeTab).toHaveAttribute("aria-selected", "false");
@@ -181,29 +234,28 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Completed story points sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Average cycle time sprint bar chart" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
     expect(screen.getByText("Sprints (old to new)")).toBeInTheDocument();
-    expect(screen.getByText("82 SP")).toBeInTheDocument();
-    expect(screen.getByText("80 SP")).toBeInTheDocument();
-    const firstStoryPointSprint = screen.getByText("Sprint 1");
-    const secondStoryPointSprint = screen.getByText("Sprint 2");
-    expect(
-      firstStoryPointSprint.compareDocumentPosition(secondStoryPointSprint) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(firstStoryPointSprint.closest(".tb-trend-column")).toHaveAttribute(
-      "title",
-      "From 18-Mar-2026 to 01-Apr-2026"
-    );
-    expect(screen.queryByText("3.9 d")).not.toBeInTheDocument();
-    expect(screen.queryByText("4.7 d")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const completedStoryPointsChart = getLatestChartCall("Completed story points sprint bar chart");
+      expect(completedStoryPointsChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(getBarDataset(completedStoryPointsChart).data).toEqual([80, 82]);
+      expect(getTargetLinePlugin(completedStoryPointsChart)).toBeUndefined();
+      expect(getTooltipLabel(completedStoryPointsChart, 0)).toBe("From 18-Mar-2026 to 01-Apr-2026");
+      expect(getTooltipLabel(completedStoryPointsChart, 1)).toBe("From 02-Apr-2026 to 15-Apr-2026");
+      expect(getTickLabel(completedStoryPointsChart, 1)).toEqual(["Sprint 2", "●"]);
+      expect(hasValueLabelPlugin(completedStoryPointsChart)).toBe(true);
+    });
 
     fireEvent.click(cycleTimeTab);
     expect(cycleTimeTab).toHaveAttribute("aria-selected", "true");
     expect(completedStoryPointsTab).toHaveAttribute("aria-selected", "false");
     expect(screen.queryByRole("heading", { name: "Avg Cycle Time by Sprint" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Completed SP by Sprint" })).not.toBeInTheDocument();
-    expect(screen.getByText("3.9 d")).toBeInTheDocument();
-    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("62.5%");
+    await waitFor(() => {
+      const cycleTimeChartAfterReturn = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(getBarDataset(cycleTimeChartAfterReturn).data).toEqual([4.7, 3.9]);
+      expect(getTargetLinePlugin(cycleTimeChartAfterReturn)?.targetValue).toBe(5);
+    });
 
     expect(screen.queryByText("Completed story points per sprint.")).not.toBeInTheDocument();
     expect(screen.queryByText("Average cycle time per sprint.")).not.toBeInTheDocument();
@@ -211,7 +263,7 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Trend Bars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 6 sprints)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
     expect(screen.getByText("% Cycle Time is normalized within the selected statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
 
@@ -310,7 +362,7 @@ describe("TeamInsightsScreen", () => {
     render(<TeamInsightsScreen />);
 
     const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
-    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 6 sprints)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
 
     fireEvent.change(trendWindowSelect, { target: { value: "1" } });
     await waitFor(() => expect(trendWindowSelect).toHaveValue("1"));
@@ -320,11 +372,11 @@ describe("TeamInsightsScreen", () => {
     });
 
     fireEvent.change(trendWindowSelect, { target: { value: "5" } });
-    await waitFor(() => expect(trendWindowSelect).toHaveValue("6"));
-    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 6 sprints)" })).toBeInTheDocument();
+    await waitFor(() => expect(trendWindowSelect).toHaveValue("12"));
+    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
     await waitFor(() => {
-      const sprintLimitSixCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes("sprintLimit=6"));
-      expect(sprintLimitSixCalls.length).toBeGreaterThan(1);
+      const sprintLimitTwelveCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes("sprintLimit=12"));
+      expect(sprintLimitTwelveCalls.length).toBeGreaterThan(1);
     });
   });
 
@@ -474,16 +526,19 @@ describe("TeamInsightsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("combobox", { name: "Trend Window" })).toHaveValue("6");
+    expect(screen.getByRole("combobox", { name: "Trend Window" })).toHaveValue("12");
     expect(fetchSpy.mock.calls).toHaveLength(fetchCallCountBeforeSettings);
     expect(screen.getByRole("tab", { name: "Avg Cycle Time" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Completed story points sprint bar chart" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("cycle-time-target-line").getAttribute("style")).toContain("81.25%");
-    expect(screen.queryByText("82 SP")).not.toBeInTheDocument();
-    expect(screen.queryByText("80 SP")).not.toBeInTheDocument();
-    expect(screen.queryAllByTitle("Active sprint")).toHaveLength(0);
+    await waitFor(() => {
+      const updatedCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(getTargetLinePlugin(updatedCycleTimeChart)?.targetValue).toBe(6.5);
+      expect(hasValueLabelPlugin(updatedCycleTimeChart)).toBe(false);
+      expect(getTickLabel(updatedCycleTimeChart, 1)).toBe("Sprint 2");
+    });
+    expect(screen.getByText("Older sprints are shown on the left and recent sprints on the right.")).toBeInTheDocument();
 
     window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT));
 
@@ -497,7 +552,10 @@ describe("TeamInsightsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
     });
-    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const chartWithoutTarget = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(getTargetLinePlugin(chartWithoutTarget)).toBeUndefined();
+    });
   });
 
   it("renders fallback chart labels and stable status sorting for atypical sprint data", async () => {
@@ -592,15 +650,18 @@ describe("TeamInsightsScreen", () => {
 
     render(<TeamInsightsScreen />);
 
-    const fallbackNamedSprint = await screen.findByText("Sprint 1");
-    const fallbackUnnamedSprint = screen.getByText("Sprint 2");
-    expect(fallbackNamedSprint.closest(".tb-trend-column")).toHaveAttribute("title", "From - to -");
-    expect(fallbackUnnamedSprint.closest(".tb-trend-column")).toHaveAttribute("title", "From - to -");
+    await screen.findByText("7.2 d");
+    await waitFor(() => {
+      const fallbackCycleChart = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(fallbackCycleChart.config.data.labels).toEqual(["Sprint 1", "Sprint 2"]);
+      expect(getTooltipLabel(fallbackCycleChart, 0)).toBe("From - to -");
+      expect(getTooltipLabel(fallbackCycleChart, 1)).toBe("From - to -");
+    });
 
     fireEvent.click(screen.getByRole("tab", { name: "Completed SP" }));
     expect(await screen.findByRole("img", { name: "Completed story points sprint bar chart" })).toBeInTheDocument();
-    expect(screen.getAllByText("12.5 SP").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("0 SP").length).toBeGreaterThan(0);
+    const fallbackCompletedStoryPointsChart = getLatestChartCall("Completed story points sprint bar chart");
+    expect(getBarDataset(fallbackCompletedStoryPointsChart).data).toEqual([12.5, 0]);
 
     const statusCycleTable = screen.getByRole("table", { name: "Status cycle time table" });
     const rows = within(statusCycleTable).getAllByRole("row");
@@ -732,7 +793,9 @@ describe("TeamInsightsScreen", () => {
     expect(screen.getByText("No cycle-time data found for the selected workflow statuses.")).toBeInTheDocument();
     expect(screen.getByText("Tracked completed cards: 0")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
-    expect(screen.getByText("4 d")).toBeInTheDocument();
+    const emptyCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
+    expect(emptyCycleTimeChart.config.options.scales.y.max).toBe(8);
+    expect(emptyCycleTimeChart.config.options.scales.y.ticks.callback(4)).toBe("4 d");
   });
 
   it("hydrates persisted Team Insights settings from preferences", async () => {
@@ -830,9 +893,13 @@ describe("TeamInsightsScreen", () => {
 
     expect(await screen.findByText("4.1 d")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("cycle-time-target-line")).not.toBeInTheDocument();
-    expect(screen.queryByText("4.7 d")).not.toBeInTheDocument();
-    expect(screen.queryAllByTitle("Active sprint")).toHaveLength(0);
+    await waitFor(() => {
+      const hydratedCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
+      expect(getTargetLinePlugin(hydratedCycleTimeChart)).toBeUndefined();
+      expect(hasValueLabelPlugin(hydratedCycleTimeChart)).toBe(false);
+      expect(getTickLabel(hydratedCycleTimeChart, 0)).toBe("Sprint 1");
+    });
+    expect(screen.getByText("Older sprints are shown on the left and recent sprints on the right.")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => (
