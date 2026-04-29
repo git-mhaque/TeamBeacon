@@ -3,6 +3,10 @@
 FROM node:22-bookworm-slim AS frontend-builder
 WORKDIR /build/app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY app/package.json app/package-lock.json ./
 RUN npm ci
 
