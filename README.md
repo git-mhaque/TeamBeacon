@@ -153,6 +153,7 @@ npm run desktop:build
 ## 📚 Documentation
 - [TeamBeacon Communication One-Pager](docs/communication/communication_one_pager.md): product narrative, value framing, and screenshots
 - [AGENTS.md](AGENTS.md): contributor conventions and repository map
+- [LICENSE](LICENSE): Apache License 2.0 terms for this repository
 - [config/README.md](config/README.md): required and optional environment variables
 - [services/api/README.md](services/api/README.md): local API endpoints and Swagger/OpenAPI docs
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
