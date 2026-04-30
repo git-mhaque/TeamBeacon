@@ -261,42 +261,9 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByRole("heading", { name: "Sprint Trend Bars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Performance (Last 6 Sprints)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Work Mix and Capacity Signal" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
-    expect(screen.getByText("% Cycle Time is normalized within the selected statuses.")).toBeInTheDocument();
-    expect(screen.getByText("Tracked completed cards: 13")).toBeInTheDocument();
-
-    const statusCycleTable = screen.getByRole("table", { name: "Status cycle time table" });
-    const initialRows = within(statusCycleTable).getAllByRole("row");
-    expect(within(initialRows[1]).getByText("In Progress")).toBeInTheDocument();
-    expect(within(initialRows[2]).getByText("In Review")).toBeInTheDocument();
-    expect(screen.getByText("1.5 d")).toBeInTheDocument();
-    expect(screen.getAllByText("65.5%").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /Sort by Median Days/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Sort by P85 Days/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Sort by Max Days/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Sort by Total Days/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Status cycle time share pie chart" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Avg Days/i }));
-    const avgAscRows = within(statusCycleTable).getAllByRole("row");
-    expect(within(avgAscRows[1]).getByText("In Review")).toBeInTheDocument();
-    expect(within(avgAscRows[2]).getByText("In Progress")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Status/i }));
-    const statusSortedRows = within(statusCycleTable).getAllByRole("row");
-    expect(within(statusSortedRows[1]).getByText("In Progress")).toBeInTheDocument();
-    expect(within(statusSortedRows[2]).getByText("In Review")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Percent Of Cycle Time/i }));
-    const percentSortedRows = within(statusCycleTable).getAllByRole("row");
-    expect(within(percentSortedRows[1]).getByText("In Progress")).toBeInTheDocument();
-    expect(within(percentSortedRows[2]).getByText("In Review")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Issue Count/i }));
-    const headerSortedRows = within(statusCycleTable).getAllByRole("row");
-    expect(within(headerSortedRows[1]).getByText("In Progress")).toBeInTheDocument();
-    expect(screen.queryByText("Done")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Cycle Time Breakdown/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Status cycle time table" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Status cycle time share pie chart" })).not.toBeInTheDocument();
   });
 
   it("renders cards-in-window filters, sorting, and ticket status detail timeline", async () => {
@@ -598,12 +565,12 @@ describe("TeamInsightsScreen", () => {
 
     render(<TeamInsightsScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
 
     window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
       detail: { trendWindow: 1 },
     }));
-    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (1 sprint)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Cards in Selected Window (1 sprint)" })).toBeInTheDocument();
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("sprintLimit=1"))).toBe(true);
     });
@@ -611,7 +578,7 @@ describe("TeamInsightsScreen", () => {
     window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
       detail: { trendWindow: 5 },
     }));
-    expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
     await waitFor(() => {
       const sprintLimitTwelveCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes("sprintLimit=12"));
       expect(sprintLimitTwelveCalls.length).toBeGreaterThan(1);
@@ -766,7 +733,7 @@ describe("TeamInsightsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
     expect(fetchSpy.mock.calls).toHaveLength(fetchCallCountBeforeSettings);
     expect(screen.getByRole("tab", { name: "Avg Cycle Time" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
@@ -905,12 +872,8 @@ describe("TeamInsightsScreen", () => {
     const fallbackCompletedStoryPointsChart = getLatestChartCall("Completed story points sprint bar chart");
     expect(getBarDataset(fallbackCompletedStoryPointsChart).data).toEqual([12.5, 0]);
 
-    const statusCycleTable = screen.getByRole("table", { name: "Status cycle time table" });
-    const rows = within(statusCycleTable).getAllByRole("row");
-    expect(within(rows[1]).getByText("Testing")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("QA Ready")).toBeInTheDocument();
-    expect(within(rows[3]).getByText("Blocked")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Status cycle time share pie chart" })).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Status cycle time table" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Status cycle time share pie chart" })).not.toBeInTheDocument();
   });
 
   it("refetches team insights with a custom cycle-time status selection", async () => {
@@ -1032,8 +995,7 @@ describe("TeamInsightsScreen", () => {
 
     expect(await screen.findByText("Team insights error: Network down")).toBeInTheDocument();
     expect(screen.getByText("No recent sprint trend data found.")).toBeInTheDocument();
-    expect(screen.getByText("No cycle-time data found for the selected workflow statuses.")).toBeInTheDocument();
-    expect(screen.getByText("Tracked completed cards: 0")).toBeInTheDocument();
+    expect(screen.getByText("No cards found for the selected sprint window.")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
     const emptyCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");
     expect(emptyCycleTimeChart.config.options.scales.y.max).toBe(8);
