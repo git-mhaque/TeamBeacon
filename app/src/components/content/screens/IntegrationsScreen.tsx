@@ -23,11 +23,44 @@ import {
   updateWorkType,
 } from "../../../lib/api";
 
+const SHORT_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+function formatDateOnlyLabel(value: string): string | null {
+  const trimmed = value.trim();
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    const monthIndex = Number.parseInt(month, 10) - 1;
+    if (monthIndex < 0 || monthIndex >= SHORT_MONTH_NAMES.length) {
+      return null;
+    }
+    return `${day}-${SHORT_MONTH_NAMES[monthIndex]}-${year}`;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = SHORT_MONTH_NAMES[date.getMonth()];
+  const year = String(date.getFullYear());
+  return `${day}-${month}-${year}`;
+}
+
+function formatDateTimeLabel(value: string): string | null {
+  const dateLabel = formatDateOnlyLabel(value);
+  if (!dateLabel) return null;
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnlyMatch) {
+    return dateLabel;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return `${dateLabel}, ${parsed.toLocaleTimeString()}`;
+}
+
 function formatCheckedAt(value: string | null | undefined): string {
   if (!value) return "n/a";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  const formatted = formatDateTimeLabel(value);
+  return formatted ?? value;
 }
 
 function checksSummary(checks: { ok: boolean }[] | undefined): string {
@@ -38,17 +71,15 @@ function checksSummary(checks: { ok: boolean }[] | undefined): string {
 
 function formatTimestamp(value: string | null | undefined): string {
   if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  const formatted = formatDateTimeLabel(value);
+  return formatted ?? value;
 }
 
 function formatSyncMode(mode: JiraSyncMode | null | undefined, requestedSince?: string | null): string {
   if (mode === "since_date") {
     if (!requestedSince) return "Since Date";
-    const requestedDate = new Date(requestedSince);
-    if (Number.isNaN(requestedDate.getTime())) return `Since ${requestedSince}`;
-    return `Since ${requestedDate.toLocaleDateString()}`;
+    const formatted = formatDateOnlyLabel(requestedSince);
+    return `Since ${formatted ?? requestedSince}`;
   }
   return mode === "since_last" ? "Since Last" : "Full";
 }
