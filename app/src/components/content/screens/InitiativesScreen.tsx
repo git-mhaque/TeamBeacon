@@ -17,6 +17,7 @@ import {
   fetchJiraIntegrationStatus,
   upsertEpicMetadata,
 } from "../../../lib/api";
+import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 type RagLabel = "Red" | "Amber" | "Green";
 
@@ -51,6 +52,7 @@ const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }
 ];
 
 const DEFAULT_VISIBLE_OPTIONAL_COLUMNS: OptionalColumnId[] = OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id);
+const INITIATIVES_VISIBLE_COLUMNS_KEY = "teambeacon.initiatives.visibleOptionalColumns";
 
 const RAG_SORT_RANK: Record<RagLabel, number> = {
   Red: 0,
@@ -347,6 +349,31 @@ function compareNumber(left: number, right: number): number {
   return left < right ? -1 : 1;
 }
 
+function parsePersistedVisibleOptionalColumns(raw: string | null): OptionalColumnId[] {
+  if (!raw) return DEFAULT_VISIBLE_OPTIONAL_COLUMNS;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_VISIBLE_OPTIONAL_COLUMNS;
+    const allowed = new Set<OptionalColumnId>(OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id));
+    const selected = new Set<OptionalColumnId>();
+    for (const entry of parsed) {
+      if (typeof entry !== "string") continue;
+      if (allowed.has(entry as OptionalColumnId)) {
+        selected.add(entry as OptionalColumnId);
+      }
+    }
+    return OPTIONAL_COLUMN_DEFINITIONS
+      .map((column) => column.id)
+      .filter((columnId) => selected.has(columnId));
+  } catch {
+    return DEFAULT_VISIBLE_OPTIONAL_COLUMNS;
+  }
+}
+
+function readPersistedVisibleOptionalColumns(): OptionalColumnId[] {
+  return parsePersistedVisibleOptionalColumns(getPreferenceSync(INITIATIVES_VISIBLE_COLUMNS_KEY));
+}
+
 export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
@@ -362,9 +389,7 @@ export function InitiativesScreen() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ragFilter, setRagFilter] = useState<"all" | RagLabel>("all");
-  const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(
-    DEFAULT_VISIBLE_OPTIONAL_COLUMNS,
-  );
+  const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(readPersistedVisibleOptionalColumns);
   const [sortField, setSortField] = useState<SortField>("epic");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isColumnOverlayOpen, setIsColumnOverlayOpen] = useState(false);
@@ -496,6 +521,10 @@ export function InitiativesScreen() {
       window.clearTimeout(timeoutId);
     };
   }, [metaSuccess]);
+
+  useEffect(() => {
+    void setPreference(INITIATIVES_VISIBLE_COLUMNS_KEY, JSON.stringify(visibleOptionalColumns));
+  }, [visibleOptionalColumns]);
 
   const loadConfigureCandidates = useCallback(async (query: string) => {
     setConfigureCandidatesLoading(true);

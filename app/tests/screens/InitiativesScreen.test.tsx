@@ -170,6 +170,12 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
 }
 
 describe("InitiativesScreen", () => {
+  beforeEach(() => {
+    if (typeof window.localStorage?.removeItem === "function") {
+      window.localStorage.removeItem("teambeacon.initiatives.visibleOptionalColumns");
+    }
+  });
+
   it("renders configured initiative summary and progress table", async () => {
     mockInitiativesEndpoints();
 
@@ -285,7 +291,9 @@ describe("InitiativesScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     expect(screen.getByRole("dialog", { name: "Select Initiative Columns" })).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Delta"));
-    expect(screen.queryByRole("columnheader", { name: "Delta" })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("columnheader", { name: "Delta" })).not.toBeInTheDocument();
+    });
   });
 
   it("opens completed-in-period overlay and generates AI summary", async () => {
