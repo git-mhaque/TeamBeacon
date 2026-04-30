@@ -1084,7 +1084,6 @@ export function InitiativesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Configured Initiative Summary</h3>
-            <p>Progress for configured epics sourced from local synced JIRA data.</p>
           </div>
           <div class="tb-btn-row">
             <button type="button" class="tb-btn" onClick={openConfigureDialog}>
@@ -1144,7 +1143,6 @@ export function InitiativesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Initiative Progress Matrix</h3>
-            <p>Filter by group, type, and RAG to inspect initiative health.</p>
           </div>
           <div class="tb-panel-header-actions">
             <span class="tb-chip">{filteredRows.length} visible</span>
@@ -1401,11 +1399,6 @@ export function InitiativesScreen() {
                         ) : null}
                         {visibleColumnSet.has("criteria") ? (
                           <td>
-                            <p class="tb-initiative-criteria" title={row.successCriteriaTooltip}>
-                              {row.successCriteria.length > 0
-                                ? `${row.successCriteria.length} criteria configured`
-                                : "No criteria configured"}
-                            </p>
                             <p class="tb-initiative-insight" title={row.ragReason}>
                               {row.insightComment?.trim() || row.ragReason}
                             </p>

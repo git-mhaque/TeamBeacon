@@ -186,7 +186,8 @@ describe("InitiativesScreen", () => {
     expect(screen.getByText("Payment Orchestration")).toBeInTheDocument();
     expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Feature").length).toBeGreaterThan(0);
-    expect(screen.getByText("1 criteria configured")).toBeInTheDocument();
+    expect(screen.queryByText(/criteria configured/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("No criteria configured")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
