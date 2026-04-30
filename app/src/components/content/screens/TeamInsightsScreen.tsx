@@ -728,6 +728,7 @@ export function TeamInsightsScreen() {
     });
     return nextRows;
   }, [cardsInWindowSortDirection, cardsInWindowSortField, filteredCardsInWindowRows]);
+  const visibleCardsInWindowCount = sortedCardsInWindowRows.length;
   const selectedCardRow = useMemo(
     () => sortedCardsInWindowRows.find((row) => row.issueKey === selectedCardIssueKey) ?? null,
     [selectedCardIssueKey, sortedCardsInWindowRows],
@@ -1266,7 +1267,9 @@ export function TeamInsightsScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Cards in Selected Window ({formatTrendWindowLabel(trendWindowSelection)})</h3>
-            <p class="tb-muted-note">{cardsInWindowTotalCards} cards in the current sprint-window selection.</p>
+          </div>
+          <div class="tb-panel-header-actions">
+            <span class="tb-chip">{visibleCardsInWindowCount} of {cardsInWindowTotalCards} cards visible</span>
           </div>
         </header>
         <div class="tb-cards-window-filters">

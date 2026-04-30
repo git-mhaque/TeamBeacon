@@ -488,7 +488,7 @@ describe("TeamInsightsScreen", () => {
     render(<TeamInsightsScreen />);
 
     expect(await screen.findByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
-    expect(await screen.findByText("3 cards in the current sprint-window selection.")).toBeInTheDocument();
+    expect(await screen.findByText("3 of 3 cards visible")).toBeInTheDocument();
     expect(screen.queryByText("In Progress cards: 1")).not.toBeInTheDocument();
 
     const cardsTable = screen.getByRole("table", { name: "Cards in selected window table" });
@@ -508,6 +508,7 @@ describe("TeamInsightsScreen", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Filter epic" }), {
       target: { value: "EPIC-2" },
     });
+    expect(screen.getByText("1 of 3 cards visible")).toBeInTheDocument();
     const epicFilteredRows = within(cardsTable).getAllByRole("row");
     expect(epicFilteredRows).toHaveLength(2);
     expect(within(epicFilteredRows[1]).getByRole("button", { name: /REV-3/i })).toBeInTheDocument();
