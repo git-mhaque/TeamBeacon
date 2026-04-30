@@ -165,7 +165,12 @@ describe("Content", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Team Insights/ }));
     expect(await screen.findByRole("heading", { name: "Team Insights" })).toBeInTheDocument();
+    const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
+    expect(trendWindowSelect).toHaveValue("12");
     const teamSettingsButton = screen.getByRole("button", { name: "Team Insights Settings" });
+    const teamTopbarActions = teamSettingsButton.closest(".tb-topbar-actions");
+    expect(teamTopbarActions).not.toBeNull();
+    expect(within(teamTopbarActions as HTMLElement).getByRole("combobox", { name: "Trend Window" })).toBeInTheDocument();
     fireEvent.click(teamSettingsButton);
     expect(await screen.findByRole("dialog", { name: "Team Insights Settings" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));

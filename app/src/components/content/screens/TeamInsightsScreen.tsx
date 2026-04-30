@@ -4,8 +4,10 @@ import { TeamInsightAvailableStatus, TeamInsightsResponse, fetchTeamInsights } f
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { TrendBarChart, type TrendBarChartPoint } from "./TrendBarChart";
 
-const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
+export const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
 export const OPEN_TEAM_INSIGHTS_SETTINGS_EVENT = "teambeacon:team-insights-open-settings";
+export const TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT = "teambeacon:team-insights-trend-window-change";
+export const TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT = "teambeacon:team-insights-trend-window-sync";
 const DEFAULT_TARGET_CYCLE_TIME_DAYS = 5;
 const DEFAULT_TREND_WINDOW = 12;
 const TEAM_INSIGHTS_SETTINGS_KEY = "teambeacon.teamInsights.settings";
@@ -30,6 +32,14 @@ const EMPTY_INSIGHTS: TeamInsightsResponse = {
     appliedStatusKeys: [],
     defaultStatusKeys: [],
     availableStatuses: [],
+    rows: [],
+  },
+  cardsInWindow: {
+    totalCards: 0,
+    inProgressCards: 0,
+    completedCards: 0,
+    trackedCards: 0,
+    appliedStatusKeys: [],
     rows: [],
   },
   workMix: {
@@ -66,6 +76,19 @@ function formatDate(value: string | null | undefined): string {
   const month = parsed.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
   const year = String(parsed.getUTCFullYear());
   return `${day}-${month}-${year}`;
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleString("en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).replace(",", "");
 }
 
 function formatSprintDateRange(startDate: string | null | undefined, endDate: string | null | undefined): string {
@@ -156,11 +179,11 @@ function resolveDefaultCycleTimeStatusKeys(
     .map((status) => status.statusKey);
 }
 
-function normalizeTrendWindow(value: number): number {
+export function normalizeTrendWindow(value: number): number {
   return TREND_WINDOW_OPTIONS.includes(value as typeof TREND_WINDOW_OPTIONS[number]) ? value : DEFAULT_TREND_WINDOW;
 }
 
-function formatTrendWindowLabel(value: number): string {
+export function formatTrendWindowLabel(value: number): string {
   if (value === 1) return "1 sprint";
   return `Last ${value} sprints`;
 }
@@ -172,6 +195,14 @@ function getTrendAxisStep(ticks: number[]): number {
 
 type StatusCycleSortField = "status" | "issueCount" | "avgDays" | "percentOfCycleTime";
 type StatusCycleSortDirection = "asc" | "desc";
+type CardsInWindowRow = NonNullable<TeamInsightsResponse["cardsInWindow"]>["rows"][number];
+type CardsInWindowSortField = (
+  "issueKey"
+  | "summary"
+  | "status"
+  | "cycleTime"
+);
+type CardsInWindowSortDirection = "asc" | "desc";
 type TrendChartTab = "cycleTime" | "completedStoryPoints";
 type PersistedTeamInsightsSettings = {
   targetCycleTimeDays: number;
@@ -217,6 +248,46 @@ function normalizeTargetCycleTime(value: number | string | null | undefined): nu
 
 function defaultSortDirectionForStatusCycleField(field: StatusCycleSortField): StatusCycleSortDirection {
   return field === "status" ? "asc" : "desc";
+}
+
+function defaultSortDirectionForCardsInWindowField(field: CardsInWindowSortField): CardsInWindowSortDirection {
+  return field === "cycleTime"
+    ? "desc"
+    : "asc";
+}
+
+function isMissingNumber(value: number | null | undefined): boolean {
+  return value === null || value === undefined || Number.isNaN(value);
+}
+
+function compareTextWithDirection(
+  left: string,
+  right: string,
+  direction: CardsInWindowSortDirection,
+): number {
+  const comparison = compareText(left, right);
+  return direction === "asc" ? comparison : -comparison;
+}
+
+function compareNullableNumberWithDirection(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  direction: CardsInWindowSortDirection,
+): number {
+  const leftMissing = isMissingNumber(left);
+  const rightMissing = isMissingNumber(right);
+  if (leftMissing || rightMissing) {
+    if (leftMissing && rightMissing) return 0;
+    return leftMissing ? 1 : -1;
+  }
+  const comparison = compareNumber(left as number, right as number);
+  return direction === "asc" ? comparison : -comparison;
+}
+
+function resolveCardCycleTimeDays(row: CardsInWindowRow): number | null {
+  if (!isMissingNumber(row.cycleTimeDays)) return row.cycleTimeDays as number;
+  if (!isMissingNumber(row.cycleTimeToDateDays)) return row.cycleTimeToDateDays as number;
+  return null;
 }
 
 function normalizePersistedCycleTimeStatusKeys(
@@ -329,6 +400,14 @@ export function TeamInsightsScreen() {
   );
   const [statusCycleSortField, setStatusCycleSortField] = useState<StatusCycleSortField>("percentOfCycleTime");
   const [statusCycleSortDirection, setStatusCycleSortDirection] = useState<StatusCycleSortDirection>("desc");
+  const [cardKeyFilter, setCardKeyFilter] = useState("");
+  const [cardSprintFilter, setCardSprintFilter] = useState("all");
+  const [cardStatusFilter, setCardStatusFilter] = useState("all");
+  const [cardTypeFilter, setCardTypeFilter] = useState("all");
+  const [cardEpicFilter, setCardEpicFilter] = useState("all");
+  const [cardsInWindowSortField, setCardsInWindowSortField] = useState<CardsInWindowSortField>("cycleTime");
+  const [cardsInWindowSortDirection, setCardsInWindowSortDirection] = useState<CardsInWindowSortDirection>("desc");
+  const [selectedCardIssueKey, setSelectedCardIssueKey] = useState<string | null>(null);
 
   const loadInsights = useCallback(async () => {
     setLoading(true);
@@ -521,6 +600,23 @@ export function TeamInsightsScreen() {
       window.removeEventListener(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT, handleOpen);
     };
   }, [openSettings]);
+  useEffect(() => {
+    const handleTrendWindowChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ trendWindow?: number }>).detail;
+      const requestedTrendWindow = Number.parseInt(String(detail?.trendWindow ?? ""), 10);
+      if (Number.isNaN(requestedTrendWindow)) return;
+      setTrendWindowSelection(normalizeTrendWindow(requestedTrendWindow));
+    };
+    window.addEventListener(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, handleTrendWindowChange as EventListener);
+    return () => {
+      window.removeEventListener(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, handleTrendWindowChange as EventListener);
+    };
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT, {
+      detail: { trendWindow: trendWindowSelection },
+    }));
+  }, [trendWindowSelection]);
 
   const maxCompletedStoryPoints = useMemo(() => {
     if (insights.trend.length === 0) return 0;
@@ -536,6 +632,150 @@ export function TeamInsightsScreen() {
   );
   const completedStoryPointsAxis = useMemo(() => buildTrendAxis(maxCompletedStoryPoints), [maxCompletedStoryPoints]);
   const selectedStatusCycleRows = useMemo(() => insights.statusCycleTime.rows, [insights.statusCycleTime.rows]);
+  const cardsInWindowRows = useMemo(
+    () => insights.cardsInWindow?.rows ?? [],
+    [insights.cardsInWindow?.rows],
+  );
+  const cardsInWindowTotalCards = insights.cardsInWindow?.totalCards ?? cardsInWindowRows.length;
+  const cardSprintFilterOptions = useMemo(
+    () => insights.trend.map((row) => ({
+      value: String(row.sprintId),
+      label: row.sprintName?.trim() ? row.sprintName : `Sprint ${row.sprintId}`,
+    })),
+    [insights.trend],
+  );
+  const cardStatusFilterOptions = useMemo(
+    () => Array.from(
+      new Map(cardsInWindowRows.map((row) => [row.statusKey, row.status])).entries(),
+    )
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => compareText(left.label, right.label)),
+    [cardsInWindowRows],
+  );
+  const cardTypeFilterOptions = useMemo(
+    () => Array.from(
+      new Map(cardsInWindowRows.map((row) => [row.issueTypeKey, row.issueType])).entries(),
+    )
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => compareText(left.label, right.label)),
+    [cardsInWindowRows],
+  );
+  const cardEpicFilterOptions = useMemo(() => {
+    const optionsByValue = new Map<string, { value: string; label: string }>();
+    for (const row of cardsInWindowRows) {
+      const epicKey = row.epicKey?.trim();
+      if (!epicKey) continue;
+      const epicName = row.epicName?.trim();
+      const label = epicName ? `${epicKey} - ${epicName}` : epicKey;
+      const current = optionsByValue.get(epicKey);
+      if (!current || current.label === current.value) {
+        optionsByValue.set(epicKey, { value: epicKey, label });
+      }
+    }
+    return Array.from(optionsByValue.values()).sort((left, right) => compareText(left.label, right.label));
+  }, [cardsInWindowRows]);
+  const filteredCardsInWindowRows = useMemo(() => {
+    const normalizedSearchFilter = cardKeyFilter.trim().toLowerCase();
+    return cardsInWindowRows.filter((row) => {
+      if (normalizedSearchFilter) {
+        const issueKeyMatches = row.issueKey.toLowerCase().includes(normalizedSearchFilter);
+        const summaryMatches = row.summary.toLowerCase().includes(normalizedSearchFilter);
+        if (!issueKeyMatches && !summaryMatches) {
+          return false;
+        }
+      }
+      if (cardSprintFilter !== "all" && String(row.sprintId) !== cardSprintFilter) {
+        return false;
+      }
+      if (cardStatusFilter !== "all" && row.statusKey !== cardStatusFilter) {
+        return false;
+      }
+      if (cardTypeFilter !== "all" && row.issueTypeKey !== cardTypeFilter) {
+        return false;
+      }
+      if (cardEpicFilter !== "all" && (row.epicKey?.trim() ?? "") !== cardEpicFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [cardEpicFilter, cardKeyFilter, cardSprintFilter, cardStatusFilter, cardTypeFilter, cardsInWindowRows]);
+  const sortedCardsInWindowRows = useMemo(() => {
+    const nextRows = [...filteredCardsInWindowRows];
+    nextRows.sort((left, right) => {
+      let comparison = 0;
+      switch (cardsInWindowSortField) {
+        case "issueKey":
+          comparison = compareTextWithDirection(left.issueKey, right.issueKey, cardsInWindowSortDirection);
+          break;
+        case "summary":
+          comparison = compareTextWithDirection(left.summary, right.summary, cardsInWindowSortDirection);
+          break;
+        case "status":
+          comparison = compareTextWithDirection(left.status, right.status, cardsInWindowSortDirection);
+          break;
+        case "cycleTime":
+          comparison = compareNullableNumberWithDirection(
+            resolveCardCycleTimeDays(left),
+            resolveCardCycleTimeDays(right),
+            cardsInWindowSortDirection,
+          );
+          break;
+      }
+      if (comparison === 0) {
+        comparison = compareText(left.issueKey, right.issueKey);
+      }
+      return comparison;
+    });
+    return nextRows;
+  }, [cardsInWindowSortDirection, cardsInWindowSortField, filteredCardsInWindowRows]);
+  const selectedCardRow = useMemo(
+    () => sortedCardsInWindowRows.find((row) => row.issueKey === selectedCardIssueKey) ?? null,
+    [selectedCardIssueKey, sortedCardsInWindowRows],
+  );
+  const selectedCardStatusTimeline = selectedCardRow?.statusTimeline ?? [];
+  const selectedCardStatusBreakdown = useMemo(() => {
+    const totalsByStatus = new Map<string, { status: string; days: number }>();
+    for (const entry of selectedCardStatusTimeline) {
+      if (!entry.isCycleTimeStatus) continue;
+      if (entry.days <= 0) continue;
+      const current = totalsByStatus.get(entry.statusKey);
+      if (current) {
+        current.days += entry.days;
+      } else {
+        totalsByStatus.set(entry.statusKey, { status: entry.status, days: entry.days });
+      }
+    }
+    const totalDays = Array.from(totalsByStatus.values()).reduce((sum, row) => sum + row.days, 0);
+    const rows = Array.from(totalsByStatus.entries())
+      .map(([statusKey, row]) => ({
+        statusKey,
+        status: row.status,
+        days: roundMetric(row.days),
+        percentOfTicketTime: totalDays > 0 ? roundMetric((row.days / totalDays) * 100) : 0,
+      }))
+      .sort((left, right) => compareNumber(right.days, left.days));
+    return rows.map((row, index) => ({
+      ...row,
+      color: STATUS_CYCLE_PIE_COLORS[index % STATUS_CYCLE_PIE_COLORS.length],
+    }));
+  }, [selectedCardStatusTimeline]);
+  const selectedCardStatusPieGradient = useMemo(() => {
+    if (selectedCardStatusBreakdown.length === 0) {
+      return "conic-gradient(#dfe8f8 0% 100%)";
+    }
+    let cursor = 0;
+    const segments: string[] = [];
+    for (const slice of selectedCardStatusBreakdown) {
+      const start = cursor;
+      const end = Math.min(100, start + slice.percentOfTicketTime);
+      segments.push(`${slice.color} ${start}% ${end}%`);
+      cursor = end;
+    }
+    if (cursor < 100) {
+      segments.push(`#dfe8f8 ${cursor}% 100%`);
+    }
+    return `conic-gradient(${segments.join(", ")})`;
+  }, [selectedCardStatusBreakdown]);
   const statusCyclePieSlices = useMemo(() => {
     const rows = [...selectedStatusCycleRows].sort((left, right) => right.percentOfCycleTime - left.percentOfCycleTime);
     return rows.map((row, index) => ({
@@ -586,6 +826,36 @@ export function TeamInsightsScreen() {
     });
     return nextRows;
   }, [selectedStatusCycleRows, statusCycleSortDirection, statusCycleSortField]);
+  useEffect(() => {
+    if (cardSprintFilter === "all") return;
+    if (cardSprintFilterOptions.some((option) => option.value === cardSprintFilter)) return;
+    setCardSprintFilter("all");
+  }, [cardSprintFilter, cardSprintFilterOptions]);
+  useEffect(() => {
+    if (cardStatusFilter === "all") return;
+    if (cardStatusFilterOptions.some((option) => option.value === cardStatusFilter)) return;
+    setCardStatusFilter("all");
+  }, [cardStatusFilter, cardStatusFilterOptions]);
+  useEffect(() => {
+    if (cardTypeFilter === "all") return;
+    if (cardTypeFilterOptions.some((option) => option.value === cardTypeFilter)) return;
+    setCardTypeFilter("all");
+  }, [cardTypeFilter, cardTypeFilterOptions]);
+  useEffect(() => {
+    if (cardEpicFilter === "all") return;
+    if (cardEpicFilterOptions.some((option) => option.value === cardEpicFilter)) return;
+    setCardEpicFilter("all");
+  }, [cardEpicFilter, cardEpicFilterOptions]);
+  useEffect(() => {
+    if (sortedCardsInWindowRows.length === 0) {
+      if (selectedCardIssueKey !== null) setSelectedCardIssueKey(null);
+      return;
+    }
+    if (selectedCardIssueKey && sortedCardsInWindowRows.some((row) => row.issueKey === selectedCardIssueKey)) {
+      return;
+    }
+    setSelectedCardIssueKey(sortedCardsInWindowRows[0].issueKey);
+  }, [selectedCardIssueKey, sortedCardsInWindowRows]);
 
   const cycleTimeStatusGroups = useMemo(() => {
     const categoryOrder = ["To Do", "In Progress", "Done", "Other"] as const;
@@ -632,10 +902,25 @@ export function TeamInsightsScreen() {
     });
   }, []);
 
-  const resolveSortIndicator = useCallback((field: StatusCycleSortField): string => {
+  const handleCardsInWindowSortHeaderClick = useCallback((field: CardsInWindowSortField) => {
+    setCardsInWindowSortField((current) => {
+      if (current === field) {
+        setCardsInWindowSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+        return current;
+      }
+      setCardsInWindowSortDirection(defaultSortDirectionForCardsInWindowField(field));
+      return field;
+    });
+  }, []);
+
+  const resolveStatusCycleSortIndicator = useCallback((field: StatusCycleSortField): string => {
     if (statusCycleSortField !== field) return "↕";
     return statusCycleSortDirection === "asc" ? "↑" : "↓";
   }, [statusCycleSortDirection, statusCycleSortField]);
+  const resolveCardsInWindowSortIndicator = useCallback((field: CardsInWindowSortField): string => {
+    if (cardsInWindowSortField !== field) return "↕";
+    return cardsInWindowSortDirection === "asc" ? "↑" : "↓";
+  }, [cardsInWindowSortDirection, cardsInWindowSortField]);
 
   const trendRows = insights.trend;
   const activeTrendChart = selectedTrendChart === "completedStoryPoints" && showCompletedStoryPointsChart
@@ -678,23 +963,6 @@ export function TeamInsightsScreen() {
             <h3>Sprint Trend</h3>
           </div>
         </header>
-        <div class="tb-trend-window-inline">
-          <label for="tb-trend-window-select">Trend Window</label>
-          <select
-            id="tb-trend-window-select"
-            value={String(trendWindowSelection)}
-            onChange={(event) => {
-              const nextValue = Number.parseInt((event.currentTarget as HTMLSelectElement).value, 10);
-              setTrendWindowSelection(normalizeTrendWindow(nextValue));
-            }}
-          >
-            {TREND_WINDOW_OPTIONS.map((value) => (
-              <option key={value} value={String(value)}>
-                {formatTrendWindowLabel(value)}
-              </option>
-            ))}
-          </select>
-        </div>
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
             <h4>Median Cycle Time</h4>
@@ -997,6 +1265,252 @@ export function TeamInsightsScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
+            <h3>Cards in Selected Window ({formatTrendWindowLabel(trendWindowSelection)})</h3>
+            <p class="tb-muted-note">{cardsInWindowTotalCards} cards in the current sprint-window selection.</p>
+          </div>
+        </header>
+        <div class="tb-cards-window-filters">
+          <label class="tb-cards-window-filter">
+            <span>Search</span>
+            <input
+              aria-label="Search by key or summary"
+              type="text"
+              placeholder="Search key, summary"
+              value={cardKeyFilter}
+              onInput={(event) => setCardKeyFilter((event.currentTarget as HTMLInputElement).value)}
+            />
+          </label>
+          <label class="tb-cards-window-filter">
+            <span>Sprint</span>
+            <select
+              aria-label="Filter sprint"
+              value={cardSprintFilter}
+              onChange={(event) => setCardSprintFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              <option value="all">All sprints</option>
+              {cardSprintFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-cards-window-filter">
+            <span>Status</span>
+            <select
+              aria-label="Filter status"
+              value={cardStatusFilter}
+              onChange={(event) => setCardStatusFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              <option value="all">All statuses</option>
+              {cardStatusFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-cards-window-filter">
+            <span>Type</span>
+            <select
+              aria-label="Filter type"
+              value={cardTypeFilter}
+              onChange={(event) => setCardTypeFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              <option value="all">All types</option>
+              {cardTypeFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="tb-cards-window-filter">
+            <span>Epic</span>
+            <select
+              aria-label="Filter epic"
+              value={cardEpicFilter}
+              onChange={(event) => setCardEpicFilter((event.currentTarget as HTMLSelectElement).value)}
+            >
+              <option value="all">All epics</option>
+              {cardEpicFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {loading ? <p class="tb-muted-note">Loading cards in selected window...</p> : null}
+        {!loading && cardsInWindowRows.length === 0 ? (
+          <p class="tb-muted-note">No cards found for the selected sprint window.</p>
+        ) : null}
+        {!loading && sortedCardsInWindowRows.length === 0 && cardsInWindowRows.length > 0 ? (
+          <p class="tb-muted-note">No cards match the current filters.</p>
+        ) : null}
+        {sortedCardsInWindowRows.length > 0 ? (
+          <div class="tb-cards-window-layout">
+            <div class="tb-cards-window-table-wrap">
+              <table class="tb-cards-window-table" aria-label="Cards in selected window table">
+                <thead>
+                  <tr>
+                    <th>
+                      <button
+                        type="button"
+                        class={`tb-table-sort${cardsInWindowSortField === "issueKey" ? " is-active" : ""}`}
+                        onClick={() => handleCardsInWindowSortHeaderClick("issueKey")}
+                        aria-label={`Sort by Key (${cardsInWindowSortField === "issueKey" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Key</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("issueKey")}</span>
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        type="button"
+                        class={`tb-table-sort${cardsInWindowSortField === "summary" ? " is-active" : ""}`}
+                        onClick={() => handleCardsInWindowSortHeaderClick("summary")}
+                        aria-label={`Sort by Summary (${cardsInWindowSortField === "summary" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Summary</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("summary")}</span>
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        type="button"
+                        class={`tb-table-sort${cardsInWindowSortField === "status" ? " is-active" : ""}`}
+                        onClick={() => handleCardsInWindowSortHeaderClick("status")}
+                        aria-label={`Sort by Status (${cardsInWindowSortField === "status" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Status</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("status")}</span>
+                      </button>
+                    </th>
+                    <th class="is-numeric tb-cards-window-cycle-time-head">
+                      <button
+                        type="button"
+                        class={`tb-table-sort${cardsInWindowSortField === "cycleTime" ? " is-active" : ""}`}
+                        onClick={() => handleCardsInWindowSortHeaderClick("cycleTime")}
+                        aria-label={`Sort by Cycle Time (${cardsInWindowSortField === "cycleTime" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
+                      >
+                        <span>Cycle Time</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("cycleTime")}</span>
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedCardsInWindowRows.map((row) => (
+                    <tr
+                      key={`cards-window-${row.issueKey}`}
+                      class={row.issueKey === selectedCardIssueKey ? "is-selected" : ""}
+                    >
+                      <td class="tb-cards-window-key-cell">
+                        <button
+                          type="button"
+                          class={`tb-cards-window-ticket-button${row.issueKey === selectedCardIssueKey ? " is-selected" : ""}`}
+                          onClick={() => setSelectedCardIssueKey(row.issueKey)}
+                        >
+                          <span class="tb-cards-window-ticket-key">{row.issueKey}</span>
+                        </button>
+                      </td>
+                      <td class="tb-cards-window-summary-cell">{row.summary}</td>
+                      <td>{row.status}</td>
+                      <td class="tb-status-cycle-cell-numeric tb-cards-window-cycle-time-cell">
+                        {formatDays(resolveCardCycleTimeDays(row))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <aside class="tb-cards-window-detail-card">
+              <h4>Card Statuses</h4>
+              {selectedCardRow ? (
+                <>
+                  {selectedCardRow.issueUrl ? (
+                    <a
+                      class="tb-cards-window-detail-issue-link"
+                      href={selectedCardRow.issueUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span class="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
+                      <span class="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
+                    </a>
+                  ) : (
+                    <div class="tb-cards-window-detail-issue-link is-static">
+                      <span class="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
+                      <span class="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
+                    </div>
+                  )}
+                  <p class="tb-muted-note">Bold statuses contribute to cycle-time calculations.</p>
+                  {selectedCardStatusTimeline.length > 0 ? (
+                    <div class="tb-cards-window-detail-wrap">
+                      <table class="tb-cards-window-detail-table" aria-label="Selected card status timeline">
+                        <thead>
+                          <tr>
+                            <th>Status</th>
+                            <th>Changed At</th>
+                            <th class="is-numeric">Days</th>
+                            <th class="is-numeric">% Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedCardStatusTimeline.map((entry, index) => (
+                            <tr key={`${selectedCardRow.issueKey}-${entry.statusKey}-${index}`}>
+                              <td>
+                                {entry.isCycleTimeStatus ? <strong>{entry.status}</strong> : entry.status}
+                              </td>
+                              <td>{formatDateTime(entry.changedAt)}</td>
+                              <td class="tb-status-cycle-cell-numeric">
+                                {entry.isCycleTimeStatus ? <strong>{formatDays(entry.days)}</strong> : formatDays(entry.days)}
+                              </td>
+                              <td class="tb-status-cycle-cell-numeric">
+                                {entry.isCycleTimeStatus ? <strong>{formatPercent(entry.percentOfTicketTime)}</strong> : formatPercent(entry.percentOfTicketTime)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p class="tb-muted-note">No status timeline found for this card.</p>
+                  )}
+                  {selectedCardStatusBreakdown.length > 0 ? (
+                    <section class="tb-cards-window-pie-card">
+                      <h5>Time Distribution by Status</h5>
+                      <div class="tb-cards-window-pie-wrap">
+                        <div
+                          class="tb-cards-window-pie"
+                          role="img"
+                          aria-label="Selected card status time distribution pie chart"
+                          style={{ background: selectedCardStatusPieGradient }}
+                        />
+                        <ul class="tb-cards-window-pie-legend">
+                          {selectedCardStatusBreakdown.map((slice) => (
+                            <li key={`card-pie-${selectedCardRow.issueKey}-${slice.statusKey}`}>
+                              <span class="tb-cards-window-pie-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
+                              <span class="tb-cards-window-pie-legend-label">{slice.status}</span>
+                              <span class="tb-cards-window-pie-legend-value">{formatPercent(slice.percentOfTicketTime)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </section>
+                  ) : null}
+                </>
+              ) : (
+                <p class="tb-muted-note">Select a ticket to view status history details.</p>
+              )}
+            </aside>
+          </div>
+        ) : null}
+      </section>
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
             <h3>Cycle Time Breakdown ({formatTrendWindowLabel(trendWindowSelection)})</h3>
           </div>
         </header>
@@ -1024,7 +1538,7 @@ export function TeamInsightsScreen() {
                         aria-label={`Sort by Status (${statusCycleSortField === "status" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Status</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("status")}</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveStatusCycleSortIndicator("status")}</span>
                       </button>
                     </th>
                     <th class="is-numeric">
@@ -1035,7 +1549,7 @@ export function TeamInsightsScreen() {
                         aria-label={`Sort by Issue Count (${statusCycleSortField === "issueCount" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Cards</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("issueCount")}</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveStatusCycleSortIndicator("issueCount")}</span>
                       </button>
                     </th>
                     <th class="is-numeric">
@@ -1046,7 +1560,7 @@ export function TeamInsightsScreen() {
                         aria-label={`Sort by Avg Days (${statusCycleSortField === "avgDays" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Avg Days</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("avgDays")}</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveStatusCycleSortIndicator("avgDays")}</span>
                       </button>
                     </th>
                     <th class="is-numeric">
@@ -1057,7 +1571,7 @@ export function TeamInsightsScreen() {
                         aria-label={`Sort by Percent Of Cycle Time (${statusCycleSortField === "percentOfCycleTime" && statusCycleSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>% Cycle Time</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator("percentOfCycleTime")}</span>
+                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveStatusCycleSortIndicator("percentOfCycleTime")}</span>
                       </button>
                     </th>
                   </tr>

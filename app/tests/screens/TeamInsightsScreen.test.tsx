@@ -33,6 +33,7 @@ vi.mock("chart.js/auto", () => {
 
 import {
   OPEN_TEAM_INSIGHTS_SETTINGS_EVENT,
+  TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT,
   TeamInsightsScreen,
 } from "../../src/components/content/screens/TeamInsightsScreen";
 
@@ -188,11 +189,6 @@ describe("TeamInsightsScreen", () => {
     render(<TeamInsightsScreen />);
 
     expect(screen.getByRole("heading", { name: "Sprint Trend" })).toBeInTheDocument();
-    const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
-    expect(trendWindowSelect).toHaveValue("12");
-    expect(screen.getByRole("option", { name: "1 sprint" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Last 2 sprints" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Last 3 sprints" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Avg Cycle Time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cycle Time Std Dev" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Median Cycle Time" })).toBeInTheDocument();
@@ -303,6 +299,244 @@ describe("TeamInsightsScreen", () => {
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
   });
 
+  it("renders cards-in-window filters, sorting, and ticket status detail timeline", async () => {
+    setupFetchMock({
+      "/api/team/insights": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        windowSize: 3,
+        metrics: {
+          avgCommittedStoryPoints: 25,
+          avgCompletedStoryPoints: 20,
+          completionRatioPercent: 80,
+          carryoverPercent: 20,
+          avgCycleTimeDays: 4.2,
+          cycleTimeStdDevDays: 1.1,
+          medianCycleTimeDays: 4,
+        },
+        trend: [
+          {
+            sprintId: 9101,
+            sprintName: "Sprint 91",
+            state: "active",
+            startDate: "2026-04-01T00:00:00+00:00",
+            endDate: "2026-04-14T00:00:00+00:00",
+            committedStoryPoints: 25,
+            completedStoryPoints: 20,
+            avgCycleTimeDays: 4.2,
+            completionRatioPercent: 80,
+            carryoverPercent: 20,
+          },
+        ],
+        statusCycleTime: {
+          trackedIssues: 2,
+          completedIssues: 2,
+          excludedIssues: 0,
+          totalDays: 10,
+          appliedStatusKeys: ["in progress"],
+          defaultStatusKeys: ["in progress"],
+          availableStatuses: [
+            {
+              statusKey: "to do",
+              status: "To Do",
+              statusCategory: "To Do",
+              defaultIncluded: false,
+            },
+            {
+              statusKey: "in progress",
+              status: "In Progress",
+              statusCategory: "In Progress",
+              defaultIncluded: true,
+            },
+          ],
+          rows: [
+            {
+              status: "In Progress",
+              issueCount: 2,
+              avgDays: 5,
+              medianDays: 5,
+              p85Days: 6,
+              maxDays: 6,
+              totalDays: 10,
+              percentOfCycleTime: 100,
+            },
+          ],
+        },
+        cardsInWindow: {
+          totalCards: 3,
+          inProgressCards: 1,
+          completedCards: 2,
+          trackedCards: 3,
+          appliedStatusKeys: ["in progress"],
+          rows: [
+            {
+              issueKey: "REV-1",
+              epicKey: "EPIC-1",
+              epicName: "Platform Improvements",
+              sprintId: 9101,
+              sprintName: "Sprint 91",
+              status: "Done",
+              statusKey: "done",
+              issueType: "Story",
+              issueTypeKey: "story",
+              storyPoints: 5,
+              cycleTimeDays: 4,
+              cycleTimeToDateDays: 4,
+              summary: "Completed card",
+              isCompleted: true,
+              statusTimeline: [
+                {
+                  statusKey: "to do",
+                  status: "To Do",
+                  changedAt: "2026-04-02T00:00:00+00:00",
+                  days: 1,
+                  percentOfTicketTime: 25,
+                  isCycleTimeStatus: false,
+                },
+                {
+                  statusKey: "in progress",
+                  status: "In Progress",
+                  changedAt: "2026-04-03T00:00:00+00:00",
+                  days: 3,
+                  percentOfTicketTime: 75,
+                  isCycleTimeStatus: true,
+                },
+              ],
+            },
+            {
+              issueKey: "REV-2",
+              issueUrl: "https://jira.example.com/browse/REV-2",
+              epicKey: "EPIC-1",
+              epicName: "Platform Improvements",
+              sprintId: 9101,
+              sprintName: "Sprint 91",
+              status: "In Progress",
+              statusKey: "in progress",
+              issueType: "Task",
+              issueTypeKey: "task",
+              storyPoints: 3,
+              cycleTimeDays: null,
+              cycleTimeToDateDays: 3,
+              summary: "In-progress card",
+              isCompleted: false,
+              statusTimeline: [
+                {
+                  statusKey: "to do",
+                  status: "To Do",
+                  changedAt: "2026-04-07T00:00:00+00:00",
+                  days: 1,
+                  percentOfTicketTime: 20,
+                  isCycleTimeStatus: false,
+                },
+                {
+                  statusKey: "in progress",
+                  status: "In Progress",
+                  changedAt: "2026-04-08T00:00:00+00:00",
+                  days: 4,
+                  percentOfTicketTime: 80,
+                  isCycleTimeStatus: true,
+                },
+              ],
+            },
+            {
+              issueKey: "REV-3",
+              epicKey: "EPIC-2",
+              epicName: "Operational Hardening",
+              sprintId: 9101,
+              sprintName: "Sprint 91",
+              status: "Done",
+              statusKey: "done",
+              issueType: "Story",
+              issueTypeKey: "story",
+              storyPoints: 8,
+              cycleTimeDays: 6,
+              cycleTimeToDateDays: 6,
+              summary: "Top cycle-time card",
+              isCompleted: true,
+              statusTimeline: [
+                {
+                  statusKey: "to do",
+                  status: "To Do",
+                  changedAt: "2026-04-01T00:00:00+00:00",
+                  days: 2,
+                  percentOfTicketTime: 25,
+                  isCycleTimeStatus: false,
+                },
+                {
+                  statusKey: "in progress",
+                  status: "In Progress",
+                  changedAt: "2026-04-03T00:00:00+00:00",
+                  days: 6,
+                  percentOfTicketTime: 75,
+                  isCycleTimeStatus: true,
+                },
+              ],
+            },
+          ],
+        },
+        workMix: {
+          sprintId: 9101,
+          sprintName: "Sprint 91",
+          totalIssues: 3,
+          slices: [{ label: "Feature", count: 3, percent: 100 }],
+        },
+        summary: "Cards in window payload.",
+        error: null,
+      },
+    });
+
+    render(<TeamInsightsScreen />);
+
+    expect(await screen.findByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
+    expect(await screen.findByText("3 cards in the current sprint-window selection.")).toBeInTheDocument();
+    expect(screen.queryByText("In Progress cards: 1")).not.toBeInTheDocument();
+
+    const cardsTable = screen.getByRole("table", { name: "Cards in selected window table" });
+    const initialRows = within(cardsTable).getAllByRole("row");
+    expect(within(initialRows[1]).getByRole("button", { name: /REV-3/i })).toBeInTheDocument();
+    expect(within(initialRows[1]).getByText("Top cycle-time card")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filter epic" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Story Points/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Cycle Time To Date/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Type/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sort by Summary/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Key/i }));
+    const ticketSortedRows = within(cardsTable).getAllByRole("row");
+    expect(within(ticketSortedRows[1]).getByRole("button", { name: /REV-1/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter epic" }), {
+      target: { value: "EPIC-2" },
+    });
+    const epicFilteredRows = within(cardsTable).getAllByRole("row");
+    expect(epicFilteredRows).toHaveLength(2);
+    expect(within(epicFilteredRows[1]).getByRole("button", { name: /REV-3/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter epic" }), {
+      target: { value: "all" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Search by key or summary" }), {
+      target: { value: "REV-2" },
+    });
+    const filteredRows = within(cardsTable).getAllByRole("row");
+    expect(filteredRows).toHaveLength(2);
+    expect(within(filteredRows[1]).getByRole("button", { name: /REV-2/i })).toBeInTheDocument();
+    expect(within(filteredRows[1]).getByText("In-progress card")).toBeInTheDocument();
+
+    const detailTable = screen.getByRole("table", { name: "Selected card status timeline" });
+    const detailRows = within(detailTable).getAllByRole("row");
+    expect(within(detailRows[1]).queryByText("To Do", { selector: "strong" })).not.toBeInTheDocument();
+    expect(within(detailRows[2]).getByText("In Progress", { selector: "strong" })).toBeInTheDocument();
+    expect(within(detailRows[2]).getByText("4 d", { selector: "strong" })).toBeInTheDocument();
+    expect(within(detailRows[2]).getByText("80%", { selector: "strong" })).toBeInTheDocument();
+    const detailCard = screen.getByRole("heading", { name: "Card Statuses" }).closest(".tb-cards-window-detail-card");
+    expect(detailCard).not.toBeNull();
+    const detailKeyLink = within(detailCard as HTMLElement).getByRole("link", { name: /REV-2/i });
+    expect(detailKeyLink).toHaveAttribute("href", "https://jira.example.com/browse/REV-2");
+    expect(within(detailCard as HTMLElement).getByText("In-progress card")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Selected card status time distribution pie chart" })).toBeInTheDocument();
+  });
+
   it("updates the trend window and normalizes unexpected selection values", async () => {
     const fetchSpy = setupFetchMock({
       "/api/team/insights": {
@@ -363,18 +597,19 @@ describe("TeamInsightsScreen", () => {
 
     render(<TeamInsightsScreen />);
 
-    const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });
     expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
 
-    fireEvent.change(trendWindowSelect, { target: { value: "1" } });
-    await waitFor(() => expect(trendWindowSelect).toHaveValue("1"));
+    window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
+      detail: { trendWindow: 1 },
+    }));
     expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (1 sprint)" })).toBeInTheDocument();
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("sprintLimit=1"))).toBe(true);
     });
 
-    fireEvent.change(trendWindowSelect, { target: { value: "5" } });
-    await waitFor(() => expect(trendWindowSelect).toHaveValue("12"));
+    window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
+      detail: { trendWindow: 5 },
+    }));
     expect(await screen.findByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
     await waitFor(() => {
       const sprintLimitTwelveCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes("sprintLimit=12"));
@@ -530,7 +765,7 @@ describe("TeamInsightsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("combobox", { name: "Trend Window" })).toHaveValue("12");
+    expect(screen.getByRole("heading", { name: "Cycle Time Breakdown (Last 12 sprints)" })).toBeInTheDocument();
     expect(fetchSpy.mock.calls).toHaveLength(fetchCallCountBeforeSettings);
     expect(screen.getByRole("tab", { name: "Avg Cycle Time" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();

@@ -96,9 +96,17 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `statusCycleTime.appliedStatusKeys` and `statusCycleTime.defaultStatusKeys`
     - `statusCycleTime.availableStatuses[]` with `statusKey`, `status`, `statusCategory`, and `defaultIncluded`
     - `statusCycleTime.rows[]` with per-status `avgDays`, `medianDays`, `p85Days`, `maxDays`, `totalDays`, and `percentOfCycleTime`
+  - Cards-in-window payload includes:
+    - `cardsInWindow.totalCards`, `cardsInWindow.inProgressCards`, `cardsInWindow.completedCards`, `cardsInWindow.trackedCards`
+    - `cardsInWindow.appliedStatusKeys` (status keys currently used for cycle-time calculations)
+    - `cardsInWindow.rows[]` with per-card details:
+      - `issueKey`, `sprintId`, `sprintName`, `status`, `statusKey`, `issueType`, `issueTypeKey`, `storyPoints`, `summary`, `isCompleted`
+      - `cycleTimeDays` (completed cards only) and `cycleTimeToDateDays` (completed + in-progress cards)
+      - `statusTimeline[]` in chronological order with `status`, `changedAt`, `days`, `percentOfTicketTime`, and `isCycleTimeStatus`
   - Cycle-time semantics:
     - Default status selection excludes obvious backlog/to-do states
     - Custom status mode sums the time spent in the selected workflow statuses from issue creation to resolution
+    - `cycleTimeToDateDays` uses the same selected workflow statuses and runs to "now" for unresolved cards
     - Completed cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
 - `GET /api/metadata/lookup`

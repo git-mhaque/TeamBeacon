@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from math import ceil
 from statistics import median, pstdev
 from typing import Any
+from urllib.parse import quote
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
@@ -80,6 +82,39 @@ def _resolve_configured_board_id() -> int | None:
         return runtime.board_id
     except Exception:  # noqa: BLE001
         return None
+
+
+def _resolve_jira_base_url() -> str | None:
+    try:
+        load_env_files()
+    except Exception:  # noqa: BLE001
+        return None
+    base_url = str(os.environ.get("JIRA_BASE_URL", "")).strip()
+    if not base_url:
+        return None
+    return base_url.rstrip("/")
+
+
+def _resolve_jira_base_url_from_db(conn: sqlite3.Connection) -> str | None:
+    try:
+        row = conn.execute(
+            """
+            SELECT base_url
+            FROM integration_configs
+            WHERE source_type = 'jira'
+              AND is_enabled = 1
+            ORDER BY datetime(updated_at) DESC, id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    base_url = str(row["base_url"]).strip() if row["base_url"] is not None else ""
+    if not base_url:
+        return None
+    return base_url.rstrip("/")
 
 
 def _is_done_status(status_category: str | None, status_name: str | None) -> bool:
@@ -252,17 +287,47 @@ def _build_issue_status_cycle_days(
     current_status_name: str | None,
     status_changes: list[tuple[datetime, str | None, str | None]],
 ) -> dict[str, float]:
-    if not status_changes or cycle_ended_at is None:
-        return {}
+    timeline = _build_issue_status_timeline(
+        cycle_ended_at=cycle_ended_at,
+        created_at=created_at,
+        current_status_name=current_status_name,
+        status_changes=status_changes,
+    )
+    issue_status_cycle_days: dict[str, float] = defaultdict(float)
+    for segment in timeline:
+        status_key = segment["statusKey"]
+        duration_days = float(segment["days"])
+        if duration_days <= 0:
+            continue
+        issue_status_cycle_days[status_key] += duration_days
+    return dict(issue_status_cycle_days)
+
+
+def _build_issue_status_timeline(
+    *,
+    cycle_ended_at: datetime | None,
+    created_at: datetime | None,
+    current_status_name: str | None,
+    status_changes: list[tuple[datetime, str | None, str | None]],
+) -> list[dict[str, Any]]:
+    if cycle_ended_at is None:
+        return []
 
     sorted_changes = sorted(status_changes, key=lambda item: item[0])
+    if not sorted_changes and created_at is None:
+        return []
+
+    timeline_start = (
+        created_at
+        if created_at is not None and created_at < cycle_ended_at
+        else sorted_changes[0][0]
+        if sorted_changes
+        else cycle_ended_at
+    )
+    if timeline_start >= cycle_ended_at:
+        return []
+
     current_status_key: str | None = None
-
-    if created_at is not None and created_at < cycle_ended_at:
-        timeline_start = created_at
-    else:
-        timeline_start = sorted_changes[0][0]
-
     for changed_at, _from_key, to_key in sorted_changes:
         if changed_at <= timeline_start:
             if to_key is not None:
@@ -276,31 +341,49 @@ def _build_issue_status_cycle_days(
                 current_status_key = from_key
                 break
 
+    if current_status_key is None and current_status_name is not None:
+        current_status_key = _status_key(current_status_name)
+    if current_status_key is None:
+        return []
+
     cursor = timeline_start
-    issue_status_cycle_days: dict[str, float] = defaultdict(float)
+    timeline: list[dict[str, Any]] = []
+
+    def append_segment(status_key: str, started_at: datetime, ended_at: datetime) -> None:
+        if ended_at <= started_at:
+            return
+        duration_days = (ended_at - started_at).total_seconds() / 86400.0
+        if duration_days <= 0:
+            return
+        if (
+            timeline
+            and timeline[-1]["statusKey"] == status_key
+            and timeline[-1]["endedAt"] == started_at.isoformat()
+        ):
+            timeline[-1]["endedAt"] = ended_at.isoformat()
+            timeline[-1]["days"] = _round_metric(float(timeline[-1]["days"]) + duration_days)
+            return
+        timeline.append(
+            {
+                "statusKey": status_key,
+                "startedAt": started_at.isoformat(),
+                "endedAt": ended_at.isoformat(),
+                "days": _round_metric(duration_days),
+            }
+        )
 
     for changed_at, _from_key, to_key in sorted_changes:
         if changed_at <= timeline_start:
             continue
         if changed_at > cycle_ended_at:
             break
-        if current_status_key is not None and changed_at > cursor:
-            duration_days = (changed_at - cursor).total_seconds() / 86400.0
-            if duration_days > 0:
-                issue_status_cycle_days[current_status_key] += duration_days
+        append_segment(current_status_key, cursor, changed_at)
         if to_key is not None:
             current_status_key = to_key
         cursor = changed_at
 
-    if current_status_key is None and current_status_name is not None:
-        current_status_key = _status_key(current_status_name)
-
-    if current_status_key is not None and cycle_ended_at > cursor:
-        duration_days = (cycle_ended_at - cursor).total_seconds() / 86400.0
-        if duration_days > 0:
-            issue_status_cycle_days[current_status_key] += duration_days
-
-    return dict(issue_status_cycle_days)
+    append_segment(current_status_key, cursor, cycle_ended_at)
+    return timeline
 
 
 def _completion_ratio_percent(
@@ -342,6 +425,14 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
             "availableStatuses": [],
             "rows": [],
         },
+        "cardsInWindow": {
+            "totalCards": 0,
+            "inProgressCards": 0,
+            "completedCards": 0,
+            "trackedCards": 0,
+            "appliedStatusKeys": [],
+            "rows": [],
+        },
         "workMix": {
             "sprintId": None,
             "sprintName": None,
@@ -368,6 +459,7 @@ def get_team_insights(
     conn.row_factory = sqlite3.Row
     try:
         _ensure_schema(conn)
+        jira_base_url = _resolve_jira_base_url() or _resolve_jira_base_url_from_db(conn)
         sprint_rows = conn.execute(
             """
             SELECT
@@ -404,16 +496,20 @@ def get_team_insights(
             issue_rows = conn.execute(
                 f"""
                 SELECT
-                  sprint_external_id,
-                  issue_key,
-                  issue_type,
-                  status_name,
-                  status_category,
-                  story_points,
-                  created_at_source,
-                  resolved_at_source
-                FROM issues
-                WHERE sprint_external_id IN ({placeholders})
+                  i.sprint_external_id,
+                  i.issue_key,
+                  i.issue_type,
+                  i.summary,
+                  i.status_name,
+                  i.status_category,
+                  i.story_points,
+                  i.created_at_source,
+                  i.resolved_at_source,
+                  i.epic_key,
+                  em.epic_name
+                FROM issues i
+                LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
+                WHERE i.sprint_external_id IN ({placeholders})
                 """,
                 tuple(sprint_ids),
             ).fetchall()
@@ -481,6 +577,15 @@ def get_team_insights(
         status_cycle_total_days_by_status: dict[str, float] = defaultdict(float)
         status_cycle_issue_days_by_status: dict[str, list[float]] = defaultdict(list)
         status_cycle_issue_keys_by_status: dict[str, set[str]] = defaultdict(set)
+        now_utc = datetime.now(timezone.utc)
+        available_status_label_by_key = {
+            entry["statusKey"]: entry["status"]
+            for entry in available_statuses
+        }
+        cards_in_window_rows: list[dict[str, Any]] = []
+        cards_in_window_completed = 0
+        cards_in_window_in_progress = 0
+        cards_in_window_tracked = 0
         tracked_cycle_issues = 0
         completed_cycle_issues = 0
         total_committed_story_points = 0.0
@@ -504,45 +609,154 @@ def get_team_insights(
                 if story_points is not None:
                     committed_story_points += story_points
 
-                if _is_done_status(issue_row["status_category"], issue_row["status_name"]):
+                status_name_raw = issue_row["status_name"]
+                status_category_raw = issue_row["status_category"]
+                issue_type_raw = issue_row["issue_type"]
+                issue_type_key = _normalize(issue_type_raw)
+                is_epic = issue_type_key == "epic"
+                is_done_issue = _is_done_status(status_category_raw, status_name_raw)
+                issue_key = (
+                    str(issue_row["issue_key"]).strip()
+                    if issue_row["issue_key"] is not None
+                    else ""
+                )
+                created_at = _parse_iso_datetime(issue_row["created_at_source"])
+                resolved_at = _parse_iso_datetime(issue_row["resolved_at_source"])
+                cycle_ended_at = resolved_at if resolved_at is not None else now_utc
+                issue_status_timeline = _build_issue_status_timeline(
+                    cycle_ended_at=cycle_ended_at,
+                    created_at=created_at,
+                    current_status_name=status_name_raw,
+                    status_changes=status_changes_by_issue_key.get(issue_key, []),
+                )
+                issue_status_cycle_days: dict[str, float] = defaultdict(float)
+                for segment in issue_status_timeline:
+                    status_key = str(segment["statusKey"]).strip()
+                    if not status_key:
+                        continue
+                    issue_days = float(segment["days"])
+                    if issue_days <= 0:
+                        continue
+                    issue_status_cycle_days[status_key] += issue_days
+                selected_issue_status_days = {
+                    status_key: issue_days
+                    for status_key, issue_days in issue_status_cycle_days.items()
+                    if status_key in applied_cycle_time_status_key_set and issue_days > 0
+                }
+                cycle_time_to_date_days = sum(selected_issue_status_days.values())
+
+                if is_done_issue:
                     completed_cards += 1
                     if story_points is not None:
                         completed_story_points += story_points
 
-                    # Exclude epics from cycle-time metrics.
-                    issue_type = _normalize(issue_row["issue_type"])
-                    if issue_type == "epic":
-                        continue
+                if not is_epic and issue_key:
+                    if is_done_issue:
+                        cards_in_window_completed += 1
+                    else:
+                        cards_in_window_in_progress += 1
+                    if cycle_time_to_date_days > 0:
+                        cards_in_window_tracked += 1
 
-                    completed_cycle_issues += 1
-                    issue_key = str(issue_row["issue_key"]).strip()
-                    created_at = _parse_iso_datetime(issue_row["created_at_source"])
-                    resolved_at = _parse_iso_datetime(issue_row["resolved_at_source"])
-                    if resolved_at is not None:
-                        issue_status_cycle_days = _build_issue_status_cycle_days(
-                            cycle_ended_at=resolved_at,
-                            created_at=created_at,
-                            current_status_name=issue_row["status_name"],
-                            status_changes=status_changes_by_issue_key.get(issue_key, []),
-                        )
-                        selected_issue_status_days = {
-                            status_key: issue_days
-                            for status_key, issue_days in issue_status_cycle_days.items()
-                            if status_key in applied_cycle_time_status_key_set and issue_days > 0
-                        }
-                        duration_days = sum(selected_issue_status_days.values())
-                        if duration_days <= 0:
+                    total_timeline_days = sum(
+                        max(0.0, float(segment["days"]))
+                        for segment in issue_status_timeline
+                    )
+                    timeline_rows: list[dict[str, Any]] = []
+                    for segment in issue_status_timeline:
+                        status_key = str(segment["statusKey"]).strip()
+                        days = max(0.0, float(segment["days"]))
+                        if not status_key or days <= 0:
                             continue
-                        cycle_time_days.append(duration_days)
-                        sprint_cycle_time_days.append(duration_days)
-                        tracked_cycle_issues += 1
+                        timeline_rows.append(
+                            {
+                                "statusKey": status_key,
+                                "status": available_status_label_by_key.get(status_key, _status_label(status_key)),
+                                "changedAt": segment["startedAt"],
+                                "days": _round_metric(days),
+                                "percentOfTicketTime": (
+                                    _round_metric((days / total_timeline_days) * 100.0)
+                                    if total_timeline_days > 0
+                                    else 0.0
+                                ),
+                                "isCycleTimeStatus": status_key in applied_cycle_time_status_key_set,
+                            }
+                        )
 
-                        for status_key, issue_days in selected_issue_status_days.items():
-                            if issue_days <= 0:
-                                continue
-                            status_cycle_total_days_by_status[status_key] += issue_days
-                            status_cycle_issue_days_by_status[status_key].append(issue_days)
-                            status_cycle_issue_keys_by_status[status_key].add(issue_key)
+                    status_key = _status_key(status_name_raw)
+                    status_label = available_status_label_by_key.get(
+                        status_key,
+                        str(status_name_raw).strip() if status_name_raw is not None and str(status_name_raw).strip() else "Unknown",
+                    )
+                    issue_type_label = (
+                        str(issue_type_raw).strip()
+                        if issue_type_raw is not None and str(issue_type_raw).strip()
+                        else "Unspecified"
+                    )
+                    summary = (
+                        str(issue_row["summary"]).strip()
+                        if issue_row["summary"] is not None and str(issue_row["summary"]).strip()
+                        else "-"
+                    )
+                    epic_key = (
+                        str(issue_row["epic_key"]).strip()
+                        if issue_row["epic_key"] is not None and str(issue_row["epic_key"]).strip()
+                        else None
+                    )
+                    epic_name = (
+                        str(issue_row["epic_name"]).strip()
+                        if issue_row["epic_name"] is not None and str(issue_row["epic_name"]).strip()
+                        else None
+                    )
+                    cards_in_window_rows.append(
+                        {
+                            "issueKey": issue_key,
+                            "issueUrl": (
+                                f"{jira_base_url}/browse/{quote(issue_key)}"
+                                if jira_base_url and issue_key
+                                else None
+                            ),
+                            "epicKey": epic_key,
+                            "epicName": epic_name,
+                            "sprintId": sprint_external_id,
+                            "sprintName": sprint_row["name"],
+                            "status": status_label,
+                            "statusKey": status_key,
+                            "issueType": issue_type_label,
+                            "issueTypeKey": issue_type_key if issue_type_key else "unknown",
+                            "storyPoints": _round_metric(story_points) if story_points is not None else None,
+                            "cycleTimeDays": (
+                                _round_metric(cycle_time_to_date_days)
+                                if is_done_issue and resolved_at is not None and cycle_time_to_date_days > 0
+                                else None
+                            ),
+                            "cycleTimeToDateDays": _round_metric(cycle_time_to_date_days) if cycle_time_to_date_days > 0 else None,
+                            "summary": summary,
+                            "isCompleted": is_done_issue,
+                            "statusTimeline": timeline_rows,
+                        }
+                    )
+
+                if not is_done_issue or is_epic:
+                    continue
+
+                completed_cycle_issues += 1
+                if resolved_at is None or not issue_key:
+                    continue
+
+                duration_days = cycle_time_to_date_days
+                if duration_days <= 0:
+                    continue
+                cycle_time_days.append(duration_days)
+                sprint_cycle_time_days.append(duration_days)
+                tracked_cycle_issues += 1
+
+                for status_key, issue_days in selected_issue_status_days.items():
+                    if issue_days <= 0:
+                        continue
+                    status_cycle_total_days_by_status[status_key] += issue_days
+                    status_cycle_issue_days_by_status[status_key].append(issue_days)
+                    status_cycle_issue_keys_by_status[status_key].add(issue_key)
 
             completion_ratio_percent = _completion_ratio_percent(
                 committed_story_points=committed_story_points,
@@ -595,10 +809,6 @@ def get_team_insights(
         cycle_time_std_dev_days = _round_metric(float(pstdev(cycle_time_days))) if cycle_time_days else None
         median_cycle_time_days = _round_metric(float(median(cycle_time_days))) if cycle_time_days else None
         total_status_cycle_days = sum(status_cycle_total_days_by_status.values())
-        available_status_label_by_key = {
-            entry["statusKey"]: entry["status"]
-            for entry in available_statuses
-        }
         status_cycle_rows = []
         for status_key, total_days in status_cycle_total_days_by_status.items():
             issue_days = status_cycle_issue_days_by_status.get(status_key, [])
@@ -619,6 +829,13 @@ def get_team_insights(
                 }
             )
         status_cycle_rows.sort(key=lambda item: (-item["totalDays"], item["status"].lower()))
+        cards_in_window_rows.sort(
+            key=lambda item: (
+                item["cycleTimeToDateDays"] is None,
+                -(item["cycleTimeToDateDays"] or 0.0),
+                item["issueKey"].lower(),
+            )
+        )
 
         latest_active_sprint = next((row for row in sprint_rows if _normalize(row["state"]) == "active"), None)
         work_mix_sprint = latest_active_sprint or sprint_rows[0]
@@ -715,6 +932,14 @@ def get_team_insights(
             "defaultStatusKeys": default_cycle_time_status_keys,
             "availableStatuses": available_statuses,
             "rows": status_cycle_rows,
+        },
+        "cardsInWindow": {
+            "totalCards": len(cards_in_window_rows),
+            "inProgressCards": cards_in_window_in_progress,
+            "completedCards": cards_in_window_completed,
+            "trackedCards": cards_in_window_tracked,
+            "appliedStatusKeys": applied_cycle_time_status_keys,
+            "rows": cards_in_window_rows,
         },
         "workMix": {
             "sprintId": work_mix_sprint_id,

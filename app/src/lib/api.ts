@@ -382,6 +382,34 @@ export type TeamInsightAvailableStatus = {
   defaultIncluded: boolean;
 };
 
+export type TeamInsightCardStatusTimelineEntry = {
+  statusKey: string;
+  status: string;
+  changedAt: string;
+  days: number;
+  percentOfTicketTime: number;
+  isCycleTimeStatus: boolean;
+};
+
+export type TeamInsightCardWindowRow = {
+  issueKey: string;
+  issueUrl?: string | null;
+  epicKey?: string | null;
+  epicName?: string | null;
+  sprintId: number;
+  sprintName: string;
+  status: string;
+  statusKey: string;
+  issueType: string;
+  issueTypeKey: string;
+  storyPoints?: number | null;
+  cycleTimeDays?: number | null;
+  cycleTimeToDateDays?: number | null;
+  summary: string;
+  isCompleted: boolean;
+  statusTimeline: TeamInsightCardStatusTimelineEntry[];
+};
+
 export type TeamInsightsResponse = {
   source: "local";
   generatedAt?: string | null;
@@ -405,6 +433,14 @@ export type TeamInsightsResponse = {
     defaultStatusKeys?: string[];
     availableStatuses?: TeamInsightAvailableStatus[];
     rows: TeamInsightStatusCycleRow[];
+  };
+  cardsInWindow?: {
+    totalCards: number;
+    inProgressCards: number;
+    completedCards: number;
+    trackedCards?: number;
+    appliedStatusKeys?: string[];
+    rows: TeamInsightCardWindowRow[];
   };
   workMix: {
     sprintId?: number | null;

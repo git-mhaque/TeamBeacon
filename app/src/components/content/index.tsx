@@ -6,7 +6,7 @@
  * @ignore
  */
 import { h } from "preact";
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import {
   EXPORT_TEAM_DASHBOARD_HTML_EVENT,
   OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
@@ -19,7 +19,15 @@ import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
-import { OPEN_TEAM_INSIGHTS_SETTINGS_EVENT, TeamInsightsScreen } from "./screens/TeamInsightsScreen";
+import {
+  OPEN_TEAM_INSIGHTS_SETTINGS_EVENT,
+  TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT,
+  TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT,
+  TeamInsightsScreen,
+  TREND_WINDOW_OPTIONS,
+  formatTrendWindowLabel,
+  normalizeTrendWindow,
+} from "./screens/TeamInsightsScreen";
 
 type ScreenId =
   | "integrations"
@@ -92,7 +100,20 @@ function renderScreen(id: ScreenId) {
 
 export function Content({ appName }: Props) {
   const [active, setActive] = useState<ScreenId>("integrations");
+  const [teamTrendWindowSelection, setTeamTrendWindowSelection] = useState<number>(12);
   const heading = useMemo(() => screenTitle(active), [active]);
+  useEffect(() => {
+    const handleTeamInsightsTrendWindowSync = (event: Event) => {
+      const detail = (event as CustomEvent<{ trendWindow?: number }>).detail;
+      const requestedTrendWindow = Number.parseInt(String(detail?.trendWindow ?? ""), 10);
+      if (Number.isNaN(requestedTrendWindow)) return;
+      setTeamTrendWindowSelection(normalizeTrendWindow(requestedTrendWindow));
+    };
+    window.addEventListener(TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT, handleTeamInsightsTrendWindowSync as EventListener);
+    return () => {
+      window.removeEventListener(TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT, handleTeamInsightsTrendWindowSync as EventListener);
+    };
+  }, []);
 
   return (
     <div class="tb-app-frame">
@@ -136,6 +157,27 @@ export function Content({ appName }: Props) {
           <h2>{heading}</h2>
           {active === "team" ? (
             <div class="tb-topbar-actions">
+              <label class="tb-topbar-trend-window">
+                <span>Trend Window</span>
+                <select
+                  aria-label="Trend Window"
+                  value={String(teamTrendWindowSelection)}
+                  onChange={(event) => {
+                    const nextValue = Number.parseInt((event.currentTarget as HTMLSelectElement).value, 10);
+                    const normalizedValue = normalizeTrendWindow(nextValue);
+                    setTeamTrendWindowSelection(normalizedValue);
+                    window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
+                      detail: { trendWindow: normalizedValue },
+                    }));
+                  }}
+                >
+                  {TREND_WINDOW_OPTIONS.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {formatTrendWindowLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 class="tb-btn tb-btn-sm tb-no-print"

@@ -25,6 +25,16 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
 
             conn = sqlite3.connect(str(db_path))
             try:
+                conn.execute(
+                    """
+                    INSERT INTO integration_configs (
+                      source_type,
+                      name,
+                      base_url,
+                      token_keychain_ref
+                    ) VALUES ('jira', 'primary', 'https://jira.example.com', 'mock://jira-pat')
+                    """
+                )
                 conn.executemany(
                     """
                     INSERT INTO sprints (
@@ -297,6 +307,38 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertAlmostEqual(status_cycle["rows"][0]["totalDays"], 12.0, places=2)
             self.assertAlmostEqual(status_cycle["rows"][0]["percentOfCycleTime"], 100.0, places=2)
 
+            cards_window = payload["cardsInWindow"]
+            self.assertEqual(cards_window["totalCards"], 6)
+            self.assertEqual(cards_window["completedCards"], 4)
+            self.assertEqual(cards_window["inProgressCards"], 2)
+            self.assertEqual(cards_window["appliedStatusKeys"], status_cycle["appliedStatusKeys"])
+            rows_by_key = {
+                row["issueKey"]: row
+                for row in cards_window["rows"]
+            }
+            self.assertIn("TEAM-1", rows_by_key)
+            self.assertIn("TEAM-2", rows_by_key)
+            self.assertIn("TEAM-6", rows_by_key)
+            self.assertTrue(rows_by_key["TEAM-1"]["isCompleted"])
+            self.assertIsNotNone(rows_by_key["TEAM-1"]["issueUrl"])
+            self.assertTrue(str(rows_by_key["TEAM-1"]["issueUrl"]).endswith("/browse/TEAM-1"))
+            self.assertEqual(rows_by_key["TEAM-1"]["epicKey"], "EPIC-1")
+            self.assertEqual(rows_by_key["TEAM-1"]["epicName"], "Platform Improvements")
+            self.assertEqual(rows_by_key["TEAM-6"]["epicKey"], "EPIC-2")
+            self.assertEqual(rows_by_key["TEAM-6"]["epicName"], "Operational Hardening")
+            self.assertGreater(rows_by_key["TEAM-1"]["cycleTimeDays"], 0)
+            self.assertGreater(rows_by_key["TEAM-1"]["cycleTimeToDateDays"], 0)
+            self.assertIsNone(rows_by_key["TEAM-2"]["cycleTimeDays"])
+            self.assertGreater(rows_by_key["TEAM-2"]["cycleTimeToDateDays"], 0)
+            self.assertIsNone(rows_by_key["TEAM-6"]["cycleTimeDays"])
+            self.assertIsNone(rows_by_key["TEAM-6"]["cycleTimeToDateDays"])
+            self.assertGreater(len(rows_by_key["TEAM-1"]["statusTimeline"]), 0)
+            timeline_entry = rows_by_key["TEAM-1"]["statusTimeline"][0]
+            self.assertIn("status", timeline_entry)
+            self.assertIn("days", timeline_entry)
+            self.assertIn("percentOfTicketTime", timeline_entry)
+            self.assertIn("isCycleTimeStatus", timeline_entry)
+
             work_mix = payload["workMix"]
             self.assertEqual(work_mix["sprintId"], 2003)
             self.assertEqual(work_mix["sprintName"], "Sprint 03")
@@ -322,6 +364,8 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["trend"], [])
             self.assertEqual(payload["statusCycleTime"]["trackedIssues"], 0)
             self.assertEqual(payload["statusCycleTime"]["rows"], [])
+            self.assertEqual(payload["cardsInWindow"]["totalCards"], 0)
+            self.assertEqual(payload["cardsInWindow"]["rows"], [])
             self.assertEqual(payload["workMix"]["totalIssues"], 0)
             self.assertEqual(payload["summary"], "Work mix will appear once sprint data is synced.")
             self.assertEqual(payload["error"], "No sprint history found in local data.")
