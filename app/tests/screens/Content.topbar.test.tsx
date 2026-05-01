@@ -6,6 +6,7 @@ const mockedContentState = vi.hoisted(() => {
 
   return {
     trendWindowOptions,
+    openInitiativesReportingPeriodEvent: "teambeacon:initiatives-open-reporting-period",
     openTeamInsightsSettingsEvent: "teambeacon:team-insights-open-settings",
     teamInsightsTrendWindowChangeEvent: "teambeacon:team-insights-trend-window-change",
     teamInsightsTrendWindowSyncEvent: "teambeacon:team-insights-trend-window-sync",
@@ -116,11 +117,34 @@ vi.mock("../../src/components/content/screens/TeamDashboardScreen", async () => 
   };
 });
 
-vi.mock("../../src/components/content/screens/InitiativesScreen", () => ({
-  InitiativesScreen: function InitiativesScreen() {
-    return <p>Initiatives stub</p>;
-  },
-}));
+vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
+  const { useEffect, useState } = await import("preact/hooks");
+
+  return {
+    OPEN_INITIATIVES_REPORTING_PERIOD_EVENT: mockedContentState.openInitiativesReportingPeriodEvent,
+    InitiativesScreen: function InitiativesScreen() {
+      const [isReportingOpen, setIsReportingOpen] = useState(false);
+
+      useEffect(() => {
+        const handleReportingOpen = () => {
+          setIsReportingOpen(true);
+        };
+
+        window.addEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
+        return () => {
+          window.removeEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
+        };
+      }, []);
+
+      return (
+        <section>
+          <p>Initiatives stub</p>
+          {isReportingOpen ? <div role="dialog" aria-label="Configure Reporting Period"></div> : null}
+        </section>
+      );
+    },
+  };
+});
 
 vi.mock("../../src/components/content/screens/IntegrationsScreen", () => ({
   IntegrationsScreen: function IntegrationsScreen() {
@@ -222,6 +246,8 @@ describe("Content topbar controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
     expect(screen.getByText("Initiatives stub")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reporting Period" }));
+    expect(screen.getByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Sprint Insights/ }));
     expect(screen.getByText("Sprint board stub")).toBeInTheDocument();

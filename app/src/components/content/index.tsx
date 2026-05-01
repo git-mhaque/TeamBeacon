@@ -8,13 +8,16 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
+  InitiativesScreen,
+} from "./screens/InitiativesScreen";
+import {
   EXPORT_TEAM_DASHBOARD_HTML_EVENT,
   OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
   OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
   TeamDashboardScreen,
 } from "./screens/TeamDashboardScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
-import { InitiativesScreen } from "./screens/InitiativesScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
@@ -337,6 +340,17 @@ export function Content({ appName }: Props) {
       <main class="tb-main">
         <header class="tb-topbar">
           <h2>{heading}</h2>
+          {active === "initiatives" ? (
+            <div class="tb-topbar-actions">
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT))}
+              >
+                Reporting Period
+              </button>
+            </div>
+          ) : null}
           {active === "team" ? (
             <div class="tb-topbar-actions">
               <TrendWindowDropdown

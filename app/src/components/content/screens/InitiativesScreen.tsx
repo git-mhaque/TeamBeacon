@@ -1,11 +1,12 @@
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   chatWithOciGenAi,
   ConfiguredEpicSummaryResponse,
   EpicCandidate,
   EpicCompletedCard,
   EpicLookupConfig,
+  EpicSummaryReportingPeriod,
   InitiativeEpicSummary,
   deleteEpicMetadata,
   fetchAiIntegrationStatus,
@@ -17,7 +18,7 @@ import {
   fetchJiraIntegrationStatus,
   upsertEpicMetadata,
 } from "../../../lib/api";
-import { getPreferenceSync, setPreference } from "../../../lib/persistence";
+import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 type RagLabel = "Red" | "Amber" | "Green";
 
@@ -41,6 +42,19 @@ type SortField = "epic" | OptionalColumnId;
 
 type SortDirection = "asc" | "desc";
 
+type ReportingPreset = "last_7_days" | "last_14_days" | "last_30_days" | "custom";
+
+type ReportingRange = {
+  startDate: string;
+  endDate: string;
+};
+
+type PersistedReportingSelection = {
+  preset: ReportingPreset;
+  startDate: string;
+  endDate: string;
+};
+
 const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }> = [
   { id: "group", label: "Group" },
   { id: "type", label: "Type" },
@@ -53,6 +67,8 @@ const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }
 
 const DEFAULT_VISIBLE_OPTIONAL_COLUMNS: OptionalColumnId[] = OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id);
 const INITIATIVES_VISIBLE_COLUMNS_KEY = "teambeacon.initiatives.visibleOptionalColumns";
+const INITIATIVES_REPORTING_PERIOD_SELECTION_KEY = "teambeacon.initiatives.reporting.period";
+export const OPEN_INITIATIVES_REPORTING_PERIOD_EVENT = "teambeacon:initiatives-open-reporting-period";
 
 const RAG_SORT_RANK: Record<RagLabel, number> = {
   Red: 0,
@@ -78,6 +94,33 @@ function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
     return null;
   }
   return Date.UTC(year, month - 1, day);
+}
+
+function isReportingPreset(value: unknown): value is ReportingPreset {
+  return value === "last_7_days" || value === "last_14_days" || value === "last_30_days" || value === "custom";
+}
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && parseIsoDateToUtcDay(value) !== null;
+}
+
+function formatLocalIsoDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildRelativeRange(days: number): ReportingRange {
+  const safeDays = Math.max(1, Math.floor(days));
+  const endDate = new Date();
+  endDate.setHours(0, 0, 0, 0);
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - (safeDays - 1));
+  return {
+    startDate: formatLocalIsoDate(startDate),
+    endDate: formatLocalIsoDate(endDate),
+  };
 }
 
 function toIsoFromUtcDay(utcDay: number): string {
@@ -210,6 +253,30 @@ function periodLabel(period: ConfiguredEpicSummaryResponse["reportingPeriod"]): 
   const start = formatDate(period.startDate);
   const end = formatDate(period.endDate);
   return `${start} - ${end} (${period.days} day${period.days === 1 ? "" : "s"}, ${period.timezone})`;
+}
+
+function formatReportingPeriodLabel(startDate: string, endDate: string): string {
+  const startDay = parseIsoDateToUtcDay(startDate);
+  const endDay = parseIsoDateToUtcDay(endDate);
+  if (startDay === null || endDay === null) return `${startDate} - ${endDate}`;
+
+  const start = new Date(startDay);
+  const end = new Date(endDay);
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+
+  const startText = start.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+    timeZone: "UTC",
+  });
+  const endText = end.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `${startText} - ${endText}`;
 }
 
 function formatTimestamp(value: string | null | undefined): string {
@@ -374,7 +441,50 @@ function readPersistedVisibleOptionalColumns(): OptionalColumnId[] {
   return parsePersistedVisibleOptionalColumns(getPreferenceSync(INITIATIVES_VISIBLE_COLUMNS_KEY));
 }
 
+function readPersistedReportingSelection(defaultRange: ReportingRange): PersistedReportingSelection {
+  const fallback: PersistedReportingSelection = {
+    preset: "last_7_days",
+    startDate: defaultRange.startDate,
+    endDate: defaultRange.endDate,
+  };
+
+  return parsePersistedReportingSelection(getPreferenceSync(INITIATIVES_REPORTING_PERIOD_SELECTION_KEY), fallback);
+}
+
+function parsePersistedReportingSelection(
+  raw: string | null,
+  fallback: PersistedReportingSelection,
+): PersistedReportingSelection {
+  try {
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<PersistedReportingSelection>;
+    if (!isReportingPreset(parsed.preset) || !isIsoDate(parsed.startDate) || !isIsoDate(parsed.endDate)) {
+      return fallback;
+    }
+
+    const startUtc = parseIsoDateToUtcDay(parsed.startDate);
+    const endUtc = parseIsoDateToUtcDay(parsed.endDate);
+    if (startUtc === null || endUtc === null || startUtc > endUtc) return fallback;
+
+    return {
+      preset: parsed.preset,
+      startDate: parsed.startDate,
+      endDate: parsed.endDate,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export function InitiativesScreen() {
+  const initialRange = useMemo(() => buildRelativeRange(7), []);
+  const initialReportingSelection = useMemo(() => readPersistedReportingSelection(initialRange), [initialRange]);
+  const browserTimezone = useMemo(() => {
+    if (typeof window === "undefined") return "UTC";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  }, []);
+  const hasHydratedReportingSelectionFromStore = useRef(false);
+
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
@@ -384,6 +494,15 @@ export function InitiativesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [metaSuccess, setMetaSuccess] = useState<string | null>(null);
+  const [reportingPreset, setReportingPreset] = useState<ReportingPreset>(initialReportingSelection.preset);
+  const [reportingStartDraft, setReportingStartDraft] = useState(initialReportingSelection.startDate);
+  const [reportingEndDraft, setReportingEndDraft] = useState(initialReportingSelection.endDate);
+  const [reportingRange, setReportingRange] = useState<ReportingRange>({
+    startDate: initialReportingSelection.startDate,
+    endDate: initialReportingSelection.endDate,
+  });
+  const [reportingValidationError, setReportingValidationError] = useState<string | null>(null);
+  const [isReportingConfigOpen, setIsReportingConfigOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -443,9 +562,12 @@ export function InitiativesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
       const [summaryResult, jiraResult, aiStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary(100, { timezone }),
+        fetchConfiguredEpicSummary(100, {
+          periodStart: reportingRange.startDate,
+          periodEnd: reportingRange.endDate,
+          timezone: browserTimezone,
+        }),
         fetchJiraIntegrationStatus(),
         fetchAiIntegrationStatus(),
       ]);
@@ -486,7 +608,7 @@ export function InitiativesScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [browserTimezone, reportingRange.endDate, reportingRange.startDate]);
 
   const loadLookup = useCallback(async () => {
     try {
@@ -525,6 +647,157 @@ export function InitiativesScreen() {
   useEffect(() => {
     void setPreference(INITIATIVES_VISIBLE_COLUMNS_KEY, JSON.stringify(visibleOptionalColumns));
   }, [visibleOptionalColumns]);
+
+  useEffect(() => {
+    const payload: PersistedReportingSelection = {
+      preset: reportingPreset,
+      startDate: reportingRange.startDate,
+      endDate: reportingRange.endDate,
+    };
+    void setPreference(INITIATIVES_REPORTING_PERIOD_SELECTION_KEY, JSON.stringify(payload));
+  }, [reportingPreset, reportingRange.endDate, reportingRange.startDate]);
+
+  useEffect(() => {
+    if (hasHydratedReportingSelectionFromStore.current) return;
+    hasHydratedReportingSelectionFromStore.current = true;
+
+    let cancelled = false;
+    const fallback: PersistedReportingSelection = {
+      preset: initialReportingSelection.preset,
+      startDate: initialReportingSelection.startDate,
+      endDate: initialReportingSelection.endDate,
+    };
+
+    void (async () => {
+      const raw = await getPreference(INITIATIVES_REPORTING_PERIOD_SELECTION_KEY);
+      if (cancelled) return;
+
+      const persisted = parsePersistedReportingSelection(raw, fallback);
+      const isSame =
+        persisted.preset === reportingPreset
+        && persisted.startDate === reportingRange.startDate
+        && persisted.endDate === reportingRange.endDate;
+      if (isSame) return;
+
+      setReportingPreset(persisted.preset);
+      setReportingStartDraft(persisted.startDate);
+      setReportingEndDraft(persisted.endDate);
+      setReportingRange({
+        startDate: persisted.startDate,
+        endDate: persisted.endDate,
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    initialReportingSelection.endDate,
+    initialReportingSelection.preset,
+    initialReportingSelection.startDate,
+    reportingPreset,
+    reportingRange.endDate,
+    reportingRange.startDate,
+  ]);
+
+  const effectivePeriodStart = reportingPeriod?.startDate ?? reportingRange.startDate;
+  const effectivePeriodEnd = reportingPeriod?.endDate ?? reportingRange.endDate;
+  const effectivePeriodTimezone = reportingPeriod?.timezone ?? browserTimezone;
+
+  const activeReportingPeriodDays = useMemo(() => {
+    if (reportingPeriod?.days && Number.isFinite(reportingPeriod.days)) {
+      return reportingPeriod.days;
+    }
+    const startUtc = parseIsoDateToUtcDay(effectivePeriodStart);
+    const endUtc = parseIsoDateToUtcDay(effectivePeriodEnd);
+    if (startUtc === null || endUtc === null || endUtc < startUtc) return 7;
+    return Math.max(1, daysBetweenUtc(startUtc, endUtc) + 1);
+  }, [effectivePeriodEnd, effectivePeriodStart, reportingPeriod?.days]);
+
+  const activeReportingPeriod = useMemo<EpicSummaryReportingPeriod>(() => ({
+    startDate: effectivePeriodStart,
+    endDate: effectivePeriodEnd,
+    days: activeReportingPeriodDays,
+    timezone: effectivePeriodTimezone,
+  }), [activeReportingPeriodDays, effectivePeriodEnd, effectivePeriodStart, effectivePeriodTimezone]);
+
+  const activeReportingPeriodLabel = useMemo(
+    () => formatReportingPeriodLabel(effectivePeriodStart, effectivePeriodEnd),
+    [effectivePeriodEnd, effectivePeriodStart],
+  );
+
+  const applyCustomReportingRange = useCallback((): boolean => {
+    if (!reportingStartDraft || !reportingEndDraft) {
+      setReportingValidationError("Start and end date are required.");
+      return false;
+    }
+
+    const startUtc = parseIsoDateToUtcDay(reportingStartDraft);
+    const endUtc = parseIsoDateToUtcDay(reportingEndDraft);
+    if (startUtc === null || endUtc === null) {
+      setReportingValidationError("Invalid reporting period date format.");
+      return false;
+    }
+    if (startUtc > endUtc) {
+      setReportingValidationError("Start date cannot be after end date.");
+      return false;
+    }
+
+    setReportingValidationError(null);
+    setReportingRange({
+      startDate: reportingStartDraft,
+      endDate: reportingEndDraft,
+    });
+    return true;
+  }, [reportingEndDraft, reportingStartDraft]);
+
+  const onReportingPresetChange = useCallback((preset: ReportingPreset) => {
+    setReportingPreset(preset);
+    setReportingValidationError(null);
+
+    if (preset === "custom") return;
+
+    const nextRange = preset === "last_14_days"
+      ? buildRelativeRange(14)
+      : preset === "last_30_days"
+        ? buildRelativeRange(30)
+        : buildRelativeRange(7);
+
+    setReportingStartDraft(nextRange.startDate);
+    setReportingEndDraft(nextRange.endDate);
+    setReportingRange(nextRange);
+  }, []);
+
+  const openReportingConfig = useCallback(() => {
+    setReportingStartDraft(reportingRange.startDate);
+    setReportingEndDraft(reportingRange.endDate);
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(true);
+  }, [reportingRange.endDate, reportingRange.startDate]);
+
+  const closeReportingConfig = useCallback(() => {
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(false);
+  }, []);
+
+  const saveReportingConfig = useCallback(() => {
+    if (reportingPreset === "custom" && !applyCustomReportingRange()) {
+      return;
+    }
+    setReportingValidationError(null);
+    setIsReportingConfigOpen(false);
+  }, [applyCustomReportingRange, reportingPreset]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => {
+      openReportingConfig();
+    };
+    window.addEventListener(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT, handleOpen);
+    return () => {
+      window.removeEventListener(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT, handleOpen);
+    };
+  }, [openReportingConfig]);
 
   const loadConfigureCandidates = useCallback(async (query: string) => {
     setConfigureCandidatesLoading(true);
@@ -947,7 +1220,7 @@ export function InitiativesScreen() {
     });
     setCompletedSummaryCards([]);
     setCompletedSummaryPerEpicCounts({});
-    setCompletedSummaryReportingPeriod(reportingPeriod);
+    setCompletedSummaryReportingPeriod(activeReportingPeriod);
     setCompletedSummaryCount(0);
     setCompletedSummaryTruncated(false);
     setCompletedSummaryLoading(true);
@@ -958,14 +1231,14 @@ export function InitiativesScreen() {
     setCompletedSummaryModelId(null);
     setCompletedSummaryGeneratedAt(null);
 
-    const timezone = reportingPeriod?.timezone
+    const timezone = activeReportingPeriod.timezone
       || Intl.DateTimeFormat().resolvedOptions().timeZone
       || "UTC";
     try {
       const payload = await fetchEpicCompletedCards(row.epicKey, {
         limit: 250,
-        periodStart: reportingPeriod?.startDate ?? null,
-        periodEnd: reportingPeriod?.endDate ?? null,
+        periodStart: activeReportingPeriod.startDate,
+        periodEnd: activeReportingPeriod.endDate,
         timezone,
       });
       const completedCards = payload.completedCards ?? [];
@@ -974,7 +1247,7 @@ export function InitiativesScreen() {
       setCompletedSummaryPerEpicCounts({ [row.epicKey]: count });
       setCompletedSummaryCount(count);
       setCompletedSummaryTruncated(Boolean(payload.truncated));
-      setCompletedSummaryReportingPeriod(payload.reportingPeriod ?? reportingPeriod);
+      setCompletedSummaryReportingPeriod(payload.reportingPeriod ?? activeReportingPeriod);
 
       if (count <= 0 || completedCards.length === 0) {
         setCompletedSummaryText("No completed cards were found for this reporting period.");
@@ -982,7 +1255,7 @@ export function InitiativesScreen() {
       }
 
       setCompletedSummaryTextLoading(true);
-      const effectivePeriod = payload.reportingPeriod ?? reportingPeriod;
+      const effectivePeriod = payload.reportingPeriod ?? activeReportingPeriod;
       const prompt = buildCompletedCardsSummaryPrompt({
         epicName: row.epicName || "(Untitled epic)",
         reportingPeriodText: periodLabel(effectivePeriod),
@@ -1021,13 +1294,13 @@ export function InitiativesScreen() {
     } finally {
       setCompletedSummaryLoading(false);
     }
-  }, [reportingPeriod, aiProviderName]);
+  }, [activeReportingPeriod, aiProviderName]);
 
   const openConfiguredCompletedSummary = useCallback(async () => {
     setCompletedSummaryContext({ scope: "configured" });
     setCompletedSummaryCards([]);
     setCompletedSummaryPerEpicCounts({});
-    setCompletedSummaryReportingPeriod(reportingPeriod);
+    setCompletedSummaryReportingPeriod(activeReportingPeriod);
     setCompletedSummaryCount(0);
     setCompletedSummaryTruncated(false);
     setCompletedSummaryLoading(true);
@@ -1038,14 +1311,14 @@ export function InitiativesScreen() {
     setCompletedSummaryModelId(null);
     setCompletedSummaryGeneratedAt(null);
 
-    const timezone = reportingPeriod?.timezone
+    const timezone = activeReportingPeriod.timezone
       || Intl.DateTimeFormat().resolvedOptions().timeZone
       || "UTC";
     try {
       const payload = await fetchConfiguredEpicsCompletedCards({
         limit: 350,
-        periodStart: reportingPeriod?.startDate ?? null,
-        periodEnd: reportingPeriod?.endDate ?? null,
+        periodStart: activeReportingPeriod.startDate,
+        periodEnd: activeReportingPeriod.endDate,
         timezone,
       });
 
@@ -1056,7 +1329,7 @@ export function InitiativesScreen() {
       setCompletedSummaryPerEpicCounts(perEpicCounts);
       setCompletedSummaryCount(count);
       setCompletedSummaryTruncated(Boolean(payload.truncated));
-      setCompletedSummaryReportingPeriod(payload.reportingPeriod ?? reportingPeriod);
+      setCompletedSummaryReportingPeriod(payload.reportingPeriod ?? activeReportingPeriod);
 
       if (count <= 0 || completedCards.length === 0) {
         setCompletedSummaryText("No completed cards were found for this reporting period.");
@@ -1064,7 +1337,7 @@ export function InitiativesScreen() {
       }
 
       setCompletedSummaryTextLoading(true);
-      const effectivePeriod = payload.reportingPeriod ?? reportingPeriod;
+      const effectivePeriod = payload.reportingPeriod ?? activeReportingPeriod;
       const prompt = buildConfiguredCompletedCardsSummaryPrompt({
         reportingPeriodText: periodLabel(effectivePeriod),
         completedCards,
@@ -1103,11 +1376,11 @@ export function InitiativesScreen() {
     } finally {
       setCompletedSummaryLoading(false);
     }
-  }, [reportingPeriod, aiProviderName]);
+  }, [activeReportingPeriod, aiProviderName]);
 
   return (
     <div class="tb-screen-grid">
-      <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod)}</p>
+      <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
 
       <section class="tb-panel">
         <header class="tb-panel-header">
@@ -1460,6 +1733,71 @@ export function InitiativesScreen() {
           </table>
         </div>
       </section>
+
+      {isReportingConfigOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
+          <div class="tb-modal-backdrop" onClick={closeReportingConfig} />
+          <div class="tb-modal tb-modal-reporting">
+            <header class="tb-modal-head">
+              <div>
+                <h3>Configure Reporting Period</h3>
+                <p class="tb-muted-note">Set the reporting window used across Initiative Insights summaries and completed-card analysis.</p>
+              </div>
+              <div class="tb-action-row">
+                <button type="button" class="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
+                  Cancel
+                </button>
+                <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
+                  Save
+                </button>
+              </div>
+            </header>
+
+            <div class="tb-exec-period-toolbar">
+              <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
+                <label class="tb-exec-period-field">
+                  <span>Reporting Period</span>
+                  <select
+                    value={reportingPreset}
+                    onChange={(event) => onReportingPresetChange((event.currentTarget as HTMLSelectElement).value as ReportingPreset)}
+                  >
+                    <option value="last_7_days">Last 7 Days</option>
+                    <option value="last_14_days">Last 14 Days</option>
+                    <option value="last_30_days">Last 30 Days</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+
+                {reportingPreset === "custom" ? (
+                  <>
+                    <label class="tb-exec-period-field">
+                      <span>Start</span>
+                      <input
+                        type="date"
+                        value={reportingStartDraft}
+                        onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
+                      />
+                    </label>
+                    <label class="tb-exec-period-field">
+                      <span>End</span>
+                      <input
+                        type="date"
+                        value={reportingEndDraft}
+                        onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <p class="tb-muted-note">
+              Active period: {activeReportingPeriodLabel} ({activeReportingPeriod.days} days, {activeReportingPeriod.timezone})
+            </p>
+            {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
+          </div>
+        </div>
+      ) : null}
 
       {isColumnOverlayOpen ? (
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Initiative Columns">

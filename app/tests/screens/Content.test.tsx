@@ -119,6 +119,36 @@ describe("Content", () => {
         summary: "Work mix is currently Feature 60%, Ops 25%, Security 15%.",
         error: null,
       },
+      "/api/metadata/epics/summary": {
+        epics: [
+          {
+            epicKey: "CEG-101",
+            epicName: "Payment Orchestration",
+            completedCards: 7,
+            totalCards: 10,
+            completionPercent: 70,
+            completedInPeriod: 2,
+            deltaPercentInPeriod: 5,
+            groups: [{ id: 1, name: "Core Platform" }],
+            workTypes: [{ id: 2, name: "Feature" }],
+            successCriteria: ["Latency under 120ms"],
+            timelineEnabled: true,
+            timelineStartDate: "2026-03-01",
+            targetCompletionDate: "2026-04-15",
+            insightComment: "Delivery is aligned with sprint capacity.",
+          },
+        ],
+        reportingPeriod: {
+          startDate: "2026-03-23",
+          endDate: "2026-03-30",
+          days: 8,
+          timezone: "Australia/Melbourne",
+        },
+      },
+      "/api/metadata/lookup": {
+        groups: [{ id: 1, name: "Core Platform" }],
+        workTypes: [{ id: 2, name: "Feature" }],
+      },
     });
 
     render(<Content appName="TeamBeacon" />);
@@ -162,6 +192,15 @@ describe("Content", () => {
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
+    expect(await screen.findByRole("heading", { name: "Initiative Insights" })).toBeInTheDocument();
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+    const initiativeReportingButton = screen.getByRole("button", { name: "Reporting Period" });
+    fireEvent.click(initiativeReportingButton);
+    expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Configure Reporting Period" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Team Insights/ }));
     expect(await screen.findByRole("heading", { name: "Team Insights" })).toBeInTheDocument();

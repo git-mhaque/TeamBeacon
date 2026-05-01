@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
-import { InitiativesScreen } from "../../src/components/content/screens/InitiativesScreen";
+import {
+  InitiativesScreen,
+  OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
+} from "../../src/components/content/screens/InitiativesScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
 const DEFAULT_EPICS = [
@@ -173,6 +176,7 @@ describe("InitiativesScreen", () => {
   beforeEach(() => {
     if (typeof window.localStorage?.removeItem === "function") {
       window.localStorage.removeItem("teambeacon.initiatives.visibleOptionalColumns");
+      window.localStorage.removeItem("teambeacon.initiatives.reporting.period");
     }
   });
 
@@ -328,5 +332,40 @@ describe("InitiativesScreen", () => {
     expect(screen.getByText("All configured initiatives")).toBeInTheDocument();
     expect(await screen.findByText(/CEG-2002.*Risk Aggregation/i)).toBeInTheDocument();
     expect(await screen.findByText(/delivery momentum with clear operational stabilization/i)).toBeInTheDocument();
+  });
+
+  it("opens reporting period configuration and refetches initiative data for a custom range", async () => {
+    const fetchSpy = mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent(window, new CustomEvent(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT));
+    expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Reporting Period" }), {
+      target: { value: "custom" },
+    });
+    fireEvent.input(screen.getByLabelText("Start"), {
+      target: { value: "2026-04-01" },
+    });
+    fireEvent.input(screen.getByLabelText("End"), {
+      target: { value: "2026-04-07" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Configure Reporting Period" })).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([input]) => (
+          String(input).includes("/api/metadata/epics/summary?")
+          && String(input).includes("periodStart=2026-04-01")
+          && String(input).includes("periodEnd=2026-04-07")
+        )),
+      ).toBe(true);
+    });
   });
 });
