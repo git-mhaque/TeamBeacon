@@ -1510,6 +1510,23 @@ body {
   outline-offset: 1px;
 }
 
+.tb-initiative-matrix-title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tb-initiative-visible-count {
+  white-space: nowrap;
+}
+
+.tb-initiative-matrix-action {
+  min-height: var(--tb-topbar-control-height, 2.15rem);
+  display: inline-flex;
+  align-items: center;
+}
+
 .tb-column-toggle {
   display: inline-flex;
   align-items: center;
@@ -1704,6 +1721,17 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
+}
+
+.tb-initiative-table th.tb-initiative-delta-head,
+.tb-initiative-table td.tb-initiative-delta-cell {
+  text-align: center;
+}
+
+.tb-initiative-table th.tb-initiative-delta-head .tb-table-sort {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .tb-initiative-period-trigger {

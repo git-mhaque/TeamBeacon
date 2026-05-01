@@ -189,7 +189,8 @@ describe("InitiativesScreen", () => {
 
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Configured Initiative Summary" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Initiative Progress Matrix" })).toBeInTheDocument();
+    const matrixHeading = screen.getByRole("heading", { name: "Initiative Progress Matrix" });
+    expect(matrixHeading).toBeInTheDocument();
     expect(screen.getByText(/Reporting period:/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Initiative RAG" })).toBeInTheDocument();
     expect(screen.getByText(/\d+\s+Red/)).toBeInTheDocument();
@@ -202,6 +203,10 @@ describe("InitiativesScreen", () => {
     expect(screen.queryByText("No criteria configured")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    const matrixTitle = matrixHeading.closest(".tb-initiative-matrix-title");
+    expect(matrixTitle).not.toBeNull();
+    expect(within(matrixTitle as HTMLElement).getByText("1 visible")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Columns" })).toHaveClass("tb-initiative-matrix-action");
 
     const initiativeRow = screen.getByText("CEG-101").closest("tr");
     expect(initiativeRow).not.toBeNull();
@@ -209,7 +214,9 @@ describe("InitiativesScreen", () => {
     expect(within(rowCells[4]).getByText("7 / 10")).toBeInTheDocument();
     expect(within(rowCells[4]).getByText("Period:")).toBeInTheDocument();
     expect(within(rowCells[4]).getByText("5%")).toBeInTheDocument();
+    expect(rowCells[5]).toHaveClass("tb-initiative-delta-cell");
     expect(within(rowCells[5]).getByRole("button", { name: /Summarize completed cards for CEG-101/i })).toHaveTextContent("2");
+    expect(screen.getByRole("columnheader", { name: "Delta" })).toHaveClass("tb-initiative-delta-head");
   });
 
   it("shows epic candidates only when configure search input is focused", async () => {

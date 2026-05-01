@@ -1444,12 +1444,12 @@ export function InitiativesScreen() {
 
       <section class="tb-panel">
         <header class="tb-panel-header">
-          <div>
+          <div class="tb-initiative-matrix-title">
             <h3>Initiative Progress Matrix</h3>
+            <span class="tb-chip tb-initiative-visible-count">{filteredRows.length} visible</span>
           </div>
           <div class="tb-panel-header-actions">
-            <span class="tb-chip">{filteredRows.length} visible</span>
-            <button type="button" class="tb-btn tb-btn-sm" onClick={openColumnOverlay}>
+            <button type="button" class="tb-btn tb-btn-sm tb-initiative-matrix-action" onClick={openColumnOverlay}>
               Columns
             </button>
           </div>
@@ -1584,7 +1584,7 @@ export function InitiativesScreen() {
                   </th>
                 ) : null}
                 {visibleColumnSet.has("delta") ? (
-                  <th>
+                  <th class="tb-initiative-delta-head">
                     <button
                       type="button"
                       class={`tb-table-sort${sortField === "delta" ? " is-active" : ""}`}
@@ -1686,7 +1686,7 @@ export function InitiativesScreen() {
                           </td>
                         ) : null}
                         {visibleColumnSet.has("delta") ? (
-                          <td>
+                          <td class="tb-initiative-delta-cell">
                             <button
                               type="button"
                               class="tb-initiative-period-trigger"
