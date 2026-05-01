@@ -1466,6 +1466,7 @@ body {
 .tb-initiative-filter {
   display: grid;
   gap: 0.22rem;
+  min-width: 0;
 }
 
 .tb-initiative-filter span {
@@ -1481,10 +1482,14 @@ body {
   border: 1px solid #c9d7ed;
   border-radius: 0.56rem;
   background: #f8fbff;
+  box-sizing: border-box;
   color: #203959;
   font: inherit;
   font-size: 0.78rem;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.42rem 0.54rem;
+  width: 100%;
 }
 
 .tb-initiative-toolbar-sprint {
@@ -1518,6 +1523,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.38rem;
+  min-width: 0;
 }
 
 .tb-initiative-filter-toggle {
@@ -1533,8 +1539,12 @@ body {
   font-size: 0.76rem;
   font-weight: 600;
   min-height: 2.15rem;
+  min-width: 0;
   padding: 0.42rem 0.54rem;
   text-align: center;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.2;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 
