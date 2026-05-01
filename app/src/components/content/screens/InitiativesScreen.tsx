@@ -68,6 +68,7 @@ const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }
 const DEFAULT_VISIBLE_OPTIONAL_COLUMNS: OptionalColumnId[] = OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id);
 const INITIATIVES_VISIBLE_COLUMNS_KEY = "teambeacon.initiatives.visibleOptionalColumns";
 const INITIATIVES_REPORTING_PERIOD_SELECTION_KEY = "teambeacon.initiatives.reporting.period";
+export const OPEN_INITIATIVES_CONFIGURE_EVENT = "teambeacon:initiatives-open-configure";
 export const OPEN_INITIATIVES_REPORTING_PERIOD_EVENT = "teambeacon:initiatives-open-reporting-period";
 
 const RAG_SORT_RANK: Record<RagLabel, number> = {
@@ -1033,6 +1034,17 @@ export function InitiativesScreen() {
     setIsConfigureOpen(false);
   }, [configureSaving]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => {
+      openConfigureDialog();
+    };
+    window.addEventListener(OPEN_INITIATIVES_CONFIGURE_EVENT, handleOpen);
+    return () => {
+      window.removeEventListener(OPEN_INITIATIVES_CONFIGURE_EVENT, handleOpen);
+    };
+  }, [openConfigureDialog]);
+
   const openEditDialog = useCallback((entry: SummaryRow) => {
     setMetaError(null);
     setMetaSuccess(null);
@@ -1386,14 +1398,6 @@ export function InitiativesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Configured Initiative Summary</h3>
-          </div>
-          <div class="tb-btn-row">
-            <button type="button" class="tb-btn" onClick={openConfigureDialog}>
-              Configure Epic
-            </button>
-            <button type="button" class="tb-btn tb-btn-primary" onClick={() => refresh()}>
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
           </div>
         </header>
 

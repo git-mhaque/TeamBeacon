@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import {
   InitiativesScreen,
+  OPEN_INITIATIVES_CONFIGURE_EVENT,
   OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
 } from "../../src/components/content/screens/InitiativesScreen";
 import { setupFetchMock } from "../utils/fetchMock";
@@ -208,7 +209,8 @@ describe("InitiativesScreen", () => {
     render(<InitiativesScreen />);
 
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Configure Epic" }));
+    fireEvent(window, new CustomEvent(OPEN_INITIATIVES_CONFIGURE_EVENT));
+    expect(await screen.findByRole("dialog", { name: "Configure Epic Metadata" })).toBeInTheDocument();
 
     const searchInput = screen.getByPlaceholderText("Epic key or name");
     expect(screen.queryByRole("listbox", { name: "Epic candidates" })).not.toBeInTheDocument();

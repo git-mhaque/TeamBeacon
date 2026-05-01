@@ -8,6 +8,7 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  OPEN_INITIATIVES_CONFIGURE_EVENT,
   OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
   InitiativesScreen,
 } from "./screens/InitiativesScreen";
@@ -348,6 +349,13 @@ export function Content({ appName }: Props) {
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT))}
               >
                 Reporting Period
+              </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm tb-no-print"
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_CONFIGURE_EVENT))}
+              >
+                Configure Initiative
               </button>
             </div>
           ) : null}

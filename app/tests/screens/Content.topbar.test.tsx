@@ -6,6 +6,7 @@ const mockedContentState = vi.hoisted(() => {
 
   return {
     trendWindowOptions,
+    openInitiativesConfigureEvent: "teambeacon:initiatives-open-configure",
     openInitiativesReportingPeriodEvent: "teambeacon:initiatives-open-reporting-period",
     openTeamInsightsSettingsEvent: "teambeacon:team-insights-open-settings",
     teamInsightsTrendWindowChangeEvent: "teambeacon:team-insights-trend-window-change",
@@ -121,18 +122,25 @@ vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
   const { useEffect, useState } = await import("preact/hooks");
 
   return {
+    OPEN_INITIATIVES_CONFIGURE_EVENT: mockedContentState.openInitiativesConfigureEvent,
     OPEN_INITIATIVES_REPORTING_PERIOD_EVENT: mockedContentState.openInitiativesReportingPeriodEvent,
     InitiativesScreen: function InitiativesScreen() {
       const [isReportingOpen, setIsReportingOpen] = useState(false);
+      const [isConfigureOpen, setIsConfigureOpen] = useState(false);
 
       useEffect(() => {
         const handleReportingOpen = () => {
           setIsReportingOpen(true);
         };
+        const handleConfigureOpen = () => {
+          setIsConfigureOpen(true);
+        };
 
         window.addEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
+        window.addEventListener(mockedContentState.openInitiativesConfigureEvent, handleConfigureOpen);
         return () => {
           window.removeEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
+          window.removeEventListener(mockedContentState.openInitiativesConfigureEvent, handleConfigureOpen);
         };
       }, []);
 
@@ -140,6 +148,7 @@ vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
         <section>
           <p>Initiatives stub</p>
           {isReportingOpen ? <div role="dialog" aria-label="Configure Reporting Period"></div> : null}
+          {isConfigureOpen ? <div role="dialog" aria-label="Configure Epic Metadata"></div> : null}
         </section>
       );
     },
@@ -248,6 +257,8 @@ describe("Content topbar controls", () => {
     expect(screen.getByText("Initiatives stub")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reporting Period" }));
     expect(screen.getByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Configure Initiative" }));
+    expect(screen.getByRole("dialog", { name: "Configure Epic Metadata" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Sprint Insights/ }));
     expect(screen.getByText("Sprint board stub")).toBeInTheDocument();

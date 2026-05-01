@@ -196,11 +196,18 @@ describe("Content", () => {
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
     expect(await screen.findByRole("heading", { name: "Initiative Insights" })).toBeInTheDocument();
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Configure Epic" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     const initiativeReportingButton = screen.getByRole("button", { name: "Reporting Period" });
+    const initiativeConfigureButton = screen.getByRole("button", { name: "Configure Initiative" });
     fireEvent.click(initiativeReportingButton);
     expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "Configure Reporting Period" })).not.toBeInTheDocument();
+    fireEvent.click(initiativeConfigureButton);
+    expect(await screen.findByRole("dialog", { name: "Configure Epic Metadata" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Configure Epic Metadata" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Team Insights/ }));
     expect(await screen.findByRole("heading", { name: "Team Insights" })).toBeInTheDocument();
