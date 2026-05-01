@@ -149,6 +149,7 @@ body {
 }
 
 .tb-topbar {
+  --tb-topbar-control-height: 2.15rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,7 +176,7 @@ body {
   min-width: 0;
 }
 
-.tb-topbar-trend-window span {
+.tb-topbar-trend-window > span {
   color: #2b4f81;
   font-size: 0.65rem;
   font-weight: 700;
@@ -184,15 +185,106 @@ body {
   white-space: nowrap;
 }
 
-.tb-topbar-trend-window select {
+.tb-topbar-trend-window-dropdown {
+  position: relative;
+  min-width: 10.75rem;
+}
+
+.tb-topbar-trend-window-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
   border: 1px solid #c9d7ed;
   border-radius: 0.56rem;
   background: #f8fbff;
   color: #203959;
   font: inherit;
   font-size: 0.74rem;
-  padding: 0.3rem 0.46rem;
-  min-height: 1.92rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  min-height: var(--tb-topbar-control-height);
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.tb-topbar .tb-btn-sm {
+  min-height: var(--tb-topbar-control-height);
+  display: inline-flex;
+  align-items: center;
+}
+
+.tb-topbar-trend-window-trigger:hover {
+  border-color: #98b3e0;
+  background: #fcfdff;
+}
+
+.tb-topbar-trend-window-trigger:focus-visible,
+.tb-topbar-trend-window-trigger.is-open {
+  outline: none;
+  border-color: #78a4e4;
+  box-shadow: 0 0 0 0.18rem rgba(11, 95, 204, 0.14);
+}
+
+.tb-topbar-trend-window-value {
+  color: #203959;
+  font-size: 0.82rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.tb-topbar-trend-window-chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 140ms ease;
+}
+
+.tb-topbar-trend-window-chevron.is-open {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.tb-topbar-trend-window-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.28rem;
+  border: 1px solid #c9d7ed;
+  border-radius: 0.8rem;
+  background: #ffffff;
+  box-shadow: 0 1rem 2rem rgba(17, 38, 76, 0.16);
+}
+
+.tb-topbar-trend-window-option {
+  width: 100%;
+  border: none;
+  border-radius: 0.56rem;
+  background: transparent;
+  color: #203959;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.52rem 0.62rem;
+  cursor: pointer;
+}
+
+.tb-topbar-trend-window-option:hover,
+.tb-topbar-trend-window-option:focus-visible {
+  outline: none;
+  background: #eef4ff;
+  color: #0b5fcc;
+}
+
+.tb-topbar-trend-window-option.is-selected {
+  background: #e8f1ff;
+  color: #0b5fcc;
 }
 
 .tb-chip {
