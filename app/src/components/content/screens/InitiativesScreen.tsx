@@ -509,6 +509,8 @@ export function InitiativesScreen() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ragFilter, setRagFilter] = useState<"all" | RagLabel>("all");
+  const [positiveDeltaOnly, setPositiveDeltaOnly] = useState(false);
+  const [timeBoundOnly, setTimeBoundOnly] = useState(false);
   const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(readPersistedVisibleOptionalColumns);
   const [sortField, setSortField] = useState<SortField>("epic");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -885,6 +887,12 @@ export function InitiativesScreen() {
       if (ragFilter !== "all" && row.ragLabel !== ragFilter) {
         return false;
       }
+      if (positiveDeltaOnly && row.completedInPeriodValue <= 0) {
+        return false;
+      }
+      if (timeBoundOnly && !row.timelineEnabled) {
+        return false;
+      }
       if (!query) {
         return true;
       }
@@ -897,7 +905,7 @@ export function InitiativesScreen() {
         || criteriaText.includes(query)
       );
     });
-  }, [groupFilter, ragFilter, rows, searchQuery, typeFilter]);
+  }, [groupFilter, positiveDeltaOnly, ragFilter, rows, searchQuery, timeBoundOnly, typeFilter]);
 
   const visibleColumnSet = useMemo(() => new Set(visibleOptionalColumns), [visibleOptionalColumns]);
 
@@ -1504,6 +1512,28 @@ export function InitiativesScreen() {
               <option value="Green">Green</option>
             </select>
           </label>
+
+          <div class="tb-initiative-filter tb-initiative-filter-quick">
+            <span>Quick Filters</span>
+            <div class="tb-initiative-quick-filters" role="group" aria-label="Quick filters">
+              <button
+                type="button"
+                class={`tb-initiative-filter-toggle${positiveDeltaOnly ? " is-active" : ""}`}
+                aria-pressed={positiveDeltaOnly}
+                onClick={() => setPositiveDeltaOnly((current) => !current)}
+              >
+                Positive Delta
+              </button>
+              <button
+                type="button"
+                class={`tb-initiative-filter-toggle${timeBoundOnly ? " is-active" : ""}`}
+                aria-pressed={timeBoundOnly}
+                onClick={() => setTimeBoundOnly((current) => !current)}
+              >
+                Time-bound
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="tb-initiative-table-wrap">

@@ -358,6 +358,109 @@ describe("InitiativesScreen", () => {
     });
   });
 
+  it("filters initiative matrix with quick filter toggles", async () => {
+    mockInitiativesEndpoints([
+      {
+        epicKey: "CEG-101",
+        epicName: "Payment Orchestration",
+        completedCards: 7,
+        totalCards: 10,
+        completionPercent: 70,
+        completedInPeriod: 2,
+        deltaPercentInPeriod: 5,
+        groups: [{ id: 1, name: "Core Platform" }],
+        workTypes: [{ id: 2, name: "Feature" }],
+        successCriteria: ["Latency under 120ms"],
+        timelineEnabled: true,
+        timelineStartDate: "2026-03-01",
+        targetCompletionDate: "2026-04-15",
+        insightComment: "Delivery is aligned with sprint capacity.",
+      },
+      {
+        epicKey: "CEG-202",
+        epicName: "Risk Aggregation",
+        completedCards: 3,
+        totalCards: 12,
+        completionPercent: 25,
+        completedInPeriod: 0,
+        deltaPercentInPeriod: 0,
+        groups: [{ id: 3, name: "Customer Experience" }],
+        workTypes: [{ id: 4, name: "Tech Debt" }],
+        successCriteria: ["Failover exercised in staging"],
+        timelineEnabled: false,
+        timelineStartDate: null,
+        targetCompletionDate: null,
+        insightComment: "Workstream was paused for incident load.",
+      },
+      {
+        epicKey: "CEG-303",
+        epicName: "Latency Guardrails",
+        completedCards: 5,
+        totalCards: 9,
+        completionPercent: 60,
+        completedInPeriod: 3,
+        deltaPercentInPeriod: 1,
+        groups: [{ id: 1, name: "Core Platform" }],
+        workTypes: [{ id: 2, name: "Feature" }],
+        successCriteria: ["Alerts tuned for regressions"],
+        timelineEnabled: false,
+        timelineStartDate: null,
+        targetCompletionDate: null,
+        insightComment: "Alert tuning is moving steadily.",
+      },
+    ]);
+
+    const { container } = render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+    const matrixHeading = screen.getByRole("heading", { name: "Initiative Progress Matrix" });
+    const matrixTitle = matrixHeading.closest(".tb-initiative-matrix-title");
+    expect(matrixTitle).not.toBeNull();
+
+    const getEpicOrder = () =>
+      Array.from(container.querySelectorAll("tbody tr .tb-initiative-epic-key"))
+        .map((node) => node.textContent?.trim() ?? "")
+        .filter((value) => value.length > 0);
+
+    const positiveDeltaToggle = screen.getByRole("button", { name: "Positive Delta" });
+    const timeBoundToggle = screen.getByRole("button", { name: "Time-bound" });
+
+    expect(within(matrixTitle as HTMLElement).getByText("3 visible")).toBeInTheDocument();
+    expect(positiveDeltaToggle).toHaveAttribute("aria-pressed", "false");
+    expect(timeBoundToggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(positiveDeltaToggle);
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-101", "CEG-303"]);
+    });
+    expect(within(matrixTitle as HTMLElement).getByText("2 visible")).toBeInTheDocument();
+    expect(positiveDeltaToggle).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(timeBoundToggle);
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-101"]);
+    });
+    expect(within(matrixTitle as HTMLElement).getByText("1 visible")).toBeInTheDocument();
+    expect(timeBoundToggle).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(positiveDeltaToggle);
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-101"]);
+    });
+    expect(positiveDeltaToggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(timeBoundToggle);
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-101", "CEG-202", "CEG-303"]);
+    });
+    expect(within(matrixTitle as HTMLElement).getByText("3 visible")).toBeInTheDocument();
+    expect(timeBoundToggle).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("opens completed-in-period overlay and generates AI summary", async () => {
     mockInitiativesEndpoints();
     render(<InitiativesScreen />);
