@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { within } from "@testing-library/dom";
 import {
   InitiativesScreen,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
@@ -201,6 +202,14 @@ describe("InitiativesScreen", () => {
     expect(screen.queryByText("No criteria configured")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+
+    const initiativeRow = screen.getByText("CEG-101").closest("tr");
+    expect(initiativeRow).not.toBeNull();
+    const rowCells = within(initiativeRow as HTMLElement).getAllByRole("cell");
+    expect(within(rowCells[4]).getByText("7 / 10")).toBeInTheDocument();
+    expect(within(rowCells[4]).getByText("Period:")).toBeInTheDocument();
+    expect(within(rowCells[4]).getByText("5%")).toBeInTheDocument();
+    expect(within(rowCells[5]).getByRole("button", { name: /Summarize completed cards for CEG-101/i })).toHaveTextContent("2");
   });
 
   it("shows epic candidates only when configure search input is focused", async () => {
@@ -260,7 +269,7 @@ describe("InitiativesScreen", () => {
         totalCards: 12,
         completionPercent: 25,
         completedInPeriod: 1,
-        deltaPercentInPeriod: 2,
+        deltaPercentInPeriod: 22.2,
         groups: [{ id: 3, name: "Customer Experience" }],
         workTypes: [{ id: 4, name: "Tech Debt" }],
         successCriteria: ["Failover exercised in staging"],
@@ -268,6 +277,22 @@ describe("InitiativesScreen", () => {
         timelineStartDate: "2026-02-20",
         targetCompletionDate: "2026-05-01",
         insightComment: "Workstream was paused for incident load.",
+      },
+      {
+        epicKey: "CEG-303",
+        epicName: "Latency Guardrails",
+        completedCards: 5,
+        totalCards: 9,
+        completionPercent: 60,
+        completedInPeriod: 3,
+        deltaPercentInPeriod: 1,
+        groups: [{ id: 1, name: "Core Platform" }],
+        workTypes: [{ id: 2, name: "Feature" }],
+        successCriteria: ["Alerts tuned for regressions"],
+        timelineEnabled: true,
+        timelineStartDate: "2026-02-28",
+        targetCompletionDate: "2026-05-10",
+        insightComment: "Alert tuning is moving steadily.",
       },
     ]);
 
@@ -291,6 +316,30 @@ describe("InitiativesScreen", () => {
 
     await waitFor(() => {
       expect(getEpicOrder()[0]).toBe("CEG-101");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Completed/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Completed/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-202", "CEG-101", "CEG-303"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Delta/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-202", "CEG-101", "CEG-303"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Delta/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
     });
 
     expect(screen.getByRole("columnheader", { name: "Delta" })).toBeInTheDocument();

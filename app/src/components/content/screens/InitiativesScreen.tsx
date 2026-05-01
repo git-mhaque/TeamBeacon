@@ -928,13 +928,10 @@ export function InitiativesScreen() {
           comparison = compareNumber(left.completionPercent, right.completionPercent);
           break;
         case "completed":
-          comparison = compareNumber(left.completedCards, right.completedCards);
-          if (comparison === 0) {
-            comparison = compareNumber(left.totalCards, right.totalCards);
-          }
+          comparison = compareNumber(left.deltaPercentValue, right.deltaPercentValue);
           break;
         case "delta":
-          comparison = compareNumber(left.deltaPercentValue, right.deltaPercentValue);
+          comparison = compareNumber(left.completedInPeriodValue, right.completedInPeriodValue);
           break;
         case "rag":
           comparison = compareNumber(RAG_SORT_RANK[left.ragLabel], RAG_SORT_RANK[right.ragLabel]);
@@ -1679,23 +1676,27 @@ export function InitiativesScreen() {
                         ) : null}
                         {visibleColumnSet.has("completed") ? (
                           <td>
-                            <div>
+                            <div class="tb-initiative-metric-stack">
                               <strong>{row.completedCards} / {row.totalCards}</strong>
-                              <p class="tb-muted-note">
-                                Period:{" "}
-                                <button
-                                  type="button"
-                                  class="tb-initiative-period-trigger"
-                                  onClick={() => void openCompletedSummary(row)}
-                                  aria-label={`Summarize completed cards for ${row.epicKey}`}
-                                >
-                                  {row.completedInPeriodValue}
-                                </button>
+                              <p class="tb-muted-note tb-initiative-metric-detail">
+                                <span>Period:</span>
+                                <span>{formatPercent(row.deltaPercentValue)}</span>
                               </p>
                             </div>
                           </td>
                         ) : null}
-                        {visibleColumnSet.has("delta") ? <td>{formatPercent(row.deltaPercentValue)}</td> : null}
+                        {visibleColumnSet.has("delta") ? (
+                          <td>
+                            <button
+                              type="button"
+                              class="tb-initiative-period-trigger"
+                              onClick={() => void openCompletedSummary(row)}
+                              aria-label={`Summarize completed cards for ${row.epicKey}`}
+                            >
+                              {row.completedInPeriodValue}
+                            </button>
+                          </td>
+                        ) : null}
                         {visibleColumnSet.has("rag") ? (
                           <td>
                             <span class={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>

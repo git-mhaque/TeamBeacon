@@ -1695,6 +1695,17 @@ body {
   white-space: nowrap;
 }
 
+.tb-initiative-metric-stack {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.tb-initiative-metric-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
 .tb-initiative-period-trigger {
   border: none;
   background: transparent;
