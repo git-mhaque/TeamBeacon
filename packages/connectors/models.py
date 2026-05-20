@@ -28,6 +28,29 @@ class SprintRecord:
 
 
 @dataclass
+class JiraVersionRef:
+    version_id: str
+    name: str
+    archived: bool = False
+    released: bool = False
+    release_date: datetime | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class JiraProjectVersionRecord:
+    version_id: str
+    project_key: str | None
+    name: str
+    description: str | None = None
+    archived: bool = False
+    released: bool = False
+    start_date: datetime | None = None
+    release_date: datetime | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class IssueRecord:
     issue_key: str
     issue_id: str
@@ -44,6 +67,7 @@ class IssueRecord:
     epic_key: str | None
     sprint_field_present: bool = True
     parent_issue_key: str | None = None
+    fix_versions: list[JiraVersionRef] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)
     created_at_source: datetime | None = None

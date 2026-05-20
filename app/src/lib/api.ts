@@ -497,6 +497,90 @@ export type ReleaseRefreshResult = {
   error?: string | null;
 };
 
+export type ReleaseRiskLevel = "green" | "amber" | "red" | "neutral";
+
+export type ReleaseIssueTypeSlice = {
+  label: string;
+  count: number;
+  percent: number;
+};
+
+export type ReleaseOpenIssue = {
+  issueKey: string;
+  issueUrl?: string | null;
+  summary: string;
+  status: string;
+  priority?: string | null;
+  storyPoints?: number | null;
+};
+
+export type ReleaseInsightRow = {
+  versionId: string;
+  projectKey?: string | null;
+  name: string;
+  description?: string | null;
+  archived: boolean;
+  released: boolean;
+  startDate?: string | null;
+  releaseDate?: string | null;
+  cycleTimeDays?: number | null;
+  ageDays?: number | null;
+  dueInDays?: number | null;
+  overdueDays?: number | null;
+  issueCount: number;
+  doneIssueCount: number;
+  inProgressIssueCount: number;
+  todoIssueCount: number;
+  storyPoints: number;
+  doneStoryPoints: number;
+  readinessPercent: number;
+  criticalOpenIssueCount: number;
+  issueTypeMix: ReleaseIssueTypeSlice[];
+  sampleOpenIssues: ReleaseOpenIssue[];
+  riskLevel: ReleaseRiskLevel;
+  riskSummary: string;
+};
+
+export type ReleaseCycleTimeTrendPoint = {
+  versionId: string;
+  name: string;
+  releaseDate?: string | null;
+  cycleTimeDays?: number | null;
+  storyPoints: number;
+  issueCount: number;
+};
+
+export type ReleaseRiskSignal = {
+  level: ReleaseRiskLevel;
+  title: string;
+  detail: string;
+};
+
+export type ReleaseInsightsResponse = {
+  source: "local";
+  generatedAt?: string | null;
+  projectKey?: string | null;
+  metrics: {
+    totalReleases: number;
+    releasedCount: number;
+    ongoingCount: number;
+    archivedCount: number;
+    overdueCount: number;
+    dueSoonCount: number;
+    avgCycleTimeDays?: number | null;
+    medianCycleTimeDays?: number | null;
+    p85CycleTimeDays?: number | null;
+    avgCadenceDays?: number | null;
+    deliveredStoryPoints: number;
+  };
+  cycleTimeTrend: ReleaseCycleTimeTrendPoint[];
+  ongoingReleases: ReleaseInsightRow[];
+  recentReleases: ReleaseInsightRow[];
+  riskSignals: ReleaseRiskSignal[];
+  summary: string;
+  error?: string | null;
+};
+
 function resolveApiBase(): string {
   const configured = (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE;
   if (typeof configured === "string" && configured.trim()) {
@@ -974,4 +1058,20 @@ export async function fetchReleaseRefreshResult(): Promise<ReleaseRefreshResult>
     throw await parseError(response, `Release refresh result request failed (${response.status})`);
   }
   return (await response.json()) as ReleaseRefreshResult;
+}
+
+export async function fetchReleaseInsights(releaseLimit = 12, projectKey?: string | null): Promise<ReleaseInsightsResponse> {
+  const params = new URLSearchParams();
+  params.set("releaseLimit", String(releaseLimit));
+  if (projectKey?.trim()) {
+    params.set("projectKey", projectKey.trim());
+  }
+  const response = await fetch(`${API_BASE}/api/releases/insights?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Release insights request failed (${response.status})`);
+  }
+  return (await response.json()) as ReleaseInsightsResponse;
 }

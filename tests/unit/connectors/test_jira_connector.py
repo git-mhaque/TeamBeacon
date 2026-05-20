@@ -36,6 +36,15 @@ class JiraConnectorUnitTests(unittest.TestCase):
                         "reporter": {"accountId": "xyz999"},
                         "labels": ["ops", "release"],
                         "components": [{"name": "api"}],
+                        "fixVersions": [
+                            {
+                                "id": "26000",
+                                "name": "Search 26.3",
+                                "archived": False,
+                                "released": True,
+                                "releaseDate": "2026-03-31",
+                            }
+                        ],
                         "created": "2026-03-20T10:00:00.000+0000",
                         "updated": "2026-03-21T11:00:00.000+0000",
                         "resolutiondate": None,
@@ -69,6 +78,10 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(issue.parent_issue_key, "CEGBUPOL-100")
         self.assertEqual(issue.components, ["api"])
         self.assertEqual(issue.labels, ["ops", "release"])
+        self.assertEqual(len(issue.fix_versions), 1)
+        self.assertEqual(issue.fix_versions[0].version_id, "26000")
+        self.assertEqual(issue.fix_versions[0].name, "Search 26.3")
+        self.assertTrue(issue.fix_versions[0].released)
         self.assertTrue(batch.has_more)
         self.assertEqual(batch.next_cursor, "1")
 
@@ -181,6 +194,39 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(board.external_board_id, 27193)
         self.assertEqual(board.name, "CEGBU Polaris")
         self.assertEqual(board.project_key, "CEGBUPOL")
+
+    def test_get_project_versions_maps_jira_versions(self) -> None:
+        payload = [
+            {
+                "id": "26000",
+                "name": "Search 26.3",
+                "description": "Quarterly release",
+                "archived": False,
+                "released": True,
+                "startDate": "2026-03-01",
+                "releaseDate": "2026-03-31",
+            },
+            {
+                "id": "26001",
+                "name": "Q4 FY26 - Tech",
+                "archived": False,
+                "released": False,
+                "startDate": "2026-04-01",
+                "releaseDate": "2026-05-30",
+            },
+        ]
+        with patch.object(self.connector, "_request_json", return_value=payload) as mocked:
+            versions = self.connector.get_project_versions("CEGBUPOL")
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(mocked.call_args.args[0], "/rest/api/2/project/CEGBUPOL/versions")
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(versions[0].version_id, "26000")
+        self.assertEqual(versions[0].project_key, "CEGBUPOL")
+        self.assertEqual(versions[0].name, "Search 26.3")
+        self.assertTrue(versions[0].released)
+        self.assertIsNotNone(versions[0].start_date)
+        self.assertIsNotNone(versions[0].release_date)
 
     def test_get_issue_changelog_maps_items(self) -> None:
         payload = {

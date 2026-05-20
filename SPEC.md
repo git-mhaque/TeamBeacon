@@ -29,6 +29,10 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - Average cycle time by sprint plus aggregate cycle-time cards (median/avg/max).
   - Sprint rows shown recent-to-old.
   - Custom JIRA field mapping.
+- Release insights:
+  - Sync JIRA project versions/releases and issue `fixVersions`.
+  - Show released-version cycle-time trend from version start date to release date.
+  - Show ongoing release readiness, overdue/due-soon counts, linked scope, delivered story points, and risk signals.
 - Completed/In-progress work:
   - Sprint Insights board-style snapshot (`Done`, `In Progress`, `Planned`) with state breakdown and work mix breakdown.
 - Team Dashboard:
@@ -68,11 +72,14 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
   - `project = <JIRA_PROJECT_KEY> AND updated >= '<UTC timestamp>' ORDER BY updated ASC`
 - Per-run sync order:
   1. Board metadata
-  2. Board sprints
-  3. Issues (paged)
-  4. Full changelog per downloaded issue
+  2. Project versions/releases
+  3. Board sprints
+  4. Issues (paged)
+  5. Full changelog per downloaded issue
 - Persistence guarantees:
   - `issues` stores issue type (including epics), epic link, parent issue link, assignee/reporter, sprint, and timestamps.
+  - `jira_project_versions` stores JIRA project versions/releases.
+  - `issue_release_links` stores issue-to-version scope links from `fixVersions`.
   - `issue_changelog` stores per-change author, field, before/after values, and change time.
   - `sync_run_history` stores run mode/status and counters.
   - `sync_checkpoints` stores latest successful cursor/timestamp.

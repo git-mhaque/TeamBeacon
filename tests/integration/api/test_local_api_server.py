@@ -35,6 +35,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.ai_status_calls: list[str | None] = []
         self.oci_chat_calls: list[dict[str, object]] = []
         self.release_refresh_start_calls: list[dict[str, object]] = []
+        self.release_insights_calls: list[tuple[int, str | None]] = []
 
         def fake_status():
             return {
@@ -216,6 +217,42 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                         "error": None,
                     }
                 ],
+            }
+
+        def fake_release_insights(release_limit=12, project_key=None):  # noqa: ANN001
+            self.release_insights_calls.append((release_limit, project_key))
+            return {
+                "source": "local",
+                "generatedAt": "2026-05-20T00:00:00+00:00",
+                "projectKey": project_key or "CEGBUPOL",
+                "metrics": {
+                    "totalReleases": 3,
+                    "releasedCount": 2,
+                    "ongoingCount": 1,
+                    "archivedCount": 0,
+                    "overdueCount": 1,
+                    "dueSoonCount": 0,
+                    "avgCycleTimeDays": 25.0,
+                    "medianCycleTimeDays": 25.0,
+                    "p85CycleTimeDays": 30.0,
+                    "avgCadenceDays": 21.0,
+                    "deliveredStoryPoints": 16.0,
+                },
+                "cycleTimeTrend": [
+                    {
+                        "versionId": "26000",
+                        "name": "Search 26.3",
+                        "releaseDate": "2026-03-31T00:00:00+00:00",
+                        "cycleTimeDays": 30.0,
+                        "storyPoints": 13.0,
+                        "issueCount": 2,
+                    }
+                ],
+                "ongoingReleases": [],
+                "recentReleases": [],
+                "riskSignals": [],
+                "summary": "1 ongoing release, 1 overdue.",
+                "error": None,
             }
 
         def fake_oci_chat(
@@ -853,6 +890,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             current_sprint_changes_provider=fake_current_sprint_changes,
             current_sprint_work_provider=fake_current_sprint_work,
             team_insights_provider=fake_team_insights,
+            release_insights_provider=fake_release_insights,
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
             metadata_add_work_type_provider=fake_add_work_type,
@@ -902,6 +940,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/ai/chat", body["paths"])
         self.assertIn("/api/integrations/ai/status", body["paths"])
         self.assertIn("/api/integrations/confluence/status", body["paths"])
+        self.assertIn("/api/releases/insights", body["paths"])
         self.assertIn("/api/releases/refresh/start", body["paths"])
         self.assertIn("/api/releases/refresh/status", body["paths"])
         self.assertIn("/api/releases/refresh/result", body["paths"])
@@ -1060,6 +1099,16 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["state"], "completed")
         self.assertEqual(body["percent"], 100.0)
         self.assertEqual(len(body["sources"]), 1)
+
+    def test_release_insights_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/releases/insights?releaseLimit=6&projectKey=CEGBUPOL", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["projectKey"], "CEGBUPOL")
+        self.assertEqual(body["metrics"]["ongoingCount"], 1)
+        self.assertEqual(body["metrics"]["avgCycleTimeDays"], 25.0)
+        self.assertEqual(self.release_insights_calls[-1], (6, "CEGBUPOL"))
 
     def test_release_refresh_result_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/releases/refresh/result", timeout=5) as response:  # noqa: S310

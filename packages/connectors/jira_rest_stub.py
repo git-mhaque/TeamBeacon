@@ -6,11 +6,19 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .interfaces import ConnectorConfig, JiraConnector
-from .models import BoardRecord, ChangelogItemRecord, IssueRecord, SprintRecord, SyncBatch
+from .models import (
+    BoardRecord,
+    ChangelogItemRecord,
+    IssueRecord,
+    JiraProjectVersionRecord,
+    JiraVersionRef,
+    SprintRecord,
+    SyncBatch,
+)
 
 DEFAULT_STORY_POINTS_FIELD = "customfield_10016"
 DEFAULT_EPIC_LINK_FIELD = "customfield_10014"
@@ -33,6 +41,16 @@ def _parse_jira_datetime(value: str | None) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def _parse_jira_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return _parse_jira_datetime(value)
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -203,6 +221,24 @@ class JiraRestConnector(JiraConnector):
             return parent_key
         return None
 
+    @staticmethod
+    def _map_fix_version(raw_version: dict[str, Any]) -> JiraVersionRef | None:
+        version_id_raw = raw_version.get("id")
+        name = raw_version.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return None
+        version_id = str(version_id_raw).strip() if version_id_raw is not None else name.strip()
+        if not version_id:
+            version_id = name.strip()
+        return JiraVersionRef(
+            version_id=version_id,
+            name=name.strip(),
+            archived=bool(raw_version.get("archived")),
+            released=bool(raw_version.get("released")),
+            release_date=_parse_jira_date(raw_version.get("releaseDate")),
+            raw=raw_version,
+        )
+
     def _map_issue(self, raw_issue: dict[str, Any]) -> IssueRecord:
         fields = raw_issue.get("fields") or {}
         status = fields.get("status") or {}
@@ -222,6 +258,15 @@ class JiraRestConnector(JiraConnector):
                     components.append(name)
 
         labels = [label for label in (fields.get("labels") or []) if isinstance(label, str)]
+        fix_versions = [
+            version
+            for version in (
+                self._map_fix_version(raw_version)
+                for raw_version in (fields.get("fixVersions") or [])
+                if isinstance(raw_version, dict)
+            )
+            if version is not None
+        ]
 
         return IssueRecord(
             issue_key=raw_issue.get("key", ""),
@@ -239,6 +284,7 @@ class JiraRestConnector(JiraConnector):
             epic_key=epic_key,
             sprint_field_present=sprint_field_present,
             parent_issue_key=parent_issue_key,
+            fix_versions=fix_versions,
             labels=labels,
             components=components,
             created_at_source=_parse_jira_datetime(fields.get("created")),
@@ -335,6 +381,53 @@ class JiraRestConnector(JiraConnector):
                 break
 
         return boards
+
+    def _map_project_version(
+        self,
+        raw_version: dict[str, Any],
+        project_key: str,
+    ) -> JiraProjectVersionRecord | None:
+        version_id_raw = raw_version.get("id")
+        name = raw_version.get("name")
+        if version_id_raw is None or not isinstance(name, str) or not name.strip():
+            return None
+        version_id = str(version_id_raw).strip()
+        if not version_id:
+            return None
+        description = raw_version.get("description")
+        return JiraProjectVersionRecord(
+            version_id=version_id,
+            project_key=project_key,
+            name=name.strip(),
+            description=description if isinstance(description, str) else None,
+            archived=bool(raw_version.get("archived")),
+            released=bool(raw_version.get("released")),
+            start_date=_parse_jira_date(raw_version.get("startDate")),
+            release_date=_parse_jira_date(raw_version.get("releaseDate")),
+            raw=raw_version,
+        )
+
+    def get_project_versions(self, project_key: str) -> list[JiraProjectVersionRecord]:
+        normalized_project_key = project_key.strip()
+        if not normalized_project_key:
+            return []
+        payload = self._request_json(
+            f"/rest/api/2/project/{quote(normalized_project_key, safe='')}/versions"
+        )
+        if isinstance(payload, list):
+            raw_versions = payload
+        elif isinstance(payload, dict):
+            raw_versions = payload.get("values") or payload.get("versions") or []
+        else:
+            raw_versions = []
+        versions: list[JiraProjectVersionRecord] = []
+        for raw_version in raw_versions:
+            if not isinstance(raw_version, dict):
+                continue
+            mapped = self._map_project_version(raw_version, normalized_project_key)
+            if mapped is not None:
+                versions.append(mapped)
+        return versions
 
     def _map_board(self, board: dict[str, Any]) -> BoardRecord | None:
         board_id_raw = board.get("id")

@@ -174,14 +174,13 @@ describe("Content", () => {
 
     expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Release Insights is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
     expect(screen.getByText("Sprint Trend / Cycle Time")).toBeInTheDocument();
     expect(screen.getByText("Scan / Vulnerability Posture")).toBeInTheDocument();
     expect(screen.getByText("Incidents / DR / Observability")).toBeInTheDocument();
-    expect(screen.getByText("Cadence / Release Notes")).toBeInTheDocument();
+    expect(screen.getByText("Cycle Time / Readiness / Risk")).toBeInTheDocument();
     expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
     expect(screen.getByText("Connections / Metadata Configuration")).toBeInTheDocument();
 
@@ -190,6 +189,7 @@ describe("Content", () => {
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Release Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
 

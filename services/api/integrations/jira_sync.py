@@ -11,7 +11,14 @@ from typing import Any, Callable, Literal
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from packages.connectors.jira_rest_stub import JiraRestConnector
-from packages.connectors.models import BoardRecord, ChangelogItemRecord, IssueRecord, SprintRecord
+from packages.connectors.models import (
+    BoardRecord,
+    ChangelogItemRecord,
+    IssueRecord,
+    JiraProjectVersionRecord,
+    JiraVersionRef,
+    SprintRecord,
+)
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 SyncRunner = Callable[..., dict[str, Any]]
@@ -88,6 +95,48 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_epic_key ON issues(epic_key)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_parent_issue_key ON issues(parent_issue_key)")
     conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jira_project_versions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_key TEXT,
+          version_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          archived INTEGER NOT NULL DEFAULT 0,
+          released INTEGER NOT NULL DEFAULT 0,
+          start_date TEXT,
+          release_date TEXT,
+          raw_json TEXT NOT NULL DEFAULT '{}',
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(project_key, version_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS issue_release_links (
+          issue_key TEXT NOT NULL,
+          project_key TEXT,
+          version_id TEXT NOT NULL,
+          version_name TEXT NOT NULL,
+          archived INTEGER NOT NULL DEFAULT 0,
+          released INTEGER NOT NULL DEFAULT 0,
+          release_date TEXT,
+          raw_json TEXT NOT NULL DEFAULT '{}',
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY(issue_key, version_id),
+          FOREIGN KEY (issue_key) REFERENCES issues(issue_key)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jira_project_versions_project ON jira_project_versions(project_key, released, archived)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_issue_release_links_version ON issue_release_links(version_id, project_key)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_issue_release_links_issue ON issue_release_links(issue_key)")
+    conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_issue_changelog_author_issue ON issue_changelog(author_account_id, issue_key)"
     )
 
@@ -104,6 +153,59 @@ def _to_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def _parse_jira_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        parsed = datetime.strptime(candidate, "%Y-%m-%d")
+    except ValueError:
+        return _parse_iso_datetime(candidate)
+    return parsed.replace(tzinfo=timezone.utc)
+
+
+def _extract_fix_versions_from_raw_payload(raw_payload: dict[str, Any]) -> list[JiraVersionRef]:
+    fields = raw_payload.get("fields")
+    if not isinstance(fields, dict):
+        return []
+    versions: list[JiraVersionRef] = []
+    for raw_version in fields.get("fixVersions") or []:
+        if not isinstance(raw_version, dict):
+            continue
+        name_raw = raw_version.get("name")
+        if not isinstance(name_raw, str) or not name_raw.strip():
+            continue
+        version_id_raw = raw_version.get("id")
+        version_id = str(version_id_raw).strip() if version_id_raw is not None else name_raw.strip()
+        if not version_id:
+            version_id = name_raw.strip()
+        versions.append(
+            JiraVersionRef(
+                version_id=version_id,
+                name=name_raw.strip(),
+                archived=bool(raw_version.get("archived")),
+                released=bool(raw_version.get("released")),
+                release_date=_parse_jira_date(raw_version.get("releaseDate")),
+                raw=raw_version,
+            )
+        )
+    return versions
+
+
+def _extract_fix_versions_from_raw_json(raw_json: str | None) -> list[JiraVersionRef]:
+    if not raw_json:
+        return []
+    try:
+        payload = json.loads(raw_json)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    return _extract_fix_versions_from_raw_payload(payload)
 
 
 def _safe_percent(downloaded: int, total: int | None) -> float | None:
@@ -728,6 +830,133 @@ def _upsert_sprints(conn: sqlite3.Connection, sprints: list[SprintRecord]) -> No
         )
 
 
+def _upsert_project_versions(conn: sqlite3.Connection, versions: list[JiraProjectVersionRecord]) -> None:
+    for version in versions:
+        conn.execute(
+            """
+            INSERT INTO jira_project_versions (
+              project_key,
+              version_id,
+              name,
+              description,
+              archived,
+              released,
+              start_date,
+              release_date,
+              raw_json,
+              updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(project_key, version_id) DO UPDATE SET
+              name = excluded.name,
+              description = excluded.description,
+              archived = excluded.archived,
+              released = excluded.released,
+              start_date = excluded.start_date,
+              release_date = excluded.release_date,
+              raw_json = excluded.raw_json,
+              updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                version.project_key,
+                version.version_id,
+                version.name,
+                version.description,
+                1 if version.archived else 0,
+                1 if version.released else 0,
+                _to_iso(version.start_date),
+                _to_iso(version.release_date),
+                _to_json(version.raw),
+            ),
+        )
+
+
+def _replace_issue_release_links(conn: sqlite3.Connection, issue: IssueRecord) -> None:
+    issue_key = str(issue.issue_key or "").strip()
+    if not issue_key:
+        return
+
+    fix_versions = issue.fix_versions or _extract_fix_versions_from_raw_payload(issue.raw)
+    conn.execute("DELETE FROM issue_release_links WHERE issue_key = ?", (issue_key,))
+    for version in fix_versions:
+        version_id = str(version.version_id or "").strip()
+        version_name = str(version.name or "").strip()
+        if not version_id or not version_name:
+            continue
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO issue_release_links (
+              issue_key,
+              project_key,
+              version_id,
+              version_name,
+              archived,
+              released,
+              release_date,
+              raw_json,
+              updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                issue_key,
+                issue.project_key,
+                version_id,
+                version_name,
+                1 if version.archived else 0,
+                1 if version.released else 0,
+                _to_iso(version.release_date),
+                _to_json(version.raw),
+            ),
+        )
+
+
+def _backfill_issue_release_links_from_raw_json(conn: sqlite3.Connection) -> int:
+    rows = conn.execute(
+        """
+        SELECT issue_key, project_key, raw_json
+        FROM issues
+        WHERE raw_json IS NOT NULL
+          AND TRIM(raw_json) <> ''
+        """
+    ).fetchall()
+    inserted = 0
+    for issue_key_raw, project_key, raw_json in rows:
+        issue_key = str(issue_key_raw or "").strip()
+        if not issue_key:
+            continue
+        for version in _extract_fix_versions_from_raw_json(raw_json):
+            version_id = str(version.version_id or "").strip()
+            version_name = str(version.name or "").strip()
+            if not version_id or not version_name:
+                continue
+            result = conn.execute(
+                """
+                INSERT OR IGNORE INTO issue_release_links (
+                  issue_key,
+                  project_key,
+                  version_id,
+                  version_name,
+                  archived,
+                  released,
+                  release_date,
+                  raw_json,
+                  updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    issue_key,
+                    project_key,
+                    version_id,
+                    version_name,
+                    1 if version.archived else 0,
+                    1 if version.released else 0,
+                    _to_iso(version.release_date),
+                    _to_json(version.raw),
+                ),
+            )
+            inserted += int(result.rowcount or 0)
+    return inserted
+
+
 def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
     for issue in issues:
         conn.execute(
@@ -804,6 +1033,7 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
                 1 if issue.sprint_field_present else 0,
             ),
         )
+        _replace_issue_release_links(conn, issue)
 
 
 def _active_sprint_ids(sprints: list[SprintRecord]) -> list[int]:
@@ -1132,6 +1362,7 @@ def run_jira_sync_once(
     try:
         _ensure_schema(conn)
         _backfill_missing_sprint_external_ids(conn, runtime.sprint_field_candidates)
+        _backfill_issue_release_links_from_raw_json(conn)
         started_at = _utc_iso_now()
         sync_run_id = _insert_sync_run(
             conn,
@@ -1176,6 +1407,37 @@ def run_jira_sync_once(
                 "message": f"Board {runtime.board_id} ({board.name}) synced.",
             }
         )
+
+        release_versions_synced = 0
+        project_key_for_versions = runtime.project_key or board.project_key
+        version_fetcher = getattr(connector, "get_project_versions", None)
+        if project_key_for_versions and callable(version_fetcher):
+            emit(
+                {
+                    "phase": "releases",
+                    "boardsSynced": 1,
+                    "sprintsSynced": 0,
+                    "downloadedIssues": 0,
+                    "totalIssues": None,
+                    "percent": None,
+                    "message": f"Syncing releases for project {project_key_for_versions}.",
+                }
+            )
+            versions = version_fetcher(project_key_for_versions)
+            _upsert_project_versions(conn, versions)
+            release_versions_synced = len(versions)
+            conn.commit()
+            emit(
+                {
+                    "phase": "releases",
+                    "boardsSynced": 1,
+                    "sprintsSynced": 0,
+                    "downloadedIssues": 0,
+                    "totalIssues": None,
+                    "percent": None,
+                    "message": f"{release_versions_synced} JIRA releases synced.",
+                }
+            )
 
         emit(
             {
@@ -1385,6 +1647,7 @@ def run_jira_sync_once(
             "syncMode": effective_mode,
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
+            "releaseVersionsSynced": release_versions_synced,
             "staleSprintLinksCleared": stale_sprint_links_cleared,
             "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
             "activeSprintChangelogEntriesSynced": active_sprint_changelog_entries_synced,

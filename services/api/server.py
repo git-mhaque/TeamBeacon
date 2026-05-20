@@ -13,6 +13,7 @@ from services.api.issues.current_sprint import get_current_sprint
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
 from services.api.issues.current_sprint_work import get_current_sprint_work
 from services.api.issues.query import search_synced_issues
+from services.api.issues.release_insights import get_release_insights
 from services.api.issues.team_insights import get_team_insights
 from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
@@ -54,6 +55,7 @@ CurrentSprintProvider = Callable[..., dict[str, Any]]
 CurrentSprintWorkProvider = Callable[..., dict[str, Any]]
 CurrentSprintChangesProvider = Callable[..., dict[str, Any]]
 TeamInsightsProvider = Callable[..., dict[str, Any]]
+ReleaseInsightsProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
 MetadataCreateProvider = Callable[[str], dict[str, Any]]
 MetadataUpdateProvider = Callable[[int, str], dict[str, Any]]
@@ -280,6 +282,17 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "tags": ["integrations"],
                     "summary": "Release Insights refresh status",
                     "responses": {"200": {"description": "Release refresh status", "content": json_payload}},
+                }
+            },
+            "/api/releases/insights": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "JIRA release/version analytics",
+                    "parameters": [
+                        {"name": "releaseLimit", "in": "query", "schema": {"type": "integer", "default": 12}},
+                        {"name": "projectKey", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "Release insights payload", "content": json_payload}},
                 }
             },
             "/api/releases/refresh/result": {
@@ -693,6 +706,7 @@ def build_handler(
     current_sprint_work_provider: CurrentSprintWorkProvider = get_current_sprint_work,
     current_sprint_changes_provider: CurrentSprintChangesProvider = get_current_sprint_changes,
     team_insights_provider: TeamInsightsProvider = get_team_insights,
+    release_insights_provider: ReleaseInsightsProvider = get_release_insights,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
@@ -812,6 +826,23 @@ def build_handler(
 
             if path == "/api/releases/refresh/result":
                 payload = release_refresh_result_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/releases/insights":
+                query = parse_qs(parsed.query)
+                release_limit_raw = query.get("releaseLimit", ["12"])[0]
+                try:
+                    release_limit = int(release_limit_raw)
+                except ValueError:
+                    release_limit = 12
+                project_key_raw = query.get("projectKey", [None])[0]
+                project_key = project_key_raw.strip() if isinstance(project_key_raw, str) else None
+                payload = release_insights_provider(
+                    release_limit=release_limit,
+                    project_key=project_key,
+                )
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

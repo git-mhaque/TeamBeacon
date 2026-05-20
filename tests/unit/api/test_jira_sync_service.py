@@ -9,7 +9,15 @@ from pathlib import Path
 import re
 
 from packages.connectors.jira_config import JiraRuntimeConfig
-from packages.connectors.models import ChangelogItemRecord, BoardRecord, IssueRecord, SprintRecord, SyncBatch
+from packages.connectors.models import (
+    ChangelogItemRecord,
+    BoardRecord,
+    IssueRecord,
+    JiraProjectVersionRecord,
+    JiraVersionRef,
+    SprintRecord,
+    SyncBatch,
+)
 from services.api.integrations.jira_sync import (
     JiraSyncManager,
     _backfill_missing_sprint_external_ids,
@@ -41,7 +49,20 @@ class _SuccessfulConnectorStub:
             created_at_source=datetime(2026, 3, 20, 10, 0, tzinfo=timezone.utc),
             updated_at_source=datetime(2026, 3, 21, 10, 0, tzinfo=timezone.utc),
             resolved_at_source=datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc),
-            raw={"id": "1", "key": "CEGBUPOL-1"},
+            fix_versions=[
+                JiraVersionRef(
+                    version_id="26000",
+                    name="Search 26.3",
+                    released=True,
+                    release_date=datetime(2026, 3, 31, tzinfo=timezone.utc),
+                    raw={"id": "26000", "name": "Search 26.3"},
+                )
+            ],
+            raw={
+                "id": "1",
+                "key": "CEGBUPOL-1",
+                "fields": {"fixVersions": [{"id": "26000", "name": "Search 26.3", "released": True}]},
+            },
         )
         self.issue_2 = IssueRecord(
             issue_key="CEGBUPOL-2",
@@ -62,7 +83,20 @@ class _SuccessfulConnectorStub:
             created_at_source=datetime(2026, 3, 21, 10, 0, tzinfo=timezone.utc),
             updated_at_source=datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc),
             resolved_at_source=None,
-            raw={"id": "2", "key": "CEGBUPOL-2"},
+            fix_versions=[
+                JiraVersionRef(
+                    version_id="26001",
+                    name="Q4 FY26 - Tech",
+                    released=False,
+                    release_date=datetime(2026, 5, 30, tzinfo=timezone.utc),
+                    raw={"id": "26001", "name": "Q4 FY26 - Tech"},
+                )
+            ],
+            raw={
+                "id": "2",
+                "key": "CEGBUPOL-2",
+                "fields": {"fixVersions": [{"id": "26001", "name": "Q4 FY26 - Tech", "released": False}]},
+            },
         )
         self.issues_by_key: dict[str, IssueRecord] = {
             self.issue_1.issue_key: self.issue_1,
@@ -104,6 +138,32 @@ class _SuccessfulConnectorStub:
             board_type="scrum",
             raw={"id": board_id, "name": "CEGBU Polaris"},
         )
+
+    def get_project_versions(self, project_key: str) -> list[JiraProjectVersionRecord]:
+        return [
+            JiraProjectVersionRecord(
+                version_id="26000",
+                project_key=project_key,
+                name="Search 26.3",
+                description="March release",
+                archived=False,
+                released=True,
+                start_date=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                release_date=datetime(2026, 3, 31, tzinfo=timezone.utc),
+                raw={"id": "26000", "name": "Search 26.3"},
+            ),
+            JiraProjectVersionRecord(
+                version_id="26001",
+                project_key=project_key,
+                name="Q4 FY26 - Tech",
+                description="Ongoing tech release",
+                archived=False,
+                released=False,
+                start_date=datetime(2026, 4, 1, tzinfo=timezone.utc),
+                release_date=datetime(2026, 5, 30, tzinfo=timezone.utc),
+                raw={"id": "26001", "name": "Q4 FY26 - Tech"},
+            ),
+        ]
 
     def get_sprints(self, board_id: int) -> list[SprintRecord]:
         return [
@@ -278,6 +338,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(summary["state"], "completed")
             self.assertEqual(summary["downloadedIssues"], 2)
             self.assertEqual(summary["totalIssues"], 2)
+            self.assertEqual(summary["releaseVersionsSynced"], 2)
             self.assertIsNotNone(summary["lastSyncedAt"])
             self.assertTrue(any(event.get("phase") == "issues" for event in progress_events))
             self.assertTrue(any("issues downloaded" in str(event.get("message")) for event in progress_events))
@@ -287,6 +348,8 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 boards_count = conn.execute("SELECT COUNT(*) FROM boards").fetchone()[0]
                 sprints_count = conn.execute("SELECT COUNT(*) FROM sprints").fetchone()[0]
                 issues_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+                version_count = conn.execute("SELECT COUNT(*) FROM jira_project_versions").fetchone()[0]
+                release_link_count = conn.execute("SELECT COUNT(*) FROM issue_release_links").fetchone()[0]
                 changelog_count = conn.execute("SELECT COUNT(*) FROM issue_changelog").fetchone()[0]
                 checkpoint = conn.execute(
                     """
@@ -310,6 +373,8 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(boards_count, 1)
             self.assertEqual(sprints_count, 1)
             self.assertEqual(issues_count, 2)
+            self.assertEqual(version_count, 2)
+            self.assertEqual(release_link_count, 2)
             self.assertEqual(changelog_count, 4)
             self.assertIsNotNone(checkpoint)
             self.assertEqual(checkpoint[0], "idle")

@@ -60,7 +60,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "team", label: "Team Insights", blurb: "Sprint Trend / Cycle Time", showConstruction: false },
   { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true },
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true },
-  { id: "releases", label: "Release Insights", blurb: "Cadence / Release Notes", showConstruction: true },
+  { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false },
   { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false },
   { id: "integrations", label: "Settings", blurb: "Connections / Metadata Configuration", showConstruction: false },
 ];

@@ -99,6 +99,21 @@ CREATE TABLE IF NOT EXISTS sprints (
   FOREIGN KEY (board_external_id) REFERENCES boards(external_board_id)
 );
 
+CREATE TABLE IF NOT EXISTS jira_project_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_key TEXT,
+  version_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  released INTEGER NOT NULL DEFAULT 0,
+  start_date TEXT,
+  release_date TEXT,
+  raw_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(project_key, version_id)
+);
+
 CREATE TABLE IF NOT EXISTS issues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   issue_key TEXT NOT NULL UNIQUE,
@@ -122,6 +137,20 @@ CREATE TABLE IF NOT EXISTS issues (
   resolved_at_source TEXT,
   raw_json TEXT NOT NULL DEFAULT '{}',
   synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS issue_release_links (
+  issue_key TEXT NOT NULL,
+  project_key TEXT,
+  version_id TEXT NOT NULL,
+  version_name TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  released INTEGER NOT NULL DEFAULT 0,
+  release_date TEXT,
+  raw_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(issue_key, version_id),
+  FOREIGN KEY (issue_key) REFERENCES issues(issue_key)
 );
 
 CREATE TABLE IF NOT EXISTS issue_changelog (
@@ -204,6 +233,9 @@ CREATE TABLE IF NOT EXISTS epic_metadata_work_types (
 CREATE INDEX IF NOT EXISTS idx_issues_updated_at_source ON issues(updated_at_source);
 CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee_account_id);
 CREATE INDEX IF NOT EXISTS idx_issues_sprint ON issues(sprint_external_id);
+CREATE INDEX IF NOT EXISTS idx_jira_project_versions_project ON jira_project_versions(project_key, released, archived);
+CREATE INDEX IF NOT EXISTS idx_issue_release_links_version ON issue_release_links(version_id, project_key);
+CREATE INDEX IF NOT EXISTS idx_issue_release_links_issue ON issue_release_links(issue_key);
 CREATE INDEX IF NOT EXISTS idx_issue_changelog_issue_changed ON issue_changelog(issue_key, changed_at);
 CREATE INDEX IF NOT EXISTS idx_metric_snapshots_lookup ON metric_snapshots(snapshot_type, scope_key, window_start, window_end);
 CREATE INDEX IF NOT EXISTS idx_report_runs_period ON report_runs(period_start, period_end);

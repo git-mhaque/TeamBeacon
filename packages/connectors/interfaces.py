@@ -9,6 +9,7 @@ from .models import (
     ChangelogItemRecord,
     ConfluencePageRecord,
     IssueRecord,
+    JiraProjectVersionRecord,
     SprintRecord,
     SyncBatch,
 )
@@ -45,6 +46,10 @@ class JiraConnector(ABC):
     @abstractmethod
     def get_boards(self) -> list[BoardRecord]:
         """List accessible agile boards."""
+
+    @abstractmethod
+    def get_project_versions(self, project_key: str) -> list[JiraProjectVersionRecord]:
+        """List project versions/releases used by fixVersion planning."""
 
     @abstractmethod
     def get_sprints(self, board_id: int, state: str | None = None) -> list[SprintRecord]:

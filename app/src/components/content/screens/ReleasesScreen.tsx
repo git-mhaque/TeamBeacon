@@ -1,515 +1,680 @@
 import { h } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import * as ChartModule from "chart.js/auto";
+import type { Chart as ChartInstance, ChartConfiguration } from "chart.js";
 import {
-  fetchReleaseRefreshResult,
-  fetchReleaseRefreshStatus,
-  ReleaseRefreshSourceStatus,
-  ReleaseRefreshStatus,
-  startReleaseRefresh,
+  fetchReleaseInsights,
+  ReleaseInsightRow,
+  ReleaseInsightsResponse,
+  ReleaseRiskLevel,
 } from "../../../lib/api";
 
-type ReleaseSourceConfig = {
-  id: number;
-  confluenceUrl: string;
-  prompt: string;
+type ChartConstructor = new (
+  item: HTMLCanvasElement,
+  config: ChartConfiguration<"line">,
+) => ChartInstance<"line">;
+
+const EMPTY_INSIGHTS: ReleaseInsightsResponse = {
+  source: "local",
+  projectKey: null,
+  metrics: {
+    totalReleases: 0,
+    releasedCount: 0,
+    ongoingCount: 0,
+    archivedCount: 0,
+    overdueCount: 0,
+    dueSoonCount: 0,
+    avgCycleTimeDays: null,
+    medianCycleTimeDays: null,
+    p85CycleTimeDays: null,
+    avgCadenceDays: null,
+    deliveredStoryPoints: 0,
+  },
+  cycleTimeTrend: [],
+  ongoingReleases: [],
+  recentReleases: [],
+  riskSignals: [],
+  summary: "Release insights will appear once JIRA release data is synced.",
+  error: null,
 };
 
-function createEmptySource(id: number): ReleaseSourceConfig {
-  return {
-    id,
-    confluenceUrl: "",
-    prompt: "",
-  };
+const Chart =
+  ((ChartModule as unknown as { default?: ChartConstructor }).default ??
+    (ChartModule as unknown as ChartConstructor));
+
+function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(/\.0$/, "");
 }
 
-function formatRefreshTimestamp(value: string | null | undefined): string {
-  if (!value) return "Not generated yet";
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString(undefined, {
+function formatDays(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  return `${formatNumber(value)} d`;
+}
+
+function formatStoryPoints(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "0 SP";
+  return `${formatNumber(value)} SP`;
+}
+
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  return `${formatNumber(value)}%`;
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = parsed.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const year = String(parsed.getUTCFullYear());
+  return `${day}-${month}-${year}`;
+}
+
+function formatGeneratedAt(value: string | null | undefined): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleString("en-US", {
+    day: "2-digit",
     month: "short",
-    day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  });
+  }).replace(",", "");
 }
 
-function normalizePercent(value: number | null | undefined): number {
-  if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  if (value < 0) return 0;
-  if (value > 100) return 100;
-  return value;
+function riskToneClass(level: ReleaseRiskLevel | null | undefined): string {
+  if (level === "green") return "is-green";
+  if (level === "red") return "is-red";
+  if (level === "neutral") return "is-neutral";
+  return "is-amber";
 }
 
-function sourceStateTone(state: ReleaseRefreshSourceStatus["state"] | undefined): string {
-  if (state === "completed") return "tb-value-good";
-  if (state === "failed") return "tb-value-risk";
-  if (state === "fetching" || state === "processing") return "tb-value-warn";
+function riskValueClass(level: ReleaseRiskLevel | null | undefined): string {
+  if (level === "green") return "tb-value-good";
+  if (level === "red") return "tb-value-risk";
   return "tb-value-warn";
 }
 
-export function ReleasesScreen() {
-  const [isConfigureOpen, setIsConfigureOpen] = useState(false);
-  const [savedSources, setSavedSources] = useState<ReleaseSourceConfig[]>([]);
-  const [savedOverallPrompt, setSavedOverallPrompt] = useState("");
+function releaseSecondaryLine(release: ReleaseInsightRow): string {
+  const scope = `${release.issueCount} cards / ${formatStoryPoints(release.storyPoints)}`;
+  const dateRange = `${formatDate(release.startDate)} to ${formatDate(release.releaseDate)}`;
+  return `${dateRange} | ${scope}`;
+}
 
-  const [draftSources, setDraftSources] = useState<ReleaseSourceConfig[]>([]);
-  const [draftOverallPrompt, setDraftOverallPrompt] = useState("");
-  const [nextSourceId, setNextSourceId] = useState(1);
-  const [refreshStatus, setRefreshStatus] = useState<ReleaseRefreshStatus | null>(null);
-  const [refreshResultHtml, setRefreshResultHtml] = useState<string | null>(null);
-  const [refreshResultGeneratedAt, setRefreshResultGeneratedAt] = useState<string | null>(null);
-  const [refreshResultSources, setRefreshResultSources] = useState<ReleaseRefreshSourceStatus[]>([]);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const [loadingRefreshResult, setLoadingRefreshResult] = useState(false);
-  const [refreshSubmitting, setRefreshSubmitting] = useState(false);
-  const pollTimerRef = useRef<number | null>(null);
+function readinessLabel(release: ReleaseInsightRow): string {
+  return `${release.doneIssueCount}/${release.issueCount} done`;
+}
 
-  const openConfigure = useCallback(() => {
-    if (savedSources.length > 0) {
-      setDraftSources(savedSources.map((source) => ({ ...source })));
-    } else {
-      setDraftSources([createEmptySource(nextSourceId)]);
-      setNextSourceId((value) => value + 1);
-    }
-    setDraftOverallPrompt(savedOverallPrompt);
-    setIsConfigureOpen(true);
-  }, [nextSourceId, savedOverallPrompt, savedSources]);
+function releaseSortTimestamp(value: string | null | undefined): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
 
-  const closeConfigure = useCallback(() => {
-    setIsConfigureOpen(false);
-  }, []);
+function releaseMixLabel(release: ReleaseInsightRow): string {
+  if (release.issueTypeMix.length === 0) return "-";
+  return release.issueTypeMix.slice(0, 3).map((slice) => `${slice.label} ${formatPercent(slice.percent)}`).join(", ");
+}
 
-  const addDraftSource = useCallback(() => {
-    setDraftSources((sources) => [...sources, createEmptySource(nextSourceId)]);
-    setNextSourceId((value) => value + 1);
-  }, [nextSourceId]);
+function compactReleaseLabel(index: number): string {
+  return `R${index + 1}`;
+}
 
-  const removeDraftSource = useCallback((id: number) => {
-    setDraftSources((sources) => {
-      if (sources.length <= 1) {
-        return [createEmptySource(id)];
-      }
-      return sources.filter((source) => source.id !== id);
-    });
-  }, []);
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
 
-  const updateDraftSource = useCallback((id: number, field: "confluenceUrl" | "prompt", value: string) => {
-    setDraftSources((sources) => sources.map((source) => (
-      source.id === id ? { ...source, [field]: value } : source
-    )));
-  }, []);
+function measuredCycleTime(release: ReleaseInsightRow): number | null {
+  return typeof release.cycleTimeDays === "number" && Number.isFinite(release.cycleTimeDays)
+    ? release.cycleTimeDays
+    : null;
+}
 
-  const saveConfigure = useCallback(() => {
-    const normalizedSources = draftSources
-      .map((source) => ({
-        ...source,
-        confluenceUrl: source.confluenceUrl.trim(),
-        prompt: source.prompt.trim(),
-      }))
-      .filter((source) => source.confluenceUrl);
-    setSavedSources(normalizedSources);
-    setSavedOverallPrompt(draftOverallPrompt.trim());
-    setIsConfigureOpen(false);
-  }, [draftOverallPrompt, draftSources]);
+function cycleTimeStatusLabel(release: ReleaseInsightRow): string {
+  const cycleTime = measuredCycleTime(release);
+  if (cycleTime !== null) return formatDays(cycleTime);
+  if (!release.releaseDate) return "Missing end date";
+  if (!release.startDate) return "Missing start date";
+  return "Not measured";
+}
 
-  const hasRunnableConfig = savedSources.some((source) => source.confluenceUrl.trim().length > 0);
+function missingCycleReason(release: ReleaseInsightRow): string | null {
+  if (measuredCycleTime(release) !== null) return null;
+  if (!release.releaseDate) return "Missing end date";
+  if (!release.startDate) return "Missing start date";
+  return "Cycle time unavailable";
+}
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current !== null) {
-      window.clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
+function sortReleaseRowsByRisk(rows: ReleaseInsightRow[]): ReleaseInsightRow[] {
+  const riskOrder: Record<string, number> = { red: 0, amber: 1, green: 2, neutral: 3 };
+  return [...rows].sort((left, right) => {
+    const riskDelta = (riskOrder[left.riskLevel] ?? 9) - (riskOrder[right.riskLevel] ?? 9);
+    if (riskDelta !== 0) return riskDelta;
+    return (left.releaseDate ?? "").localeCompare(right.releaseDate ?? "");
+  });
+}
 
-  const loadRefreshResult = useCallback(async () => {
-    setLoadingRefreshResult(true);
-    try {
-      const payload = await fetchReleaseRefreshResult();
-      setRefreshResultHtml(payload.html ?? null);
-      setRefreshResultGeneratedAt(payload.generatedAt ?? null);
-      setRefreshResultSources(payload.sources ?? []);
-      if (payload.error) {
-        setRefreshError(payload.error);
-      } else {
-        setRefreshError(null);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load release refresh result.";
-      setRefreshError(message);
-    } finally {
-      setLoadingRefreshResult(false);
-    }
-  }, []);
+type ReleaseCycleLineChartProps = {
+  releases: ReleaseInsightRow[];
+  averageCycleTime: number | null;
+  maxCycleTime: number;
+};
 
-  const pollRefreshStatus = useCallback(async () => {
-    try {
-      const status = await fetchReleaseRefreshStatus();
-      setRefreshStatus(status);
-      if (status.state === "running") {
-        return;
-      }
+function ReleaseCycleLineChart({
+  releases,
+  averageCycleTime,
+  maxCycleTime,
+}: ReleaseCycleLineChartProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-      stopPolling();
-      if (status.state === "completed" || status.state === "failed") {
-        await loadRefreshResult();
-      }
-    } catch (error) {
-      stopPolling();
-      const message = error instanceof Error ? error.message : "Unable to check release refresh status.";
-      setRefreshError(message);
-    }
-  }, [loadRefreshResult, stopPolling]);
+  const config = useMemo(() => {
+    const labels = releases.map((_release, index) => compactReleaseLabel(index));
+    const measuredValues = releases.map((release) => measuredCycleTime(release));
+    const missingValues = releases.map((release) => (missingCycleReason(release) ? 0 : null));
+    const suggestedMax = Math.max(4, Math.ceil(maxCycleTime * 1.2));
 
-  const startPolling = useCallback(() => {
-    stopPolling();
-    void pollRefreshStatus();
-    pollTimerRef.current = window.setInterval(() => {
-      void pollRefreshStatus();
-    }, 2000);
-  }, [pollRefreshStatus, stopPolling]);
+    return {
+      type: "line" as const,
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Cycle time",
+            data: measuredValues,
+            borderColor: "#1f67c1",
+            backgroundColor: "rgba(47, 123, 216, 0.14)",
+            borderWidth: 2,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#175cae",
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 5,
+            tension: 0.28,
+            spanGaps: false,
+          },
+          {
+            label: "Missing value",
+            data: missingValues,
+            borderColor: "transparent",
+            backgroundColor: "#b46508",
+            pointBackgroundColor: "#fff7e8",
+            pointBorderColor: "#b46508",
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 6,
+            pointStyle: "triangle",
+            showLine: false,
+          },
+          ...(averageCycleTime !== null
+            ? [{
+              label: "Average",
+              data: releases.map(() => averageCycleTime),
+              borderColor: "#8d6b20",
+              borderDash: [6, 4],
+              borderWidth: 1.4,
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              tension: 0,
+            }]
+            : []),
+        ] as any[],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        normalized: true,
+        layout: {
+          padding: {
+            top: 10,
+            right: 12,
+            bottom: 4,
+            left: 4,
+          },
+        },
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            displayColors: false,
+            callbacks: {
+              title: (items: any[]) => {
+                const index = items[0]?.dataIndex ?? 0;
+                return releases[index]?.name ?? labels[index] ?? "";
+              },
+              label: (item: any) => {
+                const release = releases[item.dataIndex];
+                if (!release) return "";
+                if (item.datasetIndex === 1) {
+                  return `${missingCycleReason(release) ?? "Missing value"} | ${formatDate(release.startDate)} to ${formatDate(release.releaseDate)}`;
+                }
+                if (item.datasetIndex === 2) {
+                  return `Average: ${formatDays(averageCycleTime)}`;
+                }
+                return `${formatDays(measuredCycleTime(release))} | ${formatDate(release.startDate)} to ${formatDate(release.releaseDate)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false,
+              drawTicks: false,
+            },
+            ticks: {
+              autoSkip: false,
+              color: "#2a456d",
+              font: {
+                size: 11,
+                weight: "700",
+              },
+              maxRotation: 0,
+              minRotation: 0,
+            },
+            border: {
+              color: "#bfd0e8",
+              width: 2,
+            },
+          },
+          y: {
+            beginAtZero: true,
+            min: 0,
+            suggestedMax,
+            ticks: {
+              color: "#2a456d",
+              font: {
+                size: 11,
+                weight: "700",
+              },
+              padding: 8,
+              callback: (value: unknown) => `${formatNumber(Number(value))} d`,
+            },
+            grid: {
+              color: "#e1e9f6",
+              tickColor: "#bfd0e8",
+            },
+            border: {
+              color: "#bfd0e8",
+              width: 2,
+            },
+          },
+        },
+      },
+    };
+  }, [averageCycleTime, maxCycleTime, releases]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const hydrate = async () => {
-      try {
-        const status = await fetchReleaseRefreshStatus();
-        if (cancelled) return;
-        setRefreshStatus(status);
-
-        if (status.state === "running") {
-          startPolling();
-          return;
-        }
-
-        if (status.state === "completed" || status.state === "failed") {
-          await loadRefreshResult();
-        }
-      } catch {
-        // Release refresh is optional; avoid surfacing initial load noise.
-      }
-    };
-
-    void hydrate();
-
+    if (!canvasRef.current) return undefined;
+    const chart = new Chart(canvasRef.current, config as any);
     return () => {
-      cancelled = true;
-      stopPolling();
+      chart.destroy();
     };
-  }, [loadRefreshResult, startPolling, stopPolling]);
+  }, [config]);
 
-  const runRefresh = useCallback(async () => {
-    const sources = savedSources
-      .map((source) => ({
-        confluenceUrl: source.confluenceUrl.trim(),
-        prompt: source.prompt.trim(),
-      }))
-      .filter((source) => source.confluenceUrl);
+  return (
+    <div class="tb-release-cycle-chart">
+      <canvas
+        ref={canvasRef}
+        class="tb-release-cycle-chart-canvas"
+        role="img"
+        aria-label="Release cycle time line chart"
+        data-testid="release-cycle-time-chart"
+      >
+        Release cycle time line chart
+      </canvas>
+    </div>
+  );
+}
 
-    if (sources.length === 0) {
-      setRefreshError("Add at least one Confluence source URL before running Refresh.");
-      return;
-    }
+export function ReleasesScreen() {
+  const [insights, setInsights] = useState<ReleaseInsightsResponse>(EMPTY_INSIGHTS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    setRefreshSubmitting(true);
-    setRefreshError(null);
-    setRefreshResultHtml(null);
-    setRefreshResultGeneratedAt(null);
-    setRefreshResultSources([]);
-
+  const loadInsights = useCallback(async () => {
+    setLoading(true);
     try {
-      const status = await startReleaseRefresh({
-        sources,
-        overallPrompt: savedOverallPrompt.trim() || undefined,
-      });
-      setRefreshStatus(status);
-
-      if (status.state === "running") {
-        startPolling();
-      } else if (status.state === "completed" || status.state === "failed") {
-        await loadRefreshResult();
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to start release refresh.";
-      setRefreshError(message);
+      const payload = await fetchReleaseInsights(12);
+      setInsights(payload);
+      setError(payload.error ?? null);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Unable to load release insights.";
+      setError(message);
+      setInsights(EMPTY_INSIGHTS);
     } finally {
-      setRefreshSubmitting(false);
+      setLoading(false);
     }
-  }, [loadRefreshResult, savedOverallPrompt, savedSources, startPolling]);
+  }, []);
 
-  const overallPromptPreview = useMemo(() => {
-    const value = savedOverallPrompt.trim();
-    if (!value) {
-      return "Not configured";
-    }
-    return value.length > 160 ? `${value.slice(0, 160)}...` : value;
-  }, [savedOverallPrompt]);
+  useEffect(() => {
+    void loadInsights();
+  }, [loadInsights]);
 
-  const refreshSourceMap = useMemo(() => {
-    const map = new Map<string, ReleaseRefreshSourceStatus>();
-    for (const row of refreshResultSources) {
-      map.set(row.confluenceUrl, row);
-    }
-    if (refreshStatus?.sources) {
-      for (const row of refreshStatus.sources) {
-        map.set(row.confluenceUrl, row);
-      }
-    }
-    return map;
-  }, [refreshResultSources, refreshStatus]);
+  const sortedOngoingReleases = useMemo(
+    () => sortReleaseRowsByRisk(insights.ongoingReleases),
+    [insights.ongoingReleases],
+  );
 
-  const isRefreshRunning = refreshStatus?.state === "running";
-  const refreshPercent = normalizePercent(refreshStatus?.percent);
-  const refreshSummaryMessage = refreshStatus?.message || "Run Refresh to generate release insights.";
-  const statusLabel = useMemo(() => {
-    if (!refreshStatus) {
-      return hasRunnableConfig ? "Ready" : "Configuration Needed";
-    }
-    if (refreshStatus.state === "running") return "Running";
-    if (refreshStatus.state === "completed") return "Completed";
-    if (refreshStatus.state === "failed") return "Failed";
-    return hasRunnableConfig ? "Ready" : "Configuration Needed";
-  }, [hasRunnableConfig, refreshStatus]);
+  const sortedRecentReleases = useMemo(
+    () => [...insights.recentReleases].sort((left, right) => {
+      const dateDelta = releaseSortTimestamp(right.releaseDate) - releaseSortTimestamp(left.releaseDate);
+      if (dateDelta !== 0) return dateDelta;
+      return left.name.localeCompare(right.name);
+    }),
+    [insights.recentReleases],
+  );
 
-  const statusClass = useMemo(() => {
-    if (!refreshStatus) {
-      return hasRunnableConfig ? "tb-value-good" : "tb-value-warn";
-    }
-    if (refreshStatus.state === "completed") return "tb-value-good";
-    if (refreshStatus.state === "failed") return "tb-value-risk";
-    if (refreshStatus.state === "running") return "tb-value-warn";
-    return hasRunnableConfig ? "tb-value-good" : "tb-value-warn";
-  }, [hasRunnableConfig, refreshStatus]);
+  const last12ReleasedVersions = useMemo(
+    () => sortedRecentReleases.slice(0, 12),
+    [sortedRecentReleases],
+  );
+
+  const last12CycleTimes = useMemo(
+    () => last12ReleasedVersions
+      .map((release) => measuredCycleTime(release))
+      .filter((value): value is number => value !== null),
+    [last12ReleasedVersions],
+  );
+
+  const last12AverageCycleTime = useMemo(
+    () => average(last12CycleTimes),
+    [last12CycleTimes],
+  );
+
+  const maxLast12CycleTime = useMemo(
+    () => Math.max(1, ...last12CycleTimes),
+    [last12CycleTimes],
+  );
+
+  const chartReleases = useMemo(
+    () => [...last12ReleasedVersions].reverse(),
+    [last12ReleasedVersions],
+  );
+
+  const releasesWithMissingCycleTime = useMemo(
+    () => last12ReleasedVersions
+      .map((release) => ({ release, reason: missingCycleReason(release) }))
+      .filter((entry): entry is { release: ReleaseInsightRow; reason: string } => entry.reason !== null),
+    [last12ReleasedVersions],
+  );
+
+  const visibleRiskSignals = insights.riskSignals.length > 0
+    ? insights.riskSignals
+    : [{
+      level: "green" as ReleaseRiskLevel,
+      title: "Release posture",
+      detail: "No overdue or readiness risks detected in synced JIRA release data.",
+    }];
 
   return (
     <div class="tb-screen-grid">
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Release Configuration</h3>
-            <p class="tb-muted-note">Configure Confluence release-note sources and prompts for Release Insights.</p>
+            <h3>JIRA Release Overview</h3>
+            <p class="tb-muted-note">
+              Versions, fixVersion scope, dates, and issue completion from the local JIRA sync.
+            </p>
           </div>
           <div class="tb-panel-header-actions">
-            <button type="button" class="tb-btn" onClick={openConfigure}>
-              Configure
-            </button>
-            <button
-              type="button"
-              class="tb-btn"
-              onClick={() => void runRefresh()}
-              disabled={!hasRunnableConfig || isRefreshRunning || refreshSubmitting}
-            >
-              {isRefreshRunning ? "Refreshing..." : "Refresh"}
+            <button type="button" class="tb-btn" onClick={() => void loadInsights()} disabled={loading}>
+              {loading ? "Loading..." : "Refresh Data"}
             </button>
           </div>
         </header>
-        <div class="tb-metrics-grid tb-three-up">
+
+        <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
-            <h4>Confluence Sources</h4>
-            <strong class="tb-value">{savedSources.length}</strong>
-            <p>Configured release-note page URLs.</p>
+            <h4>Ongoing Releases</h4>
+            <strong class={`tb-value ${insights.metrics.overdueCount > 0 ? "tb-value-risk" : "tb-value-good"}`}>
+              {insights.metrics.ongoingCount}
+            </strong>
+            <p>{insights.metrics.overdueCount} overdue / {insights.metrics.dueSoonCount} due soon.</p>
           </article>
           <article class="tb-metric-card">
-            <h4>Overall Prompt</h4>
-            <strong class={`tb-value ${savedOverallPrompt.trim() ? "tb-value-good" : "tb-value-warn"}`}>
-              {savedOverallPrompt.trim() ? "Configured" : "Not Set"}
-            </strong>
-            <p>Global guidance applied across all sources.</p>
+            <h4>Avg Cycle Time</h4>
+            <strong class="tb-value">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
+            <p>Released versions with start and release dates.</p>
           </article>
           <article class="tb-metric-card">
-            <h4>Status</h4>
-            <strong class={`tb-value ${statusClass}`}>
-              {statusLabel}
-            </strong>
-            <p>{isRefreshRunning ? "Release refresh is currently running." : "Release refresh state from backend."}</p>
+            <h4>Release Cadence</h4>
+            <strong class="tb-value">{formatDays(insights.metrics.avgCadenceDays)}</strong>
+            <p>Average days between released versions.</p>
+          </article>
+          <article class="tb-metric-card">
+            <h4>Delivered Scope</h4>
+            <strong class="tb-value">{formatStoryPoints(insights.metrics.deliveredStoryPoints)}</strong>
+            <p>{insights.metrics.releasedCount} released / {insights.metrics.totalReleases} total versions.</p>
           </article>
         </div>
 
-        <div class="tb-release-refresh-status">
-          <div class="tb-release-refresh-head">
-            <strong>{refreshSummaryMessage}</strong>
-            <span>{refreshStatus?.percent != null ? `${refreshPercent.toFixed(1).replace(/\.0$/, "")}%` : "n/a"}</span>
+        {loading ? (
+          <div class="tb-summary is-loading">Loading release insights from local JIRA data...</div>
+        ) : (
+          <div class="tb-summary">
+            <p>{insights.summary}</p>
+            <div class="tb-exec-summary-meta">
+              <span>Project: {insights.projectKey || "Auto-detected"}</span>
+              <span>Generated: {formatGeneratedAt(insights.generatedAt)}</span>
+              <span>Archived versions: {insights.metrics.archivedCount}</span>
+            </div>
           </div>
-          <div class="tb-release-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={refreshPercent}>
-            <div class="tb-release-progress-fill" style={{ width: `${refreshPercent}%` }} />
-          </div>
-          <p class="tb-muted-note">
-            Phase: {refreshStatus?.phase ?? "idle"} | Started: {formatRefreshTimestamp(refreshStatus?.startedAt)}
-          </p>
-          {refreshStatus?.error ? <p class="tb-error-note">Refresh status error: {refreshStatus.error}</p> : null}
-          {refreshError ? <p class="tb-error-note">Refresh error: {refreshError}</p> : null}
-        </div>
+        )}
+        {error ? <p class="tb-error-note">{error}</p> : null}
       </section>
 
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Configured Sources</h3>
-            <p class="tb-muted-note">Saved source-level prompts and overall release guidance.</p>
+            <h3>Release Cycle Time Trend</h3>
+            <p class="tb-muted-note">Last 12 released versions from version start date to release date.</p>
           </div>
+          <span class="tb-chip">{last12ReleasedVersions.length} shown</span>
         </header>
-        {savedSources.length === 0 ? (
-          <div class="tb-summary">
-            No Confluence source URLs configured yet. Use Configure to add release-note pages and prompts.
-          </div>
-        ) : (
-          <div class="tb-release-source-list">
-            {savedSources.map((source, index) => (
-              <article key={source.id} class="tb-release-source-card">
-                <h4>Source {index + 1}</h4>
-                <p>
-                  URL:{" "}
-                  <a class="tb-external-link" href={source.confluenceUrl} target="_blank" rel="noopener noreferrer">
-                    {source.confluenceUrl}
-                  </a>
-                </p>
-                <p>Prompt: {source.prompt || "Not provided"}</p>
-                {refreshSourceMap.has(source.confluenceUrl) ? (
-                  <p>
-                    Latest state:{" "}
-                    <strong class={sourceStateTone(refreshSourceMap.get(source.confluenceUrl)?.state)}>
-                      {refreshSourceMap.get(source.confluenceUrl)?.state ?? "unknown"}
-                    </strong>
-                  </p>
-                ) : null}
-                {refreshSourceMap.get(source.confluenceUrl)?.error ? (
-                  <p class="tb-error-note">Source error: {refreshSourceMap.get(source.confluenceUrl)?.error}</p>
-                ) : null}
+
+        {last12ReleasedVersions.length > 0 ? (
+          <div class="tb-release-cycle-view">
+            <div class="tb-release-cycle-summary">
+              <article>
+                <span>Measured</span>
+                <strong>{last12CycleTimes.length}/{last12ReleasedVersions.length}</strong>
               </article>
-            ))}
+              <article>
+                <span>Avg Cycle</span>
+                <strong>{formatDays(last12AverageCycleTime)}</strong>
+              </article>
+              <article>
+                <span>Fastest</span>
+                <strong>{formatDays(last12CycleTimes.length > 0 ? Math.min(...last12CycleTimes) : null)}</strong>
+              </article>
+              <article>
+                <span>Slowest</span>
+                <strong>{formatDays(last12CycleTimes.length > 0 ? Math.max(...last12CycleTimes) : null)}</strong>
+              </article>
+            </div>
+
+            <div class="tb-release-cycle-chart-frame" data-testid="release-cycle-time-trend">
+              <ReleaseCycleLineChart
+                releases={chartReleases}
+                averageCycleTime={last12AverageCycleTime}
+                maxCycleTime={maxLast12CycleTime}
+              />
+              <div class="tb-release-cycle-legend" aria-label="Release cycle chart legend">
+                <span><i class="tb-release-cycle-line-swatch" />Cycle time</span>
+                <span><i class="tb-release-cycle-average-swatch" />Average</span>
+                <span><i class="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
+              </div>
+              <p class="tb-trend-x-axis-label">Oldest to newest among the latest 12 releases</p>
+            </div>
+
+            {releasesWithMissingCycleTime.length > 0 ? (
+              <div class="tb-release-cycle-gaps" role="list" aria-label="Release cycle missing values">
+                {releasesWithMissingCycleTime.map(({ release, reason }) => (
+                  <span key={release.versionId} role="listitem">
+                    {release.name}: {reason}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <div class="tb-release-cycle-key" role="list" aria-label="Line chart release labels">
+              {chartReleases.map((release, index) => (
+                <span key={release.versionId} role="listitem">
+                  <strong>{compactReleaseLabel(index)}</strong>
+                  {release.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div class="tb-summary">
+            Release cycle-time trend needs released JIRA versions from the current sync.
           </div>
         )}
-        <p class="tb-muted-note">Overall Prompt: {overallPromptPreview}</p>
       </section>
 
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Release Output</h3>
-            <p class="tb-muted-note">Generated HTML output from configured Confluence sources and prompts.</p>
+            <h3>Ongoing Releases</h3>
+            <p class="tb-muted-note">Readiness and delivery risk for unreleased, non-archived versions.</p>
           </div>
         </header>
 
-        {loadingRefreshResult ? (
-          <div class="tb-summary is-loading">Loading release output...</div>
-        ) : refreshResultHtml ? (
-          <article class="tb-release-output" dangerouslySetInnerHTML={{ __html: refreshResultHtml }} />
+        {sortedOngoingReleases.length > 0 ? (
+          <div class="tb-release-table-wrap">
+            <table class="tb-release-table">
+              <thead>
+                <tr>
+                  <th>Release</th>
+                  <th>Target</th>
+                  <th class="is-numeric">Age</th>
+                  <th class="is-readiness">Readiness</th>
+                  <th class="is-numeric">Scope</th>
+                  <th>Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedOngoingReleases.map((release) => (
+                  <tr key={release.versionId}>
+                    <td>
+                      <div class="tb-release-name-cell">
+                        <strong>{release.name}</strong>
+                        <span>{releaseSecondaryLine(release)}</span>
+                      </div>
+                    </td>
+                    <td>{formatDate(release.releaseDate)}</td>
+                    <td class="tb-release-numeric">{formatDays(release.ageDays)}</td>
+                    <td>
+                      <div class="tb-release-readiness">
+                        <div class="tb-release-readiness-track">
+                          <span style={{ width: `${Math.max(0, Math.min(100, release.readinessPercent))}%` }} />
+                        </div>
+                        <span>{formatPercent(release.readinessPercent)} | {readinessLabel(release)}</span>
+                      </div>
+                    </td>
+                    <td class="tb-release-numeric">
+                      {release.issueCount} / {formatStoryPoints(release.storyPoints)}
+                    </td>
+                    <td>
+                      <span class={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>
+                        {release.riskLevel}
+                      </span>
+                      <p class="tb-release-risk-detail">{release.riskSummary}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <div class="tb-summary">
-            No generated release output yet. Run Refresh after configuring at least one Confluence source URL.
-          </div>
+          <div class="tb-summary">No ongoing JIRA releases found in the current sync.</div>
         )}
-
-        <p class="tb-muted-note">Generated: {formatRefreshTimestamp(refreshResultGeneratedAt)}</p>
-
-        {refreshResultSources.some((source) => source.summary) ? (
-          <div class="tb-release-output-sources">
-            <h4>Source Summaries</h4>
-            {refreshResultSources
-              .filter((source) => source.summary)
-              .map((source) => (
-                <article key={source.id} class="tb-release-source-card">
-                  <h4>{source.title || `Source ${source.id}`}</h4>
-                  <p>
-                    <a
-                      class="tb-external-link"
-                      href={source.resolvedUrl || source.confluenceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {source.resolvedUrl || source.confluenceUrl}
-                    </a>
-                  </p>
-                  <p>{source.summary}</p>
-                </article>
-              ))}
-          </div>
-        ) : null}
       </section>
 
-      {isConfigureOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Release Insights">
-          <div class="tb-modal-backdrop" onClick={closeConfigure} />
-          <div class="tb-modal tb-modal-wide">
-            <header class="tb-modal-head">
-              <h3>Configure Release Insights</h3>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={closeConfigure}>
-                Close
-              </button>
-            </header>
-
-            <p class="tb-muted-note">
-              Add one or more Confluence page URLs, each with a source-level prompt.
-            </p>
-
-            <div class="tb-release-config-list">
-              {draftSources.map((source, index) => (
-                <article key={source.id} class="tb-release-config-card">
-                  <header class="tb-panel-header">
-                    <div>
-                      <h4>Source {index + 1}</h4>
-                    </div>
-                    <button
-                      type="button"
-                      class="tb-btn tb-btn-sm tb-btn-danger"
-                      onClick={() => removeDraftSource(source.id)}
-                    >
-                      Remove
-                    </button>
-                  </header>
-
-                  <label class="tb-modal-field">
-                    <span>Confluence Page URL</span>
-                    <input
-                      type="url"
-                      value={source.confluenceUrl}
-                      onInput={(event) =>
-                        updateDraftSource(source.id, "confluenceUrl", (event.currentTarget as HTMLInputElement).value)}
-                      placeholder="https://gbuconfluence.oraclecorp.com/display/SPACE/Page+Title"
-                    />
-                  </label>
-
-                  <label class="tb-modal-field">
-                    <span>Source Prompt</span>
-                    <textarea
-                      value={source.prompt}
-                      onInput={(event) =>
-                        updateDraftSource(source.id, "prompt", (event.currentTarget as HTMLTextAreaElement).value)}
-                      placeholder="What should TeamBeacon extract from this page for release insights?"
-                    />
-                  </label>
-                </article>
-              ))}
-            </div>
-
-            <div class="tb-action-row">
-              <button type="button" class="tb-btn tb-btn-sm" onClick={addDraftSource}>
-                Add Source
-              </button>
-            </div>
-
-            <label class="tb-modal-field">
-              <span>Overall Prompt</span>
-              <textarea
-                value={draftOverallPrompt}
-                onInput={(event) => setDraftOverallPrompt((event.currentTarget as HTMLTextAreaElement).value)}
-                placeholder="Shared release-level prompt applied alongside source prompts."
-              />
-            </label>
-
-            <footer class="tb-modal-actions">
-              <button type="button" class="tb-btn" onClick={closeConfigure}>
-                Cancel
-              </button>
-              <button type="button" class="tb-btn tb-btn-primary" onClick={saveConfigure}>
-                Save
-              </button>
-            </footer>
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
+            <h3>Release Risk Signals</h3>
+            <p class="tb-muted-note">Signals derived from dates, readiness, and linked fixVersion scope.</p>
           </div>
+        </header>
+        <div class="tb-release-risk-grid">
+          {visibleRiskSignals.map((signal) => (
+            <article key={`${signal.title}-${signal.detail}`} class="tb-metric-card">
+              <h4>{signal.title}</h4>
+              <strong class={`tb-release-risk-heading ${riskValueClass(signal.level)}`}>{signal.level}</strong>
+              <p>{signal.detail}</p>
+            </article>
+          ))}
         </div>
-      ) : null}
+      </section>
+
+      <section class="tb-panel">
+        <header class="tb-panel-header">
+          <div>
+            <h3>Recent Released Versions</h3>
+            <p class="tb-muted-note">Delivered scope, cycle time, and completion quality for released versions.</p>
+          </div>
+        </header>
+
+        {last12ReleasedVersions.length > 0 ? (
+          <div class="tb-initiative-table-wrap tb-release-recent-table-wrap">
+            <table class="tb-initiative-table tb-release-recent-table" aria-label="Recent released versions">
+              <thead>
+                <tr>
+                  <th>Release</th>
+                  <th>Released</th>
+                  <th class="tb-release-recent-numeric">Cycle Time</th>
+                  <th class="tb-release-recent-numeric">Scope</th>
+                  <th>Completion</th>
+                  <th>Mix</th>
+                  <th>Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {last12ReleasedVersions.map((release) => (
+                  <tr key={release.versionId}>
+                    <td>
+                      <div class="tb-release-name-cell">
+                        <strong>{release.name}</strong>
+                        <span>{formatDate(release.startDate)} to {formatDate(release.releaseDate)}</span>
+                      </div>
+                    </td>
+                    <td>{formatDate(release.releaseDate)}</td>
+                    <td class="tb-release-recent-numeric">{cycleTimeStatusLabel(release)}</td>
+                    <td class="tb-release-recent-numeric">
+                      {release.issueCount} cards / {formatStoryPoints(release.doneStoryPoints)}
+                    </td>
+                    <td>
+                      <div class="tb-release-readiness">
+                        <div class="tb-release-readiness-track">
+                          <span style={{ width: `${Math.max(0, Math.min(100, release.readinessPercent))}%` }} />
+                        </div>
+                        <span>{formatPercent(release.readinessPercent)} | {readinessLabel(release)}</span>
+                      </div>
+                    </td>
+                    <td class="tb-release-mix-cell">{releaseMixLabel(release)}</td>
+                    <td>
+                      <span class={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>{release.riskLevel}</span>
+                      <p class="tb-release-risk-detail">{release.riskSummary}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div class="tb-summary">No released JIRA versions with linked scope are available yet.</div>
+        )}
+      </section>
     </div>
   );
 }
