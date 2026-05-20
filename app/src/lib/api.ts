@@ -261,6 +261,7 @@ export type CurrentSprint = {
   endDate?: string | null;
   goal?: string | null;
   sprintUrl?: string | null;
+  daysOver?: number | null;
   remainingDays?: number | null;
 };
 

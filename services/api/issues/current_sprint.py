@@ -36,6 +36,15 @@ def _remaining_days(end_date: datetime | None, now_utc: datetime) -> int | None:
     return max(0, int(math.ceil(delta_seconds / 86400)))
 
 
+def _days_over(end_date: datetime | None, now_utc: datetime) -> int | None:
+    if end_date is None:
+        return None
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    now_utc = now_utc.astimezone(timezone.utc)
+    return max(0, (now_utc.date() - end_date.date()).days)
+
+
 def _resolve_configured_board_id() -> int | None:
     try:
         load_env_files()
@@ -118,6 +127,7 @@ def get_current_sprint(
             "endDate": row["end_date"],
             "goal": row["goal"],
             "sprintUrl": sprint_url,
+            "daysOver": _days_over(end_date, current_time),
             "remainingDays": _remaining_days(end_date, current_time),
         },
         "error": None,

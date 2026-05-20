@@ -16,6 +16,7 @@ describe("SprintBoardScreen", () => {
           endDate: "2026-04-06",
           goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           sprintUrl: "https://jira.example.com/secure/RapidBoard.jspa?rapidView=42",
+          daysOver: 0,
           remainingDays: 7,
         },
         work: {
@@ -88,6 +89,7 @@ describe("SprintBoardScreen", () => {
           endDate: "2026-04-06",
           goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           sprintUrl: "https://jira.example.com/secure/RapidBoard.jspa?rapidView=42",
+          daysOver: 0,
           remainingDays: 7,
         },
         changes: {
@@ -139,6 +141,7 @@ describe("SprintBoardScreen", () => {
           endDate: "2026-04-06",
           goal: "Reduce production defects by closing top reliability stories; complete OCI GenAI rollout validation",
           sprintUrl: "https://jira.example.com/secure/RapidBoard.jspa?rapidView=42",
+          daysOver: 0,
           remainingDays: 7,
         },
       },
@@ -153,6 +156,8 @@ describe("SprintBoardScreen", () => {
       "https://jira.example.com/secure/RapidBoard.jspa?rapidView=42",
     );
     expect(screen.getByText("State: active")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Days Over" })).toBeInTheDocument();
+    expect(screen.getByText("Since 06-Apr-2026")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sprint Goals" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "State Breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Card breakdown:/i })).toBeInTheDocument();

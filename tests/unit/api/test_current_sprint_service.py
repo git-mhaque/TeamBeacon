@@ -83,7 +83,41 @@ class CurrentSprintServiceUnitTests(unittest.TestCase):
             self.assertEqual(sprint["name"], "Current Platform Sprint")
             self.assertEqual(sprint["startDate"], "2026-03-20T00:00:00+00:00")
             self.assertEqual(sprint["endDate"], "2026-03-30T00:00:00+00:00")
+            self.assertEqual(sprint["daysOver"], 0)
             self.assertEqual(sprint["remainingDays"], 4)
+
+    def test_get_current_sprint_counts_days_over_after_end_date(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            self._init_db(db_path)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO sprints (
+                      external_sprint_id,
+                      board_external_id,
+                      name,
+                      state,
+                      start_date,
+                      end_date
+                    ) VALUES (11004, 27193, 'Overrun Sprint', 'active', '2026-03-10T00:00:00+00:00', '2026-03-24T00:00:00+00:00')
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            payload = get_current_sprint(
+                db_path=str(db_path),
+                now_utc=datetime(2026, 3, 26, 12, 0, 0, tzinfo=timezone.utc),
+            )
+            sprint = payload["sprint"]
+
+            self.assertIsNotNone(sprint)
+            self.assertEqual(sprint["daysOver"], 2)
+            self.assertEqual(sprint["remainingDays"], 0)
 
     def test_get_current_sprint_returns_empty_when_no_active_sprint_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

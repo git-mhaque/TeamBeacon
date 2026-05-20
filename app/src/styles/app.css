@@ -398,6 +398,10 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.tb-five-up {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .tb-metric-card {
   min-width: 0;
   border: 1px solid var(--tb-line);
@@ -3368,6 +3372,7 @@ body {
 }
 
 @media (max-width: 1160px) {
+  .tb-five-up,
   .tb-four-up,
   .tb-three-up {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3473,6 +3478,7 @@ body {
 }
 
 @media (max-width: 760px) {
+  .tb-five-up,
   .tb-four-up,
   .tb-three-up,
   .tb-two-up {

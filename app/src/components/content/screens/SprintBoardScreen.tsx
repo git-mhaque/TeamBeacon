@@ -63,6 +63,11 @@ function resolveToneForRemainingDays(days: number | null | undefined): string {
   return "tb-value-good";
 }
 
+function resolveToneForDaysOver(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "";
+  return days > 0 ? "tb-value-risk" : "tb-value-good";
+}
+
 function resolveStatusTone(statusCategory: string | null | undefined, statusName: string | null | undefined): string {
   const category = (statusCategory ?? "").trim().toLowerCase();
   const status = (statusName ?? "").trim().toLowerCase();
@@ -350,6 +355,10 @@ export function SprintBoardScreen() {
     () => resolveToneForRemainingDays(sprint?.remainingDays),
     [sprint?.remainingDays],
   );
+  const daysOverToneClass = useMemo(
+    () => resolveToneForDaysOver(sprint?.daysOver),
+    [sprint?.daysOver],
+  );
 
   const stateBreakdownRows = useMemo<StateBreakdownRow[]>(() => {
     const cardTotal = work.totals.total;
@@ -496,7 +505,7 @@ export function SprintBoardScreen() {
             <p class="tb-muted-note">Active sprint metadata from local synced JIRA data.</p>
           </div>
         </header>
-        <div class="tb-metrics-grid tb-four-up">
+        <div class="tb-metrics-grid tb-five-up">
           <article class="tb-metric-card">
             <h4>Sprint Name</h4>
             <strong class="tb-value">
@@ -532,6 +541,11 @@ export function SprintBoardScreen() {
               {sprintLoading ? "Loading..." : sprint?.remainingDays ?? "-"}
             </strong>
             <p>{sprint?.endDate ? `Until ${formatDate(sprint.endDate)}` : "End date not available."}</p>
+          </article>
+          <article class="tb-metric-card">
+            <h4>Days Over</h4>
+            <strong class={`tb-value ${daysOverToneClass}`}>{sprintLoading ? "Loading..." : sprint?.daysOver ?? "-"}</strong>
+            <p>{sprint?.endDate ? `Since ${formatDate(sprint.endDate)}` : "End date not available."}</p>
           </article>
         </div>
         <div class="tb-sprint-summary-grid">
