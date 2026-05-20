@@ -152,46 +152,10 @@ def get_current_sprint_changes(
     sprint_start_raw = sprint.get("startDate")
     sprint_start = _parse_iso_datetime(sprint_start_raw if isinstance(sprint_start_raw, str) else None)
 
-    added_issue_keys: set[str] = set()
-    removed_issue_keys: set[str] = set()
-
-    if sprint_name:
-        conn = sqlite3.connect(resolved_db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            _ensure_schema(conn)
-            where_sql = "LOWER(COALESCE(field_name, '')) = 'sprint'"
-            params: list[Any] = []
-            if sprint_start is not None:
-                where_sql += " AND datetime(changed_at) >= datetime(?)"
-                params.append(sprint_start.isoformat())
-            rows = conn.execute(
-                f"""
-                SELECT issue_key, from_value, to_value
-                FROM issue_changelog
-                WHERE {where_sql}
-                ORDER BY datetime(changed_at) ASC, id ASC
-                """,
-                tuple(params),
-            ).fetchall()
-        finally:
-            conn.close()
-
-        sprint_name_token = sprint_name.lower()
-        for row in rows:
-            issue_key = str(row["issue_key"])
-            from_tokens = _normalize_sprint_values(row["from_value"])
-            to_tokens = _normalize_sprint_values(row["to_value"])
-            had_sprint = sprint_name_token in from_tokens
-            has_sprint = sprint_name_token in to_tokens
-            if has_sprint and not had_sprint:
-                added_issue_keys.add(issue_key)
-            if had_sprint and not has_sprint:
-                removed_issue_keys.add(issue_key)
-
     work_payload = get_current_sprint_work(db_path=resolved_db_path)
     work = work_payload.get("work", {})
     blocked_issue_keys: set[str] = set()
+    current_sprint_issue_keys: set[str] = set()
     blocked_overrides: dict[str, dict[str, Any]] = {}
     blocked_story_points_by_issue_key: dict[str, float] = {}
     for issue in [
@@ -201,14 +165,16 @@ def get_current_sprint_changes(
     ]:
         if not isinstance(issue, dict):
             continue
+        issue_key = issue.get("issueKey")
+        normalized_issue_key = issue_key.strip() if isinstance(issue_key, str) and issue_key.strip() else None
+        if normalized_issue_key is not None:
+            current_sprint_issue_keys.add(normalized_issue_key)
         status = issue.get("status")
         status_category = issue.get("statusCategory")
         if _status_contains_blocked(status if isinstance(status, str) else None) or _status_contains_blocked(
             status_category if isinstance(status_category, str) else None
         ):
-            issue_key = issue.get("issueKey")
-            if isinstance(issue_key, str) and issue_key.strip():
-                normalized_issue_key = issue_key.strip()
+            if normalized_issue_key is not None:
                 blocked_issue_keys.add(normalized_issue_key)
                 summary_raw = issue.get("summary")
                 issue_url_raw = issue.get("issueUrl")
@@ -232,6 +198,86 @@ def get_current_sprint_changes(
                 if story_points is not None:
                     blocked_story_points_by_issue_key[normalized_issue_key] = story_points
                     blocked_overrides[normalized_issue_key]["storyPoints"] = story_points
+
+    added_issue_keys: set[str] = set()
+    removed_issue_keys: set[str] = set()
+    if sprint_start is not None:
+        sprint_change_rows: list[sqlite3.Row] = []
+        conn = sqlite3.connect(resolved_db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            _ensure_schema(conn)
+            if sprint_name:
+                sprint_change_rows = conn.execute(
+                    """
+                    SELECT issue_key, from_value, to_value
+                    FROM issue_changelog
+                    WHERE LOWER(COALESCE(field_name, '')) = 'sprint'
+                      AND datetime(changed_at) >= datetime(?)
+                    ORDER BY datetime(changed_at) DESC, id DESC
+                    """,
+                    (sprint_start.isoformat(),),
+                ).fetchall()
+
+            sprint_name_token = sprint_name.lower()
+            candidate_issue_keys = set(current_sprint_issue_keys)
+            baseline_membership_by_issue_key: dict[str, bool] = {
+                issue_key: True for issue_key in current_sprint_issue_keys
+            }
+
+            for row in sprint_change_rows:
+                issue_key = str(row["issue_key"] or "").strip()
+                if not issue_key:
+                    continue
+                from_tokens = _normalize_sprint_values(row["from_value"])
+                to_tokens = _normalize_sprint_values(row["to_value"])
+                had_sprint = sprint_name_token in from_tokens
+                has_sprint = sprint_name_token in to_tokens
+                if had_sprint == has_sprint:
+                    continue
+                candidate_issue_keys.add(issue_key)
+                baseline_membership_by_issue_key.setdefault(issue_key, issue_key in current_sprint_issue_keys)
+
+            for row in sprint_change_rows:
+                issue_key = str(row["issue_key"] or "").strip()
+                if not issue_key or issue_key not in baseline_membership_by_issue_key:
+                    continue
+                from_tokens = _normalize_sprint_values(row["from_value"])
+                to_tokens = _normalize_sprint_values(row["to_value"])
+                had_sprint = sprint_name_token in from_tokens
+                has_sprint = sprint_name_token in to_tokens
+                if had_sprint != has_sprint:
+                    baseline_membership_by_issue_key[issue_key] = had_sprint
+
+            created_after_start_issue_keys: set[str] = set()
+            if candidate_issue_keys:
+                issue_keys_to_check = sorted(candidate_issue_keys)
+                placeholders = ",".join("?" for _ in issue_keys_to_check)
+                created_rows = conn.execute(
+                    f"""
+                    SELECT issue_key
+                    FROM issues
+                    WHERE issue_key IN ({placeholders})
+                      AND created_at_source IS NOT NULL
+                      AND datetime(created_at_source) >= datetime(?)
+                    """,
+                    (*issue_keys_to_check, sprint_start.isoformat()),
+                ).fetchall()
+                created_after_start_issue_keys = {
+                    str(row["issue_key"]).strip()
+                    for row in created_rows
+                    if row["issue_key"] is not None and str(row["issue_key"]).strip()
+                }
+        finally:
+            conn.close()
+
+        baseline_issue_keys = {
+            issue_key
+            for issue_key, was_in_sprint_at_start in baseline_membership_by_issue_key.items()
+            if was_in_sprint_at_start
+        } - created_after_start_issue_keys
+        added_issue_keys = current_sprint_issue_keys - baseline_issue_keys
+        removed_issue_keys = baseline_issue_keys - current_sprint_issue_keys
 
     summary_by_issue_key: dict[str, str] = {}
     story_points_by_issue_key: dict[str, float] = {}
