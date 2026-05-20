@@ -735,6 +735,7 @@ describe("TeamInsightsScreen", () => {
     });
     expect(screen.getByRole("heading", { name: "Cards in Selected Window (Last 12 sprints)" })).toBeInTheDocument();
     expect(fetchSpy.mock.calls).toHaveLength(fetchCallCountBeforeSettings);
+    expect(screen.queryByRole("heading", { name: "Avg SP" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Avg Cycle Time" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Average cycle time sprint bar chart" })).toBeInTheDocument();
@@ -1097,6 +1098,7 @@ describe("TeamInsightsScreen", () => {
     render(<TeamInsightsScreen />);
 
     expect(await screen.findByText("4.1 d")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Avg SP" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Completed SP" })).not.toBeInTheDocument();
     await waitFor(() => {
       const hydratedCycleTimeChart = getLatestChartCall("Average cycle time sprint bar chart");

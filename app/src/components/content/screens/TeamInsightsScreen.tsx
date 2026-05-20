@@ -964,7 +964,7 @@ export function TeamInsightsScreen() {
             <h3>Sprint Trend</h3>
           </div>
         </header>
-        <div class="tb-metrics-grid tb-four-up">
+        <div class={`tb-metrics-grid ${showCompletedStoryPointsChart ? "tb-four-up" : "tb-three-up"}`}>
           <article class="tb-metric-card">
             <h4>Median Cycle Time</h4>
             <strong class="tb-value tb-value-good">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
@@ -980,11 +980,13 @@ export function TeamInsightsScreen() {
             <strong class="tb-value tb-value-good">{formatDays(insights.metrics.cycleTimeStdDevDays)}</strong>
             <p>Variation across tracked-card cycle times in trend window.</p>
           </article>
-          <article class="tb-metric-card">
-            <h4>Avg SP</h4>
-            <strong class="tb-value tb-value-good">{formatStoryPoints(insights.metrics.avgCompletedStoryPoints)} SP</strong>
-            <p>Average completed story points per sprint.</p>
-          </article>
+          {showCompletedStoryPointsChart ? (
+            <article class="tb-metric-card">
+              <h4>Avg SP</h4>
+              <strong class="tb-value tb-value-good">{formatStoryPoints(insights.metrics.avgCompletedStoryPoints)} SP</strong>
+              <p>Average completed story points per sprint.</p>
+            </article>
+          ) : null}
         </div>
         <article class="tb-metric-card tb-trend-tab-card">
           <div class="tb-trend-tabs" role="tablist" aria-label="Sprint trend charts">
@@ -1115,7 +1117,7 @@ export function TeamInsightsScreen() {
                           />
                           <span>Show SP chart</span>
                         </label>
-                        <p class="tb-muted-note">Avg Cycle Time is always visible. This adds the completed story points tab.</p>
+                        <p class="tb-muted-note">Avg Cycle Time is always visible. This adds the completed story points metric and tab.</p>
                       </div>
                     </div>
 
