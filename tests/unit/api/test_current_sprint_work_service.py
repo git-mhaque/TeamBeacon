@@ -71,6 +71,22 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
                         ("CEGBUPOL-1003", "1003", "Finalize rollout checklist", "To Do", "To Do", 3, "CEGBUPOL-9000"),
                     ],
                 )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      story_points,
+                      epic_key,
+                      sprint_external_id
+                    ) VALUES ('CEGBUPOL-1004', '1004', 'CEGBUPOL', 'Sub-task', 'Nested validation work', 'Done', 'Done', 13, 'CEGBUPOL-9000', 33001)
+                    """
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -96,6 +112,11 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["work"]["planned"][0]["storyPoints"], 3.0)
             self.assertEqual(payload["work"]["done"][0]["epicKey"], "CEGBUPOL-9000")
             self.assertEqual(payload["work"]["done"][0]["epicName"], "Sprint Reliability Epic")
+            visible_issue_keys = [
+                item["issueKey"]
+                for item in payload["work"]["done"] + payload["work"]["inProgress"] + payload["work"]["planned"]
+            ]
+            self.assertNotIn("CEGBUPOL-1004", visible_issue_keys)
 
     def test_get_current_sprint_work_returns_empty_if_no_active_sprint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -171,6 +192,33 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
                         '{"fields":{"customfield_10901":["com.atlassian.greenhopper.service.sprint.Sprint@abcd[id=44001,rapidViewId=27193,state=ACTIVE,name=Sprint 2]"]}}',
                     ),
                 )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      sprint_external_id,
+                      story_points,
+                      epic_key,
+                      raw_json
+                    ) VALUES (?, ?, 'CEGBUPOL', 'Sub-task', ?, ?, ?, NULL, ?, ?, ?)
+                    """,
+                    (
+                        "CEGBUPOL-2002",
+                        "2002",
+                        "Raw mapped sub-task",
+                        "To Do",
+                        "To Do",
+                        21,
+                        "CEGBUPOL-9001",
+                        '{"fields":{"customfield_10901":["com.atlassian.greenhopper.service.sprint.Sprint@abcd[id=44001,rapidViewId=27193,state=ACTIVE,name=Sprint 2]"]}}',
+                    ),
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -184,6 +232,9 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["work"]["inProgress"][0]["storyPoints"], 2.0)
             self.assertEqual(payload["work"]["inProgress"][0]["epicKey"], "CEGBUPOL-9001")
             self.assertEqual(payload["work"]["inProgress"][0]["epicName"], "Fallback Epic")
+            self.assertEqual(payload["work"]["totals"]["total"], 1)
+            self.assertEqual(payload["work"]["totals"]["storyPoints"]["total"], 2.0)
+            self.assertEqual(payload["work"]["planned"], [])
 
     def test_get_current_sprint_work_merges_primary_and_raw_json_fallback_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

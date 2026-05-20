@@ -7,7 +7,7 @@ from typing import Any
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 from services.api.issues.current_sprint import get_current_sprint
-from services.api.issues.current_sprint_work import get_current_sprint_work
+from services.api.issues.current_sprint_work import get_current_sprint_work, is_subtask_issue_type
 
 
 def _parse_iso_datetime(value: str | None) -> datetime | None:
@@ -34,6 +34,10 @@ def _status_contains_blocked(status_value: str | None) -> bool:
     if status_value is None:
         return False
     return "blocked" in status_value.strip().lower()
+
+
+def _subtask_sql_expression(column_name: str) -> str:
+    return f"lower(replace(replace(replace(COALESCE({column_name}, ''), '-', ''), '_', ''), ' ', '')) = 'subtask'"
 
 
 def _coerce_story_points(value: Any) -> float | None:
@@ -208,13 +212,16 @@ def get_current_sprint_changes(
         try:
             _ensure_schema(conn)
             if sprint_name:
+                subtask_filter = _subtask_sql_expression("i.issue_type")
                 sprint_change_rows = conn.execute(
-                    """
-                    SELECT issue_key, from_value, to_value
-                    FROM issue_changelog
-                    WHERE LOWER(COALESCE(field_name, '')) = 'sprint'
-                      AND datetime(changed_at) >= datetime(?)
-                    ORDER BY datetime(changed_at) DESC, id DESC
+                    f"""
+                    SELECT c.issue_key, c.from_value, c.to_value
+                    FROM issue_changelog c
+                    LEFT JOIN issues i ON i.issue_key = c.issue_key
+                    WHERE LOWER(COALESCE(c.field_name, '')) = 'sprint'
+                      AND datetime(c.changed_at) >= datetime(?)
+                      AND NOT {subtask_filter}
+                    ORDER BY datetime(c.changed_at) DESC, c.id DESC
                     """,
                     (sprint_start.isoformat(),),
                 ).fetchall()
@@ -260,6 +267,7 @@ def get_current_sprint_changes(
                     WHERE issue_key IN ({placeholders})
                       AND created_at_source IS NOT NULL
                       AND datetime(created_at_source) >= datetime(?)
+                      AND NOT {_subtask_sql_expression("issue_type")}
                     """,
                     (*issue_keys_to_check, sprint_start.isoformat()),
                 ).fetchall()
@@ -295,6 +303,7 @@ def get_current_sprint_changes(
                 SELECT
                   i.issue_key,
                   i.summary,
+                  i.issue_type,
                   i.story_points,
                   i.epic_key,
                   e.summary AS epic_summary,
@@ -311,12 +320,16 @@ def get_current_sprint_changes(
         summary_by_issue_key = {
             str(row["issue_key"]): str(row["summary"]).strip()
             for row in rows
-            if row["issue_key"] is not None and row["summary"] is not None
+            if (
+                row["issue_key"] is not None
+                and row["summary"] is not None
+                and not is_subtask_issue_type(row["issue_type"])
+            )
         }
         story_points_by_issue_key = {
             str(row["issue_key"]): _coerce_story_points(row["story_points"]) or 0.0
             for row in rows
-            if row["issue_key"] is not None
+            if row["issue_key"] is not None and not is_subtask_issue_type(row["issue_type"])
         }
         epic_by_issue_key = {
             str(row["issue_key"]): {
@@ -328,7 +341,7 @@ def get_current_sprint_changes(
                 else None,
             }
             for row in rows
-            if row["issue_key"] is not None
+            if row["issue_key"] is not None and not is_subtask_issue_type(row["issue_type"])
         }
         status_by_issue_key = {
             str(row["issue_key"]): {
@@ -340,7 +353,7 @@ def get_current_sprint_changes(
                 else None,
             }
             for row in rows
-            if row["issue_key"] is not None
+            if row["issue_key"] is not None and not is_subtask_issue_type(row["issue_type"])
         }
 
     def _sum_story_points(issue_keys: set[str]) -> float:

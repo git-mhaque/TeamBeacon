@@ -75,6 +75,27 @@ class CurrentSprintChangesServiceUnitTests(unittest.TestCase):
                 )
                 conn.executemany(
                     """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      story_points,
+                      epic_key,
+                      sprint_external_id
+                    ) VALUES (?, ?, 'CEGBUPOL', 'Sub-task', ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("CEGBUPOL-7012", "7012", "Blocked sub-task", "Blocked", "In Progress", 21, "CEGBUPOL-9000", 77001),
+                        ("CEGBUPOL-7013", "7013", "Added sub-task", "Open", "To Do", 34, None, 77001),
+                        ("CEGBUPOL-7014", "7014", "Removed sub-task", "Open", "To Do", 55, None, None),
+                    ],
+                )
+                conn.executemany(
+                    """
                     INSERT INTO issue_changelog (
                       issue_key,
                       history_id,
@@ -137,6 +158,22 @@ class CurrentSprintChangesServiceUnitTests(unittest.TestCase):
                             "Current Sprint 45",
                             "Next Sprint",
                         ),
+                        (
+                            "CEGBUPOL-7013",
+                            "h10",
+                            "2026-03-22T10:00:00+00:00",
+                            "u1",
+                            "Previous Sprint",
+                            "Current Sprint 45, Previous Sprint",
+                        ),
+                        (
+                            "CEGBUPOL-7014",
+                            "h11",
+                            "2026-03-22T10:00:00+00:00",
+                            "u1",
+                            "Current Sprint 45",
+                            "Next Sprint",
+                        ),
                     ],
                 )
                 conn.commit()
@@ -172,9 +209,12 @@ class CurrentSprintChangesServiceUnitTests(unittest.TestCase):
             self.assertNotIn("CEGBUPOL-7008", payload["changes"]["removedAfterStart"]["issueKeys"])
             self.assertNotIn("CEGBUPOL-7009", payload["changes"]["addedAfterStart"]["issueKeys"])
             self.assertNotIn("CEGBUPOL-7009", payload["changes"]["removedAfterStart"]["issueKeys"])
+            self.assertNotIn("CEGBUPOL-7013", payload["changes"]["addedAfterStart"]["issueKeys"])
+            self.assertNotIn("CEGBUPOL-7014", payload["changes"]["removedAfterStart"]["issueKeys"])
             self.assertEqual(payload["changes"]["blockedCards"]["count"], 2)
             self.assertEqual(payload["changes"]["blockedCards"]["storyPointsTotal"], 13.0)
             self.assertEqual(payload["changes"]["blockedCards"]["issueKeys"], ["CEGBUPOL-7001", "CEGBUPOL-7002"])
+            self.assertNotIn("CEGBUPOL-7012", payload["changes"]["blockedCards"]["issueKeys"])
             self.assertEqual(len(payload["changes"]["blockedCards"]["issueCards"]), 2)
             self.assertEqual(payload["changes"]["blockedCards"]["issueCards"][0]["issueKey"], "CEGBUPOL-7001")
             self.assertEqual(payload["changes"]["blockedCards"]["issueCards"][0]["summary"], "Blocked by dependency")
@@ -278,6 +318,22 @@ class CurrentSprintChangesServiceUnitTests(unittest.TestCase):
                 )
                 conn.execute(
                     """
+                    INSERT INTO issues (
+                      issue_key,
+                      issue_id,
+                      project_key,
+                      issue_type,
+                      summary,
+                      status_name,
+                      status_category,
+                      story_points,
+                      sprint_external_id,
+                      created_at_source
+                    ) VALUES ('CEGBUPOL-7012', '7012', 'CEGBUPOL', 'Sub-task', 'Created sub-task in sprint', 'Open', 'To Do', 13, 77001, '2026-03-21T10:00:00+00:00')
+                    """
+                )
+                conn.execute(
+                    """
                     INSERT INTO issue_changelog (
                       issue_key,
                       history_id,
@@ -297,6 +353,7 @@ class CurrentSprintChangesServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["changes"]["addedAfterStart"]["count"], 1)
             self.assertEqual(payload["changes"]["addedAfterStart"]["storyPointsTotal"], 2.0)
             self.assertEqual(payload["changes"]["addedAfterStart"]["issueKeys"], ["CEGBUPOL-7010"])
+            self.assertNotIn("CEGBUPOL-7012", payload["changes"]["addedAfterStart"]["issueKeys"])
             self.assertEqual(payload["changes"]["addedAfterStart"]["issueCards"][0]["summary"], "Created directly into sprint")
             self.assertEqual(payload["changes"]["addedAfterStart"]["issueCards"][0]["status"], "Open")
             self.assertEqual(payload["changes"]["addedAfterStart"]["issueCards"][0]["statusCategory"], "To Do")

@@ -18,6 +18,12 @@ def _normalize(value: str | None) -> str:
     return value.strip().lower()
 
 
+def is_subtask_issue_type(issue_type: str | None) -> bool:
+    issue_type_key = _normalize(issue_type)
+    collapsed = issue_type_key.replace("-", "").replace("_", "").replace(" ", "")
+    return collapsed == "subtask"
+
+
 def _bucket_for_issue(status_category: str | None, status_name: str | None) -> WorkBucket:
     category = _normalize(status_category)
     name = _normalize(status_name)
@@ -175,6 +181,7 @@ def get_current_sprint_work(
             """
             SELECT
               i.issue_key,
+              i.issue_type,
               i.summary,
               i.status_name,
               i.status_category,
@@ -200,6 +207,7 @@ def get_current_sprint_work(
             """
             SELECT
               i.issue_key,
+              i.issue_type,
               i.summary,
               i.status_name,
               i.status_category,
@@ -238,6 +246,7 @@ def get_current_sprint_work(
     filtered_rows: list[dict[str, Any]] = [
         {
             "issue_key": row["issue_key"],
+            "issue_type": row["issue_type"],
             "summary": row["summary"],
             "status_name": row["status_name"],
             "status_category": row["status_category"],
@@ -249,11 +258,14 @@ def get_current_sprint_work(
             "work_type_name": row["work_type_name"],
         }
         for row in rows
+        if not is_subtask_issue_type(row["issue_type"])
     ]
     seen_issue_keys = {str(row["issue_key"]) for row in rows}
     for row in supplemental_rows:
         issue_key = str(row["issue_key"])
         if issue_key in seen_issue_keys:
+            continue
+        if is_subtask_issue_type(row["issue_type"]):
             continue
         try:
             payload = json.loads(row["raw_json"] or "{}")
@@ -268,6 +280,7 @@ def get_current_sprint_work(
         filtered_rows.append(
             {
                 "issue_key": issue_key,
+                "issue_type": row["issue_type"],
                 "summary": row["summary"],
                 "status_name": row["status_name"],
                 "status_category": row["status_category"],
