@@ -968,17 +968,17 @@ export function TeamInsightsScreen() {
           <article class="tb-metric-card">
             <h4>Median Cycle Time</h4>
             <strong class="tb-value tb-value-good">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
-            <p>Middle cycle-time value across completed cards.</p>
+            <p>Middle cycle-time value across tracked cards.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg Cycle Time</h4>
             <strong class="tb-value tb-value-good">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
-            <p>Average across completed cards in trend window.</p>
+            <p>Average across tracked cards in trend window.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Cycle Time Std Dev</h4>
             <strong class="tb-value tb-value-good">{formatDays(insights.metrics.cycleTimeStdDevDays)}</strong>
-            <p>Variation across completed-card cycle times in trend window.</p>
+            <p>Variation across tracked-card cycle times in trend window.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg SP</h4>
@@ -1201,7 +1201,7 @@ export function TeamInsightsScreen() {
                         ) : null}
                       </div>
                       <p class="tb-muted-note">
-                        We sum time spent in the checked workflow statuses only. Completed cards with no time in checked
+                        We sum time spent in the checked workflow statuses only. Tracked cards with no time in checked
                         statuses are excluded from cycle-time metrics.
                       </p>
                     </div>
@@ -1217,7 +1217,7 @@ export function TeamInsightsScreen() {
   
                   {hasNoDraftCycleTimeStatuses ? (
                     <p class="tb-team-settings-warning">
-                      No statuses are selected. Completed cards will be excluded from cycle-time metrics until at least
+                      No statuses are selected. Tracked cards will be excluded from cycle-time metrics until at least
                       one workflow status is checked.
                     </p>
                   ) : null}

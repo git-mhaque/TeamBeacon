@@ -11,6 +11,7 @@ from urllib.parse import quote
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
+from services.api.issues.current_sprint_work import is_subtask_issue_type
 
 
 def _normalize(value: str | None) -> str:
@@ -217,7 +218,8 @@ def _build_available_cycle_time_statuses(
         """
         SELECT
           i.status_name,
-          i.status_category
+          i.status_category,
+          i.issue_type
         FROM issues i
         LEFT JOIN sprints s ON s.external_sprint_id = i.sprint_external_id
         WHERE (? IS NULL OR s.board_external_id = ?)
@@ -225,6 +227,8 @@ def _build_available_cycle_time_statuses(
         (board_id, board_id),
     ).fetchall()
     for row in issue_status_rows:
+        if is_subtask_issue_type(row["issue_type"]):
+            continue
         _record_status_catalog_entry(
             labels_by_key=labels_by_key,
             categories_by_key=categories_by_key,
@@ -236,7 +240,8 @@ def _build_available_cycle_time_statuses(
         """
         SELECT
           c.from_value,
-          c.to_value
+          c.to_value,
+          i.issue_type
         FROM issue_changelog c
         JOIN issues i ON i.issue_key = c.issue_key
         LEFT JOIN sprints s ON s.external_sprint_id = i.sprint_external_id
@@ -246,6 +251,8 @@ def _build_available_cycle_time_statuses(
         (board_id, board_id),
     ).fetchall()
     for row in changelog_status_rows:
+        if is_subtask_issue_type(row["issue_type"]):
+            continue
         _record_status_catalog_entry(
             labels_by_key=labels_by_key,
             categories_by_key=categories_by_key,
@@ -513,6 +520,10 @@ def get_team_insights(
                 """,
                 tuple(sprint_ids),
             ).fetchall()
+            issue_rows = [
+                row for row in issue_rows
+                if not is_subtask_issue_type(row["issue_type"])
+            ]
 
         available_statuses, default_cycle_time_status_keys = _build_available_cycle_time_statuses(
             conn,
@@ -596,6 +607,7 @@ def get_team_insights(
         # Present oldest->newest so trend bars progress left-to-right in time order.
         for sprint_row in reversed(sprint_rows):
             sprint_external_id = int(sprint_row["external_sprint_id"])
+            sprint_is_active = _normalize(sprint_row["state"]) == "active"
             sprint_issues = issues_by_sprint.get(sprint_external_id, [])
 
             committed_story_points = 0.0
@@ -737,26 +749,27 @@ def get_team_insights(
                         }
                     )
 
-                if not is_done_issue or is_epic:
-                    continue
-
-                completed_cycle_issues += 1
-                if resolved_at is None or not issue_key:
-                    continue
-
                 duration_days = cycle_time_to_date_days
-                if duration_days <= 0:
-                    continue
-                cycle_time_days.append(duration_days)
-                sprint_cycle_time_days.append(duration_days)
-                tracked_cycle_issues += 1
+                if is_done_issue and not is_epic:
+                    completed_cycle_issues += 1
 
-                for status_key, issue_days in selected_issue_status_days.items():
-                    if issue_days <= 0:
-                        continue
-                    status_cycle_total_days_by_status[status_key] += issue_days
-                    status_cycle_issue_days_by_status[status_key].append(issue_days)
-                    status_cycle_issue_keys_by_status[status_key].add(issue_key)
+                should_include_cycle_time = (
+                    not is_epic
+                    and bool(issue_key)
+                    and duration_days > 0
+                    and (is_done_issue or sprint_is_active)
+                )
+                if should_include_cycle_time:
+                    cycle_time_days.append(duration_days)
+                    sprint_cycle_time_days.append(duration_days)
+                    tracked_cycle_issues += 1
+
+                    for status_key, issue_days in selected_issue_status_days.items():
+                        if issue_days <= 0:
+                            continue
+                        status_cycle_total_days_by_status[status_key] += issue_days
+                        status_cycle_issue_days_by_status[status_key].append(issue_days)
+                        status_cycle_issue_keys_by_status[status_key].add(issue_key)
 
             completion_ratio_percent = _completion_ratio_percent(
                 committed_story_points=committed_story_points,
@@ -871,6 +884,10 @@ def get_team_insights(
             """,
             (work_mix_sprint_id,),
         ).fetchall()
+        work_mix_rows = [
+            row for row in work_mix_rows
+            if not is_subtask_issue_type(row["issue_type"])
+        ]
     finally:
         conn.close()
 

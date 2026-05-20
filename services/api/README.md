@@ -96,7 +96,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `avgCycleTimeDays` per sprint
     - sprint metadata (`sprintName`, `state`, `startDate`, `endDate`)
   - Status-level cycle-time payload includes:
-    - `statusCycleTime.trackedIssues` (completed cards with measurable cycle time)
+    - `statusCycleTime.trackedIssues` (cards with measurable cycle time or cycle time to date)
     - `statusCycleTime.completedIssues` and `statusCycleTime.excludedIssues`
     - `statusCycleTime.appliedStatusKeys` and `statusCycleTime.defaultStatusKeys`
     - `statusCycleTime.availableStatuses[]` with `statusKey`, `status`, `statusCategory`, and `defaultIncluded`
@@ -110,10 +110,11 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
       - `statusTimeline[]` in chronological order with `status`, `changedAt`, `days`, `percentOfTicketTime`, and `isCycleTimeStatus`
   - Cycle-time semantics:
     - Default status selection excludes obvious backlog/to-do states
-    - Custom status mode sums the time spent in the selected workflow statuses from issue creation to resolution
+    - Custom status mode sums the time spent in the selected workflow statuses from issue creation to resolution, or to "now" for active/unresolved tracked cards
     - `cycleTimeToDateDays` uses the same selected workflow statuses and runs to "now" for unresolved cards
-    - Completed cards with no time in the selected statuses are excluded from cycle-time metrics
+    - Tracked cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
+    - Sub-tasks are excluded from Team Insights calculations
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:
     - `groups` (epic groups)
