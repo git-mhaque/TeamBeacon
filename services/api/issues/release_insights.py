@@ -181,7 +181,7 @@ def _empty_response(error: str | None = None) -> dict[str, Any]:
         "ongoingReleases": [],
         "recentReleases": [],
         "riskSignals": [],
-        "summary": "Release insights will appear once JIRA release data is synced.",
+        "summary": "Release insights will appear once release data is synced.",
         "error": error,
     }
 
@@ -213,7 +213,7 @@ def _release_risk(
     if archived:
         return "neutral", "Archived release."
     if total_issues == 0:
-        return "amber", "No linked fixVersion scope yet."
+        return "amber", "No linked release scope yet."
     if released:
         if readiness_percent < 100:
             return "amber", "Released with unresolved linked scope."
@@ -235,7 +235,7 @@ def get_release_insights(
     db_path: str | None = None,
     project_key: str | None = None,
 ) -> dict[str, Any]:
-    safe_release_limit = max(3, min(int(release_limit), 24))
+    safe_release_limit = max(3, min(int(release_limit), 100))
     resolved_db_path = db_path or _resolve_db_path()
     configured_project_key = project_key or _resolve_configured_project_key()
 
@@ -274,7 +274,7 @@ def get_release_insights(
         ).fetchall()
 
         if not version_rows:
-            return _empty_response("No JIRA releases found in local data. Run Sync Data after configuring JIRA.")
+            return _empty_response("No releases found in local data. Run Sync Data after configuring release sync.")
 
         version_ids = [str(row["version_id"]) for row in version_rows]
         issue_rows_by_version_id: dict[str, list[sqlite3.Row]] = defaultdict(list)
@@ -516,7 +516,7 @@ def get_release_insights(
             {
                 "level": "amber",
                 "title": "Scope linkage",
-                "detail": f"{no_scope_count} active release(s) have no issues linked via fixVersion.",
+                "detail": f"{no_scope_count} active release(s) have no linked release scope.",
             }
         )
 
@@ -536,11 +536,11 @@ def get_release_insights(
         )
     elif recent_releases:
         summary = (
-            f"{len(recent_releases)} released version(s) available. "
+            f"{len(recent_releases)} completed release(s) available. "
             "No ongoing releases are currently synced."
         )
     else:
-        summary = "Release versions are synced, but no active or recent release scope is available yet."
+        summary = "Release data is synced, but no active or recent release scope is available yet."
 
     return {
         "source": "local",

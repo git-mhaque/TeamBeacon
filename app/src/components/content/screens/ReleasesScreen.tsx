@@ -34,9 +34,12 @@ const EMPTY_INSIGHTS: ReleaseInsightsResponse = {
   ongoingReleases: [],
   recentReleases: [],
   riskSignals: [],
-  summary: "Release insights will appear once JIRA release data is synced.",
+  summary: "Release insights will appear once release data is synced.",
   error: null,
 };
+
+const DEFAULT_RELEASE_SELECTION_COUNT = 12;
+const RELEASE_SELECTOR_FETCH_LIMIT = 100;
 
 const Chart =
   ((ChartModule as unknown as { default?: ChartConstructor }).default ??
@@ -71,19 +74,6 @@ function formatDate(value: string | null | undefined): string {
   const month = parsed.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
   const year = String(parsed.getUTCFullYear());
   return `${day}-${month}-${year}`;
-}
-
-function formatGeneratedAt(value: string | null | undefined): string {
-  if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "-";
-  return parsed.toLocaleString("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).replace(",", "");
 }
 
 function riskToneClass(level: ReleaseRiskLevel | null | undefined): string {
@@ -335,21 +325,20 @@ function ReleaseCycleLineChart({
 
 export function ReleasesScreen() {
   const [insights, setInsights] = useState<ReleaseInsightsResponse>(EMPTY_INSIGHTS);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedReleaseIds, setSelectedReleaseIds] = useState<string[]>([]);
+  const [draftSelectedReleaseIds, setDraftSelectedReleaseIds] = useState<string[]>([]);
+  const [isReleaseSelectorOpen, setIsReleaseSelectorOpen] = useState(false);
 
   const loadInsights = useCallback(async () => {
-    setLoading(true);
     try {
-      const payload = await fetchReleaseInsights(12);
+      const payload = await fetchReleaseInsights(RELEASE_SELECTOR_FETCH_LIMIT);
       setInsights(payload);
       setError(payload.error ?? null);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Unable to load release insights.";
       setError(message);
       setInsights(EMPTY_INSIGHTS);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -371,46 +360,118 @@ export function ReleasesScreen() {
     [insights.recentReleases],
   );
 
-  const last12ReleasedVersions = useMemo(
-    () => sortedRecentReleases.slice(0, 12),
+  useEffect(() => {
+    const availableReleaseIds = sortedRecentReleases.map((release) => release.versionId);
+    if (availableReleaseIds.length === 0) {
+      setSelectedReleaseIds([]);
+      return;
+    }
+
+    setSelectedReleaseIds((currentIds) => {
+      const availableReleaseIdSet = new Set(availableReleaseIds);
+      const validCurrentIds = currentIds.filter((versionId) => availableReleaseIdSet.has(versionId));
+      if (validCurrentIds.length > 0) return validCurrentIds;
+      return availableReleaseIds.slice(0, DEFAULT_RELEASE_SELECTION_COUNT);
+    });
+  }, [sortedRecentReleases]);
+
+  const recentCompletedReleases = useMemo(
+    () => sortedRecentReleases.slice(0, DEFAULT_RELEASE_SELECTION_COUNT),
     [sortedRecentReleases],
   );
 
-  const last12CycleTimes = useMemo(
-    () => last12ReleasedVersions
+  const effectiveSelectedReleaseIds = useMemo(
+    () => selectedReleaseIds.length > 0
+      ? selectedReleaseIds
+      : sortedRecentReleases.slice(0, DEFAULT_RELEASE_SELECTION_COUNT).map((release) => release.versionId),
+    [selectedReleaseIds, sortedRecentReleases],
+  );
+
+  const selectedReleaseIdSet = useMemo(
+    () => new Set(effectiveSelectedReleaseIds),
+    [effectiveSelectedReleaseIds],
+  );
+
+  const selectedTrendReleases = useMemo(
+    () => sortedRecentReleases.filter((release) => selectedReleaseIdSet.has(release.versionId)),
+    [selectedReleaseIdSet, sortedRecentReleases],
+  );
+
+  const selectedCycleTimes = useMemo(
+    () => selectedTrendReleases
       .map((release) => measuredCycleTime(release))
       .filter((value): value is number => value !== null),
-    [last12ReleasedVersions],
+    [selectedTrendReleases],
   );
 
-  const last12AverageCycleTime = useMemo(
-    () => average(last12CycleTimes),
-    [last12CycleTimes],
+  const selectedAverageCycleTime = useMemo(
+    () => average(selectedCycleTimes),
+    [selectedCycleTimes],
   );
 
-  const maxLast12CycleTime = useMemo(
-    () => Math.max(1, ...last12CycleTimes),
-    [last12CycleTimes],
+  const maxSelectedCycleTime = useMemo(
+    () => Math.max(1, ...selectedCycleTimes),
+    [selectedCycleTimes],
   );
 
   const chartReleases = useMemo(
-    () => [...last12ReleasedVersions].reverse(),
-    [last12ReleasedVersions],
+    () => [...selectedTrendReleases].reverse(),
+    [selectedTrendReleases],
   );
 
   const releasesWithMissingCycleTime = useMemo(
-    () => last12ReleasedVersions
+    () => selectedTrendReleases
       .map((release) => ({ release, reason: missingCycleReason(release) }))
       .filter((entry): entry is { release: ReleaseInsightRow; reason: string } => entry.reason !== null),
-    [last12ReleasedVersions],
+    [selectedTrendReleases],
   );
+
+  const draftSelectedReleaseIdSet = useMemo(
+    () => new Set(draftSelectedReleaseIds),
+    [draftSelectedReleaseIds],
+  );
+
+  const openReleaseSelector = useCallback(() => {
+    setDraftSelectedReleaseIds(effectiveSelectedReleaseIds);
+    setIsReleaseSelectorOpen(true);
+  }, [effectiveSelectedReleaseIds]);
+
+  const closeReleaseSelector = useCallback(() => {
+    setIsReleaseSelectorOpen(false);
+  }, []);
+
+  const toggleDraftRelease = useCallback((versionId: string) => {
+    setDraftSelectedReleaseIds((currentIds) => (
+      currentIds.includes(versionId)
+        ? currentIds.filter((currentId) => currentId !== versionId)
+        : [...currentIds, versionId]
+    ));
+  }, []);
+
+  const selectAllDraftReleases = useCallback(() => {
+    setDraftSelectedReleaseIds(sortedRecentReleases.map((release) => release.versionId));
+  }, [sortedRecentReleases]);
+
+  const clearDraftReleases = useCallback(() => {
+    setDraftSelectedReleaseIds([]);
+  }, []);
+
+  const applyReleaseSelection = useCallback(() => {
+    const selectedIds = new Set(draftSelectedReleaseIds);
+    const orderedSelection = sortedRecentReleases
+      .filter((release) => selectedIds.has(release.versionId))
+      .map((release) => release.versionId);
+    if (orderedSelection.length === 0) return;
+    setSelectedReleaseIds(orderedSelection);
+    setIsReleaseSelectorOpen(false);
+  }, [draftSelectedReleaseIds, sortedRecentReleases]);
 
   const visibleRiskSignals = insights.riskSignals.length > 0
     ? insights.riskSignals
     : [{
       level: "green" as ReleaseRiskLevel,
       title: "Release posture",
-      detail: "No overdue or readiness risks detected in synced JIRA release data.",
+      detail: "No overdue or readiness risks detected in synced release data.",
     }];
 
   return (
@@ -418,55 +479,37 @@ export function ReleasesScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>JIRA Release Overview</h3>
-            <p class="tb-muted-note">
-              Versions, fixVersion scope, dates, and issue completion from the local JIRA sync.
-            </p>
-          </div>
-          <div class="tb-panel-header-actions">
-            <button type="button" class="tb-btn" onClick={() => void loadInsights()} disabled={loading}>
-              {loading ? "Loading..." : "Refresh Data"}
-            </button>
+            <h3>Release Overview</h3>
           </div>
         </header>
 
         <div class="tb-metrics-grid tb-four-up">
           <article class="tb-metric-card">
             <h4>Ongoing Releases</h4>
-            <strong class={`tb-value ${insights.metrics.overdueCount > 0 ? "tb-value-risk" : "tb-value-good"}`}>
+            <strong class="tb-value">
               {insights.metrics.ongoingCount}
             </strong>
-            <p>{insights.metrics.overdueCount} overdue / {insights.metrics.dueSoonCount} due soon.</p>
+            <p>Active releases currently tracked.</p>
+          </article>
+          <article class="tb-metric-card">
+            <h4>Overdue Releases</h4>
+            <strong class={`tb-value ${insights.metrics.overdueCount > 0 ? "tb-value-risk" : "tb-value-good"}`}>
+              {insights.metrics.overdueCount}
+            </strong>
+            <p>{insights.metrics.dueSoonCount} due soon.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg Cycle Time</h4>
             <strong class="tb-value">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
-            <p>Released versions with start and release dates.</p>
+            <p>Completed releases with start and release dates.</p>
           </article>
           <article class="tb-metric-card">
             <h4>Release Cadence</h4>
             <strong class="tb-value">{formatDays(insights.metrics.avgCadenceDays)}</strong>
-            <p>Average days between released versions.</p>
-          </article>
-          <article class="tb-metric-card">
-            <h4>Delivered Scope</h4>
-            <strong class="tb-value">{formatStoryPoints(insights.metrics.deliveredStoryPoints)}</strong>
-            <p>{insights.metrics.releasedCount} released / {insights.metrics.totalReleases} total versions.</p>
+            <p>Average days between releases.</p>
           </article>
         </div>
 
-        {loading ? (
-          <div class="tb-summary is-loading">Loading release insights from local JIRA data...</div>
-        ) : (
-          <div class="tb-summary">
-            <p>{insights.summary}</p>
-            <div class="tb-exec-summary-meta">
-              <span>Project: {insights.projectKey || "Auto-detected"}</span>
-              <span>Generated: {formatGeneratedAt(insights.generatedAt)}</span>
-              <span>Archived versions: {insights.metrics.archivedCount}</span>
-            </div>
-          </div>
-        )}
         {error ? <p class="tb-error-note">{error}</p> : null}
       </section>
 
@@ -474,44 +517,54 @@ export function ReleasesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Release Cycle Time Trend</h3>
-            <p class="tb-muted-note">Last 12 released versions from version start date to release date.</p>
+            <p class="tb-muted-note">Selected completed releases from start date to release date.</p>
           </div>
-          <span class="tb-chip">{last12ReleasedVersions.length} shown</span>
+          <div class="tb-panel-header-actions tb-release-cycle-actions">
+            <span class="tb-chip">{selectedTrendReleases.length} shown</span>
+            <button
+              type="button"
+              class="tb-btn tb-btn-sm"
+              disabled={sortedRecentReleases.length === 0}
+              onClick={openReleaseSelector}
+            >
+              Select Releases
+            </button>
+          </div>
         </header>
 
-        {last12ReleasedVersions.length > 0 ? (
+        {selectedTrendReleases.length > 0 ? (
           <div class="tb-release-cycle-view">
             <div class="tb-release-cycle-summary">
               <article>
                 <span>Measured</span>
-                <strong>{last12CycleTimes.length}/{last12ReleasedVersions.length}</strong>
+                <strong>{selectedCycleTimes.length}/{selectedTrendReleases.length}</strong>
               </article>
               <article>
                 <span>Avg Cycle</span>
-                <strong>{formatDays(last12AverageCycleTime)}</strong>
+                <strong>{formatDays(selectedAverageCycleTime)}</strong>
               </article>
               <article>
                 <span>Fastest</span>
-                <strong>{formatDays(last12CycleTimes.length > 0 ? Math.min(...last12CycleTimes) : null)}</strong>
+                <strong>{formatDays(selectedCycleTimes.length > 0 ? Math.min(...selectedCycleTimes) : null)}</strong>
               </article>
               <article>
                 <span>Slowest</span>
-                <strong>{formatDays(last12CycleTimes.length > 0 ? Math.max(...last12CycleTimes) : null)}</strong>
+                <strong>{formatDays(selectedCycleTimes.length > 0 ? Math.max(...selectedCycleTimes) : null)}</strong>
               </article>
             </div>
 
             <div class="tb-release-cycle-chart-frame" data-testid="release-cycle-time-trend">
               <ReleaseCycleLineChart
                 releases={chartReleases}
-                averageCycleTime={last12AverageCycleTime}
-                maxCycleTime={maxLast12CycleTime}
+                averageCycleTime={selectedAverageCycleTime}
+                maxCycleTime={maxSelectedCycleTime}
               />
               <div class="tb-release-cycle-legend" aria-label="Release cycle chart legend">
                 <span><i class="tb-release-cycle-line-swatch" />Cycle time</span>
                 <span><i class="tb-release-cycle-average-swatch" />Average</span>
                 <span><i class="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
               </div>
-              <p class="tb-trend-x-axis-label">Oldest to newest among the latest 12 releases</p>
+              <p class="tb-trend-x-axis-label">Oldest to newest among selected releases</p>
             </div>
 
             {releasesWithMissingCycleTime.length > 0 ? (
@@ -535,7 +588,7 @@ export function ReleasesScreen() {
           </div>
         ) : (
           <div class="tb-summary">
-            Release cycle-time trend needs released JIRA versions from the current sync.
+            Select completed releases to show the cycle-time trend.
           </div>
         )}
       </section>
@@ -544,7 +597,7 @@ export function ReleasesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Ongoing Releases</h3>
-            <p class="tb-muted-note">Readiness and delivery risk for unreleased, non-archived versions.</p>
+            <p class="tb-muted-note">Readiness and delivery risk for active, non-archived releases.</p>
           </div>
         </header>
 
@@ -595,7 +648,7 @@ export function ReleasesScreen() {
             </table>
           </div>
         ) : (
-          <div class="tb-summary">No ongoing JIRA releases found in the current sync.</div>
+          <div class="tb-summary">No ongoing releases found in the current sync.</div>
         )}
       </section>
 
@@ -603,7 +656,7 @@ export function ReleasesScreen() {
         <header class="tb-panel-header">
           <div>
             <h3>Release Risk Signals</h3>
-            <p class="tb-muted-note">Signals derived from dates, readiness, and linked fixVersion scope.</p>
+            <p class="tb-muted-note">Signals derived from dates, readiness, and linked release scope.</p>
           </div>
         </header>
         <div class="tb-release-risk-grid">
@@ -620,14 +673,14 @@ export function ReleasesScreen() {
       <section class="tb-panel">
         <header class="tb-panel-header">
           <div>
-            <h3>Recent Released Versions</h3>
-            <p class="tb-muted-note">Delivered scope, cycle time, and completion quality for released versions.</p>
+            <h3>Recent Completed Releases</h3>
+            <p class="tb-muted-note">Delivered scope, cycle time, and completion quality for completed releases.</p>
           </div>
         </header>
 
-        {last12ReleasedVersions.length > 0 ? (
+        {recentCompletedReleases.length > 0 ? (
           <div class="tb-initiative-table-wrap tb-release-recent-table-wrap">
-            <table class="tb-initiative-table tb-release-recent-table" aria-label="Recent released versions">
+            <table class="tb-initiative-table tb-release-recent-table" aria-label="Recent completed releases">
               <thead>
                 <tr>
                   <th>Release</th>
@@ -640,7 +693,7 @@ export function ReleasesScreen() {
                 </tr>
               </thead>
               <tbody>
-                {last12ReleasedVersions.map((release) => (
+                {recentCompletedReleases.map((release) => (
                   <tr key={release.versionId}>
                     <td>
                       <div class="tb-release-name-cell">
@@ -672,9 +725,63 @@ export function ReleasesScreen() {
             </table>
           </div>
         ) : (
-          <div class="tb-summary">No released JIRA versions with linked scope are available yet.</div>
+          <div class="tb-summary">No completed releases with linked scope are available yet.</div>
         )}
       </section>
+
+      {isReleaseSelectorOpen ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Releases">
+          <div class="tb-modal-backdrop" onClick={closeReleaseSelector} />
+          <div class="tb-modal tb-modal-wide tb-release-selector-modal">
+            <header class="tb-modal-head">
+              <div>
+                <h3>Select Releases</h3>
+                <p class="tb-muted-note">Completed releases available from the local sync.</p>
+              </div>
+              <span class="tb-chip">{draftSelectedReleaseIds.length} selected</span>
+            </header>
+
+            <div class="tb-release-selector-toolbar">
+              <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftReleases}>
+                Select all
+              </button>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftReleases}>
+                Clear
+              </button>
+            </div>
+
+            <div class="tb-release-selector-list" role="group" aria-label="Completed release selection">
+              {sortedRecentReleases.map((release) => (
+                <label key={release.versionId} class="tb-release-selector-option">
+                  <input
+                    type="checkbox"
+                    checked={draftSelectedReleaseIdSet.has(release.versionId)}
+                    onChange={() => toggleDraftRelease(release.versionId)}
+                  />
+                  <span class="tb-release-selector-option-copy">
+                    <strong>{release.name}</strong>
+                    <span>{formatDate(release.releaseDate)} | {cycleTimeStatusLabel(release)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <footer class="tb-modal-actions">
+              <button type="button" class="tb-btn" onClick={closeReleaseSelector}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-primary"
+                disabled={draftSelectedReleaseIds.length === 0}
+                onClick={applyReleaseSelection}
+              >
+                Apply
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

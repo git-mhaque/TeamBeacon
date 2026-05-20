@@ -281,7 +281,7 @@ describe("ReleasesScreen", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders JIRA release analytics from the local insights endpoint", async () => {
+  it("renders release analytics from the local insights endpoint", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
@@ -297,13 +297,25 @@ describe("ReleasesScreen", () => {
 
     render(<ReleasesScreen />);
 
-    expect(screen.getByRole("heading", { name: "JIRA Release Overview" })).toBeInTheDocument();
-    expect(await screen.findByText("1 ongoing release(s), 1 overdue, and 0 due within 14 days.")).toBeInTheDocument();
-    expect(screen.getAllByText("Q4 FY26 - Tech").length).toBeGreaterThan(0);
+    const overviewHeading = screen.getByRole("heading", { name: "Release Overview" });
+    expect(overviewHeading).toBeInTheDocument();
+    expect((await screen.findAllByText("Q4 FY26 - Tech")).length).toBeGreaterThan(0);
+    const overviewPanel = overviewHeading.closest("section");
+    if (!overviewPanel) {
+      throw new Error("Release Overview panel not found.");
+    }
+    const scopedOverview = within(overviewPanel);
+    const ongoingHeading = scopedOverview.getByRole("heading", { name: "Ongoing Releases" });
+    const overdueHeading = scopedOverview.getByRole("heading", { name: "Overdue Releases" });
+    expect(ongoingHeading.compareDocumentPosition(overdueHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overdueHeading.closest("article")).toHaveTextContent("1");
+    expect(overdueHeading.closest("article")).toHaveTextContent("0 due soon.");
     expect(screen.getAllByText("Search 26.4").length).toBeGreaterThan(0);
-    expect(screen.getByText("16 SP")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Delivered Scope" })).not.toBeInTheDocument();
     const cycleTrend = screen.getByTestId("release-cycle-time-trend");
     expect(cycleTrend).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select Releases" })).toBeInTheDocument();
+    expect(screen.getByText("2 shown")).toBeInTheDocument();
     expect(screen.getByTestId("release-cycle-time-chart")).toHaveAttribute("aria-label", "Release cycle time line chart");
     const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
     const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
@@ -327,7 +339,7 @@ describe("ReleasesScreen", () => {
     expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 99, datasetIndex: 0 })).toBe("");
     expect(chartCall.config.options.scales.y.ticks.callback(20)).toBe("20 d");
 
-    const recentTable = screen.getByRole("table", { name: "Recent released versions" });
+    const recentTable = screen.getByRole("table", { name: "Recent completed releases" });
     const recentRows = within(recentTable).getAllByRole("row");
     expect(recentRows[1]).toHaveTextContent("Search 26.4");
     expect(recentRows[1]).toHaveTextContent("21-Apr-2026");
@@ -335,7 +347,7 @@ describe("ReleasesScreen", () => {
     expect(recentRows[2]).toHaveTextContent("Search 26.3");
   });
 
-  it("shows the last 12 released versions newest first in the trend and table", async () => {
+  it("defaults the trend and table to the latest 12 completed releases", async () => {
     const payload = releaseInsightsPayload();
     payload.recentReleases = Array.from({ length: 14 }, (_, index) => releasedVersionFixture(index + 1));
     payload.metrics.totalReleases = 14;
@@ -366,7 +378,7 @@ describe("ReleasesScreen", () => {
     const chartCall = await findLatestChartCall("Release cycle time line chart");
     expect(chartCall.config.data.datasets[0].data).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 
-    const recentTable = screen.getByRole("table", { name: "Recent released versions" });
+    const recentTable = screen.getByRole("table", { name: "Recent completed releases" });
     const recentRows = within(recentTable).getAllByRole("row");
     expect(recentRows).toHaveLength(13);
     expect(recentRows[1]).toHaveTextContent("Release 14");
@@ -374,7 +386,78 @@ describe("ReleasesScreen", () => {
     expect(within(recentTable).queryByText("Release 02")).not.toBeInTheDocument();
   });
 
-  it("marks released versions with missing end dates in the chart and table", async () => {
+  it("lets users select releases for the cycle-time chart in oldest-to-newest order", async () => {
+    const payload = releaseInsightsPayload();
+    payload.recentReleases = Array.from({ length: 5 }, (_, index) => releasedVersionFixture(index + 1));
+    payload.metrics.totalReleases = 5;
+    payload.metrics.releasedCount = 5;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.includes("/api/releases/insights")) {
+        return jsonResponse(payload);
+      }
+      return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
+    });
+
+    render(<ReleasesScreen />);
+
+    await screen.findByText("5 shown");
+    fireEvent.click(screen.getByRole("button", { name: "Select Releases" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select Releases" });
+    const dialogScope = within(dialog);
+    expect(dialogScope.getByText("5 selected")).toBeInTheDocument();
+
+    fireEvent.click(dialogScope.getByLabelText(/Release 05/));
+    expect(dialogScope.getByText("4 selected")).toBeInTheDocument();
+    fireEvent.click(dialogScope.getByRole("button", { name: "Select all" }));
+    expect(dialogScope.getByText("5 selected")).toBeInTheDocument();
+    fireEvent.click(dialogScope.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Select Releases" })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Releases" }));
+    const reopenedDialog = await screen.findByRole("dialog", { name: "Select Releases" });
+    const reopenedDialogScope = within(reopenedDialog);
+    expect(reopenedDialogScope.getByText("5 selected")).toBeInTheDocument();
+
+    fireEvent.click(reopenedDialogScope.getByRole("button", { name: "Clear" }));
+    expect(reopenedDialogScope.getByText("0 selected")).toBeInTheDocument();
+    expect(reopenedDialogScope.getByRole("button", { name: "Apply" })).toBeDisabled();
+
+    fireEvent.click(reopenedDialogScope.getByLabelText(/Release 02/));
+    fireEvent.click(reopenedDialogScope.getByLabelText(/Release 05/));
+    expect(reopenedDialogScope.getByText("2 selected")).toBeInTheDocument();
+    fireEvent.click(reopenedDialogScope.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Select Releases" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("2 shown")).toBeInTheDocument();
+
+    const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
+    const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
+    expect(releaseKeyItems).toHaveLength(2);
+    expect(releaseKeyItems[0]).toHaveTextContent("R1");
+    expect(releaseKeyItems[0]).toHaveTextContent("Release 02");
+    expect(releaseKeyItems[1]).toHaveTextContent("R2");
+    expect(releaseKeyItems[1]).toHaveTextContent("Release 05");
+
+    await waitFor(() => {
+      const chartCall = getLatestChartCall("Release cycle time line chart");
+      expect(chartCall.config.data.labels).toEqual(["R1", "R2"]);
+      expect(chartCall.config.data.datasets[0].data).toEqual([2, 5]);
+      expect(chartCall.config.data.datasets[2].data).toEqual([3.5, 3.5]);
+    });
+  });
+
+  it("marks completed releases with missing end dates in the chart and table", async () => {
     const payload = releaseInsightsPayload();
     payload.recentReleases = [
       releasedVersionFixture(2),
@@ -413,41 +496,12 @@ describe("ReleasesScreen", () => {
       "Missing end date | 01-Apr-2026 to -"
     );
 
-    const recentTable = screen.getByRole("table", { name: "Recent released versions" });
+    const recentTable = screen.getByRole("table", { name: "Recent completed releases" });
     expect(within(recentTable).getByText("Missing end date")).toBeInTheDocument();
     expect(within(recentTable).getByText("01-Apr-2026 to -")).toBeInTheDocument();
   });
 
-  it("reloads insights when Refresh Data is clicked", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url.includes("/api/releases/insights")) {
-        return jsonResponse(releaseInsightsPayload());
-      }
-      return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
-    });
-
-    render(<ReleasesScreen />);
-
-    await screen.findAllByText("Q4 FY26 - Tech");
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Data" }));
-
-    await waitFor(() => {
-      const releaseInsightsCalls = fetchSpy.mock.calls.filter((call) => {
-        const input = call[0];
-        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        return url.includes("/api/releases/insights");
-      });
-      expect(releaseInsightsCalls.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  it("shows empty-state guidance when no JIRA releases are synced", async () => {
+  it("shows empty-state guidance when no releases are synced", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
@@ -477,8 +531,8 @@ describe("ReleasesScreen", () => {
           ongoingReleases: [],
           recentReleases: [],
           riskSignals: [],
-          summary: "Release insights will appear once JIRA release data is synced.",
-          error: "No JIRA releases found in local data. Run Sync Data after configuring JIRA.",
+          summary: "Release insights will appear once release data is synced.",
+          error: "No releases found in local data. Run Sync Data after configuring release sync.",
         });
       }
       return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
@@ -486,9 +540,8 @@ describe("ReleasesScreen", () => {
 
     render(<ReleasesScreen />);
 
-    expect(await screen.findByText("Release insights will appear once JIRA release data is synced.")).toBeInTheDocument();
-    expect(screen.getByText(/No JIRA releases found in local data/i)).toBeInTheDocument();
-    expect(screen.getByText("No ongoing JIRA releases found in the current sync.")).toBeInTheDocument();
+    expect(await screen.findByText(/No releases found in local data/i)).toBeInTheDocument();
+    expect(screen.getByText("No ongoing releases found in the current sync.")).toBeInTheDocument();
   });
 
   it("surfaces endpoint failures without keeping stale release rows", async () => {
@@ -497,7 +550,6 @@ describe("ReleasesScreen", () => {
     render(<ReleasesScreen />);
 
     expect(await screen.findByText("Release endpoint unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Release insights will appear once JIRA release data is synced.")).toBeInTheDocument();
     expect(screen.queryByText("Q4 FY26 - Tech")).not.toBeInTheDocument();
   });
 });

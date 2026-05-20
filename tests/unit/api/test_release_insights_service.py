@@ -18,7 +18,7 @@ class ReleaseInsightsServiceUnitTests(unittest.TestCase):
         finally:
             conn.close()
 
-    def test_get_release_insights_aggregates_versions_and_fixversion_scope(self) -> None:
+    def test_get_release_insights_aggregates_release_scope(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             self._init_db(db_path)
@@ -131,7 +131,7 @@ class ReleaseInsightsServiceUnitTests(unittest.TestCase):
             self.assertEqual(recent[1]["doneIssueCount"], 2)
             self.assertEqual(recent[1]["riskLevel"], "green")
 
-    def test_get_release_insights_returns_empty_payload_without_versions(self) -> None:
+    def test_get_release_insights_returns_empty_payload_without_releases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             self._init_db(db_path)
@@ -142,7 +142,7 @@ class ReleaseInsightsServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["metrics"]["totalReleases"], 0)
             self.assertEqual(payload["cycleTimeTrend"], [])
             self.assertEqual(payload["ongoingReleases"], [])
-            self.assertIn("No JIRA releases found", payload["error"])
+            self.assertIn("No releases found", payload["error"])
 
 
 if __name__ == "__main__":

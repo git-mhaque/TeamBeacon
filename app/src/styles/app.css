@@ -3011,6 +3011,11 @@ body {
   gap: 0.7rem;
 }
 
+.tb-release-cycle-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .tb-release-cycle-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3163,6 +3168,62 @@ body {
   color: #3d5577;
   max-width: 18rem;
   line-height: 1.35;
+}
+
+.tb-release-selector-modal {
+  width: min(100%, 48rem);
+  max-height: min(42rem, calc(100vh - 2rem));
+  overflow: hidden;
+}
+
+.tb-release-selector-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.tb-release-selector-list {
+  display: grid;
+  gap: 0.42rem;
+  max-height: min(25rem, calc(100vh - 13rem));
+  overflow: auto;
+  padding: 0.08rem;
+}
+
+.tb-release-selector-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.48rem;
+  border: 1px solid #d2def1;
+  border-radius: 0.58rem;
+  background: #f8fbff;
+  color: #243d60;
+  cursor: pointer;
+  padding: 0.54rem 0.62rem;
+}
+
+.tb-release-selector-option input {
+  margin-top: 0.14rem;
+}
+
+.tb-release-selector-option-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.tb-release-selector-option-copy strong {
+  color: #17375f;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.tb-release-selector-option-copy span {
+  color: #50698d;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .tb-release-name-cell {
