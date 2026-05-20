@@ -3178,7 +3178,26 @@ body {
 
 .tb-release-selector-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.42rem;
+}
+
+.tb-release-selector-search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  border: 1px solid #c9d7ed;
+  border-radius: 0.56rem;
+  background: #f8fbff;
+  color: #203959;
+  font: inherit;
+  font-size: 0.79rem;
+  padding: 0.42rem 0.54rem;
+}
+
+.tb-release-selector-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
   gap: 0.42rem;
 }
 
@@ -3188,6 +3207,10 @@ body {
   max-height: min(25rem, calc(100vh - 13rem));
   overflow: auto;
   padding: 0.08rem;
+}
+
+.tb-release-selector-empty {
+  margin: 0;
 }
 
 .tb-release-selector-option {
@@ -3582,6 +3605,20 @@ body {
 
   .tb-release-cycle-key {
     grid-template-columns: 1fr;
+  }
+
+  .tb-release-selector-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tb-release-selector-search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .tb-release-selector-actions {
+    justify-content: flex-end;
   }
 
   .tb-status-cycle-table {

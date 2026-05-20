@@ -8,6 +8,7 @@ import {
   ReleaseInsightsResponse,
   ReleaseRiskLevel,
 } from "../../../lib/api";
+import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 type ChartConstructor = new (
   item: HTMLCanvasElement,
@@ -40,6 +41,7 @@ const EMPTY_INSIGHTS: ReleaseInsightsResponse = {
 
 const DEFAULT_RELEASE_SELECTION_COUNT = 12;
 const RELEASE_SELECTOR_FETCH_LIMIT = 100;
+const RELEASE_TREND_SELECTION_KEY = "teambeacon.releaseInsights.selectedReleaseIds";
 
 const Chart =
   ((ChartModule as unknown as { default?: ChartConstructor }).default ??
@@ -119,6 +121,11 @@ function average(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function selectionsMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 function measuredCycleTime(release: ReleaseInsightRow): number | null {
   return typeof release.cycleTimeDays === "number" && Number.isFinite(release.cycleTimeDays)
     ? release.cycleTimeDays
@@ -147,6 +154,29 @@ function sortReleaseRowsByRisk(rows: ReleaseInsightRow[]): ReleaseInsightRow[] {
     if (riskDelta !== 0) return riskDelta;
     return (left.releaseDate ?? "").localeCompare(right.releaseDate ?? "");
   });
+}
+
+function parsePersistedReleaseSelection(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const selected = new Set<string>();
+    for (const entry of parsed) {
+      if (typeof entry !== "string") continue;
+      const releaseId = entry.trim();
+      if (releaseId) {
+        selected.add(releaseId);
+      }
+    }
+    return [...selected];
+  } catch {
+    return [];
+  }
+}
+
+function readPersistedReleaseSelection(): string[] {
+  return parsePersistedReleaseSelection(getPreferenceSync(RELEASE_TREND_SELECTION_KEY));
 }
 
 type ReleaseCycleLineChartProps = {
@@ -326,9 +356,16 @@ function ReleaseCycleLineChart({
 export function ReleasesScreen() {
   const [insights, setInsights] = useState<ReleaseInsightsResponse>(EMPTY_INSIGHTS);
   const [error, setError] = useState<string | null>(null);
-  const [selectedReleaseIds, setSelectedReleaseIds] = useState<string[]>([]);
+  const [selectedReleaseIds, setSelectedReleaseIds] = useState<string[]>(readPersistedReleaseSelection);
   const [draftSelectedReleaseIds, setDraftSelectedReleaseIds] = useState<string[]>([]);
   const [isReleaseSelectorOpen, setIsReleaseSelectorOpen] = useState(false);
+  const [releaseSelectorSearch, setReleaseSelectorSearch] = useState("");
+  const hasInitializedReleaseSelection = useRef(false);
+  const hasHydratedReleaseSelectionFromStore = useRef(false);
+
+  const persistReleaseSelection = useCallback((releaseIds: string[]) => {
+    void setPreference(RELEASE_TREND_SELECTION_KEY, JSON.stringify(releaseIds));
+  }, []);
 
   const loadInsights = useCallback(async () => {
     try {
@@ -364,15 +401,61 @@ export function ReleasesScreen() {
     const availableReleaseIds = sortedRecentReleases.map((release) => release.versionId);
     if (availableReleaseIds.length === 0) {
       setSelectedReleaseIds([]);
+      hasInitializedReleaseSelection.current = false;
+      hasHydratedReleaseSelectionFromStore.current = false;
+      return;
+    }
+
+    const defaultReleaseIds = availableReleaseIds.slice(0, DEFAULT_RELEASE_SELECTION_COUNT);
+    const normalizeAvailableSelection = (releaseIds: string[]) => {
+      const requestedIds = new Set(releaseIds);
+      const availableSelection = availableReleaseIds.filter((versionId) => requestedIds.has(versionId));
+      return availableSelection.length > 0 ? availableSelection : defaultReleaseIds;
+    };
+
+    if (!hasInitializedReleaseSelection.current) {
+      const initialSelection = normalizeAvailableSelection(readPersistedReleaseSelection());
+      setSelectedReleaseIds(initialSelection);
+      persistReleaseSelection(initialSelection);
+      hasInitializedReleaseSelection.current = true;
       return;
     }
 
     setSelectedReleaseIds((currentIds) => {
-      const availableReleaseIdSet = new Set(availableReleaseIds);
-      const validCurrentIds = currentIds.filter((versionId) => availableReleaseIdSet.has(versionId));
-      if (validCurrentIds.length > 0) return validCurrentIds;
-      return availableReleaseIds.slice(0, DEFAULT_RELEASE_SELECTION_COUNT);
+      const nextSelection = normalizeAvailableSelection(currentIds);
+      if (selectionsMatch(nextSelection, currentIds)) return currentIds;
+      persistReleaseSelection(nextSelection);
+      return nextSelection;
     });
+  }, [persistReleaseSelection, sortedRecentReleases]);
+
+  useEffect(() => {
+    if (sortedRecentReleases.length === 0 || !hasInitializedReleaseSelection.current) return;
+    if (hasHydratedReleaseSelectionFromStore.current) return;
+    hasHydratedReleaseSelectionFromStore.current = true;
+
+    const availableReleaseIds = sortedRecentReleases.map((release) => release.versionId);
+    const availableReleaseIdSet = new Set(availableReleaseIds);
+    let cancelled = false;
+
+    void (async () => {
+      const raw = await getPreference(RELEASE_TREND_SELECTION_KEY);
+      if (cancelled || !raw) return;
+
+      const persistedIds = parsePersistedReleaseSelection(raw).filter((versionId) => (
+        availableReleaseIdSet.has(versionId)
+      ));
+      if (persistedIds.length === 0) return;
+
+      const orderedSelection = availableReleaseIds.filter((versionId) => persistedIds.includes(versionId));
+      setSelectedReleaseIds((currentIds) => (
+        selectionsMatch(currentIds, orderedSelection) ? currentIds : orderedSelection
+      ));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sortedRecentReleases]);
 
   const recentCompletedReleases = useMemo(
@@ -431,8 +514,21 @@ export function ReleasesScreen() {
     [draftSelectedReleaseIds],
   );
 
+  const filteredSelectorReleases = useMemo(() => {
+    const query = releaseSelectorSearch.trim().toLowerCase();
+    if (!query) return sortedRecentReleases;
+
+    return sortedRecentReleases.filter((release) => [
+      release.name,
+      formatDate(release.startDate),
+      formatDate(release.releaseDate),
+      cycleTimeStatusLabel(release),
+    ].some((value) => value.toLowerCase().includes(query)));
+  }, [releaseSelectorSearch, sortedRecentReleases]);
+
   const openReleaseSelector = useCallback(() => {
     setDraftSelectedReleaseIds(effectiveSelectedReleaseIds);
+    setReleaseSelectorSearch("");
     setIsReleaseSelectorOpen(true);
   }, [effectiveSelectedReleaseIds]);
 
@@ -463,8 +559,9 @@ export function ReleasesScreen() {
       .map((release) => release.versionId);
     if (orderedSelection.length === 0) return;
     setSelectedReleaseIds(orderedSelection);
+    persistReleaseSelection(orderedSelection);
     setIsReleaseSelectorOpen(false);
-  }, [draftSelectedReleaseIds, sortedRecentReleases]);
+  }, [draftSelectedReleaseIds, persistReleaseSelection, sortedRecentReleases]);
 
   const visibleRiskSignals = insights.riskSignals.length > 0
     ? insights.riskSignals
@@ -742,28 +839,44 @@ export function ReleasesScreen() {
             </header>
 
             <div class="tb-release-selector-toolbar">
-              <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftReleases}>
-                Select all
-              </button>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftReleases}>
-                Clear
-              </button>
+              <input
+                class="tb-release-selector-search"
+                type="search"
+                aria-label="Search releases"
+                placeholder="Search releases"
+                value={releaseSelectorSearch}
+                onInput={(event) => setReleaseSelectorSearch((event.currentTarget as HTMLInputElement).value)}
+              />
+              <div class="tb-release-selector-actions">
+                <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftReleases}>
+                  Select all
+                </button>
+                <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftReleases}>
+                  Clear
+                </button>
+              </div>
             </div>
 
             <div class="tb-release-selector-list" role="group" aria-label="Completed release selection">
-              {sortedRecentReleases.map((release) => (
-                <label key={release.versionId} class="tb-release-selector-option">
-                  <input
-                    type="checkbox"
-                    checked={draftSelectedReleaseIdSet.has(release.versionId)}
-                    onChange={() => toggleDraftRelease(release.versionId)}
-                  />
-                  <span class="tb-release-selector-option-copy">
-                    <strong>{release.name}</strong>
-                    <span>{formatDate(release.releaseDate)} | {cycleTimeStatusLabel(release)}</span>
-                  </span>
-                </label>
-              ))}
+              {filteredSelectorReleases.length > 0 ? (
+                filteredSelectorReleases.map((release) => (
+                  <label key={release.versionId} class="tb-release-selector-option">
+                    <input
+                      type="checkbox"
+                      checked={draftSelectedReleaseIdSet.has(release.versionId)}
+                      onChange={() => toggleDraftRelease(release.versionId)}
+                    />
+                    <span class="tb-release-selector-option-copy">
+                      <strong>{release.name}</strong>
+                      <span>{formatDate(release.releaseDate)} | {cycleTimeStatusLabel(release)}</span>
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <div class="tb-summary tb-release-selector-empty">
+                  No releases match this search.
+                </div>
+              )}
             </div>
 
             <footer class="tb-modal-actions">

@@ -7,8 +7,9 @@ type MockChartCall = {
   destroy: ReturnType<typeof vi.fn>;
 };
 
-const { chartCalls } = vi.hoisted(() => ({
+const { chartCalls, preferenceStore } = vi.hoisted(() => ({
   chartCalls: [] as MockChartCall[],
+  preferenceStore: new Map<string, string>(),
 }));
 
 vi.mock("chart.js/auto", () => {
@@ -27,7 +28,17 @@ vi.mock("chart.js/auto", () => {
   };
 });
 
+vi.mock("../../src/lib/persistence", () => ({
+  getPreferenceSync: vi.fn(),
+  getPreference: vi.fn(),
+  setPreference: vi.fn(),
+  removePreference: vi.fn(),
+}));
+
+import * as persistence from "../../src/lib/persistence";
 import { ReleasesScreen } from "../../src/components/content/screens/ReleasesScreen";
+
+const RELEASE_TREND_SELECTION_KEY = "teambeacon.releaseInsights.selectedReleaseIds";
 
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
@@ -275,6 +286,12 @@ async function findLatestChartCall(ariaLabel: string): Promise<MockChartCall> {
 describe("ReleasesScreen", () => {
   beforeEach(() => {
     chartCalls.length = 0;
+    preferenceStore.clear();
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => preferenceStore.get(key) ?? null);
+    vi.mocked(persistence.getPreference).mockImplementation(async (key) => preferenceStore.get(key) ?? null);
+    vi.mocked(persistence.setPreference).mockImplementation(async (key, value) => {
+      preferenceStore.set(key, value);
+    });
   });
 
   afterEach(() => {
@@ -412,6 +429,14 @@ describe("ReleasesScreen", () => {
     const dialog = await screen.findByRole("dialog", { name: "Select Releases" });
     const dialogScope = within(dialog);
     expect(dialogScope.getByText("5 selected")).toBeInTheDocument();
+    const searchBox = dialogScope.getByRole("searchbox", { name: "Search releases" });
+    expect(searchBox).toBeInTheDocument();
+    fireEvent.input(searchBox, { target: { value: "Release 02" } });
+    expect(dialogScope.getByLabelText(/Release 02/)).toBeInTheDocument();
+    expect(dialogScope.queryByLabelText(/Release 05/)).not.toBeInTheDocument();
+    fireEvent.input(searchBox, { target: { value: "No matching release" } });
+    expect(dialogScope.getByText("No releases match this search.")).toBeInTheDocument();
+    fireEvent.input(searchBox, { target: { value: "" } });
 
     fireEvent.click(dialogScope.getByLabelText(/Release 05/));
     expect(dialogScope.getByText("4 selected")).toBeInTheDocument();
@@ -455,6 +480,49 @@ describe("ReleasesScreen", () => {
       expect(chartCall.config.data.datasets[0].data).toEqual([2, 5]);
       expect(chartCall.config.data.datasets[2].data).toEqual([3.5, 3.5]);
     });
+    expect(JSON.parse(preferenceStore.get(RELEASE_TREND_SELECTION_KEY) ?? "[]")).toEqual([
+      "release-05",
+      "release-02",
+    ]);
+  });
+
+  it("hydrates selected releases from persisted preferences", async () => {
+    const payload = releaseInsightsPayload();
+    payload.recentReleases = Array.from({ length: 5 }, (_, index) => releasedVersionFixture(index + 1));
+    payload.metrics.totalReleases = 5;
+    payload.metrics.releasedCount = 5;
+    preferenceStore.set(RELEASE_TREND_SELECTION_KEY, JSON.stringify(["release-02", "release-05"]));
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.includes("/api/releases/insights")) {
+        return jsonResponse(payload);
+      }
+      return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
+    });
+
+    render(<ReleasesScreen />);
+
+    expect(await screen.findByText("2 shown")).toBeInTheDocument();
+    const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
+    const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
+    expect(releaseKeyItems).toHaveLength(2);
+    expect(releaseKeyItems[0]).toHaveTextContent("Release 02");
+    expect(releaseKeyItems[1]).toHaveTextContent("Release 05");
+
+    await waitFor(() => {
+      const chartCall = getLatestChartCall("Release cycle time line chart");
+      expect(chartCall.config.data.datasets[0].data).toEqual([2, 5]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Releases" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select Releases" });
+    expect(within(dialog).getByText("2 selected")).toBeInTheDocument();
   });
 
   it("marks completed releases with missing end dates in the chart and table", async () => {
