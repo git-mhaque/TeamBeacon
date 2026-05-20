@@ -229,8 +229,14 @@ describe("Content", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Security Insights/ }));
     expect(await screen.findByRole("heading", { name: "Security Insights" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Security Posture Snapshot" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Security Insights under construction")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Under construction" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Operations Insights/ }));
+    expect(await screen.findByRole("heading", { name: "Operations Insights" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Operations Insights under construction")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Under construction" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();

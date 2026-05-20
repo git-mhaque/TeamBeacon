@@ -307,6 +307,18 @@ body {
   min-width: 0;
 }
 
+.tb-construction-empty {
+  min-height: clamp(20rem, calc(100vh - 10rem), 40rem);
+  display: grid;
+  place-items: center;
+}
+
+.tb-construction-icon {
+  font-size: clamp(5rem, 11vw, 9rem);
+  line-height: 1;
+  filter: drop-shadow(0 0.65rem 1rem rgba(22, 38, 68, 0.18));
+}
+
 .tb-panel {
   min-width: 0;
   border: 1px solid var(--tb-line);

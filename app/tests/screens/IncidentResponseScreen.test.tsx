@@ -2,12 +2,11 @@ import { render, screen } from "@testing-library/preact";
 import { IncidentResponseScreen } from "../../src/components/content/screens/IncidentResponseScreen";
 
 describe("IncidentResponseScreen", () => {
-  it("renders incident operations baseline metrics", () => {
+  it("renders a construction empty state", () => {
     render(<IncidentResponseScreen />);
 
-    expect(screen.getByRole("heading", { name: "Incident Operations" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Active Incidents" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "SLA Breaches" })).toBeInTheDocument();
-    expect(screen.getByText(/response latency/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Operations Insights under construction")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Under construction" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Incident Operations" })).not.toBeInTheDocument();
   });
 });
