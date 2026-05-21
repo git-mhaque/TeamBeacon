@@ -35,10 +35,10 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `/rest/api/space?limit=1` query
     - Required Confluence environment variables
 - `GET /api/releases/insights?releaseLimit=12`
-  - Returns JIRA release/version analytics from local sync data:
-    - release cycle-time trend from version `startDate` to `releaseDate`
+  - Returns release analytics from local sync data:
+    - release cycle-time trend from release start date to release date
     - ongoing release readiness and overdue/due-soon counts
-    - linked `fixVersions` scope, delivered story points, and risk signals
+    - linked release scope, delivered story points, and risk signals
 - `GET /api/releases/refresh/status`
   - Returns current Release Insights refresh state.
 - `GET /api/releases/refresh/result`

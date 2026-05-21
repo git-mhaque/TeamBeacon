@@ -31,7 +31,7 @@ Exit criteria:
 ## Phase 2 (Weeks 4-5): Insights MVP
 - Initiative insights with configurable success criteria.
 - Team metrics: committed/completed points, cycle time trends.
-- Release metrics: JIRA version cycle time, ongoing release readiness, and fixVersion scope risk.
+- Release metrics: release cycle time, selectable completed-release trend, ongoing release readiness, and linked scope risk.
 - Individual insights by alias and date range.
 - Sprint Insights snapshot (`Done`, `In Progress`, `Planned`).
 - Align implemented UI routes/components with mockup intent.

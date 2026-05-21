@@ -36,7 +36,7 @@ TeamBeacon is a local-first desktop analytics system:
 - `team_members`: real account + alias (`SE 1`, `QA 1`).
 - `initiative_config`: epic keys, initiative rules/success criteria.
 - `issues`, `issue_changelog`, `sprints`, `boards`.
-- `jira_project_versions`, `issue_release_links`: JIRA releases and fixVersion scope for Release Insights.
+- `jira_project_versions`, `issue_release_links`: normalized release records and linked release scope for Release Insights.
 - `epic_groups`, `work_types`: reusable lookup/reference data.
 - `epic_metadata` + mapping tables: per-epic success checklist and group/work-type assignments.
 - `metric_snapshots`: time-windowed aggregates.
@@ -86,6 +86,6 @@ Default thresholds:
   - Left rail for filters/context scope.
   - Main pane for KPI cards, trend widgets, and narrative insights.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
-  - Release Insights renders JIRA version analytics: cycle-time trend, ongoing release readiness, and risk signals.
+  - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 - Design source:
   - `docs/design/teambeacon-ojet-mockups.html` should be updated with major flow changes.

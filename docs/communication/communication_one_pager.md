@@ -38,6 +38,7 @@ TeamBeacon helps Engineering Managers:
 - Reduce cognitive load by consolidating critical delivery signals.
 - Shift from issue-level noise to system-level insights.
 - Identify risk earlier through initiative RAG visibility.
+- Understand release readiness and release cycle-time patterns without manually assembling status evidence.
 - Save significant time on executive communication artifacts.
 
 ## Implemented Capability Highlights
@@ -90,7 +91,20 @@ Manager value:
 - Better planning and coaching based on throughput and flow-time signals.
 - Clearer signal quality for retrospective and forecast conversations.
 
-### 5 Team Dashboard (Killer Feature)
+### 5 Release Insights
+What is implemented today:
+- Release Overview cards for ongoing releases, overdue releases, average cycle time, and release cadence.
+- Release Cycle Time Trend for selected completed releases, displayed oldest to newest with an average line.
+- Select Releases overlay with search, select-all, clear, and locally persisted selection.
+- Ongoing release readiness, risk signals, and recent completed-release quality views.
+
+Manager value:
+- Faster release review conversations with trend evidence already assembled.
+- Clearer view of release cadence and cycle-time movement across chosen releases.
+- Earlier attention to overdue or due-soon release readiness risks.
+- Manager-facing language that avoids source-system terminology in the product experience.
+
+### 6 Team Dashboard (Killer Feature)
 What is implemented today:
 - AI-generated Executive Summary using the configured AI provider (OCI, Ollama, or OpenAI).
 - AI-generated Wins and Risks using current configured initiative data.
@@ -112,10 +126,11 @@ Manager value:
 ## Practical EM Use Cases
 - Weekly team update: quickly draft summary plus wins and risks.
 - Monthly leadership checkpoint: report progress and risk posture by initiative.
+- Release review: compare selected releases, identify cadence changes, and call out readiness risks.
 - Quarterly review prep: show trend-backed narrative with clear RAG signals.
 
 ## Typical Usage Rhythm
-- Weekly: Team Insights plus Sprint Insights plus Initiative Insights plus AI draft update.
+- Weekly: Team Insights plus Sprint Insights plus Release Insights plus Initiative Insights plus AI draft update.
 - Monthly: executive summary and risk posture review.
 - Quarterly: progress narrative with initiative-level RAG and trends.
 
