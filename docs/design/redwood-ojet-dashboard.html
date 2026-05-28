@@ -1,0 +1,1349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Initiative Insights - Redwood OJET Mockup</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f6f3ef;
+        --canvas-alt: #fbfaf8;
+        --surface: #ffffff;
+        --surface-soft: #f9f7f4;
+        --surface-tint: #f2efea;
+        --border: #d8d0c7;
+        --border-strong: #bfb5aa;
+        --text: #221f1c;
+        --text-muted: #5f5650;
+        --text-soft: #766d66;
+        --redwood: #7f2d22;
+        --redwood-strong: #5d2119;
+        --redwood-soft: #f5e7e2;
+        --red: #ba372a;
+        --red-soft: #fce8e5;
+        --amber: #946200;
+        --amber-soft: #fff1cf;
+        --green: #2f6f4e;
+        --green-soft: #e4f5ec;
+        --blue: #2f5d72;
+        --blue-soft: #e6f1f4;
+        --violet: #635380;
+        --shadow: 0 8px 24px rgba(49, 45, 42, 0.08);
+        --radius: 8px;
+        --radius-sm: 6px;
+        --focus: 0 0 0 3px rgba(127, 45, 34, 0.18);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--canvas);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background: var(--canvas);
+        font-family:
+          "Oracle Sans",
+          "Segoe UI",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      a {
+        color: #095c82;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .side-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        height: 100vh;
+        padding: 18px 12px;
+        color: #f8f3ef;
+        background: #312d2a;
+        border-right: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: var(--radius);
+        background: var(--redwood);
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+      }
+
+      .brand-mark svg {
+        width: 26px;
+        height: 26px;
+      }
+
+      .nav-stack {
+        display: grid;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .nav-button {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 42px;
+        margin: 0 auto;
+        color: #d8d0c7;
+        background: transparent;
+        border: 0;
+        border-radius: var(--radius-sm);
+        cursor: default;
+      }
+
+      .nav-button svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 1.8;
+      }
+
+      .nav-button.is-active {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .nav-button.is-active::before {
+        position: absolute;
+        left: -12px;
+        width: 4px;
+        height: 24px;
+        content: "";
+        background: #d63f2f;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 64px;
+        padding: 12px 28px;
+        background: rgba(251, 250, 248, 0.94);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(18px);
+      }
+
+      .product {
+        min-width: 0;
+      }
+
+      .eyebrow {
+        display: block;
+        color: var(--text-soft);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .product-title {
+        margin-top: 2px;
+        font-size: 18px;
+        font-weight: 760;
+      }
+
+      .topbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 34px;
+        padding: 7px 12px;
+        color: var(--redwood-strong);
+        font-size: 13px;
+        font-weight: 680;
+        white-space: nowrap;
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 1px 0 rgba(49, 45, 42, 0.04);
+        cursor: default;
+      }
+
+      .button svg {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        stroke-width: 1.9;
+      }
+
+      .button.primary {
+        color: #ffffff;
+        background: var(--redwood);
+        border-color: var(--redwood);
+      }
+
+      .button.icon-only {
+        width: 34px;
+        padding: 0;
+      }
+
+      .page {
+        width: min(1680px, 100%);
+        margin: 0 auto;
+        padding: 22px 28px 34px;
+      }
+
+      .page-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 20px;
+        padding-bottom: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 30px;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin-top: 7px;
+        color: var(--text-muted);
+      }
+
+      .period-card {
+        display: grid;
+        gap: 4px;
+        min-width: 270px;
+        padding: 12px 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 1px 0 rgba(49, 45, 42, 0.04);
+      }
+
+      .period-card strong {
+        font-size: 13px;
+      }
+
+      .period-card span {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .section-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .section-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        font-weight: 760;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        padding: 3px 9px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 680;
+        background: var(--blue-soft);
+        border: 1px solid #bfd8e0;
+        border-radius: 999px;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .metric-card {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        min-height: 132px;
+        padding: 16px;
+        overflow: hidden;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .metric-card::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        content: "";
+        background: var(--metric-accent, var(--redwood));
+      }
+
+      .metric-label {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 720;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .metric-value {
+        margin-top: 8px;
+        font-size: 32px;
+        font-weight: 780;
+        line-height: 1;
+      }
+
+      .metric-note {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .metric-visual {
+        align-self: center;
+        width: 88px;
+        height: 68px;
+      }
+
+      .rag-inline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 10px;
+      }
+
+      .rag-count {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .rag-count::before {
+        width: 9px;
+        height: 9px;
+        content: "";
+        background: currentColor;
+        border-radius: 50%;
+      }
+
+      .rag-count.red {
+        color: var(--red);
+      }
+
+      .rag-count.amber {
+        color: var(--amber);
+      }
+
+      .rag-count.green {
+        color: var(--green);
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        align-items: start;
+        gap: 18px;
+      }
+
+      .work-surface,
+      .insight-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .work-surface {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .surface-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.15fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr) minmax(130px, 0.65fr) auto;
+        gap: 10px;
+        padding: 14px 16px;
+        background: var(--surface-soft);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      label {
+        color: #4b3f38;
+        font-size: 11px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .input,
+      select {
+        width: 100%;
+        min-height: 36px;
+        padding: 7px 10px;
+        color: #2e2924;
+        background: #ffffff;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        outline: none;
+      }
+
+      .input:focus,
+      select:focus,
+      .button:focus {
+        box-shadow: var(--focus);
+      }
+
+      .chip-row {
+        display: flex;
+        align-items: end;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 7px 11px;
+        color: var(--blue);
+        font-size: 13px;
+        font-weight: 680;
+        white-space: nowrap;
+        background: var(--blue-soft);
+        border: 1px solid #bfd8e0;
+        border-radius: var(--radius-sm);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 1040px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        color: #4a342f;
+        font-size: 11px;
+        font-weight: 780;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: #ece7e1;
+      }
+
+      td {
+        color: #2f3b4b;
+        font-size: 13px;
+        background: #ffffff;
+      }
+
+      tbody tr:hover td {
+        background: #fbf8f4;
+      }
+
+      .epic-link {
+        display: block;
+        color: #075a83;
+        font-weight: 760;
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+
+      .epic-name {
+        display: block;
+        max-width: 430px;
+        margin-top: 2px;
+        color: #35465d;
+      }
+
+      .progress-cell {
+        min-width: 140px;
+      }
+
+      .progress-bar {
+        width: 108px;
+        height: 8px;
+        overflow: hidden;
+        background: #e7edf1;
+        border: 1px solid #bfd2de;
+        border-radius: 999px;
+      }
+
+      .progress-bar span {
+        display: block;
+        height: 100%;
+        background: #1f73d1;
+        border-radius: inherit;
+      }
+
+      .percent {
+        display: block;
+        margin-top: 3px;
+        color: #25486b;
+        font-weight: 760;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 23px;
+        padding: 3px 9px;
+        font-size: 11px;
+        font-weight: 780;
+        letter-spacing: 0.04em;
+        border-radius: 999px;
+      }
+
+      .status-pill.red {
+        color: var(--red);
+        background: var(--red-soft);
+        border: 1px solid #efb1a9;
+      }
+
+      .status-pill.amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+        border: 1px solid #e5c76f;
+      }
+
+      .status-pill.green {
+        color: var(--green);
+        background: var(--green-soft);
+        border: 1px solid #9bd5b6;
+      }
+
+      .delta {
+        color: #164b93;
+        font-weight: 760;
+        text-decoration: underline;
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .action-button {
+        display: inline-grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        color: var(--text-muted);
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+      }
+
+      .action-button svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .action-button.delete {
+        color: var(--red);
+        background: var(--red-soft);
+        border-color: #efb1a9;
+      }
+
+      .insight-panel {
+        display: grid;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .panel-section {
+        display: grid;
+        gap: 11px;
+      }
+
+      .panel-section + .panel-section {
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+
+      h3 {
+        font-size: 15px;
+        font-weight: 760;
+      }
+
+      .donut-wrap {
+        display: grid;
+        grid-template-columns: 128px minmax(0, 1fr);
+        align-items: center;
+        gap: 14px;
+      }
+
+      .donut {
+        width: 128px;
+        height: 128px;
+      }
+
+      .legend {
+        display: grid;
+        gap: 8px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .legend-key {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .callout {
+        display: grid;
+        gap: 7px;
+        padding: 12px;
+        background: #fbf8f4;
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--redwood);
+        border-radius: var(--radius-sm);
+      }
+
+      .callout strong {
+        font-size: 13px;
+      }
+
+      .callout p {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 9px;
+        align-items: start;
+      }
+
+      .timeline-dot {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        color: var(--redwood);
+        background: var(--redwood-soft);
+        border: 1px solid #dfbdb6;
+        border-radius: 50%;
+      }
+
+      .timeline-dot svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .timeline-copy {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .timeline-copy strong {
+        display: block;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .footnote {
+        margin-top: 16px;
+        color: var(--text-soft);
+        font-size: 12px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 1240px) {
+        .metrics-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .insight-panel {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .panel-section + .panel-section {
+          padding-top: 0;
+          padding-left: 16px;
+          border-top: 0;
+          border-left: 1px solid var(--border);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .side-rail {
+          position: static;
+          flex-direction: row;
+          justify-content: space-between;
+          height: auto;
+          padding: 10px 14px;
+        }
+
+        .nav-stack {
+          display: flex;
+          justify-content: flex-end;
+          width: auto;
+        }
+
+        .nav-button {
+          width: 38px;
+          height: 36px;
+        }
+
+        .nav-button.is-active::before {
+          display: none;
+        }
+
+        .topbar {
+          position: static;
+          padding: 12px 18px;
+        }
+
+        .page {
+          padding: 18px;
+        }
+
+        .page-header {
+          grid-template-columns: 1fr;
+        }
+
+        .period-card {
+          min-width: 0;
+        }
+
+        .filters {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .chip-row {
+          grid-column: 1 / -1;
+          align-items: center;
+        }
+
+        .insight-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-section + .panel-section {
+          padding-top: 16px;
+          padding-left: 0;
+          border-top: 1px solid var(--border);
+          border-left: 0;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .topbar,
+        .topbar-actions,
+        .section-title-row,
+        .surface-header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .topbar-actions {
+          width: 100%;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        h1 {
+          font-size: 25px;
+        }
+
+        .metrics-grid,
+        .filters {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-card {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-visual {
+          display: none;
+        }
+
+        .chip-row {
+          flex-wrap: wrap;
+        }
+
+        .chip {
+          flex: 1 1 150px;
+        }
+
+        .donut-wrap {
+          grid-template-columns: 1fr;
+          justify-items: start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="side-rail" aria-label="Application navigation">
+        <div class="brand-mark" title="TeamBeacon">
+          <svg aria-hidden="true" viewBox="0 0 32 32" fill="none">
+            <rect x="5" y="7" width="22" height="6" rx="2" fill="#f7d8d1"></rect>
+            <rect x="5" y="16" width="14" height="9" rx="2" fill="#ffffff"></rect>
+            <rect x="22" y="16" width="5" height="9" rx="2" fill="#e76f5a"></rect>
+          </svg>
+        </div>
+        <nav class="nav-stack" aria-label="Primary">
+          <button class="nav-button is-active" title="Dashboard" aria-label="Dashboard">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="3" width="7" height="8" rx="1.5"></rect>
+              <rect x="14" y="3" width="7" height="5" rx="1.5"></rect>
+              <rect x="14" y="12" width="7" height="9" rx="1.5"></rect>
+              <rect x="3" y="15" width="7" height="6" rx="1.5"></rect>
+            </svg>
+          </button>
+          <button class="nav-button" title="Epics" aria-label="Epics">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M5 6h14"></path>
+              <path d="M5 12h14"></path>
+              <path d="M5 18h9"></path>
+            </svg>
+          </button>
+          <button class="nav-button" title="Teams" aria-label="Teams">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="8" cy="8" r="3"></circle>
+              <circle cx="17" cy="9" r="2.5"></circle>
+              <path d="M3 20c.8-3.2 2.8-5 5-5s4.2 1.8 5 5"></path>
+              <path d="M13.5 19c.7-2.2 2-3.5 3.6-3.5 1.8 0 3.3 1.5 3.9 3.5"></path>
+            </svg>
+          </button>
+          <button class="nav-button" title="Settings" aria-label="Settings">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.4 1a7.5 7.5 0 0 0-2-1.2L14.1 3h-4.2l-.4 2.7a7.5 7.5 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.4-1a7.5 7.5 0 0 0 2 1.2l.4 2.7h4.2l.4-2.7a7.5 7.5 0 0 0 2-1.2l2.4 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"></path>
+            </svg>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="product">
+            <span class="eyebrow">Redwood OJET Workspace</span>
+            <div class="product-title">Pod Initiative Control</div>
+          </div>
+          <div class="topbar-actions" aria-label="Page actions">
+            <button class="button" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                <path d="M8 2v4"></path>
+                <path d="M16 2v4"></path>
+                <path d="M3 10h18"></path>
+              </svg>
+              Reporting Period
+            </button>
+            <button class="button" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+              </svg>
+              Configure Initiative
+            </button>
+            <button class="button primary" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M21 12a9 9 0 1 1-2.6-6.4"></path>
+                <path d="M21 4v6h-6"></path>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </header>
+
+        <div class="page">
+          <section class="page-header" aria-labelledby="page-title">
+            <div>
+              <h1 id="page-title">Initiative Insights</h1>
+              <p class="subtitle">Track configured epics, RAG drift, and completion momentum for OCI Native Adoption in the current reporting window.</p>
+            </div>
+            <div class="period-card" aria-label="Current reporting period">
+              <strong>15-May-2026 - 21-May-2026</strong>
+              <span>7 days, Australia/Melbourne</span>
+            </div>
+          </section>
+
+          <section aria-labelledby="summary-title">
+            <div class="section-title-row">
+              <div class="section-title">
+                <h2 id="summary-title">Configured Initiative Summary</h2>
+                <span class="badge">44 configured epics</span>
+              </div>
+            </div>
+
+            <div class="metrics-grid">
+              <article class="metric-card" style="--metric-accent: var(--blue);">
+                <div>
+                  <div class="metric-label">Configured Epics</div>
+                  <div class="metric-value">44</div>
+                  <p class="metric-note">Epics with metadata configured in TeamBeacon.</p>
+                </div>
+                <svg class="metric-visual" aria-hidden="true" viewBox="0 0 88 68" fill="none">
+                  <rect x="6" y="12" width="30" height="18" rx="4" fill="#e6f1f4" stroke="#a8cbd6"></rect>
+                  <rect x="48" y="8" width="34" height="22" rx="4" fill="#f5e7e2" stroke="#d7aaa0"></rect>
+                  <rect x="10" y="42" width="34" height="16" rx="4" fill="#fff1cf" stroke="#e4c56f"></rect>
+                  <rect x="54" y="40" width="24" height="18" rx="4" fill="#e4f5ec" stroke="#9bd5b6"></rect>
+                </svg>
+              </article>
+
+              <article class="metric-card" style="--metric-accent: var(--green);">
+                <div>
+                  <div class="metric-label">Avg Completion</div>
+                  <div class="metric-value" style="color: var(--green);">65.7%</div>
+                  <p class="metric-note">Average completion percentage across configured epics.</p>
+                </div>
+                <svg class="metric-visual" aria-hidden="true" viewBox="0 0 88 68" fill="none">
+                  <path d="M6 56h76" stroke="#d8d0c7"></path>
+                  <path d="M10 48c11-18 18-8 28-20 10-13 19-10 36-18" stroke="#2f6f4e" stroke-width="4" stroke-linecap="round"></path>
+                  <circle cx="74" cy="10" r="5" fill="#2f6f4e"></circle>
+                </svg>
+              </article>
+
+              <article class="metric-card" style="--metric-accent: var(--amber);">
+                <div>
+                  <div class="metric-label">Initiative RAG</div>
+                  <div class="rag-inline" aria-label="RAG counts">
+                    <span class="rag-count red">8 Red</span>
+                    <span class="rag-count amber">8 Amber</span>
+                    <span class="rag-count green">28 Green</span>
+                  </div>
+                  <p class="metric-note">For configured initiatives.</p>
+                </div>
+                <svg class="metric-visual" aria-hidden="true" viewBox="0 0 88 68" fill="none">
+                  <rect x="10" y="44" width="14" height="14" rx="3" fill="#ba372a"></rect>
+                  <rect x="34" y="36" width="14" height="22" rx="3" fill="#946200"></rect>
+                  <rect x="58" y="14" width="14" height="44" rx="3" fill="#2f6f4e"></rect>
+                </svg>
+              </article>
+
+              <article class="metric-card" style="--metric-accent: var(--redwood);">
+                <div>
+                  <div class="metric-label">Completed In Period</div>
+                  <div class="metric-value" style="color: var(--redwood);">12</div>
+                  <p class="metric-note">Total issues completed in current reporting period.</p>
+                </div>
+                <svg class="metric-visual" aria-hidden="true" viewBox="0 0 88 68" fill="none">
+                  <circle cx="44" cy="34" r="26" fill="#f5e7e2" stroke="#d7aaa0"></circle>
+                  <path d="m31 34 8 8 18-20" stroke="#7f2d22" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </article>
+            </div>
+          </section>
+
+          <section class="dashboard-grid" aria-label="Initiative progress workspace">
+            <div class="work-surface">
+              <div class="surface-header">
+                <div class="section-title">
+                  <h2>Initiative Progress Matrix</h2>
+                  <span class="badge">6 visible</span>
+                </div>
+                <button class="button" type="button">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M4 5h16"></path>
+                    <path d="M4 12h16"></path>
+                    <path d="M4 19h16"></path>
+                    <path d="M8 5v14"></path>
+                    <path d="M16 5v14"></path>
+                  </svg>
+                  Columns
+                </button>
+              </div>
+
+              <div class="filters" aria-label="Matrix filters">
+                <div class="field">
+                  <label for="search">Search</label>
+                  <input class="input" id="search" type="search" value="" placeholder="Epic key, name, group, type...">
+                </div>
+                <div class="field">
+                  <label for="group">Group</label>
+                  <select id="group" aria-label="Group">
+                    <option selected>OCI Native Adoption</option>
+                    <option>Platform Reliability</option>
+                    <option>Customer Migration</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="work-type">Work Type</label>
+                  <select id="work-type" aria-label="Work type">
+                    <option selected>All types</option>
+                    <option>Migration</option>
+                    <option>Remediation</option>
+                    <option>Integration</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="rag">RAG</label>
+                  <select id="rag" aria-label="RAG">
+                    <option selected>All</option>
+                    <option>Red</option>
+                    <option>Amber</option>
+                    <option>Green</option>
+                  </select>
+                </div>
+                <div class="chip-row" aria-label="Quick filters">
+                  <span class="chip">Positive Delta</span>
+                  <span class="chip">Time-bound</span>
+                </div>
+              </div>
+
+              <div class="table-wrap">
+                <table aria-label="Initiative progress matrix">
+                  <thead>
+                    <tr>
+                      <th scope="col">Epic</th>
+                      <th scope="col">Group</th>
+                      <th scope="col">Progress</th>
+                      <th scope="col">Delta</th>
+                      <th scope="col">RAG</th>
+                      <th scope="col">Criteria / Insight</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-3553</a>
+                        <span class="epic-name">OCI Native Migration for Email Notification Service</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 70%;"></span></div>
+                        <span class="percent">70%</span>
+                      </td>
+                      <td><span class="delta">0</span></td>
+                      <td><span class="status-pill amber">Amber</span></td>
+                      <td>Slightly behind: 70.0% vs expected 94.6%.</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-3553" aria-label="Edit CEGBUPOL-3553">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-3553" aria-label="Delete CEGBUPOL-3553">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-3635</a>
+                        <span class="epic-name">OCI Vault Migration for Search Platform</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 94.9%;"></span></div>
+                        <span class="percent">94.9%</span>
+                      </td>
+                      <td><span class="delta">2</span></td>
+                      <td><span class="status-pill green">Green</span></td>
+                      <td>On track: 94.9% vs expected 94.6%.</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-3635" aria-label="Edit CEGBUPOL-3635">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-3635" aria-label="Delete CEGBUPOL-3635">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-3840</a>
+                        <span class="epic-name">Post ATP Migration Tasks</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 66.7%;"></span></div>
+                        <span class="percent">66.7%</span>
+                      </td>
+                      <td><span class="delta">0</span></td>
+                      <td><span class="status-pill green">Green</span></td>
+                      <td>Timeline not enabled. RAG from completion (66.7%).</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-3840" aria-label="Edit CEGBUPOL-3840">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-3840" aria-label="Delete CEGBUPOL-3840">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-4487</a>
+                        <span class="epic-name">OCI Native Migration for OCI Search Integration</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 81.2%;"></span></div>
+                        <span class="percent">81.2%</span>
+                      </td>
+                      <td><span class="delta">0</span></td>
+                      <td><span class="status-pill amber">Amber</span></td>
+                      <td>Slightly behind: 81.2% vs expected 94.6%.</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-4487" aria-label="Edit CEGBUPOL-4487">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-4487" aria-label="Delete CEGBUPOL-4487">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-4677</a>
+                        <span class="epic-name">ESS V1 Integration - Single Entity End-to-End Flow in PL (Q4 Milestone)</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 73.7%;"></span></div>
+                        <span class="percent">73.7%</span>
+                      </td>
+                      <td><span class="delta">0</span></td>
+                      <td><span class="status-pill amber">Amber</span></td>
+                      <td>Slightly behind: 73.7% vs expected 94.6%.</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-4677" aria-label="Edit CEGBUPOL-4677">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-4677" aria-label="Delete CEGBUPOL-4677">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <a class="epic-link" href="#">CEGBUPOL-4787</a>
+                        <span class="epic-name">Babylon 64-bit Migration Impact Remediation</span>
+                      </td>
+                      <td>OCI Native Adoption</td>
+                      <td class="progress-cell">
+                        <div class="progress-bar" aria-hidden="true"><span style="width: 100%;"></span></div>
+                        <span class="percent">100%</span>
+                      </td>
+                      <td><span class="delta">0</span></td>
+                      <td><span class="status-pill green">Green</span></td>
+                      <td>Complete (100.0%). Target date 2026-05-31.</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="action-button" type="button" title="Edit CEGBUPOL-4787" aria-label="Edit CEGBUPOL-4787">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                          </button>
+                          <button class="action-button delete" type="button" title="Delete CEGBUPOL-4787" aria-label="Delete CEGBUPOL-4787">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="insight-panel" aria-label="Initiative insights">
+              <section class="panel-section" aria-labelledby="rag-title">
+                <h3 id="rag-title">RAG Distribution</h3>
+                <div class="donut-wrap">
+                  <svg class="donut" aria-hidden="true" viewBox="0 0 128 128">
+                    <circle cx="64" cy="64" r="42" fill="none" stroke="#e4f5ec" stroke-width="18"></circle>
+                    <circle cx="64" cy="64" r="42" fill="none" stroke="#2f6f4e" stroke-width="18" stroke-dasharray="176 264" stroke-dashoffset="0" transform="rotate(-90 64 64)"></circle>
+                    <circle cx="64" cy="64" r="42" fill="none" stroke="#946200" stroke-width="18" stroke-dasharray="50 264" stroke-dashoffset="-176" transform="rotate(-90 64 64)"></circle>
+                    <circle cx="64" cy="64" r="42" fill="none" stroke="#ba372a" stroke-width="18" stroke-dasharray="38 264" stroke-dashoffset="-226" transform="rotate(-90 64 64)"></circle>
+                    <text x="64" y="60" text-anchor="middle" fill="#221f1c" font-size="19" font-weight="760">44</text>
+                    <text x="64" y="77" text-anchor="middle" fill="#766d66" font-size="11" font-weight="650">epics</text>
+                  </svg>
+                  <div class="legend">
+                    <div class="legend-item"><span class="legend-key"><span class="swatch" style="background: var(--green);"></span>Green</span><strong>28</strong></div>
+                    <div class="legend-item"><span class="legend-key"><span class="swatch" style="background: var(--amber);"></span>Amber</span><strong>8</strong></div>
+                    <div class="legend-item"><span class="legend-key"><span class="swatch" style="background: var(--red);"></span>Red</span><strong>8</strong></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel-section" aria-labelledby="watch-title">
+                <h3 id="watch-title">Attention Queue</h3>
+                <div class="callout">
+                  <strong>3 amber epics are trending below the expected line.</strong>
+                  <p>Prioritize migration blockers where target-date variance is more than 20 percentage points.</p>
+                </div>
+              </section>
+
+              <section class="panel-section" aria-labelledby="activity-title">
+                <h3 id="activity-title">Recent Movement</h3>
+                <div class="timeline">
+                  <div class="timeline-item">
+                    <span class="timeline-dot">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m5 12 5 5L20 7"></path></svg>
+                    </span>
+                    <p class="timeline-copy"><strong>12 issues completed</strong>Across the current reporting period.</p>
+                  </div>
+                  <div class="timeline-item">
+                    <span class="timeline-dot">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20V4"></path><path d="m6 10 6-6 6 6"></path></svg>
+                    </span>
+                    <p class="timeline-copy"><strong>2 point delta</strong>OCI Vault Migration moved back on track.</p>
+                  </div>
+                  <div class="timeline-item">
+                    <span class="timeline-dot">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 8v5l3 3"></path><circle cx="12" cy="12" r="9"></circle></svg>
+                    </span>
+                    <p class="timeline-copy"><strong>31-May-2026 target</strong>Babylon remediation remains complete before date.</p>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </section>
+
+          <p class="footnote">Mockup only. Values mirror the supplied screenshot and are arranged for a Redwood Oracle JET implementation pattern.</p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -11,6 +11,7 @@ This directory contains product, architecture, plan, and design artifacts for Te
 
 ## Design Artifacts
 - [design/teambeacon-ojet-mockups.html](design/teambeacon-ojet-mockups.html): Oracle JET-oriented UI mockups for current TeamBeacon screens.
+- [design/redwood-ojet-dashboard.html](design/redwood-ojet-dashboard.html): focused Redwood Oracle JET dashboard mockup for Initiative Insights.
 
 ## Operations Runbooks
 - [ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI-specific smoke test for connectivity and chat execution (`INTELLIGENCE_PROVIDER=oci`).
