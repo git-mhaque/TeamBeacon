@@ -25,6 +25,8 @@ teambeacon.db-shm
 teambeacon.db-wal
 data/*
 !data/.gitkeep
+logs/*
+!logs/.gitkeep
 
 # macOS
 .DS_Store

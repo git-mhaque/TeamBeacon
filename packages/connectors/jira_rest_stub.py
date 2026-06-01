@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
+import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -23,6 +25,9 @@ from .models import (
 DEFAULT_STORY_POINTS_FIELD = "customfield_10016"
 DEFAULT_EPIC_LINK_FIELD = "customfield_10014"
 DEFAULT_SPRINT_FIELD_CANDIDATES = ("sprint", "customfield_10901", "customfield_10020")
+RETRYABLE_HTTP_STATUS_CODES = {429, 500, 502, 503, 504}
+RetryObserver = Callable[[dict[str, Any]], None]
+logger = logging.getLogger(__name__)
 
 
 class JiraAPIError(RuntimeError):
@@ -87,12 +92,14 @@ class JiraRestConnector(JiraConnector):
         story_points_field: str = DEFAULT_STORY_POINTS_FIELD,
         epic_link_field: str = DEFAULT_EPIC_LINK_FIELD,
         sprint_field_candidates: tuple[str, ...] = DEFAULT_SPRINT_FIELD_CANDIDATES,
+        retry_observer: RetryObserver | None = None,
     ) -> None:
         self.config = config
         self.project_key = project_key
         self.story_points_field = story_points_field
         self.epic_link_field = epic_link_field
         self.sprint_field_candidates = self._normalize_sprint_field_candidates(sprint_field_candidates)
+        self.retry_observer = retry_observer
 
     @staticmethod
     def _normalize_sprint_field_candidates(candidates: tuple[str, ...]) -> tuple[str, ...]:
@@ -125,22 +132,97 @@ class JiraRestConnector(JiraConnector):
             return {"Authorization": f"Basic {encoded}"}
         raise ValueError(f"unsupported auth_mode: {self.config.auth_mode}")
 
+    def _retry_delay_seconds(self, exc: HTTPError | None, retry_number: int) -> float:
+        if exc is not None:
+            retry_after = exc.headers.get("Retry-After") if exc.headers is not None else None
+            if retry_after:
+                try:
+                    return max(0.0, float(retry_after))
+                except ValueError:
+                    pass
+        backoff = max(0.0, float(self.config.retry_backoff_seconds))
+        return min(backoff * (2 ** max(0, retry_number - 1)), 30.0)
+
+    def _notify_retry(
+        self,
+        *,
+        path: str,
+        status_code: int | None,
+        reason: str,
+        attempt: int,
+        max_attempts: int,
+        delay_seconds: float,
+    ) -> None:
+        payload = {
+            "path": path,
+            "statusCode": status_code,
+            "reason": reason,
+            "attempt": attempt,
+            "maxAttempts": max_attempts,
+            "delaySeconds": delay_seconds,
+        }
+        logger.warning(
+            "JIRA request failed for %s with %s; retrying attempt %s/%s in %.2fs",
+            path,
+            status_code or reason,
+            attempt + 1,
+            max_attempts,
+            delay_seconds,
+        )
+        if self.retry_observer is None:
+            return
+        try:
+            self.retry_observer(payload)
+        except Exception:  # noqa: BLE001
+            return
+
     def _request_json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = self._build_url(path, params)
         headers = {"Accept": "application/json", **self._auth_headers()}
-        request = Request(url=url, headers=headers, method="GET")
-        try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-        except HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
-            raise JiraAPIError(
-                f"JIRA request failed with HTTP {exc.code}: {path}",
-                status_code=exc.code,
-                body=body,
-            ) from exc
-        except URLError as exc:
-            raise JiraAPIError(f"JIRA request failed for {path}: {exc}") from exc
+        retry_attempts = max(0, int(self.config.retry_attempts))
+        max_attempts = retry_attempts + 1
+        raw = ""
+        for attempt in range(1, max_attempts + 1):
+            request = Request(url=url, headers=headers, method="GET")
+            try:
+                with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                    raw = response.read().decode("utf-8")
+                break
+            except HTTPError as exc:
+                body = exc.read().decode("utf-8", errors="replace")
+                should_retry = exc.code in RETRYABLE_HTTP_STATUS_CODES and attempt < max_attempts
+                if not should_retry:
+                    attempt_suffix = f" after {attempt} attempts" if attempt > 1 else ""
+                    raise JiraAPIError(
+                        f"JIRA request failed with HTTP {exc.code}{attempt_suffix}: {path}",
+                        status_code=exc.code,
+                        body=body,
+                    ) from exc
+                delay_seconds = self._retry_delay_seconds(exc, attempt)
+                self._notify_retry(
+                    path=path,
+                    status_code=exc.code,
+                    reason=exc.reason,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    delay_seconds=delay_seconds,
+                )
+                time.sleep(delay_seconds)
+            except URLError as exc:
+                should_retry = attempt < max_attempts
+                if not should_retry:
+                    attempt_suffix = f" after {attempt} attempts" if attempt > 1 else ""
+                    raise JiraAPIError(f"JIRA request failed{attempt_suffix} for {path}: {exc}") from exc
+                delay_seconds = self._retry_delay_seconds(None, attempt)
+                self._notify_retry(
+                    path=path,
+                    status_code=None,
+                    reason=str(exc.reason),
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    delay_seconds=delay_seconds,
+                )
+                time.sleep(delay_seconds)
 
         if not raw:
             return {}
@@ -530,7 +612,7 @@ class JiraRestConnector(JiraConnector):
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
         payload = self._request_json(
             f"/rest/api/2/issue/{issue_key}",
-            params={"expand": "changelog"},
+            params={"expand": "changelog", "fields": "key"},
         )
         changelog = payload.get("changelog") or {}
         histories = changelog.get("histories") or []

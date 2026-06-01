@@ -44,6 +44,8 @@ class JiraRuntimeConfig:
     auth_mode: str = "pat_bearer"
     username: str | None = None
     timeout_seconds: int = 30
+    retry_attempts: int = 3
+    retry_backoff_seconds: float = 0.75
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> JiraRuntimeConfig:
@@ -59,6 +61,8 @@ class JiraRuntimeConfig:
 
         timeout_raw = source.get("JIRA_TIMEOUT_SECONDS", "30")
         timeout_seconds = int(timeout_raw)
+        retry_attempts = int(source.get("JIRA_RETRY_ATTEMPTS", "3"))
+        retry_backoff_seconds = float(source.get("JIRA_RETRY_BACKOFF_SECONDS", "0.75"))
 
         sprint_fields_value = source.get("JIRA_SPRINT_FIELDS", source.get("JIRA_SPRINT_FIELD"))
         if sprint_fields_value:
@@ -80,6 +84,8 @@ class JiraRuntimeConfig:
             auth_mode=source.get("JIRA_AUTH_MODE", "pat_bearer"),
             username=source.get("JIRA_USERNAME"),
             timeout_seconds=timeout_seconds,
+            retry_attempts=retry_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
         )
 
     def to_connector_config(self) -> ConnectorConfig:
@@ -89,4 +95,6 @@ class JiraRuntimeConfig:
             auth_mode=self.auth_mode,
             username=self.username,
             timeout_seconds=self.timeout_seconds,
+            retry_attempts=self.retry_attempts,
+            retry_backoff_seconds=self.retry_backoff_seconds,
         )

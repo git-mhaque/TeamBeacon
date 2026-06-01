@@ -10,10 +10,12 @@ services:
       - ./config/.env
     environment:
       TEAMBEACON_DB_PATH: /data/teambeacon.db
+      TEAMBEACON_LOG_DIR: /logs
       TEAMBEACON_HOST_PORT: ${TEAMBEACON_HOST_PORT:-18000}
       OCI_GENAI_CONFIG_FILE: ${OCI_GENAI_CONFIG_FILE:-/home/teambeacon/.oci/config}
     volumes:
       - ./data:/data
+      - ./logs:/logs
       - ${HOME}/.oci:/home/teambeacon/.oci:ro
       - ${HOME}/.oci:${HOME}/.oci:ro
     extra_hosts:

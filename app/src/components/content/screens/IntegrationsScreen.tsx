@@ -576,6 +576,22 @@ export function IntegrationsScreen() {
     return null;
   }, [syncError, jiraSyncStatus]);
 
+  const jiraSyncStepText = useMemo(() => {
+    if (!jiraSyncStatus || jiraSyncStatus.state !== "running") return null;
+    const currentStep = jiraSyncStatus.currentStep;
+    const totalSteps = jiraSyncStatus.totalSteps;
+    const stepLabel = jiraSyncStatus.stepLabel ?? "Syncing";
+    if (
+      typeof currentStep === "number"
+      && Number.isFinite(currentStep)
+      && typeof totalSteps === "number"
+      && Number.isFinite(totalSteps)
+    ) {
+      return `${stepLabel} (Step ${currentStep} of ${totalSteps})`;
+    }
+    return stepLabel;
+  }, [jiraSyncStatus]);
+
   const jiraSyncProgressSummary = useMemo(() => {
     if (syncError) return `Sync status error: ${syncError}`;
     if (!jiraSyncStatus) return "Sync not started.";
@@ -583,7 +599,7 @@ export function IntegrationsScreen() {
       return jiraSyncStatus.error ?? "Last sync failed.";
     }
     if (jiraSyncStatus.state === "running") {
-      return "In progress";
+      return jiraSyncStatus.message ?? jiraSyncStepText ?? "In progress";
     }
     if (jiraSyncStatus.state === "completed") {
       return "Sync complete.";
@@ -592,12 +608,12 @@ export function IntegrationsScreen() {
       return "Not currently syncing.";
     }
     return "Sync not started.";
-  }, [syncError, jiraSyncStatus]);
+  }, [syncError, jiraSyncStatus, jiraSyncStepText]);
 
   const jiraLastSyncedText = useMemo(() => formatCheckedAt(jiraSyncStatus?.lastSyncedAt), [jiraSyncStatus?.lastSyncedAt]);
 
   const showJiraSyncStatusPillInActions = Boolean(syncError || jiraSyncStatus?.state === "failed");
-  const showJiraSyncProgressNote = jiraSyncPercent !== null && jiraSyncProgressSummary !== "In progress";
+  const showJiraSyncProgressNote = jiraSyncProgressSummary !== "In progress";
 
   const jiraBaseUrl = jiraStatus?.config.baseUrl ? jiraStatus.config.baseUrl.replace(/\/$/, "") : null;
   const configuredBoard = jiraStatus?.configuredBoard;
@@ -654,6 +670,7 @@ export function IntegrationsScreen() {
                       <span>{jiraSyncStateText}</span>
                     </span>
                   ) : null}
+                  {jiraSyncStepText ? <span>{jiraSyncStepText}</span> : null}
                   {jiraSyncPercent !== null ? (
                     <>
                       <span

@@ -22,6 +22,8 @@ class ConnectorConfig:
     auth_mode: str = "pat_bearer"
     username: str | None = None
     timeout_seconds: int = 30
+    retry_attempts: int = 3
+    retry_backoff_seconds: float = 0.75
 
 
 class JiraConnector(ABC):

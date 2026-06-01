@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
-from packages.connectors.jira_rest_stub import JiraRestConnector
+from packages.connectors.jira_rest_stub import JiraAPIError, JiraRestConnector
 from packages.connectors.models import (
     BoardRecord,
     ChangelogItemRecord,
@@ -27,6 +27,27 @@ SyncMode = Literal["full", "since_last", "since_date"]
 SYNC_MODE_FULL: SyncMode = "full"
 SYNC_MODE_SINCE_LAST: SyncMode = "since_last"
 SYNC_MODE_SINCE_DATE: SyncMode = "since_date"
+SYNC_STEPS: dict[str, tuple[int, str]] = {
+    "initializing": (1, "Preparing sync"),
+    "board": (2, "Syncing board metadata"),
+    "releases": (3, "Syncing releases"),
+    "issues": (4, "Syncing issues and changelog"),
+    "sprints": (5, "Syncing sprints"),
+    "active_sprint": (6, "Reconciling active sprint"),
+    "done": (6, "Finalizing sync"),
+    "failed": (6, "Sync failed"),
+}
+SYNC_TOTAL_STEPS = 6
+TRANSIENT_JIRA_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+def _sync_step_payload(phase: str) -> dict[str, Any]:
+    current_step, step_label = SYNC_STEPS.get(phase, SYNC_STEPS["initializing"])
+    return {
+        "currentStep": current_step,
+        "totalSteps": SYNC_TOTAL_STEPS,
+        "stepLabel": step_label,
+    }
 
 
 def _utc_iso_now() -> str:
@@ -43,6 +64,34 @@ def _resolve_db_path() -> str:
     if configured:
         return configured
     return str(_repo_root() / "teambeacon.db")
+
+
+def _resolve_log_dir() -> Path:
+    configured = os.getenv("TEAMBEACON_LOG_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    return _repo_root() / "logs"
+
+
+def _sync_log_path(sync_run_id: int, started_at: str, board_id: int | None) -> Path:
+    timestamp_slug = re.sub(r"[^0-9A-Za-z]+", "-", started_at).strip("-")
+    board_slug = f"board-{board_id}" if board_id is not None else "board-unknown"
+    return _resolve_log_dir() / f"sync-{timestamp_slug}-run-{sync_run_id}-{board_slug}.log"
+
+
+def _write_sync_log(event: str, payload: dict[str, Any], log_path: Path | None = None) -> None:
+    try:
+        resolved_log_path = log_path or (_resolve_log_dir() / "sync.log")
+        resolved_log_path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {"timestamp": _utc_iso_now(), "event": event, **payload}
+        with resolved_log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(entry, separators=(",", ":"), ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001
+        return
+
+
+def _is_transient_jira_error(exc: Exception) -> bool:
+    return isinstance(exc, JiraAPIError) and exc.status_code in TRANSIENT_JIRA_STATUS_CODES
 
 
 def _migration_path() -> Path:
@@ -1089,13 +1138,53 @@ def _fetch_live_issue_keys_for_sprint(
     return {issue.issue_key for issue in _fetch_live_issues_for_sprint(connector, sprint_id)}
 
 
+def _sync_issue_changelog(
+    conn: sqlite3.Connection,
+    connector: JiraRestConnector,
+    issue_key: str,
+    *,
+    sync_log_path: Path | None,
+    sync_run_id: int | None,
+    board_id: int | None,
+    phase: str,
+) -> tuple[int, bool]:
+    try:
+        changelog_items = connector.get_issue_changelog(issue_key)
+    except Exception as exc:  # noqa: BLE001
+        if not _is_transient_jira_error(exc):
+            raise
+        _write_sync_log(
+            "changelog_skipped",
+            {
+                "syncRunId": sync_run_id,
+                "boardId": board_id,
+                "logFile": str(sync_log_path) if sync_log_path is not None else None,
+                "phase": phase,
+                "issueKey": issue_key,
+                "statusCode": getattr(exc, "status_code", None),
+                "error": str(exc),
+                "message": "Skipped changelog after transient JIRA failure; issue data was kept.",
+            },
+            sync_log_path,
+        )
+        return 0, True
+
+    _replace_issue_changelog(conn, issue_key, changelog_items)
+    return len(changelog_items), False
+
+
 def _sync_active_sprint_issues(
     conn: sqlite3.Connection,
     connector: JiraRestConnector,
     active_sprint_ids: list[int],
-) -> tuple[int, int, dict[int, set[str]]]:
+    *,
+    sync_log_path: Path | None = None,
+    sync_run_id: int | None = None,
+    board_id: int | None = None,
+) -> tuple[int, int, int, dict[int, set[str]]]:
     active_sprint_issues_hydrated = 0
     active_sprint_changelog_entries_synced = 0
+    active_sprint_changelog_failures = 0
     live_issue_keys_by_sprint: dict[int, set[str]] = {}
 
     for sprint_id in active_sprint_ids:
@@ -1139,14 +1228,24 @@ def _sync_active_sprint_issues(
 
         _upsert_issues(conn, issues_to_hydrate)
         for issue in issues_to_hydrate:
-            changelog_items = connector.get_issue_changelog(issue.issue_key)
-            _replace_issue_changelog(conn, issue.issue_key, changelog_items)
-            active_sprint_changelog_entries_synced += len(changelog_items)
+            changelog_count, changelog_failed = _sync_issue_changelog(
+                conn,
+                connector,
+                issue.issue_key,
+                sync_log_path=sync_log_path,
+                sync_run_id=sync_run_id,
+                board_id=board_id,
+                phase="active_sprint",
+            )
+            active_sprint_changelog_entries_synced += changelog_count
+            if changelog_failed:
+                active_sprint_changelog_failures += 1
         active_sprint_issues_hydrated += len(issues_to_hydrate)
 
     return (
         active_sprint_issues_hydrated,
         active_sprint_changelog_entries_synced,
+        active_sprint_changelog_failures,
         live_issue_keys_by_sprint,
     )
 
@@ -1352,13 +1451,27 @@ def run_jira_sync_once(
         else:
             effective_mode = SYNC_MODE_FULL
 
+    sync_run_id: int | None = None
+    sync_log_path: Path | None = None
+
     def emit(update: dict[str, Any]) -> None:
+        phase = str(update.get("phase") or "initializing")
+        update = {**_sync_step_payload(phase), **update}
+        log_payload = dict(update)
+        log_payload["boardId"] = runtime.board_id
+        log_payload["syncMode"] = effective_mode
+        log_payload["requestedSyncMode"] = requested_mode
+        log_payload["requestedSince"] = requested_since
+        if sync_run_id is not None:
+            log_payload["syncRunId"] = sync_run_id
+        if sync_log_path is not None:
+            log_payload["logFile"] = str(sync_log_path)
+        _write_sync_log("progress", log_payload, sync_log_path)
         if progress_callback is None:
             return
         progress_callback(update)
 
     conn = sqlite3.connect(resolved_db_path)
-    sync_run_id: int | None = None
     try:
         _ensure_schema(conn)
         _backfill_missing_sprint_external_ids(conn, runtime.sprint_field_candidates)
@@ -1375,6 +1488,31 @@ def run_jira_sync_once(
         )
         _upsert_checkpoint(conn, scope, status="running", error_message=None)
         conn.commit()
+        sync_log_path = _sync_log_path(sync_run_id, started_at, runtime.board_id)
+        _write_sync_log(
+            "started",
+            {
+                "syncRunId": sync_run_id,
+                "boardId": runtime.board_id,
+                "logFile": str(sync_log_path),
+                "syncMode": effective_mode,
+                "requestedSyncMode": requested_mode,
+                "requestedSince": requested_since,
+                "startedAt": started_at,
+            },
+            sync_log_path,
+        )
+        if hasattr(connector, "retry_observer"):
+            connector.retry_observer = lambda payload: _write_sync_log(
+                "jira_request_retry",
+                {
+                    "syncRunId": sync_run_id,
+                    "boardId": runtime.board_id,
+                    "logFile": str(sync_log_path),
+                    **payload,
+                },
+                sync_log_path,
+            )
 
         emit(
             {
@@ -1409,6 +1547,8 @@ def run_jira_sync_once(
         )
 
         release_versions_synced = 0
+        sprints: list[SprintRecord] = []
+        sprints_synced = 0
         project_key_for_versions = runtime.project_key or board.project_key
         version_fetcher = getattr(connector, "get_project_versions", None)
         if project_key_for_versions and callable(version_fetcher):
@@ -1441,36 +1581,9 @@ def run_jira_sync_once(
 
         emit(
             {
-                "phase": "sprints",
-                "boardsSynced": 1,
-                "sprintsSynced": 0,
-                "downloadedIssues": 0,
-                "totalIssues": None,
-                "percent": None,
-                "message": f"Syncing sprints for board {runtime.board_id}.",
-            }
-        )
-        sprints = connector.get_sprints(runtime.board_id)
-        _upsert_sprints(conn, sprints)
-        _update_sync_run(conn, sync_run_id, sprints_synced=len(sprints))
-        conn.commit()
-        emit(
-            {
-                "phase": "sprints",
-                "boardsSynced": 1,
-                "sprintsSynced": len(sprints),
-                "downloadedIssues": 0,
-                "totalIssues": None,
-                "percent": None,
-                "message": f"{len(sprints)} sprints synced for board {runtime.board_id}.",
-            }
-        )
-
-        emit(
-            {
                 "phase": "issues",
                 "boardsSynced": 1,
-                "sprintsSynced": len(sprints),
+                "sprintsSynced": sprints_synced,
                 "downloadedIssues": 0,
                 "totalIssues": None,
                 "percent": None,
@@ -1486,10 +1599,12 @@ def run_jira_sync_once(
         )
         downloaded = 0
         changelog_entries_synced = 0
+        changelog_failures = 0
         total_issues: int | None = None
         stale_sprint_links_cleared = 0
         active_sprint_issues_hydrated = 0
         active_sprint_changelog_entries_synced = 0
+        active_sprint_changelog_failures = 0
         if incremental_since_utc is not None:
             count_incremental = getattr(connector, "count_incremental_issues", None)
             if callable(count_incremental):
@@ -1520,9 +1635,18 @@ def run_jira_sync_once(
 
             _upsert_issues(conn, issues)
             for index, issue in enumerate(issues, start=1):
-                changelog_items = connector.get_issue_changelog(issue.issue_key)
-                _replace_issue_changelog(conn, issue.issue_key, changelog_items)
-                changelog_entries_synced += len(changelog_items)
+                changelog_count, changelog_failed = _sync_issue_changelog(
+                    conn,
+                    connector,
+                    issue.issue_key,
+                    sync_log_path=sync_log_path,
+                    sync_run_id=sync_run_id,
+                    board_id=runtime.board_id,
+                    phase="issues",
+                )
+                changelog_entries_synced += changelog_count
+                if changelog_failed:
+                    changelog_failures += 1
                 current_downloaded = downloaded + index
                 if index % 10 == 0 or index == len(issues):
                     _update_sync_run(
@@ -1537,7 +1661,7 @@ def run_jira_sync_once(
                         {
                             "phase": "issues",
                             "boardsSynced": 1,
-                            "sprintsSynced": len(sprints),
+                            "sprintsSynced": sprints_synced,
                             "downloadedIssues": current_downloaded,
                             "totalIssues": total_issues,
                             "percent": percent,
@@ -1549,6 +1673,11 @@ def run_jira_sync_once(
                                     f"{current_downloaded} issues downloaded; "
                                     f"{changelog_entries_synced} changelog events synced"
                                 )
+                            )
+                            + (
+                                f"; {changelog_failures} changelog fetches skipped"
+                                if changelog_failures
+                                else ""
                             ),
                         }
                     )
@@ -1567,20 +1696,64 @@ def run_jira_sync_once(
                 break
             start_at = int(batch.next_cursor)
 
+        emit(
+            {
+                "phase": "sprints",
+                "boardsSynced": 1,
+                "sprintsSynced": 0,
+                "downloadedIssues": downloaded,
+                "totalIssues": total_issues,
+                "percent": _safe_percent(downloaded, total_issues),
+                "message": f"Syncing sprints for board {runtime.board_id}.",
+            }
+        )
+        sprints = connector.get_sprints(runtime.board_id)
+        sprints_synced = len(sprints)
+        _upsert_sprints(conn, sprints)
+        _update_sync_run(conn, sync_run_id, sprints_synced=sprints_synced)
+        conn.commit()
+        emit(
+            {
+                "phase": "sprints",
+                "boardsSynced": 1,
+                "sprintsSynced": sprints_synced,
+                "downloadedIssues": downloaded,
+                "totalIssues": total_issues,
+                "percent": _safe_percent(downloaded, total_issues),
+                "message": f"{sprints_synced} sprints synced for board {runtime.board_id}.",
+            }
+        )
+
         active_sprint_ids = _active_sprint_ids(sprints)
         live_issue_keys_by_sprint: dict[int, set[str]] | None = None
         if active_sprint_ids:
+            emit(
+                {
+                    "phase": "active_sprint",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": f"Reconciling {len(active_sprint_ids)} active sprint(s).",
+                }
+            )
             (
                 active_sprint_issues_hydrated,
                 active_sprint_changelog_entries_synced,
+                active_sprint_changelog_failures,
                 live_issue_keys_by_sprint,
             ) = _sync_active_sprint_issues(
                 conn,
                 connector,
                 active_sprint_ids,
+                sync_log_path=sync_log_path,
+                sync_run_id=sync_run_id,
+                board_id=runtime.board_id,
             )
             if active_sprint_issues_hydrated > 0:
                 changelog_entries_synced += active_sprint_changelog_entries_synced
+                changelog_failures += active_sprint_changelog_failures
                 _update_sync_run(
                     conn,
                     sync_run_id,
@@ -1590,15 +1763,20 @@ def run_jira_sync_once(
                 conn.commit()
                 emit(
                     {
-                        "phase": "issues",
+                        "phase": "active_sprint",
                         "boardsSynced": 1,
-                        "sprintsSynced": len(sprints),
+                        "sprintsSynced": sprints_synced,
                         "downloadedIssues": downloaded,
                         "totalIssues": total_issues,
                         "percent": _safe_percent(downloaded, total_issues),
                         "message": (
                             f"Hydrated {active_sprint_issues_hydrated} active sprint issues; "
                             f"{changelog_entries_synced} changelog events synced"
+                        )
+                        + (
+                            f"; {changelog_failures} changelog fetches skipped"
+                            if changelog_failures
+                            else ""
                         ),
                     }
                 )
@@ -1610,6 +1788,31 @@ def run_jira_sync_once(
                 live_issue_keys_by_sprint=live_issue_keys_by_sprint,
             )
             conn.commit()
+            emit(
+                {
+                    "phase": "active_sprint",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": (
+                        f"Active sprint reconcile complete; cleared {stale_sprint_links_cleared} stale links."
+                    ),
+                }
+            )
+        else:
+            emit(
+                {
+                    "phase": "active_sprint",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": "No active sprints found to reconcile.",
+                }
+            )
 
         if total_issues is None:
             total_issues = downloaded
@@ -1633,7 +1836,7 @@ def run_jira_sync_once(
         )
         conn.commit()
 
-        return {
+        result = {
             "source": "jira",
             "state": "completed",
             "phase": "done",
@@ -1642,6 +1845,7 @@ def run_jira_sync_once(
             "downloadedIssues": downloaded,
             "totalIssues": total_issues,
             "percent": _safe_percent(downloaded, total_issues),
+            **_sync_step_payload("done"),
             "finishedAt": completed_at,
             "lastSyncedAt": completed_at,
             "syncMode": effective_mode,
@@ -1651,13 +1855,33 @@ def run_jira_sync_once(
             "staleSprintLinksCleared": stale_sprint_links_cleared,
             "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
             "activeSprintChangelogEntriesSynced": active_sprint_changelog_entries_synced,
+            "changelogFailures": changelog_failures,
+            "activeSprintChangelogFailures": active_sprint_changelog_failures,
             "error": None,
             "message": (
-                "Sync complete."
-                if active_sprint_issues_hydrated <= 0
-                else f"Sync complete. Hydrated {active_sprint_issues_hydrated} active sprint issues."
+                (
+                    "Sync complete."
+                    if active_sprint_issues_hydrated <= 0
+                    else f"Sync complete. Hydrated {active_sprint_issues_hydrated} active sprint issues."
+                )
+                + (
+                    f" Skipped changelog for {changelog_failures} issue(s) after transient JIRA failures."
+                    if changelog_failures
+                    else ""
+                )
             ),
         }
+        _write_sync_log(
+            "completed",
+            {
+                "syncRunId": sync_run_id,
+                "boardId": runtime.board_id,
+                "logFile": str(sync_log_path) if sync_log_path is not None else None,
+                **result,
+            },
+            sync_log_path,
+        )
+        return result
     except Exception as exc:  # noqa: BLE001
         try:
             if sync_run_id is not None:
@@ -1672,6 +1896,19 @@ def run_jira_sync_once(
             conn.commit()
         except Exception:  # noqa: BLE001
             pass
+        _write_sync_log(
+            "failed",
+            {
+                "syncRunId": sync_run_id,
+                "boardId": runtime.board_id,
+                "logFile": str(sync_log_path) if sync_log_path is not None else None,
+                "syncMode": effective_mode,
+                "requestedSyncMode": requested_mode,
+                "requestedSince": requested_since,
+                "error": str(exc),
+            },
+            sync_log_path,
+        )
         raise
     finally:
         conn.close()
@@ -1698,6 +1935,9 @@ class JiraSyncManager:
             "downloadedIssues": 0,
             "totalIssues": None,
             "percent": None,
+            "currentStep": 1,
+            "totalSteps": SYNC_TOTAL_STEPS,
+            "stepLabel": SYNC_STEPS["initializing"][1],
             "startedAt": None,
             "finishedAt": None,
             "lastSyncedAt": None,
@@ -1720,6 +1960,9 @@ class JiraSyncManager:
             )
             self._state["totalIssues"] = update.get("totalIssues", self._state["totalIssues"])
             self._state["percent"] = update.get("percent", self._state["percent"])
+            self._state["currentStep"] = update.get("currentStep", self._state["currentStep"])
+            self._state["totalSteps"] = update.get("totalSteps", self._state["totalSteps"])
+            self._state["stepLabel"] = update.get("stepLabel", self._state["stepLabel"])
             self._state["message"] = update.get("message", self._state["message"])
             self._state["error"] = None
 
@@ -1762,6 +2005,7 @@ class JiraSyncManager:
             mapped_state = mapped_status if mapped_status in {"running", "completed", "failed"} else "idle"
             phase = "issues" if mapped_state == "running" else ("done" if mapped_state == "completed" else "failed" if mapped_state == "failed" else "idle")
             message = "Sync complete." if mapped_state == "completed" else ("JIRA sync failed." if mapped_state == "failed" else "Idle")
+            step_payload = _sync_step_payload(phase)
 
             state.update(
                 {
@@ -1777,6 +2021,7 @@ class JiraSyncManager:
                         int(latest_run.get("issuesSynced") or 0),
                         int(latest_run["totalIssues"]) if latest_run.get("totalIssues") is not None else None,
                     ),
+                    **step_payload,
                     "startedAt": latest_run.get("startedAt"),
                     "finishedAt": latest_run.get("finishedAt"),
                     "error": latest_run.get("error"),
@@ -1800,6 +2045,9 @@ class JiraSyncManager:
                         "downloadedIssues": state.get("downloadedIssues", self._state["downloadedIssues"]),
                         "totalIssues": state.get("totalIssues", self._state["totalIssues"]),
                         "percent": state.get("percent", self._state["percent"]),
+                        "currentStep": state.get("currentStep", self._state["currentStep"]),
+                        "totalSteps": state.get("totalSteps", self._state["totalSteps"]),
+                        "stepLabel": state.get("stepLabel", self._state["stepLabel"]),
                         "startedAt": state.get("startedAt", self._state["startedAt"]),
                         "finishedAt": state.get("finishedAt", self._state["finishedAt"]),
                         "lastSyncedAt": state.get("lastSyncedAt", self._state["lastSyncedAt"]),
@@ -1851,6 +2099,7 @@ class JiraSyncManager:
                     "downloadedIssues": 0,
                     "totalIssues": None,
                     "percent": None,
+                    **_sync_step_payload("initializing"),
                     "startedAt": started_at,
                     "finishedAt": None,
                     "error": None,
@@ -1889,6 +2138,7 @@ class JiraSyncManager:
                         "boardsSynced": self._state.get("boardsSynced", 0),
                         "sprintsSynced": self._state.get("sprintsSynced", 0),
                         "finishedAt": failed_at,
+                        **_sync_step_payload("failed"),
                         "error": str(exc),
                         "message": "JIRA sync failed.",
                     }
@@ -1907,6 +2157,7 @@ class JiraSyncManager:
                     "downloadedIssues": result.get("downloadedIssues", 0),
                     "totalIssues": result.get("totalIssues"),
                     "percent": result.get("percent"),
+                    **_sync_step_payload(str(result.get("phase", "done"))),
                     "finishedAt": result.get("finishedAt"),
                     "lastSyncedAt": result.get("lastSyncedAt"),
                     "error": result.get("error"),

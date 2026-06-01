@@ -2,6 +2,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+LOG_DIR="${TEAMBEACON_LOG_DIR:-${REPO_ROOT}/logs}"
+API_LOG="${LOG_DIR}/api.log"
+APP_LOG="${LOG_DIR}/app.log"
+
+mkdir -p "${LOG_DIR}"
+printf '\n[%s] Starting TeamBeacon dev API\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${API_LOG}"
+printf '\n[%s] Starting TeamBeacon frontend dev server\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${APP_LOG}"
+echo "Writing API logs to ${API_LOG}"
+echo "Writing frontend logs to ${APP_LOG}"
 
 kill_port_listeners() {
   local port="$1"
@@ -46,17 +56,40 @@ kill_port_listeners 5174
 ensure_port_free 8000
 ensure_port_free 5174
 
-"${SCRIPT_DIR}/run-api.sh" &
-API_PID=$!
+API_PID=""
+FRONTEND_PID=""
 
-cleanup() {
-  if kill -0 "${API_PID}" >/dev/null 2>&1; then
-    kill "${API_PID}" >/dev/null 2>&1 || true
-    wait "${API_PID}" 2>/dev/null || true
+terminate_process() {
+  local name="$1"
+  local pid="$2"
+
+  if [ -z "${pid}" ]; then
+    return
+  fi
+
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    echo "Stopping ${name} process: ${pid}"
+    kill "${pid}" >/dev/null 2>&1 || true
+    wait "${pid}" 2>/dev/null || true
   fi
 }
 
-trap cleanup EXIT INT TERM
+cleanup() {
+  local status="${1:-$?}"
+  trap - EXIT INT TERM
+  terminate_process "frontend" "${FRONTEND_PID}"
+  terminate_process "API" "${API_PID}"
+  kill_port_listeners 5174
+  kill_port_listeners 8000
+  exit "${status}"
+}
+
+trap 'cleanup $?' EXIT
+trap 'cleanup 130' INT
+trap 'cleanup 143' TERM
+
+"${SCRIPT_DIR}/run-api.sh" >> "${API_LOG}" 2>&1 &
+API_PID=$!
 
 wait_for_api() {
   local retries=40
@@ -81,4 +114,7 @@ wait_for_api() {
 }
 
 wait_for_api
-npm run dev:web
+npm run dev:web >> "${APP_LOG}" 2>&1 &
+FRONTEND_PID=$!
+
+wait "${FRONTEND_PID}"

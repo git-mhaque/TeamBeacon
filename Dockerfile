@@ -17,6 +17,7 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TEAMBEACON_DB_PATH=/data/teambeacon.db \
+    TEAMBEACON_LOG_DIR=/logs \
     TEAMBEACON_HOST=0.0.0.0 \
     TEAMBEACON_PORT=8000 \
     TEAMBEACON_WEB_DIR=/app/app/web \
@@ -37,12 +38,12 @@ COPY --from=frontend-builder /build/app/web /app/app/web
 COPY docker/entrypoint.sh /usr/local/bin/teambeacon-entrypoint.sh
 
 RUN chmod +x /usr/local/bin/teambeacon-entrypoint.sh \
-    && mkdir -p /data /home/teambeacon/.oci \
-    && chown -R teambeacon:teambeacon /app /data /home/teambeacon
+    && mkdir -p /data /logs /home/teambeacon/.oci \
+    && chown -R teambeacon:teambeacon /app /data /logs /home/teambeacon
 
 USER teambeacon
 
 EXPOSE 8000
-VOLUME ["/data"]
+VOLUME ["/data", "/logs"]
 
 ENTRYPOINT ["/usr/local/bin/teambeacon-entrypoint.sh"]

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
+import os
+import re
 import sqlite3
 import tempfile
 import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-import re
 
 from packages.connectors.jira_config import JiraRuntimeConfig
+from packages.connectors.jira_rest_stub import JiraAPIError
 from packages.connectors.models import (
     ChangelogItemRecord,
     BoardRecord,
@@ -286,7 +289,29 @@ class _IncrementalMissingActiveIssueConnectorStub(_SuccessfulConnectorStub):
         return [], SyncBatch(next_cursor=None, has_more=False)
 
 
+class _TransientChangelogFailureConnectorStub(_SuccessfulConnectorStub):
+    def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
+        if issue_key == "CEGBUPOL-2":
+            raise JiraAPIError(
+                "JIRA request failed with HTTP 503 after 4 attempts: /rest/api/2/issue/CEGBUPOL-2",
+                status_code=503,
+            )
+        return super().get_issue_changelog(issue_key)
+
+
 class JiraSyncServiceUnitTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._previous_log_dir = os.environ.get("TEAMBEACON_LOG_DIR")
+        self._log_dir = tempfile.TemporaryDirectory()
+        os.environ["TEAMBEACON_LOG_DIR"] = self._log_dir.name
+
+    def tearDown(self) -> None:
+        if self._previous_log_dir is None:
+            os.environ.pop("TEAMBEACON_LOG_DIR", None)
+        else:
+            os.environ["TEAMBEACON_LOG_DIR"] = self._previous_log_dir
+        self._log_dir.cleanup()
+
     def _runtime(self) -> JiraRuntimeConfig:
         return JiraRuntimeConfig(
             base_url="https://jira.example.com",
@@ -388,6 +413,97 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(run_history[4], 1)
             self.assertEqual(run_history[5], 2)
             self.assertEqual(run_history[6], "completed")
+
+    def test_run_sync_writes_separate_step_log_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=self._runtime(),
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            log_files = sorted(Path(self._log_dir.name).glob("sync-*.log"))
+            self.assertEqual(len(log_files), 1)
+            self.assertIn("-run-1-board-27193", log_files[0].name)
+
+            entries = [
+                json.loads(line)
+                for line in log_files[0].read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            events = [entry["event"] for entry in entries]
+            phases = [entry.get("phase") for entry in entries if entry.get("event") == "progress"]
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertIn("started", events)
+            self.assertIn("progress", events)
+            self.assertIn("completed", events)
+            self.assertIn("board", phases)
+            self.assertIn("releases", phases)
+            self.assertIn("sprints", phases)
+            self.assertIn("issues", phases)
+            self.assertIn("active_sprint", phases)
+            self.assertLess(phases.index("issues"), phases.index("sprints"))
+            self.assertTrue(all(entry.get("syncRunId") == 1 for entry in entries))
+            self.assertTrue(all(entry.get("logFile") == str(log_files[0]) for entry in entries))
+            self.assertTrue(all(entry.get("totalSteps") == 6 for entry in entries if entry["event"] == "progress"))
+
+    def test_run_sync_continues_when_changelog_fetch_has_transient_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=self._runtime(),
+                connector=_TransientChangelogFailureConnectorStub(),
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertEqual(summary["downloadedIssues"], 2)
+            self.assertEqual(summary["changelogFailures"], 1)
+            self.assertIn("Skipped changelog", str(summary["message"]))
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                issue_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+                changelog_count = conn.execute("SELECT COUNT(*) FROM issue_changelog").fetchone()[0]
+                skipped_issue_changelog = conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM issue_changelog
+                    WHERE issue_key = 'CEGBUPOL-2'
+                    """
+                ).fetchone()[0]
+                run_status = conn.execute(
+                    """
+                    SELECT status
+                    FROM sync_run_history
+                    WHERE source_type = 'jira'
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertEqual(issue_count, 2)
+            self.assertEqual(changelog_count, 2)
+            self.assertEqual(skipped_issue_changelog, 0)
+            self.assertEqual(run_status, "completed")
+
+            log_files = sorted(Path(self._log_dir.name).glob("sync-*.log"))
+            self.assertEqual(len(log_files), 1)
+            entries = [
+                json.loads(line)
+                for line in log_files[0].read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            skipped_entries = [entry for entry in entries if entry.get("event") == "changelog_skipped"]
+            self.assertEqual(len(skipped_entries), 1)
+            self.assertEqual(skipped_entries[0]["issueKey"], "CEGBUPOL-2")
+            self.assertEqual(skipped_entries[0]["statusCode"], 503)
 
     def test_run_sync_reconciles_active_sprint_membership_without_hard_delete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

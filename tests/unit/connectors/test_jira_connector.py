@@ -1,12 +1,38 @@
 from __future__ import annotations
 
 import unittest
+from io import BytesIO
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 from unittest.mock import patch
 
 from packages.connectors.interfaces import ConnectorConfig
-from packages.connectors.jira_rest_stub import JiraRestConnector
+from packages.connectors.jira_rest_stub import JiraAPIError, JiraRestConnector
 from packages.connectors.models import SyncBatch
+
+
+class _FakeHttpResponse:
+    def __init__(self, payload: bytes) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> _FakeHttpResponse:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        return None
+
+    def read(self) -> bytes:
+        return self._payload
+
+
+def _http_error(status_code: int, reason: str = "Service Unavailable") -> HTTPError:
+    return HTTPError(
+        url="https://jira.example.com/rest/api/2/search",
+        code=status_code,
+        msg=reason,
+        hdrs={},
+        fp=BytesIO(b'{"errorMessages":["temporary outage"]}'),
+    )
 
 
 class JiraConnectorUnitTests(unittest.TestCase):
@@ -261,6 +287,17 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertEqual(changes[0].to_value, "In Progress")
         self.assertEqual(changes[1].field_name, "assignee")
 
+    def test_get_issue_changelog_limits_issue_fields(self) -> None:
+        payload = {"changelog": {"histories": []}}
+        with patch.object(self.connector, "_request_json", return_value=payload) as mocked:
+            self.connector.get_issue_changelog("CEGBUPOL-101")
+
+        self.assertEqual(mocked.call_args.args[0], "/rest/api/2/issue/CEGBUPOL-101")
+        self.assertEqual(
+            mocked.call_args.kwargs["params"],
+            {"expand": "changelog", "fields": "key"},
+        )
+
     def test_get_board_issues_maps_payload(self) -> None:
         payload = {
             "startAt": 0,
@@ -340,6 +377,57 @@ class JiraConnectorUnitTests(unittest.TestCase):
         headers = connector._auth_headers()
         self.assertIn("Authorization", headers)
         self.assertTrue(headers["Authorization"].startswith("Basic "))
+
+    def test_request_json_retries_transient_http_errors(self) -> None:
+        retry_events: list[dict[str, object]] = []
+        connector = JiraRestConnector(
+            config=ConnectorConfig(
+                base_url="https://jira.example.com",
+                pat_token="token-123",
+                retry_attempts=2,
+                retry_backoff_seconds=0,
+            ),
+            retry_observer=retry_events.append,
+        )
+
+        with (
+            patch(
+                "packages.connectors.jira_rest_stub.urlopen",
+                side_effect=[
+                    _http_error(503),
+                    _FakeHttpResponse(b'{"ok": true}'),
+                ],
+            ) as mocked_urlopen,
+            patch("packages.connectors.jira_rest_stub.time.sleep") as mocked_sleep,
+        ):
+            payload = connector._request_json("/rest/agile/1.0/board/27193")
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(mocked_urlopen.call_count, 2)
+        mocked_sleep.assert_called_once_with(0.0)
+        self.assertEqual(len(retry_events), 1)
+        self.assertEqual(retry_events[0]["statusCode"], 503)
+        self.assertEqual(retry_events[0]["path"], "/rest/agile/1.0/board/27193")
+
+    def test_request_json_does_not_retry_non_transient_http_errors(self) -> None:
+        connector = JiraRestConnector(
+            config=ConnectorConfig(
+                base_url="https://jira.example.com",
+                pat_token="token-123",
+                retry_attempts=2,
+                retry_backoff_seconds=0,
+            )
+        )
+
+        with (
+            patch("packages.connectors.jira_rest_stub.urlopen", side_effect=_http_error(404)) as mocked_urlopen,
+            patch("packages.connectors.jira_rest_stub.time.sleep") as mocked_sleep,
+        ):
+            with self.assertRaises(JiraAPIError):
+                connector._request_json("/rest/api/2/issue/MISSING-1")
+
+        self.assertEqual(mocked_urlopen.call_count, 1)
+        mocked_sleep.assert_not_called()
 
 
 if __name__ == "__main__":
