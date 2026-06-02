@@ -685,23 +685,45 @@ export function IntegrationsScreen() {
     return "Sync not started.";
   }, [syncError, jiraSyncStatus, jiraSyncStepLabel]);
 
-  const showJiraIssueProgress = useMemo(() => {
+  const hasJiraIssueProgressPercent = useMemo(() => {
     return Boolean(
       jiraSyncStatus?.state === "running"
       && jiraSyncStatus.phase === "issues"
       && jiraSyncPercent !== null
-      && typeof jiraSyncStatus.totalIssues === "number"
-      && jiraSyncStatus.totalIssues > 0,
     );
   }, [jiraSyncPercent, jiraSyncStatus]);
+
+  const showJiraIssueActivity = useMemo(() => {
+    return Boolean(
+      jiraSyncStatus?.state === "running"
+      && jiraSyncStatus.phase === "issues"
+      && !syncError,
+    );
+  }, [jiraSyncStatus, syncError]);
 
   const jiraIssueProgressText = useMemo(() => {
     if (!jiraSyncStatus) return null;
     const downloaded = jiraSyncStatus.downloadedIssues ?? 0;
     if (typeof jiraSyncStatus.totalIssues === "number" && jiraSyncStatus.totalIssues > 0) {
-      return `${downloaded} of ${jiraSyncStatus.totalIssues} issues synced`;
+      return `${downloaded} of ${jiraSyncStatus.totalIssues} issues downloaded`;
     }
-    if (downloaded > 0) return `${downloaded} issues synced`;
+    if (downloaded > 0) return `${downloaded} issues downloaded`;
+    return null;
+  }, [jiraSyncStatus]);
+
+  const jiraCandidateProgressText = useMemo(() => {
+    if (!jiraSyncStatus) return null;
+    const checked = jiraSyncStatus.candidateIssues;
+    const total = jiraSyncStatus.candidateTotalIssues;
+    if (
+      typeof checked === "number"
+      && Number.isFinite(checked)
+      && typeof total === "number"
+      && Number.isFinite(total)
+      && total > 0
+    ) {
+      return `${checked} of ${total} candidates checked`;
+    }
     return null;
   }, [jiraSyncStatus]);
 
@@ -720,11 +742,24 @@ export function IntegrationsScreen() {
   const jiraSyncMessageText = useMemo(() => {
     if (syncError) return jiraSyncProgressSummary;
     if (jiraSyncStatus?.state === "running") {
-      if (showJiraIssueProgress) return jiraSkippedChangelogText;
+      if (showJiraIssueActivity) {
+        return jiraSkippedChangelogText ?? (
+          jiraIssueProgressText || jiraChangelogText || jiraCandidateProgressText ? null : jiraSyncProgressSummary
+        );
+      }
       return jiraSyncProgressSummary;
     }
     return null;
-  }, [jiraSkippedChangelogText, jiraSyncProgressSummary, jiraSyncStatus, showJiraIssueProgress, syncError]);
+  }, [
+    jiraChangelogText,
+    jiraCandidateProgressText,
+    jiraIssueProgressText,
+    jiraSkippedChangelogText,
+    jiraSyncProgressSummary,
+    jiraSyncStatus,
+    showJiraIssueActivity,
+    syncError,
+  ]);
 
   const jiraLastSyncedText = useMemo(() => formatCheckedAt(jiraSyncStatus?.lastSyncedAt), [jiraSyncStatus?.lastSyncedAt]);
 
@@ -890,24 +925,31 @@ export function IntegrationsScreen() {
                   </div>
                 ) : null}
 
-                {showJiraIssueProgress && jiraSyncPercent !== null ? (
+                {showJiraIssueActivity ? (
                   <div class="tb-sync-measured-progress">
                     <div class="tb-sync-progress-meta">
                       {jiraIssueProgressText ? <span>{jiraIssueProgressText}</span> : null}
                       {jiraChangelogText ? <span>{jiraChangelogText}</span> : null}
+                      {jiraCandidateProgressText ? <span>{jiraCandidateProgressText}</span> : null}
                     </div>
                     <div class="tb-sync-progress-line">
                       <span
-                        class="tb-sync-progress-track"
+                        class={`tb-sync-progress-track${hasJiraIssueProgressPercent ? "" : " is-indeterminate"}`}
                         role="progressbar"
                         aria-label="JIRA issue sync progress"
                         aria-valuemin={0}
                         aria-valuemax={100}
-                        aria-valuenow={jiraSyncPercent}
+                        aria-valuenow={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? jiraSyncPercent : undefined}
+                        aria-valuetext={hasJiraIssueProgressPercent ? undefined : "In progress"}
                       >
-                        <span class="tb-sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
+                        <span
+                          class="tb-sync-progress-fill"
+                          style={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? { width: `${jiraSyncPercent}%` } : undefined}
+                        />
                       </span>
-                      <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                      {hasJiraIssueProgressPercent && jiraSyncPercent !== null ? (
+                        <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}

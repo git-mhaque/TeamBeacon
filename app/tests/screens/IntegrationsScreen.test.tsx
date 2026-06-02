@@ -297,7 +297,7 @@ describe("IntegrationsScreen", () => {
     expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
     expect(within(syncActionRegion).getByText("Syncing")).toBeInTheDocument();
     expect(screen.getByText("Step 4 of 6: Issues and changelog")).toBeInTheDocument();
-    expect(screen.getByText("10 of 39 issues synced")).toBeInTheDocument();
+    expect(screen.getByText("10 of 39 issues downloaded")).toBeInTheDocument();
     expect(screen.getByText("155 changelog events captured")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "JIRA issue sync progress" })).toHaveAttribute("aria-valuenow", "25.6");
     expect(screen.getByRole("button", { name: "Sync Data" })).toBeDisabled();
@@ -371,6 +371,78 @@ describe("IntegrationsScreen", () => {
 
     expect(await screen.findByText(`Syncing issues updated since ${expectedLabel}.`)).toBeInTheDocument();
     expect(screen.queryByText(/02:33 UTC/)).not.toBeInTheDocument();
+  });
+
+  it("shows candidate percentage while total issue count is unknown", async () => {
+    setupFetchMock({
+      "/api/integrations/jira/status": {
+        source: "jira",
+        connected: true,
+        checkedAt: "2026-06-02T03:30:47Z",
+        config: { projectKey: "CEG", boardId: 42 },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "project", ok: true, detail: "resolved" },
+        ],
+      },
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
+        connected: true,
+        checkedAt: "2026-06-02T03:30:47Z",
+        config: { modelId: "gemma4:e2b", baseUrl: "http://127.0.0.1:11434" },
+        checks: [
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-06-02T03:30:47Z",
+        config: { baseUrl: "https://gbuconfluence.oraclecorp.com" },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/jira/sync/status": {
+        source: "jira",
+        state: "running",
+        phase: "issues",
+        syncMode: "since_last",
+        downloadedIssues: 50,
+        totalIssues: null,
+        candidateIssues: 80,
+        candidateTotalIssues: 160,
+        percent: 50,
+        currentStep: 4,
+        totalSteps: 6,
+        stepLabel: "Syncing issues and changelog",
+        message: "50 issues downloaded; 704 changelog events synced",
+        lastSyncedAt: "2026-06-02T03:30:23Z",
+      },
+      "/api/integrations/jira/sync/history": {
+        source: "jira",
+        history: [],
+      },
+      "/api/metadata/lookup": {
+        groups: [],
+        workTypes: [],
+      },
+    });
+
+    render(<IntegrationsScreen />);
+
+    expect(await screen.findByText("50 issues downloaded")).toBeInTheDocument();
+    expect(screen.getByText("704 changelog events captured")).toBeInTheDocument();
+    expect(screen.getByText("80 of 160 candidates checked")).toBeInTheDocument();
+    const issueProgress = screen.getByRole("progressbar", { name: "JIRA issue sync progress" });
+    expect(issueProgress).toHaveAttribute("aria-valuenow", "50");
+    expect(issueProgress).not.toHaveAttribute("aria-valuetext");
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.queryByText("50 issues downloaded; 704 changelog events synced")).not.toBeInTheDocument();
   });
 
   it("does not label completed since-last totals as changed without candidate metadata", async () => {

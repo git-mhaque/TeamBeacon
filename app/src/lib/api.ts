@@ -128,6 +128,7 @@ export type JiraSyncStatus = {
   downloadedIssues: number;
   totalIssues?: number | null;
   candidateIssues?: number | null;
+  candidateTotalIssues?: number | null;
   percent?: number | null;
   currentStep?: number | null;
   totalSteps?: number | null;

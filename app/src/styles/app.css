@@ -2063,6 +2063,12 @@ body {
   background: linear-gradient(90deg, #2f7bd8 0%, #0f60c9 100%);
 }
 
+.tb-sync-progress-track.is-indeterminate .tb-sync-progress-fill {
+  width: 42%;
+  min-width: 4rem;
+  animation: tb-sync-indeterminate 1.35s ease-in-out infinite;
+}
+
 .tb-sync-progress-percent {
   color: #365985;
   font-size: 0.74rem;
@@ -2566,6 +2572,18 @@ body {
 @keyframes tb-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes tb-sync-indeterminate {
+  0% {
+    transform: translateX(-115%);
+  }
+  45% {
+    transform: translateX(35%);
+  }
+  100% {
+    transform: translateX(245%);
+  }
 }
 
 @keyframes tb-toast-rise {

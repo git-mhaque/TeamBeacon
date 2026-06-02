@@ -293,6 +293,11 @@ class _IncrementalOverlapCandidateConnectorStub(_SuccessfulConnectorStub):
     def __init__(self) -> None:
         super().__init__()
         self.changelog_issue_keys: list[str] = []
+        self.count_cursor: datetime | None = None
+
+    def count_incremental_issues(self, updated_since: datetime | None) -> int | None:
+        self.count_cursor = updated_since
+        return 2
 
     def incremental_issues(
         self,
@@ -650,10 +655,15 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(summary["downloadedIssues"], 0)
             self.assertEqual(summary["totalIssues"], 0)
             self.assertEqual(summary["candidateIssues"], 2)
+            self.assertEqual(summary["candidateTotalIssues"], 2)
             self.assertEqual(connector.incremental_cursor, datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc))
+            self.assertEqual(connector.count_cursor, datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc))
             self.assertEqual(connector.changelog_issue_keys, [])
             self.assertTrue(
                 any("no Jira issues changed" in str(event.get("message")) for event in progress_events)
+            )
+            self.assertTrue(
+                any(event.get("candidateTotalIssues") == 2 and event.get("percent") == 100.0 for event in progress_events)
             )
 
             conn = sqlite3.connect(str(db_path))

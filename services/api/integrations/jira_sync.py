@@ -1688,6 +1688,7 @@ def run_jira_sync_once(
         )
         downloaded = 0
         candidate_issues_checked = 0
+        candidate_total_issues: int | None = None
         changelog_entries_synced = 0
         changelog_failures = 0
         total_issues: int | None = None
@@ -1696,6 +1697,15 @@ def run_jira_sync_once(
         active_sprint_changelog_entries_synced = 0
         active_sprint_changelog_failures = 0
         incremental_filter_inclusive = requested_mode == SYNC_MODE_SINCE_DATE
+        if incremental_since_utc is not None:
+            count_incremental = getattr(connector, "count_incremental_issues", None)
+            if callable(count_incremental):
+                try:
+                    counted_total = count_incremental(incremental_since_utc)
+                    if isinstance(counted_total, int) and counted_total >= 0:
+                        candidate_total_issues = counted_total
+                except Exception:  # noqa: BLE001
+                    candidate_total_issues = None
         start_at = 0
         while True:
             if incremental_since_utc is not None:
@@ -1743,7 +1753,11 @@ def run_jira_sync_once(
                         total_issues=total_issues,
                     )
                     conn.commit()
-                    percent = _safe_percent(current_downloaded, total_issues)
+                    percent = (
+                        _safe_percent(candidate_issues_checked, candidate_total_issues)
+                        if incremental_since_utc is not None
+                        else _safe_percent(current_downloaded, total_issues)
+                    )
                     emit(
                         {
                             "phase": "issues",
@@ -1752,6 +1766,7 @@ def run_jira_sync_once(
                             "downloadedIssues": current_downloaded,
                             "totalIssues": total_issues,
                             "candidateIssues": candidate_issues_checked,
+                            "candidateTotalIssues": candidate_total_issues,
                             "percent": percent,
                             "message": (
                                 f"{current_downloaded} of {total_issues} issues downloaded; "
@@ -1802,7 +1817,8 @@ def run_jira_sync_once(
                     "downloadedIssues": downloaded,
                     "totalIssues": total_issues,
                     "candidateIssues": candidate_issues_checked,
-                    "percent": _safe_percent(downloaded, total_issues),
+                    "candidateTotalIssues": candidate_total_issues,
+                    "percent": _safe_percent(candidate_issues_checked, candidate_total_issues),
                     "message": (
                         f"Checked {candidate_issues_checked} candidate issues; "
                         f"no Jira issues changed since {cursor_display}."
@@ -1969,6 +1985,7 @@ def run_jira_sync_once(
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
             "candidateIssues": candidate_issues_checked,
+            "candidateTotalIssues": candidate_total_issues,
             "releaseVersionsSynced": release_versions_synced,
             "staleSprintLinksCleared": stale_sprint_links_cleared,
             "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
@@ -2052,6 +2069,8 @@ class JiraSyncManager:
             "sprintsSynced": 0,
             "downloadedIssues": 0,
             "totalIssues": None,
+            "candidateIssues": 0,
+            "candidateTotalIssues": None,
             "percent": None,
             "currentStep": 1,
             "totalSteps": SYNC_TOTAL_STEPS,
@@ -2077,6 +2096,12 @@ class JiraSyncManager:
                 "downloadedIssues", self._state["downloadedIssues"]
             )
             self._state["totalIssues"] = update.get("totalIssues", self._state["totalIssues"])
+            self._state["candidateIssues"] = update.get(
+                "candidateIssues", self._state["candidateIssues"]
+            )
+            self._state["candidateTotalIssues"] = update.get(
+                "candidateTotalIssues", self._state["candidateTotalIssues"]
+            )
             self._state["percent"] = update.get("percent", self._state["percent"])
             self._state["currentStep"] = update.get("currentStep", self._state["currentStep"])
             self._state["totalSteps"] = update.get("totalSteps", self._state["totalSteps"])
@@ -2162,6 +2187,10 @@ class JiraSyncManager:
                         "sprintsSynced": state.get("sprintsSynced", self._state["sprintsSynced"]),
                         "downloadedIssues": state.get("downloadedIssues", self._state["downloadedIssues"]),
                         "totalIssues": state.get("totalIssues", self._state["totalIssues"]),
+                        "candidateIssues": state.get("candidateIssues", self._state["candidateIssues"]),
+                        "candidateTotalIssues": state.get(
+                            "candidateTotalIssues", self._state["candidateTotalIssues"]
+                        ),
                         "percent": state.get("percent", self._state["percent"]),
                         "currentStep": state.get("currentStep", self._state["currentStep"]),
                         "totalSteps": state.get("totalSteps", self._state["totalSteps"]),
@@ -2216,6 +2245,8 @@ class JiraSyncManager:
                     "sprintsSynced": 0,
                     "downloadedIssues": 0,
                     "totalIssues": None,
+                    "candidateIssues": 0,
+                    "candidateTotalIssues": None,
                     "percent": None,
                     **_sync_step_payload("initializing"),
                     "startedAt": started_at,
@@ -2274,6 +2305,8 @@ class JiraSyncManager:
                     "sprintsSynced": result.get("sprintsSynced", self._state.get("sprintsSynced", 0)),
                     "downloadedIssues": result.get("downloadedIssues", 0),
                     "totalIssues": result.get("totalIssues"),
+                    "candidateIssues": result.get("candidateIssues", self._state.get("candidateIssues", 0)),
+                    "candidateTotalIssues": result.get("candidateTotalIssues"),
                     "percent": result.get("percent"),
                     **_sync_step_payload(str(result.get("phase", "done"))),
                     "finishedAt": result.get("finishedAt"),
