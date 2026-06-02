@@ -289,6 +289,30 @@ class _IncrementalMissingActiveIssueConnectorStub(_SuccessfulConnectorStub):
         return [], SyncBatch(next_cursor=None, has_more=False)
 
 
+class _IncrementalOverlapCandidateConnectorStub(_SuccessfulConnectorStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.changelog_issue_keys: list[str] = []
+
+    def incremental_issues(
+        self,
+        updated_since: datetime | None,
+        start_at: int = 0,
+        max_results: int = 100,
+    ) -> tuple[list[IssueRecord], SyncBatch]:
+        _ = max_results
+        self.incremental_cursor = updated_since
+        if start_at == 0:
+            return [self.issue_1], SyncBatch(next_cursor="1", has_more=True)
+        if start_at == 1:
+            return [self.issue_2], SyncBatch(next_cursor=None, has_more=False)
+        return [], SyncBatch(next_cursor=None, has_more=False)
+
+    def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
+        self.changelog_issue_keys.append(issue_key)
+        return super().get_issue_changelog(issue_key)
+
+
 class _TransientChangelogFailureConnectorStub(_SuccessfulConnectorStub):
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
         if issue_key == "CEGBUPOL-2":
@@ -378,7 +402,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 changelog_count = conn.execute("SELECT COUNT(*) FROM issue_changelog").fetchone()[0]
                 checkpoint = conn.execute(
                     """
-                    SELECT status, last_synced_at, error_message
+                    SELECT status, last_cursor, last_synced_at, error_message
                     FROM sync_checkpoints
                     WHERE source_type = 'jira' AND scope_key = 'board:27193'
                     """
@@ -403,8 +427,9 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(changelog_count, 4)
             self.assertIsNotNone(checkpoint)
             self.assertEqual(checkpoint[0], "idle")
-            self.assertIsNotNone(checkpoint[1])
-            self.assertIsNone(checkpoint[2])
+            self.assertEqual(checkpoint[1], "2026-03-22T10:00:00+00:00")
+            self.assertIsNotNone(checkpoint[2])
+            self.assertIsNone(checkpoint[3])
             self.assertIsNotNone(run_history)
             self.assertEqual(run_history[0], 27193)
             self.assertEqual(run_history[1], "CEGBU Polaris")
@@ -546,7 +571,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(issue_2[0], "CEGBUPOL-2")
             self.assertIsNone(issue_2[1])
 
-    def test_run_sync_since_last_uses_last_synced_cursor_without_overlap(self) -> None:
+    def test_run_sync_since_last_uses_latest_issue_source_watermark(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             runtime = self._runtime()
@@ -581,7 +606,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertIsNotNone(connector.incremental_cursor)
             self.assertEqual(
                 connector.incremental_cursor,
-                datetime(2026, 3, 25, 12, 0, tzinfo=timezone.utc),
+                datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc),
             )
 
             conn = sqlite3.connect(str(db_path))
@@ -600,20 +625,78 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertIsNotNone(sync_mode)
             self.assertEqual(sync_mode[0], "since_last")
 
-    def test_run_sync_since_last_uses_latest_completed_run_when_checkpoint_missing(self) -> None:
+    def test_run_sync_since_last_filters_overlap_candidates_after_source_cursor(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             runtime = self._runtime()
+            progress_events: list[dict[str, object]] = []
 
-            first_summary = run_jira_sync_once(
+            run_jira_sync_once(
                 db_path=str(db_path),
                 runtime=runtime,
                 connector=_SuccessfulConnectorStub(),
             )
-            finished_at_raw = first_summary.get("finishedAt")
-            self.assertIsInstance(finished_at_raw, str)
-            finished_at = datetime.fromisoformat(finished_at_raw)
-            expected_cursor = finished_at
+
+            connector = _IncrementalOverlapCandidateConnectorStub()
+            summary = run_jira_sync_once(
+                progress_callback=progress_events.append,
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=connector,
+                sync_mode="since_last",
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertEqual(summary["downloadedIssues"], 0)
+            self.assertEqual(summary["totalIssues"], 0)
+            self.assertEqual(summary["candidateIssues"], 2)
+            self.assertEqual(connector.incremental_cursor, datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc))
+            self.assertEqual(connector.changelog_issue_keys, [])
+            self.assertTrue(
+                any("no Jira issues changed" in str(event.get("message")) for event in progress_events)
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                run_history = conn.execute(
+                    """
+                    SELECT issues_synced, total_issues, sync_mode
+                    FROM sync_run_history
+                    WHERE source_type = 'jira'
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+                checkpoint = conn.execute(
+                    """
+                    SELECT last_cursor, last_synced_at
+                    FROM sync_checkpoints
+                    WHERE source_type = 'jira' AND scope_key = 'board:27193'
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+
+            self.assertIsNotNone(run_history)
+            self.assertEqual(run_history[0], 0)
+            self.assertEqual(run_history[1], 0)
+            self.assertEqual(run_history[2], "since_last")
+            self.assertIsNotNone(checkpoint)
+            self.assertEqual(checkpoint[0], "2026-03-22T10:00:00+00:00")
+            self.assertIsNotNone(checkpoint[1])
+
+    def test_run_sync_since_last_uses_latest_issue_source_when_checkpoint_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            expected_cursor = datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc)
 
             conn = sqlite3.connect(str(db_path))
             try:

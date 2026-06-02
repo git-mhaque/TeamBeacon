@@ -212,6 +212,151 @@ describe("IntegrationsScreen", () => {
     expect(screen.queryByRole("columnheader", { name: "Progress" })).not.toBeInTheDocument();
   });
 
+  it("shows running JIRA sync as a dedicated step panel", async () => {
+    setupFetchMock({
+      "/api/integrations/jira/status": {
+        source: "jira",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: {
+          baseUrl: "https://jira.example.com",
+          projectKey: "CEG",
+          boardId: 42,
+        },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "project", ok: true, detail: "resolved" },
+        ],
+      },
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: {
+          baseUrl: "http://127.0.0.1:11434",
+          modelId: "gemma4:e2b",
+        },
+        checks: [
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: { baseUrl: "https://gbuconfluence.oraclecorp.com" },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/jira/sync/status": {
+        source: "jira",
+        state: "running",
+        phase: "issues",
+        syncMode: "since_last",
+        downloadedIssues: 10,
+        totalIssues: 39,
+        percent: 25.6,
+        currentStep: 4,
+        totalSteps: 6,
+        stepLabel: "Syncing issues and changelog",
+        message: "10 of 39 issues downloaded; 155 changelog events synced",
+        lastSyncedAt: "2026-06-02T00:30:25Z",
+      },
+      "/api/integrations/jira/sync/history": {
+        source: "jira",
+        history: [],
+      },
+      "/api/metadata/lookup": {
+        groups: [],
+        workTypes: [],
+      },
+    });
+
+    render(<IntegrationsScreen />);
+
+    expect(await screen.findByText("Sync in progress")).toBeInTheDocument();
+    expect(screen.getByText("Step 4 of 6: Issues and changelog")).toBeInTheDocument();
+    expect(screen.getByText("10 of 39 issues synced")).toBeInTheDocument();
+    expect(screen.getByText("155 changelog events captured")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "JIRA issue sync progress" })).toHaveAttribute("aria-valuenow", "25.6");
+    expect(screen.getByRole("button", { name: "Sync Data" })).toBeDisabled();
+    expect(screen.queryByText("Syncing...")).not.toBeInTheDocument();
+  });
+
+  it("localizes UTC timestamps in JIRA sync status messages", async () => {
+    setupFetchMock({
+      "/api/integrations/jira/status": {
+        source: "jira",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: { projectKey: "CEG", boardId: 42 },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "project", ok: true, detail: "resolved" },
+        ],
+      },
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: { modelId: "gemma4:e2b", baseUrl: "http://127.0.0.1:11434" },
+        checks: [
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-06-02T00:10:20Z",
+        config: { baseUrl: "https://gbuconfluence.oraclecorp.com" },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/jira/sync/status": {
+        source: "jira",
+        state: "running",
+        phase: "issues",
+        syncMode: "since_last",
+        downloadedIssues: 0,
+        totalIssues: null,
+        percent: null,
+        currentStep: 4,
+        totalSteps: 6,
+        stepLabel: "Syncing issues and changelog",
+        message: "Syncing issues updated since 2026-06-02 02:33 UTC.",
+        lastSyncedAt: "2026-06-02T00:30:25Z",
+      },
+      "/api/integrations/jira/sync/history": {
+        source: "jira",
+        history: [],
+      },
+      "/api/metadata/lookup": {
+        groups: [],
+        workTypes: [],
+      },
+    });
+
+    render(<IntegrationsScreen />);
+
+    const expectedDate = new Date("2026-06-02T02:33:00Z");
+    const expectedDay = String(expectedDate.getDate()).padStart(2, "0");
+    const expectedMonth = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][expectedDate.getMonth()];
+    const expectedLabel = `${expectedDay}-${expectedMonth}-${expectedDate.getFullYear()}, ${expectedDate.toLocaleTimeString()}`;
+
+    expect(await screen.findByText(`Syncing issues updated since ${expectedLabel}.`)).toBeInTheDocument();
+    expect(screen.queryByText(/02:33 UTC/)).not.toBeInTheDocument();
+  });
+
   it("uses overlay confirmation before deleting epic metadata lookup values", async () => {
     const confirmSpy = vi.spyOn(window, "confirm");
     confirmSpy.mockReturnValue(true);

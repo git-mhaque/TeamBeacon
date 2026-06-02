@@ -1900,7 +1900,7 @@ body {
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   padding: 0.14rem 0.44rem;
   text-transform: uppercase;
 }
@@ -1939,16 +1939,88 @@ body {
   animation: tb-spin 0.7s linear infinite;
 }
 
-.tb-sync-progress-row {
+.tb-jira-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.tb-jira-sync-section {
+  margin-top: 0.62rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid var(--tb-line);
+  display: grid;
+  gap: 0.46rem;
+}
+
+.tb-jira-sync-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.tb-jira-sync-title-block {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tb-jira-sync-kicker {
+  color: #2b4f81;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.tb-jira-sync-title {
+  color: #223752;
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
+.tb-jira-sync-step-meta {
+  color: var(--tb-muted);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.tb-sync-stepper {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.18rem;
+}
+
+.tb-sync-step-segment {
+  display: block;
+  height: 0.46rem;
+  border-radius: 999px;
+  background: #d8e4f5;
+}
+
+.tb-sync-step-segment.is-complete {
+  background: #95c5a8;
+}
+
+.tb-sync-step-segment.is-current {
+  background: #2f7bd8;
+}
+
+.tb-sync-measured-progress {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.tb-sync-progress-line {
   display: flex;
   align-items: center;
-  gap: 0.34rem;
+  gap: 0.5rem;
 }
 
 .tb-sync-progress-track {
   flex: 1;
-  height: 0.46rem;
-  min-width: 6rem;
+  height: 0.24rem;
+  min-width: 0;
   border-radius: 999px;
   border: 1px solid #ccdaf0;
   background: #eaf2ff;
@@ -1966,12 +2038,35 @@ body {
   color: #365985;
   font-size: 0.74rem;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.tb-sync-progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22rem 0.7rem;
+  color: var(--tb-muted);
+  font-size: 0.74rem;
+  line-height: 1.3;
 }
 
 .tb-sync-progress-fallback,
-.tb-sync-progress-note {
+.tb-sync-progress-note,
+.tb-jira-sync-message,
+.tb-jira-sync-last {
   color: var(--tb-muted);
   font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.tb-jira-sync-message,
+.tb-jira-sync-last {
+  margin: 0;
+}
+
+.tb-jira-sync-message.is-warning {
+  color: #8f5800;
+  font-weight: 600;
 }
 
 .tb-external-link {
@@ -3589,10 +3684,6 @@ body {
   .tb-lookup-item-row {
     grid-template-columns: 1fr;
     align-items: stretch;
-  }
-
-  .tb-sync-progress-track {
-    min-width: 4.5rem;
   }
 
   .tb-kanban {

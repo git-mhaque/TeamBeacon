@@ -75,6 +75,14 @@ function formatTimestamp(value: string | null | undefined): string {
   return formatted ?? value;
 }
 
+function localizeUtcTimestamps(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.replace(/\b(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+UTC\b/g, (match, datePart, timePart) => {
+    const formatted = formatDateTimeLabel(`${datePart}T${timePart}:00Z`);
+    return formatted ?? match;
+  });
+}
+
 function formatSyncMode(mode: JiraSyncMode | null | undefined, requestedSince?: string | null): string {
   if (mode === "since_date") {
     if (!requestedSince) return "Since Date";
@@ -90,6 +98,45 @@ function formatAiProviderName(value: string | null | undefined): string {
   if (normalized === "ollama") return "Ollama";
   if (normalized === "openai") return "OpenAI";
   return "AI";
+}
+
+const JIRA_SYNC_STEPS = [
+  "Prepare",
+  "Board",
+  "Releases",
+  "Issues",
+  "Sprints",
+  "Active sprint",
+] as const;
+
+function normalizeSyncStepLabel(value: string | null | undefined, phase: string | null | undefined): string {
+  const normalizedPhase = (phase ?? "").trim().toLowerCase();
+  if (normalizedPhase === "board") return "Board metadata";
+  if (normalizedPhase === "releases") return "Releases";
+  if (normalizedPhase === "issues") return "Issues and changelog";
+  if (normalizedPhase === "sprints") return "Sprints";
+  if (normalizedPhase === "active_sprint") return "Active sprint";
+  if (normalizedPhase === "done") return "Finalize";
+
+  const cleaned = (value ?? "").replace(/^syncing\s+/i, "").replace(/^reconciling\s+/i, "").trim();
+  if (!cleaned) return "Preparing sync";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function extractChangelogCount(message: string | null | undefined): number | null {
+  const match = /(\d+)\s+changelog events synced/i.exec(message ?? "");
+  if (!match) return null;
+  const count = Number.parseInt(match[1], 10);
+  return Number.isFinite(count) ? count : null;
+}
+
+function extractSkippedChangelogCount(message: string | null | undefined): number | null {
+  const raw = message ?? "";
+  const match = /(\d+)\s+changelog fetches skipped/i.exec(raw)
+    ?? /Skipped changelog for (\d+) issue\(s\)/i.exec(raw);
+  if (!match) return null;
+  const count = Number.parseInt(match[1], 10);
+  return Number.isFinite(count) ? count : null;
 }
 
 type PendingLookupDelete = {
@@ -564,6 +611,15 @@ export function IntegrationsScreen() {
     return "Idle";
   }, [syncError, jiraSyncStatus]);
 
+  const jiraSyncPanelTitle = useMemo(() => {
+    if (syncError) return "Sync status unavailable";
+    if (!jiraSyncStatus || jiraSyncStatus.state === "idle") return "Ready to sync";
+    if (jiraSyncStatus.state === "running") return "Sync in progress";
+    if (jiraSyncStatus.state === "completed") return "Last sync complete";
+    if (jiraSyncStatus.state === "failed") return "Sync failed";
+    return "Ready to sync";
+  }, [syncError, jiraSyncStatus]);
+
   const jiraSyncPercent = useMemo(() => {
     if (!jiraSyncStatus || syncError) return null;
     if (typeof jiraSyncStatus.percent === "number" && Number.isFinite(jiraSyncStatus.percent)) {
@@ -576,44 +632,96 @@ export function IntegrationsScreen() {
     return null;
   }, [syncError, jiraSyncStatus]);
 
-  const jiraSyncStepText = useMemo(() => {
+  const jiraSyncStepLabel = useMemo(() => {
+    if (!jiraSyncStatus || jiraSyncStatus.state !== "running") return null;
+    return normalizeSyncStepLabel(jiraSyncStatus.stepLabel, jiraSyncStatus.phase);
+  }, [jiraSyncStatus]);
+
+  const jiraSyncStepCounter = useMemo(() => {
     if (!jiraSyncStatus || jiraSyncStatus.state !== "running") return null;
     const currentStep = jiraSyncStatus.currentStep;
     const totalSteps = jiraSyncStatus.totalSteps;
-    const stepLabel = jiraSyncStatus.stepLabel ?? "Syncing";
     if (
       typeof currentStep === "number"
       && Number.isFinite(currentStep)
       && typeof totalSteps === "number"
       && Number.isFinite(totalSteps)
     ) {
-      return `${stepLabel} (Step ${currentStep} of ${totalSteps})`;
+      return `Step ${currentStep} of ${totalSteps}`;
     }
-    return stepLabel;
+    return null;
   }, [jiraSyncStatus]);
 
   const jiraSyncProgressSummary = useMemo(() => {
     if (syncError) return `Sync status error: ${syncError}`;
     if (!jiraSyncStatus) return "Sync not started.";
     if (jiraSyncStatus.state === "failed") {
-      return jiraSyncStatus.error ?? "Last sync failed.";
+      return localizeUtcTimestamps(jiraSyncStatus.error) ?? "Last sync failed.";
     }
     if (jiraSyncStatus.state === "running") {
-      return jiraSyncStatus.message ?? jiraSyncStepText ?? "In progress";
+      return localizeUtcTimestamps(jiraSyncStatus.message)
+        ?? (jiraSyncStepLabel ? `Working on ${jiraSyncStepLabel}.` : "In progress");
     }
     if (jiraSyncStatus.state === "completed") {
-      return "Sync complete.";
+      return localizeUtcTimestamps(jiraSyncStatus.message) ?? "Sync complete.";
     }
     if (jiraSyncStatus.lastSyncedAt) {
       return "Not currently syncing.";
     }
     return "Sync not started.";
-  }, [syncError, jiraSyncStatus, jiraSyncStepText]);
+  }, [syncError, jiraSyncStatus, jiraSyncStepLabel]);
+
+  const showJiraIssueProgress = useMemo(() => {
+    return Boolean(
+      jiraSyncStatus?.state === "running"
+      && jiraSyncStatus.phase === "issues"
+      && jiraSyncPercent !== null
+      && typeof jiraSyncStatus.totalIssues === "number"
+      && jiraSyncStatus.totalIssues > 0,
+    );
+  }, [jiraSyncPercent, jiraSyncStatus]);
+
+  const jiraIssueProgressText = useMemo(() => {
+    if (!jiraSyncStatus) return null;
+    const downloaded = jiraSyncStatus.downloadedIssues ?? 0;
+    if (typeof jiraSyncStatus.totalIssues === "number" && jiraSyncStatus.totalIssues > 0) {
+      return `${downloaded} of ${jiraSyncStatus.totalIssues} issues synced`;
+    }
+    if (downloaded > 0) return `${downloaded} issues synced`;
+    return null;
+  }, [jiraSyncStatus]);
+
+  const jiraChangelogText = useMemo(() => {
+    const count = extractChangelogCount(jiraSyncStatus?.message);
+    if (count === null) return null;
+    return `${count} changelog events captured`;
+  }, [jiraSyncStatus?.message]);
+
+  const jiraSkippedChangelogText = useMemo(() => {
+    const count = extractSkippedChangelogCount(jiraSyncStatus?.message);
+    if (count === null) return null;
+    return `${count} issue changelog${count === 1 ? "" : "s"} skipped after transient JIRA errors`;
+  }, [jiraSyncStatus?.message]);
+
+  const jiraSyncMessageText = useMemo(() => {
+    if (syncError || jiraSyncStatus?.state === "failed") return jiraSyncProgressSummary;
+    if (jiraSyncStatus?.state === "running") {
+      if (showJiraIssueProgress) return jiraSkippedChangelogText;
+      return jiraSyncProgressSummary;
+    }
+    if (jiraSyncStatus?.state === "completed") {
+      return jiraSkippedChangelogText ?? jiraSyncProgressSummary;
+    }
+    if (jiraSyncStatus?.lastSyncedAt) return null;
+    return jiraSyncProgressSummary;
+  }, [jiraSkippedChangelogText, jiraSyncProgressSummary, jiraSyncStatus, showJiraIssueProgress, syncError]);
 
   const jiraLastSyncedText = useMemo(() => formatCheckedAt(jiraSyncStatus?.lastSyncedAt), [jiraSyncStatus?.lastSyncedAt]);
 
-  const showJiraSyncStatusPillInActions = Boolean(syncError || jiraSyncStatus?.state === "failed");
-  const showJiraSyncProgressNote = jiraSyncProgressSummary !== "In progress";
+  const jiraCurrentStepNumber = typeof jiraSyncStatus?.currentStep === "number"
+    && Number.isFinite(jiraSyncStatus.currentStep)
+    ? jiraSyncStatus.currentStep
+    : null;
 
   const jiraBaseUrl = jiraStatus?.config.baseUrl ? jiraStatus.config.baseUrl.replace(/\/$/, "") : null;
   const configuredBoard = jiraStatus?.configuredBoard;
@@ -655,42 +763,80 @@ export function IntegrationsScreen() {
           </button>
         </header>
         <div class="tb-metrics-grid tb-three-up">
-          <article class="tb-metric-card">
+          <article class="tb-metric-card tb-jira-card">
             <h4>JIRA Connection</h4>
             <strong class={`tb-value ${jiraToneClass}`}>{jiraValue}</strong>
             <p>{jiraHint}</p>
             <p>Last checked: {formatCheckedAt(jiraStatus?.checkedAt)}</p>
-            {jiraSyncStatus?.state === "running" ? (
-              <>
-                <p class="tb-sync-progress-row">
-                  <span>Sync:</span>
+
+            <section class={`tb-jira-sync-section ${jiraSyncToneClass}`} aria-label="JIRA sync status">
+              <div class="tb-jira-sync-head">
+                <div class="tb-jira-sync-title-block">
+                  <span class="tb-jira-sync-kicker">Sync</span>
+                  <strong class="tb-jira-sync-title">{jiraSyncPanelTitle}</strong>
+                </div>
+                <span class={`tb-status-pill ${jiraSyncToneClass}`}>
                   {jiraSyncStatus?.state === "running" ? (
-                    <span class={`tb-status-pill ${jiraSyncToneClass}`}>
-                      <span class="tb-inline-spinner" aria-hidden="true" />
-                      <span>{jiraSyncStateText}</span>
-                    </span>
+                    <span class="tb-inline-spinner" aria-hidden="true" />
                   ) : null}
-                  {jiraSyncStepText ? <span>{jiraSyncStepText}</span> : null}
-                  {jiraSyncPercent !== null ? (
-                    <>
+                  <span>{jiraSyncStateText}</span>
+                </span>
+              </div>
+
+              {jiraSyncStatus?.state === "running" && jiraSyncStepLabel ? (
+                <span class="tb-jira-sync-step-meta">
+                  {jiraSyncStepCounter ? `${jiraSyncStepCounter}: ` : null}
+                  {jiraSyncStepLabel}
+                </span>
+              ) : null}
+
+              {jiraSyncStatus?.state === "running" ? (
+                <div class="tb-sync-stepper" aria-label="JIRA sync steps">
+                  {JIRA_SYNC_STEPS.map((stepName, index) => {
+                    const stepNumber = index + 1;
+                    const isComplete = jiraCurrentStepNumber !== null && stepNumber < jiraCurrentStepNumber;
+                    const isCurrent = jiraCurrentStepNumber === stepNumber;
+                    return (
                       <span
-                        class="tb-sync-progress-track"
-                        role="progressbar"
-                        aria-label="JIRA sync progress"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={jiraSyncPercent}
-                      >
-                        <span class="tb-sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
-                      </span>
-                      <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
-                    </>
-                  ) : null}
+                        key={stepName}
+                        class={`tb-sync-step-segment${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
+                        title={stepName}
+                      />
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {showJiraIssueProgress && jiraSyncPercent !== null ? (
+                <div class="tb-sync-measured-progress">
+                  <div class="tb-sync-progress-meta">
+                    {jiraIssueProgressText ? <span>{jiraIssueProgressText}</span> : null}
+                    {jiraChangelogText ? <span>{jiraChangelogText}</span> : null}
+                  </div>
+                  <div class="tb-sync-progress-line">
+                    <span
+                      class="tb-sync-progress-track"
+                      role="progressbar"
+                      aria-label="JIRA issue sync progress"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={jiraSyncPercent}
+                    >
+                      <span class="tb-sync-progress-fill" style={{ width: `${jiraSyncPercent}%` }} />
+                    </span>
+                    <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                  </div>
+                </div>
+              ) : null}
+
+              {jiraSyncMessageText ? (
+                <p class={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
+                  {jiraSyncMessageText}
                 </p>
-                {showJiraSyncProgressNote ? <p class="tb-sync-progress-note">{jiraSyncProgressSummary}</p> : null}
-              </>
-            ) : null}
-            <p>Last synced: {jiraLastSyncedText}</p>
+              ) : null}
+              <p class="tb-jira-sync-last">Last successful sync: {jiraLastSyncedText}</p>
+            </section>
+
             <div class="tb-card-actions">
               <button
                 type="button"
@@ -698,7 +844,7 @@ export function IntegrationsScreen() {
                 onClick={openSyncOptions}
                 disabled={jiraSyncStatus?.state === "running"}
               >
-                {jiraSyncStatus?.state === "running" ? "Syncing..." : "Sync Data"}
+                Sync Data
               </button>
               <button type="button" class="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
                 Sync History
@@ -706,14 +852,6 @@ export function IntegrationsScreen() {
               <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
                 Diagnostics
               </button>
-              {showJiraSyncStatusPillInActions ? (
-                <span class={`tb-status-pill ${jiraSyncToneClass}`}>
-                  {jiraSyncStatus?.state === "running" ? (
-                    <span class="tb-inline-spinner" aria-hidden="true" />
-                  ) : null}
-                  <span>{jiraSyncStateText}</span>
-                </span>
-              ) : null}
             </div>
           </article>
 

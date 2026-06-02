@@ -263,6 +263,43 @@ def _safe_percent(downloaded: int, total: int | None) -> float | None:
     return round((downloaded / total) * 100, 2)
 
 
+def _issue_updated_at_utc(issue: IssueRecord) -> datetime | None:
+    updated_at = issue.updated_at_source
+    if updated_at is None:
+        return None
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    return updated_at.astimezone(timezone.utc)
+
+
+def _filter_incremental_issues(
+    issues: list[IssueRecord],
+    cursor: datetime | None,
+    *,
+    inclusive: bool,
+) -> list[IssueRecord]:
+    if cursor is None:
+        return issues
+    cursor_utc = cursor
+    if cursor_utc.tzinfo is None:
+        cursor_utc = cursor_utc.replace(tzinfo=timezone.utc)
+    cursor_utc = cursor_utc.astimezone(timezone.utc)
+
+    filtered: list[IssueRecord] = []
+    for issue in issues:
+        updated_at = _issue_updated_at_utc(issue)
+        if updated_at is None:
+            filtered.append(issue)
+            continue
+        if inclusive:
+            should_sync = updated_at >= cursor_utc
+        else:
+            should_sync = updated_at > cursor_utc
+        if should_sync:
+            filtered.append(issue)
+    return filtered
+
+
 def _extract_sprint_id_from_fields(fields: dict[str, Any], sprint_field_candidates: tuple[str, ...]) -> int | None:
     for field_name in sprint_field_candidates:
         if field_name not in fields:
@@ -445,6 +482,26 @@ def _read_last_synced_at(db_path: str, scope_key: str) -> str | None:
         conn.close()
 
 
+def _read_last_cursor(db_path: str, scope_key: str) -> str | None:
+    conn = sqlite3.connect(db_path)
+    try:
+        _ensure_schema(conn)
+        row = conn.execute(
+            """
+            SELECT last_cursor
+            FROM sync_checkpoints
+            WHERE source_type = 'jira' AND scope_key = ?
+            LIMIT 1
+            """,
+            (scope_key,),
+        ).fetchone()
+        if row is None:
+            return None
+        return row[0]
+    finally:
+        conn.close()
+
+
 def _read_last_completed_sync_finished_at(db_path: str, scope_key: str) -> str | None:
     conn = sqlite3.connect(db_path)
     try:
@@ -467,6 +524,47 @@ def _read_last_completed_sync_finished_at(db_path: str, scope_key: str) -> str |
         return row[0]
     finally:
         conn.close()
+
+
+def _read_latest_issue_updated_at_source(conn: sqlite3.Connection) -> datetime | None:
+    row = conn.execute(
+        """
+        SELECT updated_at_source
+        FROM issues
+        WHERE updated_at_source IS NOT NULL
+          AND TRIM(updated_at_source) != ''
+        ORDER BY datetime(updated_at_source) DESC, issue_key DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row is None:
+        return None
+    return _parse_iso_datetime(row[0])
+
+
+def _read_latest_issue_updated_at_source_from_db(db_path: str) -> datetime | None:
+    conn = sqlite3.connect(db_path)
+    try:
+        _ensure_schema(conn)
+        return _read_latest_issue_updated_at_source(conn)
+    finally:
+        conn.close()
+
+
+def _read_since_last_cursor(db_path: str, scope_key: str) -> datetime | None:
+    source_cursor = _read_latest_issue_updated_at_source_from_db(db_path)
+    if source_cursor is not None:
+        return source_cursor
+
+    parsed_last_cursor = _parse_iso_datetime(_read_last_cursor(db_path, scope_key))
+    if parsed_last_cursor is not None:
+        return parsed_last_cursor
+
+    parsed_last_synced_at = _parse_iso_datetime(_read_last_synced_at(db_path, scope_key))
+    if parsed_last_synced_at is not None:
+        return parsed_last_synced_at
+
+    return _parse_iso_datetime(_read_last_completed_sync_finished_at(db_path, scope_key))
 
 
 def _insert_sync_run(
@@ -1441,13 +1539,9 @@ def run_jira_sync_once(
         # Keep persisted mode compatible with pre-existing DB CHECK constraint.
         persisted_mode = SYNC_MODE_SINCE_LAST
     elif requested_mode == SYNC_MODE_SINCE_LAST:
-        last_synced_at = _read_last_synced_at(resolved_db_path, scope)
-        parsed_last_synced_at = _parse_iso_datetime(last_synced_at)
-        if parsed_last_synced_at is None:
-            fallback_last_synced_at = _read_last_completed_sync_finished_at(resolved_db_path, scope)
-            parsed_last_synced_at = _parse_iso_datetime(fallback_last_synced_at)
-        if parsed_last_synced_at is not None:
-            incremental_since_utc = parsed_last_synced_at
+        parsed_source_cursor = _read_since_last_cursor(resolved_db_path, scope)
+        if parsed_source_cursor is not None:
+            incremental_since_utc = parsed_source_cursor
         else:
             effective_mode = SYNC_MODE_FULL
 
@@ -1591,13 +1685,14 @@ def run_jira_sync_once(
                     "Syncing board issues."
                     if incremental_since_utc is None
                     else (
-                        "Syncing issues updated since "
+                        "Checking for Jira issues changed since "
                         f"{incremental_since_utc.strftime('%Y-%m-%d %H:%M')} UTC."
                     )
                 ),
             }
         )
         downloaded = 0
+        candidate_issues_checked = 0
         changelog_entries_synced = 0
         changelog_failures = 0
         total_issues: int | None = None
@@ -1605,23 +1700,20 @@ def run_jira_sync_once(
         active_sprint_issues_hydrated = 0
         active_sprint_changelog_entries_synced = 0
         active_sprint_changelog_failures = 0
-        if incremental_since_utc is not None:
-            count_incremental = getattr(connector, "count_incremental_issues", None)
-            if callable(count_incremental):
-                try:
-                    counted_total = count_incremental(incremental_since_utc)
-                    if isinstance(counted_total, int) and counted_total >= 0:
-                        total_issues = counted_total
-                except Exception:  # noqa: BLE001
-                    # Keep sync running even if total pre-count fails.
-                    total_issues = None
+        incremental_filter_inclusive = requested_mode == SYNC_MODE_SINCE_DATE
         start_at = 0
         while True:
             if incremental_since_utc is not None:
-                issues, batch = connector.incremental_issues(
+                raw_issues, batch = connector.incremental_issues(
                     updated_since=incremental_since_utc,
                     start_at=start_at,
                     max_results=100,
+                )
+                candidate_issues_checked += len(raw_issues)
+                issues = _filter_incremental_issues(
+                    raw_issues,
+                    incremental_since_utc,
+                    inclusive=incremental_filter_inclusive,
                 )
                 page_total = None
             else:
@@ -1664,6 +1756,7 @@ def run_jira_sync_once(
                             "sprintsSynced": sprints_synced,
                             "downloadedIssues": current_downloaded,
                             "totalIssues": total_issues,
+                            "candidateIssues": candidate_issues_checked,
                             "percent": percent,
                             "message": (
                                 f"{current_downloaded} of {total_issues} issues downloaded; "
@@ -1695,6 +1788,32 @@ def run_jira_sync_once(
             if batch.next_cursor is None:
                 break
             start_at = int(batch.next_cursor)
+
+        if incremental_since_utc is not None and downloaded == 0:
+            total_issues = 0
+            _update_sync_run(
+                conn,
+                sync_run_id,
+                issues_synced=downloaded,
+                total_issues=total_issues,
+            )
+            conn.commit()
+            cursor_display = incremental_since_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+            emit(
+                {
+                    "phase": "issues",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "candidateIssues": candidate_issues_checked,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": (
+                        f"Checked {candidate_issues_checked} candidate issues; "
+                        f"no Jira issues changed since {cursor_display}."
+                    ),
+                }
+            )
 
         emit(
             {
@@ -1818,6 +1937,8 @@ def run_jira_sync_once(
             total_issues = downloaded
 
         completed_at = _utc_iso_now()
+        source_cursor = _read_latest_issue_updated_at_source(conn)
+        source_cursor_at = source_cursor.isoformat() if source_cursor is not None else completed_at
         _update_sync_run(
             conn,
             sync_run_id,
@@ -1830,7 +1951,7 @@ def run_jira_sync_once(
             conn,
             scope,
             status="idle",
-            last_cursor=completed_at,
+            last_cursor=source_cursor_at,
             last_synced_at=completed_at,
             error_message=None,
         )
@@ -1848,9 +1969,11 @@ def run_jira_sync_once(
             **_sync_step_payload("done"),
             "finishedAt": completed_at,
             "lastSyncedAt": completed_at,
+            "lastCursor": source_cursor_at,
             "syncMode": effective_mode,
             "requestedSyncMode": requested_mode,
             "requestedSince": requested_since,
+            "candidateIssues": candidate_issues_checked,
             "releaseVersionsSynced": release_versions_synced,
             "staleSprintLinksCleared": stale_sprint_links_cleared,
             "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
