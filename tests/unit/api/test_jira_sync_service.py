@@ -685,6 +685,18 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(checkpoint[0], "2026-03-22T10:00:00+00:00")
             self.assertIsNotNone(checkpoint[1])
 
+            manager = JiraSyncManager(
+                db_path_provider=lambda: str(db_path),
+                sync_runner=lambda **_: {},  # noqa: ARG005
+            )
+            manager._resolve_runtime_scope = lambda: "board:27193"  # type: ignore[method-assign]
+            status = manager.get_status()
+            history = manager.get_history()
+            self.assertEqual(status["downloadedIssues"], 0)
+            self.assertEqual(status["totalIssues"], 0)
+            self.assertEqual(history[0]["issuesSynced"], 0)
+            self.assertEqual(history[0]["totalIssues"], 0)
+
     def test_run_sync_since_last_uses_latest_issue_source_when_checkpoint_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"

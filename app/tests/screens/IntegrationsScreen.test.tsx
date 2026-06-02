@@ -96,6 +96,16 @@ describe("IntegrationsScreen", () => {
     });
 
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
+    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
+    expect(within(lastSyncRegion).getByText("Last Sync")).toBeInTheDocument();
+    expect(within(lastSyncRegion).getByText("Previous run")).toBeInTheDocument();
+    expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
+    expect(within(lastSyncRegion).getByText("Completed")).toBeInTheDocument();
+    const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
+    expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
+    expect(within(syncActionRegion).getByText("Ready to sync")).toBeInTheDocument();
+    expect(within(syncActionRegion).getByText("Ready")).toBeInTheDocument();
+    expect(within(syncActionRegion).queryByText("Success")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Diagnostics" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Diagnostics" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Field Mapping Readiness" })).not.toBeInTheDocument();
@@ -280,6 +290,12 @@ describe("IntegrationsScreen", () => {
     render(<IntegrationsScreen />);
 
     expect(await screen.findByText("Sync in progress")).toBeInTheDocument();
+    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
+    expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
+    expect(within(lastSyncRegion).queryByText("Syncing")).not.toBeInTheDocument();
+    const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
+    expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
+    expect(within(syncActionRegion).getByText("Syncing")).toBeInTheDocument();
     expect(screen.getByText("Step 4 of 6: Issues and changelog")).toBeInTheDocument();
     expect(screen.getByText("10 of 39 issues synced")).toBeInTheDocument();
     expect(screen.getByText("155 changelog events captured")).toBeInTheDocument();
@@ -355,6 +371,67 @@ describe("IntegrationsScreen", () => {
 
     expect(await screen.findByText(`Syncing issues updated since ${expectedLabel}.`)).toBeInTheDocument();
     expect(screen.queryByText(/02:33 UTC/)).not.toBeInTheDocument();
+  });
+
+  it("does not label completed since-last totals as changed without candidate metadata", async () => {
+    setupFetchMock({
+      "/api/integrations/jira/status": {
+        source: "jira",
+        connected: true,
+        checkedAt: "2026-06-02T03:14:02Z",
+        config: { projectKey: "CEG", boardId: 42 },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "project", ok: true, detail: "resolved" },
+        ],
+      },
+      "/api/integrations/ai/status": {
+        source: "ollama",
+        provider: "ollama",
+        configuredProvider: "ollama",
+        connected: true,
+        checkedAt: "2026-06-02T03:14:02Z",
+        config: { modelId: "gemma4:e2b", baseUrl: "http://127.0.0.1:11434" },
+        checks: [
+          { name: "ollama_api", ok: true, detail: "reachable" },
+          { name: "configured_model", ok: true, detail: "loaded" },
+        ],
+      },
+      "/api/integrations/confluence/status": {
+        source: "confluence",
+        connected: true,
+        checkedAt: "2026-06-02T03:14:02Z",
+        config: { baseUrl: "https://gbuconfluence.oraclecorp.com" },
+        checks: [
+          { name: "auth", ok: true, detail: "reachable" },
+          { name: "space_query", ok: true, detail: "responding" },
+        ],
+      },
+      "/api/integrations/jira/sync/status": {
+        source: "jira",
+        state: "completed",
+        phase: "done",
+        syncMode: "since_last",
+        downloadedIssues: 4549,
+        totalIssues: 4549,
+        percent: 100,
+        lastSyncedAt: "2026-06-02T03:15:57Z",
+      },
+      "/api/integrations/jira/sync/history": {
+        source: "jira",
+        history: [],
+      },
+      "/api/metadata/lookup": {
+        groups: [],
+        workTypes: [],
+      },
+    });
+
+    render(<IntegrationsScreen />);
+
+    expect(await screen.findByText("4549 issues synced")).toBeInTheDocument();
+    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
+    expect(within(lastSyncRegion).queryByText("4549 issues changed")).not.toBeInTheDocument();
   });
 
   it("uses overlay confirmation before deleting epic metadata lookup values", async () => {

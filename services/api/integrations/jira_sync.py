@@ -743,11 +743,6 @@ def _read_sync_history(db_path: str, limit: int) -> list[dict[str, Any]]:
         if estimated_count <= 0:
             estimated_count = total_issue_count
 
-        if issues_synced <= 0 and estimated_count > 0:
-            issues_synced = estimated_count
-            if total_issues is None:
-                total_issues = estimated_count
-
         if status != "completed" and estimated_count > issues_synced:
             issues_synced = estimated_count
             if total_issues is None:
