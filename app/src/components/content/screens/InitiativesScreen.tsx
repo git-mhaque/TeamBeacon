@@ -79,6 +79,9 @@ const INITIATIVES_REPORTING_PERIOD_SELECTION_KEY = "teambeacon.initiatives.repor
 const INITIATIVES_ACTIVE_VIEW_KEY = "teambeacon.initiatives.activeViewId";
 export const OPEN_INITIATIVES_CONFIGURE_EVENT = "teambeacon:initiatives-open-configure";
 export const OPEN_INITIATIVES_REPORTING_PERIOD_EVENT = "teambeacon:initiatives-open-reporting-period";
+export const OPEN_INITIATIVES_MANAGE_VIEW_EVENT = "teambeacon:initiatives-open-manage-view";
+export const INITIATIVES_VIEW_STATE_EVENT = "teambeacon:initiatives-view-state";
+export const SET_INITIATIVES_ACTIVE_VIEW_EVENT = "teambeacon:initiatives-set-active-view";
 
 const RAG_SORT_RANK: Record<RagLabel, number> = {
   Red: 0,
@@ -860,10 +863,22 @@ export function InitiativesScreen() {
       };
   }, [activeViewId, allConfiguredEpicSummary.length, effectiveInitiativeViews, epicSummary.length]);
 
-  const customInitiativeViews = useMemo(
-    () => effectiveInitiativeViews.filter((view) => view.id !== "all"),
-    [effectiveInitiativeViews],
-  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent(INITIATIVES_VIEW_STATE_EVENT, {
+        detail: {
+          views: effectiveInitiativeViews.map((view) => ({
+            id: view.id,
+            name: view.name,
+            epicCount: view.epicCount,
+            isDefault: Boolean(view.isDefault),
+          })),
+          activeViewId: activeView.id,
+        },
+      }),
+    );
+  }, [activeView.id, effectiveInitiativeViews]);
 
   const applyCustomReportingRange = useCallback((): boolean => {
     if (!reportingStartDraft || !reportingEndDraft) {
@@ -1267,6 +1282,41 @@ export function InitiativesScreen() {
       setDeletingViewId(null);
     }
   }, [activeViewId, editingView?.id, loadSummary, loadViews, pendingDeleteView]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleSetActiveView = (event: Event) => {
+      const detail = (event as CustomEvent<{ viewId?: InitiativeViewId | string | number }>).detail;
+      const nextViewId = detail?.viewId;
+      if (nextViewId === "all") {
+        setActiveViewId("all");
+        return;
+      }
+      const parsed = Number(nextViewId);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        setActiveViewId(parsed);
+      }
+    };
+    window.addEventListener(SET_INITIATIVES_ACTIVE_VIEW_EVENT, handleSetActiveView);
+    return () => {
+      window.removeEventListener(SET_INITIATIVES_ACTIVE_VIEW_EVENT, handleSetActiveView);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleManageView = () => {
+      if (activeView.id === "all") {
+        openCreateViewDialog();
+        return;
+      }
+      openEditViewDialog(activeView);
+    };
+    window.addEventListener(OPEN_INITIATIVES_MANAGE_VIEW_EVENT, handleManageView);
+    return () => {
+      window.removeEventListener(OPEN_INITIATIVES_MANAGE_VIEW_EVENT, handleManageView);
+    };
+  }, [activeView, openCreateViewDialog, openEditViewDialog]);
 
   const openColumnOverlay = useCallback(() => {
     setIsColumnOverlayOpen(true);
@@ -1686,36 +1736,9 @@ export function InitiativesScreen() {
     <div class="tb-screen-grid">
       <div class="tb-initiative-context-bar">
         <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
-        <div class="tb-initiative-view-controls">
-          <label class="tb-initiative-view-select">
-            <span>View</span>
-            <select
-              value={String(activeView.id)}
-              onChange={(event) => {
-                const value = (event.currentTarget as HTMLSelectElement).value;
-                setActiveViewId(value === "all" ? "all" : Number(value));
-              }}
-              aria-label="Initiative View"
-            >
-              {effectiveInitiativeViews.map((view) => (
-                <option key={String(view.id)} value={String(view.id)}>
-                  {view.name} ({view.epicCount})
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" class="tb-btn tb-btn-sm" onClick={openCreateViewDialog}>
-            New View
-          </button>
-          <button
-            type="button"
-            class="tb-btn tb-btn-sm"
-            onClick={() => openEditViewDialog(activeView)}
-            disabled={activeView.id === "all"}
-          >
-            Edit View
-          </button>
-        </div>
+        <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={openReportingConfig}>
+          Reporting Period
+        </button>
       </div>
 
       <section class="tb-panel">

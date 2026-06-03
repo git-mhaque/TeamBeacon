@@ -8,8 +8,10 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  INITIATIVES_VIEW_STATE_EVENT,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
-  OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
+  OPEN_INITIATIVES_MANAGE_VIEW_EVENT,
+  SET_INITIATIVES_ACTIVE_VIEW_EVENT,
   InitiativesScreen,
 } from "./screens/InitiativesScreen";
 import {
@@ -52,6 +54,23 @@ type NavItem = {
 
 type Props = {
   appName: string;
+};
+
+type InitiativeTopbarView = {
+  id: number | "all";
+  name: string;
+  epicCount: number;
+  isDefault?: boolean;
+};
+
+type InitiativeTopbarState = {
+  views: InitiativeTopbarView[];
+  activeViewId: number | "all";
+};
+
+const DEFAULT_INITIATIVE_TOPBAR_STATE: InitiativeTopbarState = {
+  views: [{ id: "all", name: "All Configured", epicCount: 0, isDefault: true }],
+  activeViewId: "all",
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -106,6 +125,16 @@ type TrendWindowDropdownProps = {
   value: number;
   onChange: (value: number) => void;
 };
+
+type InitiativeViewDropdownProps = {
+  views: InitiativeTopbarView[];
+  activeViewId: number | "all";
+  onChange: (viewId: number | "all") => void;
+};
+
+function formatInitiativeViewOption(view: InitiativeTopbarView): string {
+  return `${view.name} (${view.epicCount})`;
+}
 
 function TrendWindowDropdown({ value, onChange }: TrendWindowDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -276,15 +305,202 @@ function TrendWindowDropdown({ value, onChange }: TrendWindowDropdownProps) {
   );
 }
 
+function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeViewDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const optionRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const activeView = views.find((view) => view.id === activeViewId) ?? views[0] ?? DEFAULT_INITIATIVE_TOPBAR_STATE.views[0];
+
+  const viewKey = (viewId: number | "all") => String(viewId);
+
+  const focusOption = (viewId: number | "all") => {
+    optionRefs.current[viewKey(viewId)]?.focus();
+  };
+
+  const focusOptionByOffset = (viewId: number | "all", offset: number) => {
+    const currentIndex = views.findIndex((view) => view.id === viewId);
+    if (currentIndex < 0) return;
+    const nextIndex = Math.min(Math.max(currentIndex + offset, 0), views.length - 1);
+    const nextView = views[nextIndex];
+    if (nextView) {
+      focusOption(nextView.id);
+    }
+  };
+
+  const closeMenu = () => {
+    setIsOpen(false);
+  };
+
+  const selectView = (viewId: number | "all") => {
+    if (viewId !== activeViewId) {
+      onChange(viewId);
+    }
+    closeMenu();
+    triggerRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (dropdownRef.current?.contains(event.target as Node)) return;
+      closeMenu();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMenu();
+      triggerRef.current?.focus();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    focusOption(activeView.id);
+  }, [activeView.id, isOpen]);
+
+  return (
+    <div class="tb-initiative-view-select tb-topbar-initiative-view tb-no-print">
+      <span id="tb-initiative-view-label">Select View</span>
+      <div class="tb-initiative-view-dropdown" ref={dropdownRef}>
+        <button
+          ref={triggerRef}
+          type="button"
+          class={`tb-initiative-view-trigger${isOpen ? " is-open" : ""}`}
+          role="combobox"
+          aria-labelledby="tb-initiative-view-label"
+          aria-describedby="tb-initiative-view-value"
+          aria-expanded={isOpen ? "true" : "false"}
+          aria-haspopup="listbox"
+          aria-controls="tb-initiative-view-listbox"
+          onClick={() => setIsOpen((current) => !current)}
+          onKeyDown={(event) => {
+            switch (event.key) {
+              case "ArrowDown":
+                event.preventDefault();
+                if (!isOpen) {
+                  setIsOpen(true);
+                  return;
+                }
+                focusOptionByOffset(activeView.id, 1);
+                return;
+              case "ArrowUp":
+                event.preventDefault();
+                if (!isOpen) {
+                  setIsOpen(true);
+                  return;
+                }
+                focusOptionByOffset(activeView.id, -1);
+                return;
+              case "Enter":
+              case " ":
+                event.preventDefault();
+                if (!isOpen) {
+                  setIsOpen(true);
+                }
+                return;
+              default:
+                return;
+            }
+          }}
+        >
+          <span id="tb-initiative-view-value" class="tb-initiative-view-value">
+            {formatInitiativeViewOption(activeView)}
+          </span>
+          <span class={`tb-initiative-view-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
+        </button>
+
+        {isOpen ? (
+          <div
+            id="tb-initiative-view-listbox"
+            class="tb-initiative-view-menu"
+            role="listbox"
+            aria-label="Initiative View options"
+          >
+            {views.map((view) => {
+              const selected = view.id === activeView.id;
+              return (
+                <button
+                  key={String(view.id)}
+                  id={`tb-initiative-view-option-${String(view.id)}`}
+                  ref={(node) => {
+                    optionRefs.current[viewKey(view.id)] = node;
+                  }}
+                  type="button"
+                  role="option"
+                  class={`tb-initiative-view-option${selected ? " is-selected" : ""}`}
+                  aria-selected={selected ? "true" : "false"}
+                  onClick={() => selectView(view.id)}
+                  onKeyDown={(event) => {
+                    switch (event.key) {
+                      case "ArrowDown":
+                        event.preventDefault();
+                        focusOptionByOffset(view.id, 1);
+                        return;
+                      case "ArrowUp":
+                        event.preventDefault();
+                        focusOptionByOffset(view.id, -1);
+                        return;
+                      case "Home":
+                        event.preventDefault();
+                        focusOption(views[0]?.id ?? "all");
+                        return;
+                      case "End":
+                        event.preventDefault();
+                        focusOption(views[views.length - 1]?.id ?? "all");
+                        return;
+                      case "Enter":
+                      case " ":
+                        event.preventDefault();
+                        selectView(view.id);
+                        return;
+                      default:
+                        return;
+                    }
+                  }}
+                >
+                  <span>{formatInitiativeViewOption(view)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function Content({ appName }: Props) {
   const [active, setActive] = useState<ScreenId>("integrations");
   const [teamTrendWindowSelection, setTeamTrendWindowSelection] = useState<number>(12);
+  const [initiativeTopbarState, setInitiativeTopbarState] = useState<InitiativeTopbarState>(
+    DEFAULT_INITIATIVE_TOPBAR_STATE,
+  );
   const heading = useMemo(() => screenTitle(active), [active]);
 
   const updateTeamTrendWindowSelection = (nextValue: number) => {
     setTeamTrendWindowSelection(nextValue);
     window.dispatchEvent(new CustomEvent(TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT, {
       detail: { trendWindow: nextValue },
+    }));
+  };
+
+  const updateInitiativeViewSelection = (nextViewId: number | "all") => {
+    setInitiativeTopbarState((current) => ({
+      ...current,
+      activeViewId: nextViewId,
+    }));
+    window.dispatchEvent(new CustomEvent(SET_INITIATIVES_ACTIVE_VIEW_EVENT, {
+      detail: { viewId: nextViewId },
     }));
   };
 
@@ -298,6 +514,23 @@ export function Content({ appName }: Props) {
     window.addEventListener(TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT, handleTeamInsightsTrendWindowSync as EventListener);
     return () => {
       window.removeEventListener(TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT, handleTeamInsightsTrendWindowSync as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleInitiativeViewState = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<InitiativeTopbarState>>).detail;
+      const views = Array.isArray(detail?.views) && detail.views.length > 0
+        ? detail.views
+        : DEFAULT_INITIATIVE_TOPBAR_STATE.views;
+      const activeViewId = detail?.activeViewId === "all" || typeof detail?.activeViewId === "number"
+        ? detail.activeViewId
+        : DEFAULT_INITIATIVE_TOPBAR_STATE.activeViewId;
+      setInitiativeTopbarState({ views, activeViewId });
+    };
+    window.addEventListener(INITIATIVES_VIEW_STATE_EVENT, handleInitiativeViewState as EventListener);
+    return () => {
+      window.removeEventListener(INITIATIVES_VIEW_STATE_EVENT, handleInitiativeViewState as EventListener);
     };
   }, []);
 
@@ -342,13 +575,18 @@ export function Content({ appName }: Props) {
         <header class="tb-topbar">
           <h2>{heading}</h2>
           {active === "initiatives" ? (
-            <div class="tb-topbar-actions">
+            <div class="tb-topbar-actions tb-topbar-actions-initiative">
+              <InitiativeViewDropdown
+                views={initiativeTopbarState.views}
+                activeViewId={initiativeTopbarState.activeViewId}
+                onChange={updateInitiativeViewSelection}
+              />
               <button
                 type="button"
                 class="tb-btn tb-btn-sm tb-no-print"
-                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_REPORTING_PERIOD_EVENT))}
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_MANAGE_VIEW_EVENT))}
               >
-                Reporting Period
+                Manage View
               </button>
               <button
                 type="button"

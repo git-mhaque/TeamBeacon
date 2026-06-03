@@ -2,8 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { within } from "@testing-library/dom";
 import {
   InitiativesScreen,
+  OPEN_INITIATIVES_MANAGE_VIEW_EVENT,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
   OPEN_INITIATIVES_REPORTING_PERIOD_EVENT,
+  SET_INITIATIVES_ACTIVE_VIEW_EVENT,
 } from "../../src/components/content/screens/InitiativesScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
@@ -215,9 +217,7 @@ describe("InitiativesScreen", () => {
     const matrixHeading = screen.getByRole("heading", { name: "Initiative Progress Matrix" });
     expect(matrixHeading).toBeInTheDocument();
     expect(screen.getByText(/Reporting period:/i)).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Initiative View" })).toHaveValue("all");
-    expect(screen.getByRole("button", { name: "New View" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit View" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reporting Period" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Initiative RAG" })).toBeInTheDocument();
     expect(screen.getByText(/\d+\s+Red/)).toBeInTheDocument();
     expect(screen.getByText(/\d+\s+Amber/)).toBeInTheDocument();
@@ -562,9 +562,7 @@ describe("InitiativesScreen", () => {
 
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Initiative View" }), {
-      target: { value: "7" },
-    });
+    fireEvent(window, new CustomEvent(SET_INITIATIVES_ACTIVE_VIEW_EVENT, { detail: { viewId: 7 } }));
 
     await waitFor(() => {
       expect(
@@ -574,8 +572,6 @@ describe("InitiativesScreen", () => {
         )),
       ).toBe(true);
     });
-
-    expect(screen.getByRole("button", { name: "Edit View" })).not.toBeDisabled();
   });
 
   it("opens create view editor and moves epics between available and included lists", async () => {
@@ -584,7 +580,7 @@ describe("InitiativesScreen", () => {
 
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "New View" }));
+    fireEvent(window, new CustomEvent(OPEN_INITIATIVES_MANAGE_VIEW_EVENT));
 
     expect(await screen.findByRole("dialog", { name: "Create Initiative View" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Available configured epics" })).toBeInTheDocument();
@@ -605,20 +601,24 @@ describe("InitiativesScreen", () => {
   });
 
   it("opens edit view editor and shows delete confirmation", async () => {
-    mockInitiativesEndpoints();
+    const fetchSpy = mockInitiativesEndpoints();
     render(<InitiativesScreen />);
 
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Initiative View" }), {
-      target: { value: "7" },
-    });
+    fireEvent(window, new CustomEvent(SET_INITIATIVES_ACTIVE_VIEW_EVENT, { detail: { viewId: 7 } }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit View" })).not.toBeDisabled();
+      expect(
+        fetchSpy.mock.calls.some(([input]) => (
+          String(input).includes("/api/metadata/epics/summary?")
+          && String(input).includes("viewId=7")
+        )),
+      ).toBe(true);
     });
+    expect(await screen.findByText("Epics in Q1 FY27.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit View" }));
+    fireEvent(window, new CustomEvent(OPEN_INITIATIVES_MANAGE_VIEW_EVENT));
 
     expect(await screen.findByRole("dialog", { name: "Edit Initiative View" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Q1 FY27")).toBeInTheDocument();

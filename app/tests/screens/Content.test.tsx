@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { within } from "@testing-library/dom";
 import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
@@ -145,6 +145,28 @@ describe("Content", () => {
           timezone: "Australia/Melbourne",
         },
       },
+      "/api/metadata/initiative-views": {
+        views: [
+          {
+            id: "all",
+            name: "All Configured",
+            description: "All epics with metadata configured in TeamBeacon.",
+            epicKeys: [],
+            epicCount: 1,
+            isDefault: true,
+            updatedAt: null,
+          },
+          {
+            id: 7,
+            name: "Q1 FY27",
+            description: "Q1 delivery scope",
+            epicKeys: ["CEG-101"],
+            epicCount: 1,
+            isDefault: false,
+            updatedAt: "2026-03-30T09:15:00Z",
+          },
+        ],
+      },
       "/api/metadata/lookup": {
         groups: [{ id: 1, name: "Core Platform" }],
         workTypes: [{ id: 2, name: "Feature" }],
@@ -198,8 +220,25 @@ describe("Content", () => {
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Configure Epic" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+    const initiativeViewSelect = await screen.findByRole("combobox", { name: "Select View" });
+    await waitFor(() => {
+      expect(initiativeViewSelect).toHaveTextContent("All Configured (1)");
+    });
+    fireEvent.click(initiativeViewSelect);
+    expect(screen.getByRole("listbox", { name: "Initiative View options" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "All Configured (1)" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("listbox", { name: "Initiative View options" })).not.toBeInTheDocument();
+    const initiativeManageButton = screen.getByRole("button", { name: "Manage View" });
     const initiativeReportingButton = screen.getByRole("button", { name: "Reporting Period" });
     const initiativeConfigureButton = screen.getByRole("button", { name: "Configure Initiative" });
+    const initiativeTopbarActions = initiativeManageButton.closest(".tb-topbar-actions");
+    expect(initiativeTopbarActions).not.toBeNull();
+    expect(within(initiativeTopbarActions as HTMLElement).getByRole("combobox", { name: "Select View" })).toBeInTheDocument();
+    fireEvent.click(initiativeManageButton);
+    expect(await screen.findByRole("dialog", { name: "Create Initiative View" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Create Initiative View" })).not.toBeInTheDocument();
     fireEvent.click(initiativeReportingButton);
     expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

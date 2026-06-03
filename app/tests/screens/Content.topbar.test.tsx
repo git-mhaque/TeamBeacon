@@ -8,6 +8,9 @@ const mockedContentState = vi.hoisted(() => {
     trendWindowOptions,
     openInitiativesConfigureEvent: "teambeacon:initiatives-open-configure",
     openInitiativesReportingPeriodEvent: "teambeacon:initiatives-open-reporting-period",
+    openInitiativesManageViewEvent: "teambeacon:initiatives-open-manage-view",
+    initiativesViewStateEvent: "teambeacon:initiatives-view-state",
+    setInitiativesActiveViewEvent: "teambeacon:initiatives-set-active-view",
     openTeamInsightsSettingsEvent: "teambeacon:team-insights-open-settings",
     teamInsightsTrendWindowChangeEvent: "teambeacon:team-insights-trend-window-change",
     teamInsightsTrendWindowSyncEvent: "teambeacon:team-insights-trend-window-sync",
@@ -124,9 +127,26 @@ vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
   return {
     OPEN_INITIATIVES_CONFIGURE_EVENT: mockedContentState.openInitiativesConfigureEvent,
     OPEN_INITIATIVES_REPORTING_PERIOD_EVENT: mockedContentState.openInitiativesReportingPeriodEvent,
+    OPEN_INITIATIVES_MANAGE_VIEW_EVENT: mockedContentState.openInitiativesManageViewEvent,
+    INITIATIVES_VIEW_STATE_EVENT: mockedContentState.initiativesViewStateEvent,
+    SET_INITIATIVES_ACTIVE_VIEW_EVENT: mockedContentState.setInitiativesActiveViewEvent,
     InitiativesScreen: function InitiativesScreen() {
       const [isReportingOpen, setIsReportingOpen] = useState(false);
       const [isConfigureOpen, setIsConfigureOpen] = useState(false);
+      const [manageDialogLabel, setManageDialogLabel] = useState<string | null>(null);
+      const [activeViewId, setActiveViewId] = useState<number | "all">("all");
+
+      useEffect(() => {
+        window.dispatchEvent(new CustomEvent(mockedContentState.initiativesViewStateEvent, {
+          detail: {
+            views: [
+              { id: "all", name: "All Configured", epicCount: 59, isDefault: true },
+              { id: 7, name: "Q1 FY27", epicCount: 12, isDefault: false },
+            ],
+            activeViewId,
+          },
+        }));
+      }, [activeViewId]);
 
       useEffect(() => {
         const handleReportingOpen = () => {
@@ -135,20 +155,40 @@ vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
         const handleConfigureOpen = () => {
           setIsConfigureOpen(true);
         };
+        const handleManageViewOpen = () => {
+          setManageDialogLabel(activeViewId === "all" ? "Create Initiative View" : "Edit Initiative View");
+        };
+        const handleActiveViewChange = (event: Event) => {
+          const detail = (event as CustomEvent<{ viewId?: number | "all" | string }>).detail;
+          if (detail?.viewId === "all") {
+            setActiveViewId("all");
+            return;
+          }
+          const parsed = Number(detail?.viewId);
+          if (Number.isInteger(parsed)) {
+            setActiveViewId(parsed);
+          }
+        };
 
         window.addEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
         window.addEventListener(mockedContentState.openInitiativesConfigureEvent, handleConfigureOpen);
+        window.addEventListener(mockedContentState.openInitiativesManageViewEvent, handleManageViewOpen);
+        window.addEventListener(mockedContentState.setInitiativesActiveViewEvent, handleActiveViewChange as EventListener);
         return () => {
           window.removeEventListener(mockedContentState.openInitiativesReportingPeriodEvent, handleReportingOpen);
           window.removeEventListener(mockedContentState.openInitiativesConfigureEvent, handleConfigureOpen);
+          window.removeEventListener(mockedContentState.openInitiativesManageViewEvent, handleManageViewOpen);
+          window.removeEventListener(mockedContentState.setInitiativesActiveViewEvent, handleActiveViewChange as EventListener);
         };
-      }, []);
+      }, [activeViewId]);
 
       return (
         <section>
           <p>Initiatives stub</p>
+          <p>{`Active view: ${activeViewId}`}</p>
           {isReportingOpen ? <div role="dialog" aria-label="Configure Reporting Period"></div> : null}
           {isConfigureOpen ? <div role="dialog" aria-label="Configure Epic Metadata"></div> : null}
+          {manageDialogLabel ? <div role="dialog" aria-label={manageDialogLabel}></div> : null}
         </section>
       );
     },
@@ -255,8 +295,15 @@ describe("Content topbar controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
     expect(screen.getByText("Initiatives stub")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Reporting Period" }));
-    expect(screen.getByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
+    const initiativeViewSelect = screen.getByRole("combobox", { name: "Select View" });
+    expect(initiativeViewSelect).toHaveTextContent("All Configured (59)");
+    fireEvent.click(initiativeViewSelect);
+    expect(screen.getByRole("listbox", { name: "Initiative View options" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "Q1 FY27 (12)" }));
+    expect(screen.getByText("Active view: 7")).toBeInTheDocument();
+    expect(initiativeViewSelect).toHaveTextContent("Q1 FY27 (12)");
+    fireEvent.click(screen.getByRole("button", { name: "Manage View" }));
+    expect(screen.getByRole("dialog", { name: "Edit Initiative View" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Configure Initiative" }));
     expect(screen.getByRole("dialog", { name: "Configure Epic Metadata" })).toBeInTheDocument();
 
