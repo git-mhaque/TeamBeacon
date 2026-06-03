@@ -2802,6 +2802,8 @@ body {
 }
 
 .tb-modal-initiative-view {
+  max-height: calc(100vh - 1.8rem);
+  overflow: hidden;
   width: min(100%, 58rem);
 }
 
@@ -2895,17 +2897,30 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.62rem;
+  height: clamp(17rem, 48vh, 22rem);
   min-height: 0;
 }
 
 .tb-initiative-view-picker-panel {
+  align-content: stretch;
   border: 1px solid #d6e0ef;
   border-radius: 0.72rem;
   background: #f8fbff;
   padding: 0.58rem;
   display: grid;
   gap: 0.48rem;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  overflow: hidden;
+}
+
+.tb-initiative-view-picker-panel .tb-modal-field {
+  align-self: start;
+}
+
+.tb-initiative-view-picker-panel .tb-modal-field input {
+  box-sizing: border-box;
+  min-height: 2.15rem;
 }
 
 .tb-initiative-view-picker-head {
@@ -2918,8 +2933,9 @@ body {
 
 .tb-initiative-view-list {
   display: grid;
+  align-content: start;
   gap: 0.34rem;
-  max-height: 19rem;
+  min-height: 0;
   overflow: auto;
 }
 
