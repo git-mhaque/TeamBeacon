@@ -430,6 +430,11 @@ function compareNumber(left: number, right: number): number {
   return left < right ? -1 : 1;
 }
 
+function epicDisplaySortText(row: SummaryRow): string {
+  const name = row.epicName.trim();
+  return name || row.epicKey;
+}
+
 function parsePersistedVisibleOptionalColumns(raw: string | null): OptionalColumnId[] {
   if (!raw) return DEFAULT_VISIBLE_OPTIONAL_COLUMNS;
   try {
@@ -1089,7 +1094,7 @@ export function InitiativesScreen() {
       let comparison = 0;
       switch (sortField) {
         case "epic":
-          comparison = compareText(left.epicKey, right.epicKey);
+          comparison = compareText(epicDisplaySortText(left), epicDisplaySortText(right));
           break;
         case "group":
           comparison = compareText(left.groupText, right.groupText);

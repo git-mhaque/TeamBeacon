@@ -339,6 +339,22 @@ describe("InitiativesScreen", () => {
         .map((node) => node.textContent?.trim() ?? "")
         .filter((value) => value.length > 0);
 
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-202", "CEG-101", "CEG-303"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic/i }));
+
+    await waitFor(() => {
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
+    });
+
     fireEvent.click(screen.getByRole("button", { name: /Sort by Progress/i }));
 
     await waitFor(() => {
@@ -458,7 +474,7 @@ describe("InitiativesScreen", () => {
     fireEvent.click(positiveDeltaToggle);
 
     await waitFor(() => {
-      expect(getEpicOrder()).toEqual(["CEG-101", "CEG-303"]);
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101"]);
     });
     expect(within(matrixTitle as HTMLElement).getByText("2 visible")).toBeInTheDocument();
     expect(positiveDeltaToggle).toHaveAttribute("aria-pressed", "true");
@@ -481,7 +497,7 @@ describe("InitiativesScreen", () => {
     fireEvent.click(timeBoundToggle);
 
     await waitFor(() => {
-      expect(getEpicOrder()).toEqual(["CEG-101", "CEG-202", "CEG-303"]);
+      expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
     });
     expect(within(matrixTitle as HTMLElement).getByText("3 visible")).toBeInTheDocument();
     expect(timeBoundToggle).toHaveAttribute("aria-pressed", "false");
