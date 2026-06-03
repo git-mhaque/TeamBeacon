@@ -32,16 +32,20 @@ from services.api.integrations.release_refresh import (
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    create_initiative_view,
     delete_epic_metadata,
     delete_epic_group,
+    delete_initiative_view,
     delete_work_type,
     get_configured_epics_completed_cards,
     get_configured_epic_summary,
     get_epic_completed_cards,
     get_epic_lookup_config,
     get_epic_metadata,
+    get_initiative_views,
     search_unconfigured_epics,
     update_epic_group,
+    update_initiative_view,
     update_work_type,
     upsert_epic_metadata,
 )
@@ -66,6 +70,9 @@ MetadataEpicSearchProvider = Callable[..., dict[str, Any]]
 MetadataEpicUpsertProvider = Callable[..., dict[str, Any]]
 MetadataEpicDeleteProvider = Callable[[str], dict[str, Any]]
 MetadataEpicCompletedCardsProvider = Callable[..., dict[str, Any]]
+MetadataInitiativeViewReadProvider = Callable[[], dict[str, Any]]
+MetadataInitiativeViewWriteProvider = Callable[..., dict[str, Any]]
+MetadataInitiativeViewDeleteProvider = Callable[[int], dict[str, Any]]
 ConfluenceStatusProvider = Callable[[], dict[str, Any]]
 AiStatusProvider = Callable[..., dict[str, Any]]
 AiChatProvider = Callable[..., dict[str, Any]]
@@ -635,6 +642,73 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "responses": {"200": {"description": "Epic metadata deleted", "content": json_payload}, "400": error_payload},
                 }
             },
+            "/api/metadata/initiative-views": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "Read initiative views",
+                    "responses": {"200": {"description": "Initiative views", "content": json_payload}},
+                },
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Create initiative view",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "description": {"type": "string"},
+                                        "epicKeys": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Initiative view created", "content": json_payload}, "400": error_payload},
+                },
+            },
+            "/api/metadata/initiative-views/update": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Update initiative view",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id", "name"],
+                                    "properties": {
+                                        "id": {"type": "integer"},
+                                        "name": {"type": "string"},
+                                        "description": {"type": "string"},
+                                        "epicKeys": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Initiative view updated", "content": json_payload}, "400": error_payload},
+                }
+            },
+            "/api/metadata/initiative-views/delete": {
+                "post": {
+                    "tags": ["metadata"],
+                    "summary": "Delete initiative view",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Initiative view deleted", "content": json_payload}, "400": error_payload},
+                }
+            },
             "/api/metadata/epics/summary": {
                 "get": {
                     "tags": ["metadata"],
@@ -644,6 +718,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         {"name": "periodStart", "in": "query", "schema": {"type": "string"}},
                         {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
                         {"name": "timezone", "in": "query", "schema": {"type": "string"}},
+                        {"name": "viewId", "in": "query", "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "Configured epic summary", "content": json_payload}, "400": error_payload},
                 }
@@ -674,6 +749,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         {"name": "periodStart", "in": "query", "schema": {"type": "string"}},
                         {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
                         {"name": "timezone", "in": "query", "schema": {"type": "string"}},
+                        {"name": "viewId", "in": "query", "schema": {"type": "string"}},
                     ],
                     "responses": {
                         "200": {"description": "Completed cards across configured initiatives", "content": json_payload},
@@ -721,6 +797,10 @@ def build_handler(
     metadata_search_epics_provider: MetadataEpicSearchProvider = search_unconfigured_epics,
     metadata_upsert_epic_provider: MetadataEpicUpsertProvider = upsert_epic_metadata,
     metadata_delete_epic_provider: MetadataEpicDeleteProvider = delete_epic_metadata,
+    metadata_read_initiative_views_provider: MetadataInitiativeViewReadProvider = get_initiative_views,
+    metadata_create_initiative_view_provider: MetadataInitiativeViewWriteProvider = create_initiative_view,
+    metadata_update_initiative_view_provider: MetadataInitiativeViewWriteProvider = update_initiative_view,
+    metadata_delete_initiative_view_provider: MetadataInitiativeViewDeleteProvider = delete_initiative_view,
     confluence_status_provider: ConfluenceStatusProvider = get_confluence_status,
     ai_status_provider: AiStatusProvider = get_intelligence_status,
     ai_chat_provider: AiChatProvider = chat_with_intelligence,
@@ -953,6 +1033,12 @@ def build_handler(
                 self.wfile.write(_json_bytes(payload))
                 return
 
+            if path == "/api/metadata/initiative-views":
+                payload = metadata_read_initiative_views_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
             if path == "/api/metadata/epics/summary":
                 query = parse_qs(parsed.query)
                 limit_raw = query.get("limit", ["50"])[0]
@@ -966,12 +1052,15 @@ def build_handler(
                 period_end = period_end_raw.strip() if isinstance(period_end_raw, str) else None
                 timezone_raw = query.get("timezone", [None])[0]
                 timezone_name = timezone_raw.strip() if isinstance(timezone_raw, str) else None
+                view_id_raw = query.get("viewId", [None])[0]
+                view_id = view_id_raw.strip() if isinstance(view_id_raw, str) else None
                 try:
                     payload = metadata_summary_provider(
                         limit=limit,
                         period_start=period_start,
                         period_end=period_end,
                         timezone_name=timezone_name,
+                        view_id=view_id,
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)
@@ -1034,6 +1123,8 @@ def build_handler(
                 period_end = period_end_raw.strip() if isinstance(period_end_raw, str) else None
                 timezone_raw = query.get("timezone", [None])[0]
                 timezone_name = timezone_raw.strip() if isinstance(timezone_raw, str) else None
+                view_id_raw = query.get("viewId", [None])[0]
+                view_id = view_id_raw.strip() if isinstance(view_id_raw, str) else None
 
                 try:
                     payload = metadata_configured_completed_cards_provider(
@@ -1041,6 +1132,7 @@ def build_handler(
                         period_start=period_start,
                         period_end=period_end,
                         timezone_name=timezone_name,
+                        view_id=view_id,
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)
@@ -1356,6 +1448,100 @@ def build_handler(
                     return
                 try:
                     payload = metadata_delete_work_type_provider(id_raw)
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/initiative-views":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                name_raw = body_payload.get("name")
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                description_raw = body_payload.get("description")
+                if description_raw is not None and not isinstance(description_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "description must be a string."}))
+                    return
+                epic_keys_raw = body_payload.get("epicKeys")
+                if epic_keys_raw is not None and not isinstance(epic_keys_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "epicKeys must be a list of strings."}))
+                    return
+                try:
+                    payload = metadata_create_initiative_view_provider(
+                        name=name_raw,
+                        description=description_raw,
+                        epic_keys=epic_keys_raw,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/initiative-views/update":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                name_raw = body_payload.get("name")
+                if not isinstance(name_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "name is required."}))
+                    return
+                description_raw = body_payload.get("description")
+                if description_raw is not None and not isinstance(description_raw, str):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "description must be a string."}))
+                    return
+                epic_keys_raw = body_payload.get("epicKeys")
+                if epic_keys_raw is not None and not isinstance(epic_keys_raw, list):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "epicKeys must be a list of strings."}))
+                    return
+                try:
+                    payload = metadata_update_initiative_view_provider(
+                        view_id=id_raw,
+                        name=name_raw,
+                        description=description_raw,
+                        epic_keys=epic_keys_raw,
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/initiative-views/delete":
+                if not isinstance(body_payload, dict):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "JSON object payload is required."}))
+                    return
+                id_raw = body_payload.get("id")
+                if not isinstance(id_raw, int):
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "id is required as integer."}))
+                    return
+                try:
+                    payload = metadata_delete_initiative_view_provider(id_raw)
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))

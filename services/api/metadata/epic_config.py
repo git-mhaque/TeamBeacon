@@ -65,6 +65,27 @@ def _ensure_metadata_schema(conn: sqlite3.Connection) -> None:
           FOREIGN KEY (epic_metadata_id) REFERENCES epic_metadata(id),
           FOREIGN KEY (work_type_id) REFERENCES work_types(id)
         );
+
+        CREATE TABLE IF NOT EXISTS initiative_views (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          description TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS initiative_view_epics (
+          view_id INTEGER NOT NULL,
+          epic_metadata_id INTEGER NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY(view_id, epic_metadata_id),
+          FOREIGN KEY (view_id) REFERENCES initiative_views(id),
+          FOREIGN KEY (epic_metadata_id) REFERENCES epic_metadata(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_initiative_view_epics_view
+        ON initiative_view_epics(view_id, sort_order, epic_metadata_id);
         """
     )
     if not _column_exists(conn, "epic_metadata", "epic_name"):
@@ -139,6 +160,49 @@ def _normalize_epic_key(epic_key: str) -> str:
     if not normalized:
         raise ValueError("epicKey is required.")
     return normalized
+
+
+def _normalize_view_id(view_id: int | str) -> int:
+    try:
+        normalized = int(view_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("viewId must be an integer.") from exc
+    if normalized <= 0:
+        raise ValueError("viewId must be a positive integer.")
+    return normalized
+
+
+def _normalize_optional_view_id(view_id: int | str | None) -> int | None:
+    if view_id is None:
+        return None
+    if isinstance(view_id, str) and view_id.strip().lower() in {"", "all"}:
+        return None
+    return _normalize_view_id(view_id)
+
+
+def _normalize_optional_description(description: str | None) -> str | None:
+    if description is None:
+        return None
+    if not isinstance(description, str):
+        raise ValueError("description must be a string.")
+    normalized = description.strip()
+    return normalized or None
+
+
+def _normalize_epic_key_list(epic_keys: list[str] | None) -> list[str]:
+    if not epic_keys:
+        return []
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for raw in epic_keys:
+        if not isinstance(raw, str):
+            raise ValueError("epicKeys must contain strings.")
+        normalized = _normalize_epic_key(raw)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
 
 
 def _normalize_criteria(values: list[str] | None) -> list[str]:
@@ -336,6 +400,232 @@ def get_epic_lookup_config(db_path: str | None = None) -> dict[str, Any]:
     finally:
         conn.close()
     return {"groups": groups, "workTypes": work_types}
+
+
+def _read_view_epic_keys(conn: sqlite3.Connection, view_id: int) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT em.epic_key
+        FROM initiative_view_epics ive
+        JOIN epic_metadata em ON em.id = ive.epic_metadata_id
+        WHERE ive.view_id = ?
+        ORDER BY ive.sort_order ASC, em.epic_key ASC
+        """,
+        (view_id,),
+    ).fetchall()
+    return [str(row["epic_key"]) for row in rows]
+
+
+def _read_initiative_view(conn: sqlite3.Connection, view_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        """
+        SELECT id, name, description, updated_at
+        FROM initiative_views
+        WHERE id = ?
+        LIMIT 1
+        """,
+        (view_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    epic_keys = _read_view_epic_keys(conn, view_id)
+    description = row["description"]
+    return {
+        "id": int(row["id"]),
+        "name": str(row["name"]),
+        "description": str(description).strip() if description is not None and str(description).strip() else None,
+        "epicKeys": epic_keys,
+        "epicCount": len(epic_keys),
+        "isDefault": False,
+        "updatedAt": row["updated_at"],
+    }
+
+
+def _read_all_configured_view(conn: sqlite3.Connection) -> dict[str, Any]:
+    count_row = conn.execute("SELECT COUNT(*) AS count FROM epic_metadata").fetchone()
+    epic_count = int(count_row["count"] or 0) if count_row is not None else 0
+    return {
+        "id": "all",
+        "name": "All Configured",
+        "description": "All epics with metadata configured in TeamBeacon.",
+        "epicKeys": [],
+        "epicCount": epic_count,
+        "isDefault": True,
+        "updatedAt": None,
+    }
+
+
+def _resolve_view_payload(conn: sqlite3.Connection, view_id: int | None) -> dict[str, Any]:
+    if view_id is None:
+        return _read_all_configured_view(conn)
+    view = _read_initiative_view(conn, view_id)
+    if view is None:
+        raise ValueError(f"viewId {view_id} was not found.")
+    return view
+
+
+def get_initiative_views(db_path: str | None = None) -> dict[str, Any]:
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        rows = conn.execute(
+            """
+            SELECT id
+            FROM initiative_views
+            ORDER BY LOWER(name) ASC, id ASC
+            """
+        ).fetchall()
+        views = [_read_all_configured_view(conn)]
+        for row in rows:
+            view = _read_initiative_view(conn, int(row["id"]))
+            if view is not None:
+                views.append(view)
+    finally:
+        conn.close()
+    return {"views": views}
+
+
+def _replace_view_epics(conn: sqlite3.Connection, view_id: int, epic_keys: list[str]) -> None:
+    conn.execute("DELETE FROM initiative_view_epics WHERE view_id = ?", (view_id,))
+    if not epic_keys:
+        return
+
+    placeholders = ",".join("?" for _ in epic_keys)
+    rows = conn.execute(
+        f"""
+        SELECT id, epic_key
+        FROM epic_metadata
+        WHERE epic_key IN ({placeholders})
+        """,
+        epic_keys,
+    ).fetchall()
+    metadata_id_by_key = {str(row["epic_key"]): int(row["id"]) for row in rows}
+    missing = [epic_key for epic_key in epic_keys if epic_key not in metadata_id_by_key]
+    if missing:
+        raise ValueError(f"Cannot add unconfigured epic keys to a view: {missing}.")
+
+    for index, epic_key in enumerate(epic_keys):
+        conn.execute(
+            """
+            INSERT INTO initiative_view_epics (view_id, epic_metadata_id, sort_order)
+            VALUES (?, ?, ?)
+            """,
+            (view_id, metadata_id_by_key[epic_key], index),
+        )
+
+
+def create_initiative_view(
+    *,
+    name: str,
+    epic_keys: list[str] | None = None,
+    description: str | None = None,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_name = _normalize_name(name)
+    normalized_description = _normalize_optional_description(description)
+    normalized_epic_keys = _normalize_epic_key_list(epic_keys)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO initiative_views (name, description, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                (normalized_name, normalized_description),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError(f'View "{normalized_name}" already exists.') from exc
+        view_id = int(cursor.lastrowid)
+        _replace_view_epics(conn, view_id, normalized_epic_keys)
+        view = _read_initiative_view(conn, view_id)
+        conn.commit()
+    finally:
+        conn.close()
+
+    if view is None:
+        raise RuntimeError("Initiative view row was not persisted.")
+    return view
+
+
+def update_initiative_view(
+    *,
+    view_id: int | str,
+    name: str,
+    epic_keys: list[str] | None = None,
+    description: str | None = None,
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_view_id = _normalize_view_id(view_id)
+    normalized_name = _normalize_name(name)
+    normalized_description = _normalize_optional_description(description)
+    normalized_epic_keys = _normalize_epic_key_list(epic_keys)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        existing = conn.execute(
+            "SELECT id FROM initiative_views WHERE id = ? LIMIT 1",
+            (normalized_view_id,),
+        ).fetchone()
+        if existing is None:
+            raise ValueError(f"viewId {normalized_view_id} was not found.")
+
+        try:
+            conn.execute(
+                """
+                UPDATE initiative_views
+                SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (normalized_name, normalized_description, normalized_view_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError(f'View "{normalized_name}" already exists.') from exc
+        _replace_view_epics(conn, normalized_view_id, normalized_epic_keys)
+        view = _read_initiative_view(conn, normalized_view_id)
+        conn.commit()
+    finally:
+        conn.close()
+
+    if view is None:
+        raise RuntimeError("Initiative view row was not persisted.")
+    return view
+
+
+def delete_initiative_view(view_id: int | str, db_path: str | None = None) -> dict[str, Any]:
+    normalized_view_id = _normalize_view_id(view_id)
+    resolved_db_path = db_path or _resolve_db_path()
+    conn = _connect(resolved_db_path)
+    try:
+        _ensure_metadata_schema(conn)
+        existing = conn.execute(
+            "SELECT id FROM initiative_views WHERE id = ? LIMIT 1",
+            (normalized_view_id,),
+        ).fetchone()
+        if existing is None:
+            raise ValueError(f"viewId {normalized_view_id} was not found.")
+        mapping_result = conn.execute(
+            "DELETE FROM initiative_view_epics WHERE view_id = ?",
+            (normalized_view_id,),
+        )
+        view_result = conn.execute(
+            "DELETE FROM initiative_views WHERE id = ?",
+            (normalized_view_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "id": normalized_view_id,
+        "deleted": True,
+        "removedMappings": int(mapping_result.rowcount or 0),
+        "removedRows": int(view_result.rowcount or 0),
+    }
 
 
 def search_unconfigured_epics(
@@ -564,6 +854,10 @@ def delete_epic_metadata(
             "DELETE FROM epic_metadata_work_types WHERE epic_metadata_id = ?",
             (metadata_id,),
         )
+        view_result = conn.execute(
+            "DELETE FROM initiative_view_epics WHERE epic_metadata_id = ?",
+            (metadata_id,),
+        )
         metadata_result = conn.execute(
             "DELETE FROM epic_metadata WHERE id = ?",
             (metadata_id,),
@@ -577,6 +871,7 @@ def delete_epic_metadata(
         "deleted": True,
         "removedGroupMappings": int(group_result.rowcount or 0),
         "removedWorkTypeMappings": int(work_type_result.rowcount or 0),
+        "removedViewMappings": int(view_result.rowcount or 0),
         "removedMetadataRows": int(metadata_result.rowcount or 0),
     }
 
@@ -779,12 +1074,61 @@ def _read_epic_completion_metrics(
     return (total_cards, completed_cards, completed_in_period)
 
 
+def _fetch_configured_epic_rows(
+    conn: sqlite3.Connection,
+    *,
+    limit: int | None = None,
+    view_id: int | str | None = None,
+) -> tuple[list[sqlite3.Row], dict[str, Any]]:
+    normalized_view_id = _normalize_optional_view_id(view_id)
+    view = _resolve_view_payload(conn, normalized_view_id)
+    limit_clause = "" if limit is None else "LIMIT ?"
+
+    if normalized_view_id is None:
+        params: list[Any] = [] if limit is None else [limit]
+        rows = conn.execute(
+            f"""
+            SELECT
+              em.epic_key,
+              em.epic_name,
+              em.updated_at,
+              i.summary AS issue_summary
+            FROM epic_metadata em
+            LEFT JOIN issues i ON i.issue_key = em.epic_key
+            ORDER BY datetime(em.updated_at) DESC, em.epic_key ASC
+            {limit_clause}
+            """,
+            params,
+        ).fetchall()
+        return rows, view
+
+    params = [normalized_view_id] if limit is None else [normalized_view_id, limit]
+    rows = conn.execute(
+        f"""
+        SELECT
+          em.epic_key,
+          em.epic_name,
+          em.updated_at,
+          i.summary AS issue_summary
+        FROM initiative_view_epics ive
+        JOIN epic_metadata em ON em.id = ive.epic_metadata_id
+        LEFT JOIN issues i ON i.issue_key = em.epic_key
+        WHERE ive.view_id = ?
+        ORDER BY ive.sort_order ASC, em.epic_key ASC
+        {limit_clause}
+        """,
+        params,
+    ).fetchall()
+    return rows, view
+
+
 def get_configured_epic_summary(
     *,
     limit: int = 50,
     period_start: str | None = None,
     period_end: str | None = None,
     timezone_name: str | None = None,
+    view_id: int | str | None = None,
     db_path: str | None = None,
 ) -> dict[str, Any]:
     resolved_db_path = db_path or _resolve_db_path()
@@ -803,20 +1147,7 @@ def get_configured_epic_summary(
     conn = _connect(resolved_db_path)
     try:
         _ensure_metadata_schema(conn)
-        rows = conn.execute(
-            """
-            SELECT
-              em.epic_key,
-              em.epic_name,
-              em.updated_at,
-              i.summary AS issue_summary
-            FROM epic_metadata em
-            LEFT JOIN issues i ON i.issue_key = em.epic_key
-            ORDER BY datetime(em.updated_at) DESC, em.epic_key ASC
-            LIMIT ?
-            """,
-            (safe_limit,),
-        ).fetchall()
+        rows, view = _fetch_configured_epic_rows(conn, limit=safe_limit, view_id=view_id)
 
         epics: list[dict[str, Any]] = []
         for row in rows:
@@ -885,6 +1216,7 @@ def get_configured_epic_summary(
             "days": (period_end_date - period_start_date).days + 1,
             "timezone": resolved_timezone_name,
         },
+        "view": view,
     }
 
 
@@ -1002,6 +1334,7 @@ def get_configured_epics_completed_cards(
     period_start: str | None = None,
     period_end: str | None = None,
     timezone_name: str | None = None,
+    view_id: int | str | None = None,
     db_path: str | None = None,
 ) -> dict[str, Any]:
     safe_limit = max(1, min(int(limit), 1000))
@@ -1020,14 +1353,7 @@ def get_configured_epics_completed_cards(
     conn = _connect(resolved_db_path)
     try:
         _ensure_metadata_schema(conn)
-        configured_rows = conn.execute(
-            """
-            SELECT em.epic_key, em.epic_name, i.summary AS issue_summary
-            FROM epic_metadata em
-            LEFT JOIN issues i ON i.issue_key = em.epic_key
-            ORDER BY em.epic_key ASC
-            """
-        ).fetchall()
+        configured_rows, view = _fetch_configured_epic_rows(conn, view_id=view_id)
 
         configured_epic_keys = [str(row["epic_key"]) for row in configured_rows]
         if not configured_epic_keys:
@@ -1045,6 +1371,7 @@ def get_configured_epics_completed_cards(
                     "days": (period_end_date - period_start_date).days + 1,
                     "timezone": resolved_timezone_name,
                 },
+                "view": view,
             }
 
         epic_name_by_key: dict[str, str] = {}
@@ -1147,6 +1474,7 @@ def get_configured_epics_completed_cards(
             "days": (period_end_date - period_start_date).days + 1,
             "timezone": resolved_timezone_name,
         },
+        "view": view,
     }
 
 

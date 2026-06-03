@@ -29,9 +29,12 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_upsert_calls: list[dict[str, object]] = []
         self.epic_delete_calls: list[str] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
-        self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None]] = []
+        self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None, str | None]] = []
         self.epic_completed_cards_calls: list[tuple[str, int, str | None, str | None, str | None]] = []
-        self.configured_completed_cards_calls: list[tuple[int, str | None, str | None, str | None]] = []
+        self.configured_completed_cards_calls: list[tuple[int, str | None, str | None, str | None, str | None]] = []
+        self.initiative_view_create_calls: list[dict[str, object]] = []
+        self.initiative_view_update_calls: list[dict[str, object]] = []
+        self.initiative_view_delete_calls: list[int] = []
         self.ai_status_calls: list[str | None] = []
         self.oci_chat_calls: list[dict[str, object]] = []
         self.release_refresh_start_calls: list[dict[str, object]] = []
@@ -726,8 +729,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 ]
             }
 
-        def fake_epic_summary(limit=50, period_start=None, period_end=None, timezone_name=None):  # noqa: ANN001
-            self.epic_summary_calls.append((limit, period_start, period_end, timezone_name))
+        def fake_epic_summary(limit=50, period_start=None, period_end=None, timezone_name=None, view_id=None):  # noqa: ANN001
+            self.epic_summary_calls.append((limit, period_start, period_end, timezone_name, view_id))
             return {
                 "epics": [
                     {
@@ -757,6 +760,15 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                     "endDate": "2026-03-30",
                     "days": 30,
                     "timezone": "Australia/Melbourne",
+                },
+                "view": {
+                    "id": int(view_id) if view_id and str(view_id).isdigit() else "all",
+                    "name": "Q1 FY27" if view_id else "All Configured",
+                    "description": None,
+                    "epicKeys": ["CEGBUPOL-4482"] if view_id else [],
+                    "epicCount": 1,
+                    "isDefault": not bool(view_id),
+                    "updatedAt": None,
                 },
             }
 
@@ -803,8 +815,14 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 },
             }
 
-        def fake_configured_completed_cards(limit=300, period_start=None, period_end=None, timezone_name=None):  # noqa: ANN001
-            self.configured_completed_cards_calls.append((limit, period_start, period_end, timezone_name))
+        def fake_configured_completed_cards(
+            limit=300,
+            period_start=None,
+            period_end=None,
+            timezone_name=None,
+            view_id=None,
+        ):  # noqa: ANN001
+            self.configured_completed_cards_calls.append((limit, period_start, period_end, timezone_name, view_id))
             return {
                 "source": "local",
                 "scope": "configured",
@@ -853,6 +871,15 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                     "days": 30,
                     "timezone": timezone_name or "UTC",
                 },
+                "view": {
+                    "id": int(view_id) if view_id and str(view_id).isdigit() else "all",
+                    "name": "Q1 FY27" if view_id else "All Configured",
+                    "description": None,
+                    "epicKeys": ["CEGBUPOL-4482"] if view_id else [],
+                    "epicCount": 1,
+                    "isDefault": not bool(view_id),
+                    "updatedAt": None,
+                },
             }
 
         def fake_upsert_epic(**kwargs):  # noqa: ANN003
@@ -880,6 +907,58 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "removedMetadataRows": 1,
             }
 
+        def fake_read_initiative_views():
+            return {
+                "views": [
+                    {
+                        "id": "all",
+                        "name": "All Configured",
+                        "description": "All epics with metadata configured in TeamBeacon.",
+                        "epicKeys": [],
+                        "epicCount": 2,
+                        "isDefault": True,
+                        "updatedAt": None,
+                    },
+                    {
+                        "id": 7,
+                        "name": "Q1 FY27",
+                        "description": "Q1 delivery scope",
+                        "epicKeys": ["CEGBUPOL-4482", "CEGBUPOL-3553"],
+                        "epicCount": 2,
+                        "isDefault": False,
+                        "updatedAt": "2026-03-25T00:00:00+00:00",
+                    },
+                ]
+            }
+
+        def fake_create_initiative_view(**kwargs):  # noqa: ANN003
+            self.initiative_view_create_calls.append(kwargs)
+            return {
+                "id": 8,
+                "name": kwargs["name"],
+                "description": kwargs.get("description"),
+                "epicKeys": kwargs.get("epic_keys") or [],
+                "epicCount": len(kwargs.get("epic_keys") or []),
+                "isDefault": False,
+                "updatedAt": "2026-03-25T00:00:00+00:00",
+            }
+
+        def fake_update_initiative_view(**kwargs):  # noqa: ANN003
+            self.initiative_view_update_calls.append(kwargs)
+            return {
+                "id": kwargs["view_id"],
+                "name": kwargs["name"],
+                "description": kwargs.get("description"),
+                "epicKeys": kwargs.get("epic_keys") or [],
+                "epicCount": len(kwargs.get("epic_keys") or []),
+                "isDefault": False,
+                "updatedAt": "2026-03-25T00:00:00+00:00",
+            }
+
+        def fake_delete_initiative_view(view_id):  # noqa: ANN001
+            self.initiative_view_delete_calls.append(view_id)
+            return {"id": view_id, "deleted": True, "removedMappings": 2, "removedRows": 1}
+
         handler_cls = build_handler(
             jira_status_provider=fake_status,
             jira_sync_status_provider=fake_sync_status,
@@ -905,6 +984,10 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             metadata_search_epics_provider=fake_search_epics,
             metadata_upsert_epic_provider=fake_upsert_epic,
             metadata_delete_epic_provider=fake_delete_epic,
+            metadata_read_initiative_views_provider=fake_read_initiative_views,
+            metadata_create_initiative_view_provider=fake_create_initiative_view,
+            metadata_update_initiative_view_provider=fake_update_initiative_view,
+            metadata_delete_initiative_view_provider=fake_delete_initiative_view,
             confluence_status_provider=fake_confluence_status,
             ai_status_provider=fake_ai_status,
             ai_chat_provider=fake_ai_chat,
@@ -948,6 +1031,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards/configured", body["paths"])
+        self.assertIn("/api/metadata/initiative-views", body["paths"])
+        self.assertIn("/api/metadata/initiative-views/update", body["paths"])
+        self.assertIn("/api/metadata/initiative-views/delete", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
         team_insights_get = body["paths"]["/api/team/insights"]["get"]
@@ -1353,6 +1439,73 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["groups"][0]["name"], "Platform")
         self.assertEqual(body["workTypes"][0]["name"], "Feature")
 
+    def test_metadata_initiative_views_endpoint(self) -> None:
+        with urlopen(f"{self.base_url}/api/metadata/initiative-views", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["views"][0]["id"], "all")
+        self.assertTrue(body["views"][0]["isDefault"])
+        self.assertEqual(body["views"][1]["name"], "Q1 FY27")
+        self.assertEqual(body["views"][1]["epicKeys"], ["CEGBUPOL-4482", "CEGBUPOL-3553"])
+
+    def test_metadata_create_initiative_view_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/initiative-views",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "name": "Q2 FY27",
+                    "description": "Q2 delivery scope",
+                    "epicKeys": ["CEGBUPOL-4482"],
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 8)
+        self.assertEqual(body["name"], "Q2 FY27")
+        self.assertEqual(body["epicCount"], 1)
+        self.assertEqual(self.initiative_view_create_calls[-1]["name"], "Q2 FY27")
+        self.assertEqual(self.initiative_view_create_calls[-1]["epic_keys"], ["CEGBUPOL-4482"])
+
+    def test_metadata_update_initiative_view_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/initiative-views/update",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "id": 7,
+                    "name": "Q1 FY27 Delivery",
+                    "description": "Updated scope",
+                    "epicKeys": ["CEGBUPOL-3553"],
+                }
+            ).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 7)
+        self.assertEqual(body["name"], "Q1 FY27 Delivery")
+        self.assertEqual(body["epicKeys"], ["CEGBUPOL-3553"])
+        self.assertEqual(self.initiative_view_update_calls[-1]["view_id"], 7)
+
+    def test_metadata_delete_initiative_view_endpoint(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/metadata/initiative-views/delete",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"id": 7}).encode("utf-8"),
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["id"], 7)
+        self.assertTrue(body["deleted"])
+        self.assertEqual(self.initiative_view_delete_calls[-1], 7)
+
     def test_metadata_add_group_endpoint(self) -> None:
         request = Request(
             f"{self.base_url}/api/metadata/lookup/groups",
@@ -1523,7 +1676,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["perEpicCounts"]["CEGBUPOL-3553"], 2)
         self.assertEqual(
             self.configured_completed_cards_calls[-1],
-            (50, "2026-03-01", "2026-03-30", "Australia/Melbourne"),
+            (50, "2026-03-01", "2026-03-30", "Australia/Melbourne", None),
         )
 
     def test_metadata_upsert_epic_endpoint_rejects_non_string_timeline_start_date(self) -> None:
@@ -1644,8 +1797,30 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIsNone(body["epics"][0]["ragScore"])
         self.assertEqual(
             self.epic_summary_calls[-1],
-            (30, "2026-03-01", "2026-03-30", "Australia/Melbourne"),
+            (30, "2026-03-01", "2026-03-30", "Australia/Melbourne", None),
         )
+
+    def test_metadata_epic_summary_endpoint_supports_view_id(self) -> None:
+        with urlopen(  # noqa: S310
+            f"{self.base_url}/api/metadata/epics/summary?limit=30&viewId=7",
+            timeout=5,
+        ) as response:
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["view"]["id"], 7)
+        self.assertEqual(body["view"]["name"], "Q1 FY27")
+        self.assertEqual(self.epic_summary_calls[-1], (30, None, None, None, "7"))
+
+    def test_metadata_completed_cards_configured_endpoint_supports_view_id(self) -> None:
+        with urlopen(  # noqa: S310
+            f"{self.base_url}/api/metadata/epics/completed-cards/configured?limit=50&viewId=7",
+            timeout=5,
+        ) as response:
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(body["view"]["id"], 7)
+        self.assertEqual(body["view"]["name"], "Q1 FY27")
+        self.assertEqual(self.configured_completed_cards_calls[-1], (50, None, None, None, "7"))
 
 
 class LocalApiStaticWebIntegrationTests(unittest.TestCase):

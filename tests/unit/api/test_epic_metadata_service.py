@@ -9,16 +9,20 @@ import sqlite3
 from services.api.metadata.epic_config import (
     add_epic_group,
     add_work_type,
+    create_initiative_view,
     delete_epic_metadata,
     delete_epic_group,
+    delete_initiative_view,
     delete_work_type,
     get_configured_epics_completed_cards,
     get_epic_completed_cards,
     get_configured_epic_summary,
     get_epic_lookup_config,
     get_epic_metadata,
+    get_initiative_views,
     search_unconfigured_epics,
     update_epic_group,
+    update_initiative_view,
     update_work_type,
     upsert_epic_metadata,
 )
@@ -299,6 +303,135 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "is not configured"):
                 delete_epic_metadata("CEGBUPOL-4482", db_path=db_path)
+
+    def test_initiative_views_scope_summary_and_completed_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            add_epic_group("Platform", db_path=db_path)
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.executemany(
+                    """
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category,
+                      epic_key, resolved_at_source, updated_at_source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("CEGBUPOL-100", "100", "Epic", "Q1 Platform", "In Progress", "In Progress", None, None, "2026-03-20T00:00:00+00:00"),
+                        ("CEGBUPOL-200", "200", "Epic", "Shared Reliability", "In Progress", "In Progress", None, None, "2026-03-20T00:00:00+00:00"),
+                        ("CEGBUPOL-300", "300", "Epic", "Q2 Search", "In Progress", "In Progress", None, None, "2026-03-20T00:00:00+00:00"),
+                        ("CEGBUPOL-1001", "1001", "Story", "Q1 done card", "Done", "Done", "CEGBUPOL-100", "2026-03-24T00:00:00+00:00", "2026-03-24T00:00:00+00:00"),
+                        ("CEGBUPOL-2001", "2001", "Story", "Shared done card", "Done", "Done", "CEGBUPOL-200", "2026-03-25T00:00:00+00:00", "2026-03-25T00:00:00+00:00"),
+                        ("CEGBUPOL-3001", "3001", "Story", "Q2 done card", "Done", "Done", "CEGBUPOL-300", "2026-03-26T00:00:00+00:00", "2026-03-26T00:00:00+00:00"),
+                    ],
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            for epic_key in ["CEGBUPOL-100", "CEGBUPOL-200", "CEGBUPOL-300"]:
+                upsert_epic_metadata(
+                    epic_key=epic_key,
+                    success_criteria=[],
+                    group_ids=[],
+                    work_type_ids=[],
+                    db_path=db_path,
+                )
+
+            q1_view = create_initiative_view(
+                name="Q1 FY27",
+                epic_keys=["CEGBUPOL-100", "CEGBUPOL-200"],
+                db_path=db_path,
+            )
+            platform_view = create_initiative_view(
+                name="Platform Portfolio",
+                epic_keys=["CEGBUPOL-200", "CEGBUPOL-300"],
+                description="Shared platform view",
+                db_path=db_path,
+            )
+
+            views_payload = get_initiative_views(db_path=db_path)
+            self.assertEqual(views_payload["views"][0]["id"], "all")
+            self.assertEqual(views_payload["views"][0]["epicCount"], 3)
+            self.assertEqual(q1_view["epicKeys"], ["CEGBUPOL-100", "CEGBUPOL-200"])
+            self.assertEqual(platform_view["epicKeys"], ["CEGBUPOL-200", "CEGBUPOL-300"])
+            self.assertEqual(platform_view["description"], "Shared platform view")
+
+            scoped_summary = get_configured_epic_summary(
+                limit=10,
+                period_start="2026-03-23",
+                period_end="2026-03-30",
+                timezone_name="UTC",
+                view_id=q1_view["id"],
+                db_path=db_path,
+            )
+            self.assertEqual([epic["epicKey"] for epic in scoped_summary["epics"]], ["CEGBUPOL-100", "CEGBUPOL-200"])
+            self.assertEqual(scoped_summary["view"]["name"], "Q1 FY27")
+            self.assertEqual(scoped_summary["epics"][0]["completedInPeriod"], 1)
+
+            completed_payload = get_configured_epics_completed_cards(
+                period_start="2026-03-23",
+                period_end="2026-03-30",
+                timezone_name="UTC",
+                view_id=q1_view["id"],
+                db_path=db_path,
+            )
+            self.assertEqual(completed_payload["count"], 2)
+            self.assertEqual(set(completed_payload["perEpicCounts"]), {"CEGBUPOL-100", "CEGBUPOL-200"})
+            self.assertEqual(completed_payload["view"]["name"], "Q1 FY27")
+
+            updated_view = update_initiative_view(
+                view_id=q1_view["id"],
+                name="Q1 FY27 Delivery",
+                epic_keys=["CEGBUPOL-300", "CEGBUPOL-100"],
+                db_path=db_path,
+            )
+            self.assertEqual(updated_view["epicKeys"], ["CEGBUPOL-300", "CEGBUPOL-100"])
+            updated_summary = get_configured_epic_summary(
+                limit=10,
+                view_id=q1_view["id"],
+                db_path=db_path,
+            )
+            self.assertEqual([epic["epicKey"] for epic in updated_summary["epics"]], ["CEGBUPOL-300", "CEGBUPOL-100"])
+
+            deleted = delete_initiative_view(platform_view["id"], db_path=db_path)
+            self.assertTrue(deleted["deleted"])
+            self.assertEqual(deleted["removedMappings"], 2)
+
+    def test_initiative_view_rejects_unconfigured_epic_keys_and_cleans_up_on_epic_delete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            add_epic_group("Platform", db_path=db_path)
+
+            for epic_key in ["CEGBUPOL-100", "CEGBUPOL-200"]:
+                upsert_epic_metadata(
+                    epic_key=epic_key,
+                    success_criteria=[],
+                    group_ids=[],
+                    work_type_ids=[],
+                    db_path=db_path,
+                )
+
+            with self.assertRaisesRegex(ValueError, "unconfigured epic keys"):
+                create_initiative_view(
+                    name="Invalid View",
+                    epic_keys=["CEGBUPOL-999"],
+                    db_path=db_path,
+                )
+
+            view = create_initiative_view(
+                name="Cleanup View",
+                epic_keys=["CEGBUPOL-100", "CEGBUPOL-200"],
+                db_path=db_path,
+            )
+            deleted = delete_epic_metadata("CEGBUPOL-100", db_path=db_path)
+            self.assertEqual(deleted["removedViewMappings"], 1)
+
+            views_payload = get_initiative_views(db_path=db_path)
+            cleanup_view = next(item for item in views_payload["views"] if item["id"] == view["id"])
+            self.assertEqual(cleanup_view["epicKeys"], ["CEGBUPOL-200"])
 
     def test_search_unconfigured_epics_by_key_or_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

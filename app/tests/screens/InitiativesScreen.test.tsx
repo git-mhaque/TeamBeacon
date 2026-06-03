@@ -47,6 +47,28 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
         { id: 4, name: "Tech Debt" },
       ],
     },
+    "/api/metadata/initiative-views": {
+      views: [
+        {
+          id: "all",
+          name: "All Configured",
+          description: "All epics with metadata configured in TeamBeacon.",
+          epicKeys: [],
+          epicCount: epics.length,
+          isDefault: true,
+          updatedAt: null,
+        },
+        {
+          id: 7,
+          name: "Q1 FY27",
+          description: "Q1 delivery scope",
+          epicKeys: epics.slice(0, 1).map((epic) => epic.epicKey),
+          epicCount: Math.min(epics.length, 1),
+          isDefault: false,
+          updatedAt: "2026-03-30T09:15:00Z",
+        },
+      ],
+    },
     "/api/integrations/jira/status": {
       source: "jira",
       connected: true,
@@ -179,6 +201,7 @@ describe("InitiativesScreen", () => {
     if (typeof window.localStorage?.removeItem === "function") {
       window.localStorage.removeItem("teambeacon.initiatives.visibleOptionalColumns");
       window.localStorage.removeItem("teambeacon.initiatives.reporting.period");
+      window.localStorage.removeItem("teambeacon.initiatives.activeViewId");
     }
   });
 
@@ -192,6 +215,9 @@ describe("InitiativesScreen", () => {
     const matrixHeading = screen.getByRole("heading", { name: "Initiative Progress Matrix" });
     expect(matrixHeading).toBeInTheDocument();
     expect(screen.getByText(/Reporting period:/i)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Initiative View" })).toHaveValue("all");
+    expect(screen.getByRole("button", { name: "New View" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit View" })).toBeDisabled();
     expect(screen.getByRole("heading", { name: "Initiative RAG" })).toBeInTheDocument();
     expect(screen.getByText(/\d+\s+Red/)).toBeInTheDocument();
     expect(screen.getByText(/\d+\s+Amber/)).toBeInTheDocument();
@@ -528,5 +554,78 @@ describe("InitiativesScreen", () => {
         )),
       ).toBe(true);
     });
+  });
+
+  it("selects an initiative view and refetches scoped summary", async () => {
+    const fetchSpy = mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Initiative View" }), {
+      target: { value: "7" },
+    });
+
+    await waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([input]) => (
+          String(input).includes("/api/metadata/epics/summary?")
+          && String(input).includes("viewId=7")
+        )),
+      ).toBe(true);
+    });
+
+    expect(screen.getByRole("button", { name: "Edit View" })).not.toBeDisabled();
+  });
+
+  it("opens create view editor and moves epics between available and included lists", async () => {
+    mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "New View" }));
+
+    expect(await screen.findByRole("dialog", { name: "Create Initiative View" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Available configured epics" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Selected view epics" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add CEG-101 to view/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Remove CEG-101 from view/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /Add CEG-101 to view/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove CEG-101 from view/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add CEG-101 to view/i })).toBeInTheDocument();
+    });
+  });
+
+  it("opens edit view editor and shows delete confirmation", async () => {
+    mockInitiativesEndpoints();
+    render(<InitiativesScreen />);
+
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Initiative View" }), {
+      target: { value: "7" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit View" })).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit View" }));
+
+    expect(await screen.findByRole("dialog", { name: "Edit Initiative View" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Q1 FY27")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete View" }));
+
+    expect(await screen.findByRole("dialog", { name: "Delete Initiative View" })).toBeInTheDocument();
+    expect(screen.getByText(/Epic metadata will remain configured/i)).toBeInTheDocument();
   });
 });

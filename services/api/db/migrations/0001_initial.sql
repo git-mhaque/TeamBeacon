@@ -230,6 +230,24 @@ CREATE TABLE IF NOT EXISTS epic_metadata_work_types (
   FOREIGN KEY (work_type_id) REFERENCES work_types(id)
 );
 
+CREATE TABLE IF NOT EXISTS initiative_views (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS initiative_view_epics (
+  view_id INTEGER NOT NULL,
+  epic_metadata_id INTEGER NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(view_id, epic_metadata_id),
+  FOREIGN KEY (view_id) REFERENCES initiative_views(id),
+  FOREIGN KEY (epic_metadata_id) REFERENCES epic_metadata(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_issues_updated_at_source ON issues(updated_at_source);
 CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee_account_id);
 CREATE INDEX IF NOT EXISTS idx_issues_sprint ON issues(sprint_external_id);
@@ -242,5 +260,6 @@ CREATE INDEX IF NOT EXISTS idx_report_runs_period ON report_runs(period_start, p
 CREATE INDEX IF NOT EXISTS idx_sync_checkpoints_lookup ON sync_checkpoints(source_type, scope_key);
 CREATE INDEX IF NOT EXISTS idx_sync_run_history_lookup ON sync_run_history(source_type, started_at);
 CREATE INDEX IF NOT EXISTS idx_epic_metadata_updated ON epic_metadata(updated_at);
+CREATE INDEX IF NOT EXISTS idx_initiative_view_epics_view ON initiative_view_epics(view_id, sort_order, epic_metadata_id);
 
 INSERT OR IGNORE INTO schema_migrations(version) VALUES ('0001_initial');

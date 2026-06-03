@@ -215,9 +215,22 @@ export type EpicSummaryReportingPeriod = {
   timezone: string;
 };
 
+export type InitiativeViewId = number | "all";
+
+export type InitiativeView = {
+  id: InitiativeViewId;
+  name: string;
+  description?: string | null;
+  epicKeys: string[];
+  epicCount: number;
+  isDefault?: boolean;
+  updatedAt?: string | null;
+};
+
 export type ConfiguredEpicSummaryResponse = {
   epics: InitiativeEpicSummary[];
   reportingPeriod?: EpicSummaryReportingPeriod;
+  view?: InitiativeView;
   error?: string | null;
 };
 
@@ -254,6 +267,7 @@ export type ConfiguredEpicsCompletedCardsResponse = {
   completedCards: EpicCompletedCard[];
   perEpicCounts: Record<string, number>;
   reportingPeriod?: EpicSummaryReportingPeriod;
+  view?: InitiativeView;
   error?: string | null;
 };
 
@@ -741,6 +755,7 @@ export async function fetchConfiguredEpicSummary(
     periodStart?: string | null;
     periodEnd?: string | null;
     timezone?: string | null;
+    viewId?: InitiativeViewId | null;
   },
 ): Promise<ConfiguredEpicSummaryResponse> {
   const params = new URLSearchParams();
@@ -753,6 +768,9 @@ export async function fetchConfiguredEpicSummary(
   }
   if (options?.timezone) {
     params.set("timezone", options.timezone);
+  }
+  if (options?.viewId !== undefined && options.viewId !== null && options.viewId !== "all") {
+    params.set("viewId", String(options.viewId));
   }
 
   const response = await fetch(`${API_BASE}/api/metadata/epics/summary?${params.toString()}`, {
@@ -807,6 +825,7 @@ export async function fetchConfiguredEpicsCompletedCards(options?: {
   periodStart?: string | null;
   periodEnd?: string | null;
   timezone?: string | null;
+  viewId?: InitiativeViewId | null;
 }): Promise<ConfiguredEpicsCompletedCardsResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(options?.limit ?? 300));
@@ -819,6 +838,9 @@ export async function fetchConfiguredEpicsCompletedCards(options?: {
   if (options?.timezone) {
     params.set("timezone", options.timezone);
   }
+  if (options?.viewId !== undefined && options.viewId !== null && options.viewId !== "all") {
+    params.set("viewId", String(options.viewId));
+  }
 
   const response = await fetch(`${API_BASE}/api/metadata/epics/completed-cards/configured?${params.toString()}`, {
     method: "GET",
@@ -828,6 +850,73 @@ export async function fetchConfiguredEpicsCompletedCards(options?: {
     throw await parseError(response, `Configured completed cards request failed (${response.status})`);
   }
   return (await response.json()) as ConfiguredEpicsCompletedCardsResponse;
+}
+
+export async function fetchInitiativeViews(): Promise<InitiativeView[]> {
+  const response = await fetch(`${API_BASE}/api/metadata/initiative-views`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Initiative views request failed (${response.status})`);
+  }
+  const payload = (await response.json()) as { views?: InitiativeView[] };
+  return payload.views ?? [];
+}
+
+export async function createInitiativeView(payload: {
+  name: string;
+  description?: string | null;
+  epicKeys: string[];
+}): Promise<InitiativeView> {
+  const response = await fetch(`${API_BASE}/api/metadata/initiative-views`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Initiative view create failed (${response.status})`);
+  }
+  return (await response.json()) as InitiativeView;
+}
+
+export async function updateInitiativeView(payload: {
+  id: number;
+  name: string;
+  description?: string | null;
+  epicKeys: string[];
+}): Promise<InitiativeView> {
+  const response = await fetch(`${API_BASE}/api/metadata/initiative-views/update`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Initiative view update failed (${response.status})`);
+  }
+  return (await response.json()) as InitiativeView;
+}
+
+export async function deleteInitiativeView(id: number): Promise<{
+  id: number;
+  deleted: boolean;
+  removedMappings: number;
+  removedRows: number;
+}> {
+  const response = await fetch(`${API_BASE}/api/metadata/initiative-views/delete`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Initiative view delete failed (${response.status})`);
+  }
+  return (await response.json()) as {
+    id: number;
+    deleted: boolean;
+    removedMappings: number;
+    removedRows: number;
+  };
 }
 
 export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
@@ -955,6 +1044,7 @@ export async function deleteEpicMetadata(epicKey: string): Promise<{
   deleted: boolean;
   removedGroupMappings: number;
   removedWorkTypeMappings: number;
+  removedViewMappings?: number;
   removedMetadataRows: number;
 }> {
   const response = await fetch(`${API_BASE}/api/metadata/epics/delete`, {
@@ -970,6 +1060,7 @@ export async function deleteEpicMetadata(epicKey: string): Promise<{
     deleted: boolean;
     removedGroupMappings: number;
     removedWorkTypeMappings: number;
+    removedViewMappings?: number;
     removedMetadataRows: number;
   };
 }

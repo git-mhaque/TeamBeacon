@@ -7,15 +7,21 @@ import {
   EpicCompletedCard,
   EpicLookupConfig,
   EpicSummaryReportingPeriod,
+  InitiativeView,
+  InitiativeViewId,
   InitiativeEpicSummary,
+  createInitiativeView,
   deleteEpicMetadata,
+  deleteInitiativeView,
   fetchAiIntegrationStatus,
   fetchConfiguredEpicsCompletedCards,
   fetchEpicCompletedCards,
   fetchConfiguredEpicSummary,
   fetchEpicCandidates,
   fetchEpicLookupConfig,
+  fetchInitiativeViews,
   fetchJiraIntegrationStatus,
+  updateInitiativeView,
   upsertEpicMetadata,
 } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
@@ -34,7 +40,7 @@ type SummaryRow = InitiativeEpicSummary & {
 
 type CompletedSummaryContext =
   | { scope: "epic"; epicKey: string; epicName: string }
-  | { scope: "configured" };
+  | { scope: "configured"; viewName: string; isAllConfigured: boolean };
 
 type OptionalColumnId = "group" | "type" | "progress" | "completed" | "delta" | "rag" | "criteria";
 
@@ -55,6 +61,8 @@ type PersistedReportingSelection = {
   endDate: string;
 };
 
+type ViewEditorMode = "create" | "edit";
+
 const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }> = [
   { id: "group", label: "Group" },
   { id: "type", label: "Type" },
@@ -68,6 +76,7 @@ const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }
 const DEFAULT_VISIBLE_OPTIONAL_COLUMNS: OptionalColumnId[] = OPTIONAL_COLUMN_DEFINITIONS.map((column) => column.id);
 const INITIATIVES_VISIBLE_COLUMNS_KEY = "teambeacon.initiatives.visibleOptionalColumns";
 const INITIATIVES_REPORTING_PERIOD_SELECTION_KEY = "teambeacon.initiatives.reporting.period";
+const INITIATIVES_ACTIVE_VIEW_KEY = "teambeacon.initiatives.activeViewId";
 export const OPEN_INITIATIVES_CONFIGURE_EVENT = "teambeacon:initiatives-open-configure";
 export const OPEN_INITIATIVES_REPORTING_PERIOD_EVENT = "teambeacon:initiatives-open-reporting-period";
 
@@ -335,6 +344,7 @@ function buildConfiguredCompletedCardsSummaryPrompt(params: {
   completedCards: EpicCompletedCard[];
   expectedCount: number;
   perEpicCounts: Record<string, number>;
+  scopeLabel: string;
 }): string {
   const cards = params.completedCards.slice(0, 120);
   const cardLines = cards.map((card, index) => {
@@ -367,7 +377,7 @@ function buildConfiguredCompletedCardsSummaryPrompt(params: {
     : "";
 
   return [
-    "You are summarizing completed outcomes for all configured initiatives.",
+    `You are summarizing completed outcomes for ${params.scopeLabel}.`,
     "Return exactly one concise paragraph (4-6 sentences) in plain text.",
     "Use only the provided card data and do not invent metrics.",
     "Call out which initiatives drove completion, the strongest delivery themes, and immediate risk signals.",
@@ -376,7 +386,7 @@ function buildConfiguredCompletedCardsSummaryPrompt(params: {
     "Do not reference issue keys or ticket IDs.",
     "",
     `Reporting period: ${params.reportingPeriodText}`,
-    `Completed cards in period (all configured initiatives): ${params.expectedCount}`,
+    `Completed cards in period (${params.scopeLabel}): ${params.expectedCount}`,
     truncationNote,
     "",
     "Completion distribution by initiative:",
@@ -452,6 +462,37 @@ function readPersistedReportingSelection(defaultRange: ReportingRange): Persiste
   return parsePersistedReportingSelection(getPreferenceSync(INITIATIVES_REPORTING_PERIOD_SELECTION_KEY), fallback);
 }
 
+function parsePersistedInitiativeViewId(raw: string | null): InitiativeViewId {
+  if (!raw) return "all";
+  const candidate = raw.trim();
+  if (!candidate || candidate === "all") return "all";
+  const parsed = Number(candidate);
+  if (!Number.isInteger(parsed) || parsed <= 0) return "all";
+  return parsed;
+}
+
+function readPersistedInitiativeViewId(): InitiativeViewId {
+  return parsePersistedInitiativeViewId(getPreferenceSync(INITIATIVES_ACTIVE_VIEW_KEY));
+}
+
+function buildSummaryRow(entry: InitiativeEpicSummary): SummaryRow {
+  const completedInPeriodValue = Math.max(0, entry.completedInPeriod ?? entry.completedLastWeek ?? 0);
+  const deltaPercentValue = Math.max(0, entry.deltaPercentInPeriod ?? entry.deltaPercent ?? 0);
+  const ragEvaluation = evaluateInitiativeRag(entry);
+  return {
+    ...entry,
+    groupText: entry.groups.length > 0 ? entry.groups.map((group) => group.name).join(", ") : "-",
+    typeText: entry.workTypes.length > 0 ? entry.workTypes.map((type) => type.name).join(", ") : "-",
+    completedInPeriodValue,
+    deltaPercentValue,
+    ragLabel: ragEvaluation.label,
+    ragReason: ragEvaluation.reason,
+    successCriteriaTooltip: entry.successCriteria.length > 0
+      ? entry.successCriteria.map((criterion, index) => `${index + 1}. ${criterion}`).join("\n")
+      : "No success criteria configured.",
+  };
+}
+
 function parsePersistedReportingSelection(
   raw: string | null,
   fallback: PersistedReportingSelection,
@@ -487,7 +528,10 @@ export function InitiativesScreen() {
   const hasHydratedReportingSelectionFromStore = useRef(false);
 
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
+  const [allConfiguredEpicSummary, setAllConfiguredEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
+  const [initiativeViews, setInitiativeViews] = useState<InitiativeView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<InitiativeViewId>(readPersistedInitiativeViewId);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
   const [aiProviderName, setAiProviderName] = useState("AI");
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
@@ -495,6 +539,7 @@ export function InitiativesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [metaSuccess, setMetaSuccess] = useState<string | null>(null);
+  const [viewError, setViewError] = useState<string | null>(null);
   const [reportingPreset, setReportingPreset] = useState<ReportingPreset>(initialReportingSelection.preset);
   const [reportingStartDraft, setReportingStartDraft] = useState(initialReportingSelection.startDate);
   const [reportingEndDraft, setReportingEndDraft] = useState(initialReportingSelection.endDate);
@@ -515,6 +560,18 @@ export function InitiativesScreen() {
   const [sortField, setSortField] = useState<SortField>("epic");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isColumnOverlayOpen, setIsColumnOverlayOpen] = useState(false);
+
+  const [isViewEditorOpen, setIsViewEditorOpen] = useState(false);
+  const [viewEditorMode, setViewEditorMode] = useState<ViewEditorMode>("create");
+  const [viewEditorSaving, setViewEditorSaving] = useState(false);
+  const [viewEditorError, setViewEditorError] = useState<string | null>(null);
+  const [editingView, setEditingView] = useState<InitiativeView | null>(null);
+  const [viewNameDraft, setViewNameDraft] = useState("");
+  const [viewDescriptionDraft, setViewDescriptionDraft] = useState("");
+  const [viewEpicQuery, setViewEpicQuery] = useState("");
+  const [viewDraftEpicKeys, setViewDraftEpicKeys] = useState<string[]>([]);
+  const [pendingDeleteView, setPendingDeleteView] = useState<InitiativeView | null>(null);
+  const [deletingViewId, setDeletingViewId] = useState<number | null>(null);
 
   const [isConfigureOpen, setIsConfigureOpen] = useState(false);
   const [configureSaving, setConfigureSaving] = useState(false);
@@ -565,12 +622,21 @@ export function InitiativesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryResult, jiraResult, aiStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary(100, {
+      const selectedViewId = activeViewId === "all" ? null : activeViewId;
+      const [summaryResult, allSummaryResult, jiraResult, aiStatusResult] = await Promise.allSettled([
+        fetchConfiguredEpicSummary(200, {
           periodStart: reportingRange.startDate,
           periodEnd: reportingRange.endDate,
           timezone: browserTimezone,
+          viewId: selectedViewId,
         }),
+        selectedViewId === null
+          ? Promise.resolve(null)
+          : fetchConfiguredEpicSummary(200, {
+              periodStart: reportingRange.startDate,
+              periodEnd: reportingRange.endDate,
+              timezone: browserTimezone,
+            }),
         fetchJiraIntegrationStatus(),
         fetchAiIntegrationStatus(),
       ]);
@@ -580,6 +646,13 @@ export function InitiativesScreen() {
       }
 
       setEpicSummary(summaryResult.value.epics ?? []);
+      if (selectedViewId === null) {
+        setAllConfiguredEpicSummary(summaryResult.value.epics ?? []);
+      } else if (allSummaryResult.status === "fulfilled" && allSummaryResult.value) {
+        setAllConfiguredEpicSummary(allSummaryResult.value.epics ?? []);
+      } else {
+        setAllConfiguredEpicSummary([]);
+      }
       setReportingPeriod(summaryResult.value.reportingPeriod);
 
       if (jiraResult.status === "fulfilled") {
@@ -605,13 +678,26 @@ export function InitiativesScreen() {
       const message = err instanceof Error ? err.message : "Unknown initiative summary request failure.";
       setError(message);
       setEpicSummary([]);
+      setAllConfiguredEpicSummary([]);
       setReportingPeriod(undefined);
       setJiraBaseUrl(null);
       setAiProviderName("AI");
     } finally {
       setLoading(false);
     }
-  }, [browserTimezone, reportingRange.endDate, reportingRange.startDate]);
+  }, [activeViewId, browserTimezone, reportingRange.endDate, reportingRange.startDate]);
+
+  const loadViews = useCallback(async () => {
+    try {
+      const views = await fetchInitiativeViews();
+      setInitiativeViews(views);
+      setViewError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown initiative view request failure.";
+      setViewError(message);
+      setInitiativeViews([]);
+    }
+  }, []);
 
   const loadLookup = useCallback(async () => {
     try {
@@ -626,8 +712,8 @@ export function InitiativesScreen() {
   }, []);
 
   const refresh = useCallback(async () => {
-    await Promise.all([loadSummary(), loadLookup()]);
-  }, [loadLookup, loadSummary]);
+    await Promise.all([loadSummary(), loadLookup(), loadViews()]);
+  }, [loadLookup, loadSummary, loadViews]);
 
   useEffect(() => {
     refresh().catch(() => {
@@ -650,6 +736,20 @@ export function InitiativesScreen() {
   useEffect(() => {
     void setPreference(INITIATIVES_VISIBLE_COLUMNS_KEY, JSON.stringify(visibleOptionalColumns));
   }, [visibleOptionalColumns]);
+
+  useEffect(() => {
+    void setPreference(INITIATIVES_ACTIVE_VIEW_KEY, String(activeViewId));
+  }, [activeViewId]);
+
+  useEffect(() => {
+    if (activeViewId === "all" || initiativeViews.length === 0) {
+      return;
+    }
+    const exists = initiativeViews.some((view) => view.id === activeViewId);
+    if (!exists) {
+      setActiveViewId("all");
+    }
+  }, [activeViewId, initiativeViews]);
 
   useEffect(() => {
     const payload: PersistedReportingSelection = {
@@ -727,6 +827,42 @@ export function InitiativesScreen() {
   const activeReportingPeriodLabel = useMemo(
     () => formatReportingPeriodLabel(effectivePeriodStart, effectivePeriodEnd),
     [effectivePeriodEnd, effectivePeriodStart],
+  );
+
+  const effectiveInitiativeViews = useMemo<InitiativeView[]>(() => {
+    if (initiativeViews.length > 0) {
+      return initiativeViews;
+    }
+    return [
+      {
+        id: "all",
+        name: "All Configured",
+        description: "All epics with metadata configured in TeamBeacon.",
+        epicKeys: [],
+        epicCount: allConfiguredEpicSummary.length || epicSummary.length,
+        isDefault: true,
+        updatedAt: null,
+      },
+    ];
+  }, [allConfiguredEpicSummary.length, epicSummary.length, initiativeViews]);
+
+  const activeView = useMemo<InitiativeView>(() => {
+    return effectiveInitiativeViews.find((view) => view.id === activeViewId)
+      ?? effectiveInitiativeViews.find((view) => view.id === "all")
+      ?? {
+        id: "all",
+        name: "All Configured",
+        description: "All epics with metadata configured in TeamBeacon.",
+        epicKeys: [],
+        epicCount: allConfiguredEpicSummary.length || epicSummary.length,
+        isDefault: true,
+        updatedAt: null,
+      };
+  }, [activeViewId, allConfiguredEpicSummary.length, effectiveInitiativeViews, epicSummary.length]);
+
+  const customInitiativeViews = useMemo(
+    () => effectiveInitiativeViews.filter((view) => view.id !== "all"),
+    [effectiveInitiativeViews],
   );
 
   const applyCustomReportingRange = useCallback((): boolean => {
@@ -832,24 +968,38 @@ export function InitiativesScreen() {
   }, [configureSearchQuery, isConfigureOpen, isConfigureSearchFocused, loadConfigureCandidates]);
 
   const rows = useMemo<SummaryRow[]>(() => {
-    return epicSummary.map((entry) => {
-      const completedInPeriodValue = Math.max(0, entry.completedInPeriod ?? entry.completedLastWeek ?? 0);
-      const deltaPercentValue = Math.max(0, entry.deltaPercentInPeriod ?? entry.deltaPercent ?? 0);
-      const ragEvaluation = evaluateInitiativeRag(entry);
-      return {
-        ...entry,
-        groupText: entry.groups.length > 0 ? entry.groups.map((group) => group.name).join(", ") : "-",
-        typeText: entry.workTypes.length > 0 ? entry.workTypes.map((type) => type.name).join(", ") : "-",
-        completedInPeriodValue,
-        deltaPercentValue,
-        ragLabel: ragEvaluation.label,
-        ragReason: ragEvaluation.reason,
-        successCriteriaTooltip: entry.successCriteria.length > 0
-          ? entry.successCriteria.map((criterion, index) => `${index + 1}. ${criterion}`).join("\n")
-          : "No success criteria configured.",
-      };
-    });
+    return epicSummary.map(buildSummaryRow);
   }, [epicSummary]);
+
+  const allConfiguredRows = useMemo<SummaryRow[]>(() => {
+    return allConfiguredEpicSummary.map(buildSummaryRow);
+  }, [allConfiguredEpicSummary]);
+
+  const viewSelectedRows = useMemo(() => {
+    const rowByKey = new Map(allConfiguredRows.map((row) => [row.epicKey, row]));
+    return viewDraftEpicKeys
+      .map((epicKey) => rowByKey.get(epicKey))
+      .filter((row): row is SummaryRow => Boolean(row));
+  }, [allConfiguredRows, viewDraftEpicKeys]);
+
+  const viewAvailableRows = useMemo(() => {
+    const selected = new Set(viewDraftEpicKeys);
+    const query = viewEpicQuery.trim().toLowerCase();
+    return allConfiguredRows.filter((row) => {
+      if (selected.has(row.epicKey)) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return (
+        row.epicKey.toLowerCase().includes(query)
+        || row.epicName.toLowerCase().includes(query)
+        || row.groupText.toLowerCase().includes(query)
+        || row.typeText.toLowerCase().includes(query)
+      );
+    });
+  }, [allConfiguredRows, viewDraftEpicKeys, viewEpicQuery]);
 
   const groupOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -986,6 +1136,137 @@ export function InitiativesScreen() {
   const showAllColumns = useCallback(() => {
     setVisibleOptionalColumns(DEFAULT_VISIBLE_OPTIONAL_COLUMNS);
   }, []);
+
+  const addViewDraftEpicKey = useCallback((epicKey: string) => {
+    setViewDraftEpicKeys((current) => {
+      if (current.includes(epicKey)) return current;
+      return [...current, epicKey];
+    });
+  }, []);
+
+  const removeViewDraftEpicKey = useCallback((epicKey: string) => {
+    setViewDraftEpicKeys((current) => current.filter((key) => key !== epicKey));
+  }, []);
+
+  const openCreateViewDialog = useCallback(() => {
+    setMetaError(null);
+    setMetaSuccess(null);
+    setViewEditorError(null);
+    setViewEditorMode("create");
+    setEditingView(null);
+    setViewNameDraft("");
+    setViewDescriptionDraft("");
+    setViewEpicQuery("");
+    setViewDraftEpicKeys([]);
+    setIsViewEditorOpen(true);
+  }, []);
+
+  const openEditViewDialog = useCallback((view: InitiativeView) => {
+    if (view.id === "all") {
+      return;
+    }
+    setMetaError(null);
+    setMetaSuccess(null);
+    setViewEditorError(null);
+    setViewEditorMode("edit");
+    setEditingView(view);
+    setViewNameDraft(view.name);
+    setViewDescriptionDraft(view.description ?? "");
+    setViewEpicQuery("");
+    setViewDraftEpicKeys(view.epicKeys ?? []);
+    setIsViewEditorOpen(true);
+  }, []);
+
+  const closeViewEditor = useCallback(() => {
+    if (viewEditorSaving) {
+      return;
+    }
+    setIsViewEditorOpen(false);
+    setEditingView(null);
+    setViewEditorError(null);
+  }, [viewEditorSaving]);
+
+  const saveViewEditor = useCallback(async () => {
+    const name = viewNameDraft.trim();
+    if (!name) {
+      setViewEditorError("View name is required.");
+      return;
+    }
+
+    setViewEditorSaving(true);
+    setViewEditorError(null);
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      const description = viewDescriptionDraft.trim() || null;
+      const saved = viewEditorMode === "edit" && editingView && typeof editingView.id === "number"
+        ? await updateInitiativeView({
+            id: editingView.id,
+            name,
+            description,
+            epicKeys: viewDraftEpicKeys,
+          })
+        : await createInitiativeView({
+            name,
+            description,
+            epicKeys: viewDraftEpicKeys,
+          });
+
+      await loadViews();
+      if (saved.id !== "all") {
+        setActiveViewId(saved.id);
+      }
+      if (viewEditorMode === "edit") {
+        await loadSummary();
+      }
+      setMetaSuccess(`Initiative view ${viewEditorMode === "edit" ? "updated" : "created"}: ${saved.name}.`);
+      setIsViewEditorOpen(false);
+      setEditingView(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save initiative view.";
+      setViewEditorError(message);
+    } finally {
+      setViewEditorSaving(false);
+    }
+  }, [
+    editingView,
+    loadSummary,
+    loadViews,
+    viewDescriptionDraft,
+    viewDraftEpicKeys,
+    viewEditorMode,
+    viewNameDraft,
+  ]);
+
+  const confirmDeleteView = useCallback(async () => {
+    if (!pendingDeleteView || typeof pendingDeleteView.id !== "number") {
+      return;
+    }
+    const viewId = pendingDeleteView.id;
+    setDeletingViewId(viewId);
+    setMetaError(null);
+    setMetaSuccess(null);
+    try {
+      await deleteInitiativeView(viewId);
+      await loadViews();
+      if (activeViewId === viewId) {
+        setActiveViewId("all");
+      } else {
+        await loadSummary();
+      }
+      setMetaSuccess(`Initiative view deleted: ${pendingDeleteView.name}.`);
+      setPendingDeleteView(null);
+      if (editingView?.id === viewId) {
+        setIsViewEditorOpen(false);
+        setEditingView(null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete initiative view.";
+      setMetaError(message);
+    } finally {
+      setDeletingViewId(null);
+    }
+  }, [activeViewId, editingView?.id, loadSummary, loadViews, pendingDeleteView]);
 
   const openColumnOverlay = useCallback(() => {
     setIsColumnOverlayOpen(true);
@@ -1314,7 +1595,11 @@ export function InitiativesScreen() {
   }, [activeReportingPeriod, aiProviderName]);
 
   const openConfiguredCompletedSummary = useCallback(async () => {
-    setCompletedSummaryContext({ scope: "configured" });
+    setCompletedSummaryContext({
+      scope: "configured",
+      viewName: activeView.name,
+      isAllConfigured: activeView.id === "all",
+    });
     setCompletedSummaryCards([]);
     setCompletedSummaryPerEpicCounts({});
     setCompletedSummaryReportingPeriod(activeReportingPeriod);
@@ -1337,6 +1622,7 @@ export function InitiativesScreen() {
         periodStart: activeReportingPeriod.startDate,
         periodEnd: activeReportingPeriod.endDate,
         timezone,
+        viewId: activeView.id,
       });
 
       const completedCards = payload.completedCards ?? [];
@@ -1360,6 +1646,7 @@ export function InitiativesScreen() {
         completedCards,
         expectedCount: count,
         perEpicCounts,
+        scopeLabel: activeView.id === "all" ? "all configured initiatives" : `the ${activeView.name} initiative view`,
       });
       try {
         const aiPayload = await chatWithOciGenAi({
@@ -1393,11 +1680,43 @@ export function InitiativesScreen() {
     } finally {
       setCompletedSummaryLoading(false);
     }
-  }, [activeReportingPeriod, aiProviderName]);
+  }, [activeReportingPeriod, activeView.id, activeView.name, aiProviderName]);
 
   return (
     <div class="tb-screen-grid">
-      <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
+      <div class="tb-initiative-context-bar">
+        <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
+        <div class="tb-initiative-view-controls">
+          <label class="tb-initiative-view-select">
+            <span>View</span>
+            <select
+              value={String(activeView.id)}
+              onChange={(event) => {
+                const value = (event.currentTarget as HTMLSelectElement).value;
+                setActiveViewId(value === "all" ? "all" : Number(value));
+              }}
+              aria-label="Initiative View"
+            >
+              {effectiveInitiativeViews.map((view) => (
+                <option key={String(view.id)} value={String(view.id)}>
+                  {view.name} ({view.epicCount})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" class="tb-btn tb-btn-sm" onClick={openCreateViewDialog}>
+            New View
+          </button>
+          <button
+            type="button"
+            class="tb-btn tb-btn-sm"
+            onClick={() => openEditViewDialog(activeView)}
+            disabled={activeView.id === "all"}
+          >
+            Edit View
+          </button>
+        </div>
+      </div>
 
       <section class="tb-panel">
         <header class="tb-panel-header">
@@ -1410,7 +1729,7 @@ export function InitiativesScreen() {
           <article class="tb-metric-card">
             <h4>Configured Epics</h4>
             <strong class="tb-value">{totalConfigured}</strong>
-            <p>Epics with metadata configured in TeamBeacon.</p>
+            <p>{activeView.id === "all" ? "Epics with metadata configured in TeamBeacon." : `Epics in ${activeView.name}.`}</p>
           </article>
           <article class="tb-metric-card">
             <h4>Avg Completion</h4>
@@ -1428,7 +1747,7 @@ export function InitiativesScreen() {
                 <span class="tb-initiative-rag-text tb-initiative-rag-green">{ragCounts.Green} Green</span>
               </span>
             </strong>
-            <p>For configured initiatives.</p>
+            <p>{activeView.id === "all" ? "For configured initiatives." : "For selected initiative view."}</p>
           </article>
           <article class="tb-metric-card">
             <h4>Completed In Period</h4>
@@ -1448,6 +1767,7 @@ export function InitiativesScreen() {
 
         {error && !loading ? <p class="tb-error-note">Initiative summary: {error}</p> : null}
         {metaError ? <p class="tb-error-note">Epic metadata: {metaError}</p> : null}
+        {viewError ? <p class="tb-error-note">Initiative views: {viewError}</p> : null}
       </section>
 
       <section class="tb-panel">
@@ -1879,6 +2199,179 @@ export function InitiativesScreen() {
         </div>
       ) : null}
 
+      {isViewEditorOpen ? (
+        <div
+          class="tb-modal-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={viewEditorMode === "edit" ? "Edit Initiative View" : "Create Initiative View"}
+        >
+          <div class="tb-modal-backdrop" onClick={closeViewEditor} />
+          <div class="tb-modal tb-modal-wide tb-modal-initiative-view">
+            <header class="tb-modal-head">
+              <div>
+                <h3>{viewEditorMode === "edit" ? "Edit Initiative View" : "Create Initiative View"}</h3>
+                <p class="tb-muted-note">Choose configured epics for this saved view.</p>
+              </div>
+              <button type="button" class="tb-btn tb-btn-sm" onClick={closeViewEditor} disabled={viewEditorSaving}>
+                Close
+              </button>
+            </header>
+
+            <div class="tb-modal-two-up">
+              <label class="tb-modal-field">
+                <span>View Name</span>
+                <input
+                  type="text"
+                  value={viewNameDraft}
+                  onInput={(event) => setViewNameDraft((event.currentTarget as HTMLInputElement).value)}
+                  placeholder="Q1 FY27"
+                />
+              </label>
+              <label class="tb-modal-field">
+                <span>Description</span>
+                <input
+                  type="text"
+                  value={viewDescriptionDraft}
+                  onInput={(event) => setViewDescriptionDraft((event.currentTarget as HTMLInputElement).value)}
+                  placeholder="Optional"
+                />
+              </label>
+            </div>
+
+            <div class="tb-initiative-view-picker">
+              <section class="tb-initiative-view-picker-panel">
+                <label class="tb-modal-field">
+                  <span>Search Epics</span>
+                  <input
+                    type="text"
+                    value={viewEpicQuery}
+                    onInput={(event) => setViewEpicQuery((event.currentTarget as HTMLInputElement).value)}
+                    placeholder="Epic key, name, group, or type"
+                  />
+                </label>
+                <div class="tb-initiative-view-list" role="group" aria-label="Available configured epics">
+                  {viewAvailableRows.map((row) => (
+                    <button
+                      key={row.epicKey}
+                      type="button"
+                      class="tb-initiative-view-list-item"
+                      onClick={() => addViewDraftEpicKey(row.epicKey)}
+                      aria-label={`Add ${row.epicKey} to view`}
+                    >
+                      <strong>{row.epicName || row.epicKey}</strong>
+                      <span>{row.groupText} | {row.typeText} | {row.epicKey}</span>
+                    </button>
+                  ))}
+                  {viewAvailableRows.length === 0 ? (
+                    <p class="tb-muted-note tb-initiative-view-empty">No available epics match the current search.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section class="tb-initiative-view-picker-panel">
+                <div class="tb-initiative-view-picker-head">
+                  <span>Included Epics</span>
+                  <span class="tb-chip">{viewSelectedRows.length}</span>
+                </div>
+                <div class="tb-initiative-view-list" role="group" aria-label="Selected view epics">
+                  {viewSelectedRows.map((row) => (
+                    <button
+                      key={row.epicKey}
+                      type="button"
+                      class="tb-initiative-view-list-item is-selected"
+                      onClick={() => removeViewDraftEpicKey(row.epicKey)}
+                      aria-label={`Remove ${row.epicKey} from view`}
+                    >
+                      <strong>{row.epicName || row.epicKey}</strong>
+                      <span>{row.groupText} | {row.typeText} | {row.epicKey}</span>
+                    </button>
+                  ))}
+                  {viewSelectedRows.length === 0 ? (
+                    <p class="tb-muted-note tb-initiative-view-empty">No epics included yet.</p>
+                  ) : null}
+                </div>
+              </section>
+            </div>
+
+            {viewEditorError ? <p class="tb-error-note">{viewEditorError}</p> : null}
+
+            <footer class="tb-modal-actions tb-modal-actions-split">
+              {viewEditorMode === "edit" && editingView && typeof editingView.id === "number" ? (
+                <button
+                  type="button"
+                  class="tb-btn tb-btn-danger"
+                  onClick={() => {
+                    setPendingDeleteView(editingView);
+                    setIsViewEditorOpen(false);
+                  }}
+                  disabled={viewEditorSaving}
+                >
+                  Delete View
+                </button>
+              ) : (
+                <span />
+              )}
+              <span class="tb-action-row">
+                <button type="button" class="tb-btn" onClick={closeViewEditor} disabled={viewEditorSaving}>
+                  Cancel
+                </button>
+                <button type="button" class="tb-btn tb-btn-primary" onClick={() => void saveViewEditor()} disabled={viewEditorSaving}>
+                  {viewEditorSaving ? "Saving..." : viewEditorMode === "edit" ? "Save View" : "Create View"}
+                </button>
+              </span>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingDeleteView ? (
+        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Delete Initiative View">
+          <div
+            class="tb-modal-backdrop"
+            onClick={() => {
+              if (!deletingViewId) {
+                setPendingDeleteView(null);
+              }
+            }}
+          />
+          <div class="tb-modal">
+            <header class="tb-modal-head">
+              <h3>Delete Initiative View</h3>
+              <button
+                type="button"
+                class="tb-btn tb-btn-sm"
+                onClick={() => setPendingDeleteView(null)}
+                disabled={Boolean(deletingViewId)}
+              >
+                Close
+              </button>
+            </header>
+            <p class="tb-muted-note">
+              Delete <strong>{pendingDeleteView.name}</strong>? Epic metadata will remain configured.
+            </p>
+            <footer class="tb-modal-actions">
+              <button
+                type="button"
+                class="tb-btn"
+                onClick={() => setPendingDeleteView(null)}
+                disabled={Boolean(deletingViewId)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn-danger"
+                onClick={() => void confirmDeleteView()}
+                disabled={Boolean(deletingViewId)}
+              >
+                {deletingViewId ? "Deleting..." : "Delete"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
       {pendingDeleteEpic ? (
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
           <div
@@ -1949,7 +2442,8 @@ export function InitiativesScreen() {
                 </span>
               ) : (
                 <span>
-                  Scope: <strong>All configured initiatives</strong>
+                  {completedSummaryContext.isAllConfigured ? "Scope:" : "View:"}{" "}
+                  <strong>{completedSummaryContext.isAllConfigured ? "All configured initiatives" : completedSummaryContext.viewName}</strong>
                 </span>
               )}
             </p>
