@@ -616,6 +616,134 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["epics"][0]["workTypes"], [])
             self.assertEqual(payload["reportingPeriod"]["days"], 7)
 
+    def test_configured_epic_summary_ignores_issue_rows_missing_from_latest_full_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-4484",
+                success_criteria=["All cards complete"],
+                group_ids=[],
+                work_type_ids=[],
+                db_path=db_path,
+            )
+
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO sync_run_history (
+                      source_type, scope_key, sync_mode, started_at, finished_at,
+                      status, issues_synced, total_issues
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "jira",
+                        "board:27193",
+                        "full",
+                        "2026-06-03T02:12:47+00:00",
+                        "2026-06-03T03:29:30+00:00",
+                        "completed",
+                        1,
+                        1,
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category, synced_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "CEGBUPOL-4484",
+                        "4484",
+                        "Epic",
+                        "NL Search - AIA Stack Integration",
+                        "Closed",
+                        "Done",
+                        "2026-06-03 02:13:00",
+                    ),
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO issues (
+                      issue_key, issue_id, issue_type, summary, status_name, status_category,
+                      epic_key, parent_issue_key, updated_at_source, resolved_at_source, synced_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "CEGBUPOL-9001",
+                            "9001",
+                            "Story",
+                            "Current done card",
+                            "Closed",
+                            "Done",
+                            "CEGBUPOL-4484",
+                            "CEGBUPOL-4484",
+                            "2026-06-03T02:13:00+00:00",
+                            "2026-06-03T02:13:00+00:00",
+                            "2026-06-03 02:13:00",
+                        ),
+                        (
+                            "CEGBUPOL-9002",
+                            "9002",
+                            "Story",
+                            "Stale open card",
+                            "Open",
+                            "To Do",
+                            "CEGBUPOL-4484",
+                            "CEGBUPOL-4484",
+                            "2026-05-03T16:33:45-07:00",
+                            None,
+                            "2026-05-13 02:06:00",
+                        ),
+                        (
+                            "CEGBUPOL-9003",
+                            "9003",
+                            "Story",
+                            "Stale done card",
+                            "Closed",
+                            "Done",
+                            "CEGBUPOL-4484",
+                            "CEGBUPOL-4484",
+                            "2026-06-02T02:13:00+00:00",
+                            "2026-06-02T02:13:00+00:00",
+                            "2026-05-13 02:06:00",
+                        ),
+                    ],
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            summary_payload = get_configured_epic_summary(limit=10, db_path=db_path)
+            epic = summary_payload["epics"][0]
+            self.assertEqual(epic["totalCards"], 1)
+            self.assertEqual(epic["completedCards"], 1)
+            self.assertEqual(epic["completionPercent"], 100.0)
+
+            completed_payload = get_epic_completed_cards(
+                epic_key="CEGBUPOL-4484",
+                period_start="2026-06-01",
+                period_end="2026-06-03",
+                timezone_name="UTC",
+                db_path=db_path,
+            )
+            self.assertEqual(completed_payload["count"], 1)
+            self.assertEqual(completed_payload["completedCards"][0]["issueKey"], "CEGBUPOL-9001")
+
+            configured_completed_payload = get_configured_epics_completed_cards(
+                period_start="2026-06-01",
+                period_end="2026-06-03",
+                timezone_name="UTC",
+                db_path=db_path,
+            )
+            self.assertEqual(configured_completed_payload["count"], 1)
+            self.assertEqual(configured_completed_payload["perEpicCounts"], {"CEGBUPOL-4484": 1})
+
     def test_configured_epic_summary_respects_inclusive_period_and_timezone(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = str(Path(tmp_dir) / "teambeacon.db")

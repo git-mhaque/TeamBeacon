@@ -338,6 +338,33 @@ def _is_done_issue(row: sqlite3.Row) -> bool:
     )
 
 
+def _latest_completed_full_sync_started_at(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute(
+        """
+        SELECT started_at
+        FROM sync_run_history
+        WHERE source_type = 'jira'
+          AND sync_mode = 'full'
+          AND status = 'completed'
+          AND started_at IS NOT NULL
+          AND TRIM(started_at) <> ''
+        ORDER BY datetime(started_at) DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row is None:
+        return None
+    started_at = str(row["started_at"] or "").strip()
+    return started_at or None
+
+
+def _current_full_sync_issue_clause(conn: sqlite3.Connection, issue_alias: str = "i") -> tuple[str, list[Any]]:
+    latest_full_sync_started_at = _latest_completed_full_sync_started_at(conn)
+    if latest_full_sync_started_at is None:
+        return "", []
+    return f"AND datetime({issue_alias}.synced_at) >= datetime(?)", [latest_full_sync_started_at]
+
+
 def _is_completed_in_period(
     row: sqlite3.Row,
     *,
@@ -1032,8 +1059,9 @@ def _read_epic_completion_metrics(
     period_end_date: date,
     reporting_timezone: ZoneInfo,
 ) -> tuple[int, int, int]:
+    current_scope_clause, current_scope_params = _current_full_sync_issue_clause(conn, "i")
     rows = conn.execute(
-        """
+        f"""
         SELECT
           i.status_name,
           i.status_category,
@@ -1053,8 +1081,9 @@ def _read_epic_completion_metrics(
                 AND p.epic_key = ?
             )
           )
+          {current_scope_clause}
         """,
-        (epic_key, epic_key, epic_key, epic_key),
+        [epic_key, epic_key, epic_key, epic_key, *current_scope_params],
     ).fetchall()
     total_cards = len(rows)
     completed_cards = 0
@@ -1246,8 +1275,9 @@ def get_epic_completed_cards(
     conn = _connect(resolved_db_path)
     try:
         _ensure_metadata_schema(conn)
+        current_scope_clause, current_scope_params = _current_full_sync_issue_clause(conn, "i")
         rows = conn.execute(
-            """
+            f"""
             SELECT
               i.issue_key,
               i.summary,
@@ -1271,9 +1301,10 @@ def get_epic_completed_cards(
                     AND p.epic_key = ?
                 )
               )
+              {current_scope_clause}
             ORDER BY datetime(COALESCE(i.resolved_at_source, i.updated_at_source, i.synced_at)) DESC, i.issue_key ASC
             """,
-            (normalized_key, normalized_key, normalized_key, normalized_key),
+            [normalized_key, normalized_key, normalized_key, normalized_key, *current_scope_params],
         ).fetchall()
 
         epic_name = _resolve_epic_name_from_issues(conn, normalized_key)
@@ -1382,6 +1413,7 @@ def get_configured_epics_completed_cards(
             epic_name_by_key[key] = name
 
         placeholders = ",".join("?" for _ in configured_epic_keys)
+        current_scope_clause, current_scope_params = _current_full_sync_issue_clause(conn, "i")
         query = f"""
             SELECT
               i.issue_key,
@@ -1404,9 +1436,10 @@ def get_configured_epics_completed_cards(
                 OR i.parent_issue_key IN ({placeholders})
                 OR p.epic_key IN ({placeholders})
               )
+              {current_scope_clause}
             ORDER BY datetime(COALESCE(i.resolved_at_source, i.updated_at_source, i.synced_at)) DESC, i.issue_key ASC
         """
-        params = configured_epic_keys + configured_epic_keys + configured_epic_keys
+        params = configured_epic_keys + configured_epic_keys + configured_epic_keys + current_scope_params
         issue_rows = conn.execute(query, params).fetchall()
 
         configured_epic_set = set(configured_epic_keys)
