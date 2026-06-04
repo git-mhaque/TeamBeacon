@@ -1207,7 +1207,9 @@ export function IntegrationsScreen() {
         <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Start JIRA Sync">
           <div class="tb-modal-backdrop" onClick={() => setIsSyncOptionsOpen(false)} />
           <div class="tb-modal tb-modal-sync">
-            <h3>Start JIRA Sync</h3>
+            <header class="tb-modal-head">
+              <h3>Start JIRA Sync</h3>
+            </header>
             <p class="tb-muted-note">Choose how much data to refresh before starting the sync.</p>
 
             <div class="tb-sync-option-list">
