@@ -89,6 +89,8 @@ const RAG_SORT_RANK: Record<RagLabel, number> = {
   Green: 2,
 };
 
+const RAG_FILTER_OPTIONS: RagLabel[] = ["Red", "Amber", "Green"];
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
@@ -111,6 +113,10 @@ function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
 
 function isReportingPreset(value: unknown): value is ReportingPreset {
   return value === "last_7_days" || value === "last_14_days" || value === "last_30_days" || value === "custom";
+}
+
+function isRagLabel(value: string): value is RagLabel {
+  return value === "Red" || value === "Amber" || value === "Green";
 }
 
 function isIsoDate(value: unknown): value is string {
@@ -435,6 +441,152 @@ function epicDisplaySortText(row: SummaryRow): string {
   return name || row.epicKey;
 }
 
+type MultiSelectFilterOption = {
+  value: string;
+  label: string;
+};
+
+type MultiSelectFilterProps = {
+  id: string;
+  label: string;
+  allLabel: string;
+  options: MultiSelectFilterOption[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+};
+
+function formatMultiSelectSummary(
+  selectedValues: string[],
+  options: MultiSelectFilterOption[],
+  allLabel: string,
+): string {
+  if (selectedValues.length === 0) {
+    return allLabel;
+  }
+  if (selectedValues.length === 1) {
+    const selected = options.find((option) => option.value === selectedValues[0]);
+    return selected?.label ?? selectedValues[0];
+  }
+  return `${selectedValues.length} selected`;
+}
+
+function MultiSelectFilter({
+  id,
+  label,
+  allLabel,
+  options,
+  selectedValues,
+  onChange,
+}: MultiSelectFilterProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const labelId = `${id}-label`;
+  const valueId = `${id}-value`;
+  const listboxId = `${id}-listbox`;
+  const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
+  const summary = useMemo(
+    () => formatMultiSelectSummary(selectedValues, options, allLabel),
+    [allLabel, options, selectedValues],
+  );
+
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+
+  const toggleValue = useCallback((value: string) => {
+    if (selectedSet.has(value)) {
+      onChange(selectedValues.filter((selectedValue) => selectedValue !== value));
+      return;
+    }
+    onChange([...selectedValues, value]);
+  }, [onChange, selectedSet, selectedValues]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (dropdownRef.current?.contains(event.target as Node)) return;
+      closeMenu();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMenu();
+      triggerRef.current?.focus();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeMenu, isOpen]);
+
+  return (
+    <div class="tb-initiative-filter tb-initiative-multiselect" ref={dropdownRef}>
+      <span id={labelId}>{label}</span>
+      <button
+        ref={triggerRef}
+        type="button"
+        class={`tb-initiative-multiselect-trigger${isOpen ? " is-open" : ""}`}
+        role="combobox"
+        aria-labelledby={labelId}
+        aria-describedby={valueId}
+        aria-expanded={isOpen ? "true" : "false"}
+        aria-haspopup="listbox"
+        aria-controls={listboxId}
+        onClick={() => setIsOpen((current) => !current)}
+        onKeyDown={(event) => {
+          switch (event.key) {
+            case "ArrowDown":
+            case "Enter":
+            case " ":
+              event.preventDefault();
+              setIsOpen(true);
+              return;
+            default:
+              return;
+          }
+        }}
+      >
+        <span id={valueId} class="tb-initiative-multiselect-value">{summary}</span>
+        <span class={`tb-initiative-multiselect-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
+      </button>
+
+      {isOpen ? (
+        <div
+          id={listboxId}
+          class="tb-initiative-multiselect-menu"
+          role="listbox"
+          aria-label={`${label} options`}
+          aria-multiselectable="true"
+        >
+          {selectedValues.length > 0 ? (
+            <button type="button" class="tb-initiative-multiselect-clear" onClick={() => onChange([])}>
+              Clear selection
+            </button>
+          ) : null}
+          {options.map((option) => {
+            const selected = selectedSet.has(option.value);
+            return (
+              <label
+                key={option.value}
+                class={`tb-initiative-multiselect-option${selected ? " is-selected" : ""}`}
+                role="option"
+                aria-selected={selected ? "true" : "false"}
+              >
+                <input type="checkbox" checked={selected} onChange={() => toggleValue(option.value)} />
+                <span>{option.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function parsePersistedVisibleOptionalColumns(raw: string | null): OptionalColumnId[] {
   if (!raw) return DEFAULT_VISIBLE_OPTIONAL_COLUMNS;
   try {
@@ -559,9 +711,9 @@ export function InitiativesScreen() {
   const [isReportingConfigOpen, setIsReportingConfigOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [groupFilter, setGroupFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [ragFilter, setRagFilter] = useState<"all" | RagLabel>("all");
+  const [groupFilters, setGroupFilters] = useState<string[]>([]);
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [ragFilters, setRagFilters] = useState<RagLabel[]>([]);
   const [positiveDeltaOnly, setPositiveDeltaOnly] = useState(false);
   const [timeBoundOnly, setTimeBoundOnly] = useState(false);
   const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(readPersistedVisibleOptionalColumns);
@@ -1047,14 +1199,17 @@ export function InitiativesScreen() {
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    const selectedGroups = new Set(groupFilters);
+    const selectedTypes = new Set(typeFilters);
+    const selectedRags = new Set<RagLabel>(ragFilters);
     return rows.filter((row) => {
-      if (groupFilter !== "all" && !row.groups.some((group) => group.name === groupFilter)) {
+      if (selectedGroups.size > 0 && !row.groups.some((group) => selectedGroups.has(group.name))) {
         return false;
       }
-      if (typeFilter !== "all" && !row.workTypes.some((type) => type.name === typeFilter)) {
+      if (selectedTypes.size > 0 && !row.workTypes.some((type) => selectedTypes.has(type.name))) {
         return false;
       }
-      if (ragFilter !== "all" && row.ragLabel !== ragFilter) {
+      if (selectedRags.size > 0 && !selectedRags.has(row.ragLabel)) {
         return false;
       }
       if (positiveDeltaOnly && row.completedInPeriodValue <= 0) {
@@ -1075,7 +1230,7 @@ export function InitiativesScreen() {
         || criteriaText.includes(query)
       );
     });
-  }, [groupFilter, positiveDeltaOnly, ragFilter, rows, searchQuery, timeBoundOnly, typeFilter]);
+  }, [groupFilters, positiveDeltaOnly, ragFilters, rows, searchQuery, timeBoundOnly, typeFilters]);
 
   const visibleColumnSet = useMemo(() => new Set(visibleOptionalColumns), [visibleOptionalColumns]);
 
@@ -1822,44 +1977,32 @@ export function InitiativesScreen() {
             />
           </label>
 
-          <label class="tb-initiative-filter">
-            <span>Group</span>
-            <select
-              value={groupFilter}
-              onChange={(event) => setGroupFilter((event.currentTarget as HTMLSelectElement).value)}
-            >
-              <option value="all">All groups</option>
-              {groupOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
+          <MultiSelectFilter
+            id="initiative-group-filter"
+            label="Group"
+            allLabel="All groups"
+            options={groupOptions.map((option) => ({ value: option, label: option }))}
+            selectedValues={groupFilters}
+            onChange={setGroupFilters}
+          />
 
-          <label class="tb-initiative-filter">
-            <span>Work Type</span>
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter((event.currentTarget as HTMLSelectElement).value)}
-            >
-              <option value="all">All types</option>
-              {typeOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
+          <MultiSelectFilter
+            id="initiative-type-filter"
+            label="Work Type"
+            allLabel="All types"
+            options={typeOptions.map((option) => ({ value: option, label: option }))}
+            selectedValues={typeFilters}
+            onChange={setTypeFilters}
+          />
 
-          <label class="tb-initiative-filter">
-            <span>RAG</span>
-            <select
-              value={ragFilter}
-              onChange={(event) => setRagFilter((event.currentTarget as HTMLSelectElement).value as "all" | RagLabel)}
-            >
-              <option value="all">All</option>
-              <option value="Red">Red</option>
-              <option value="Amber">Amber</option>
-              <option value="Green">Green</option>
-            </select>
-          </label>
+          <MultiSelectFilter
+            id="initiative-rag-filter"
+            label="RAG"
+            allLabel="All"
+            options={RAG_FILTER_OPTIONS.map((option) => ({ value: option, label: option }))}
+            selectedValues={ragFilters}
+            onChange={(values) => setRagFilters(values.filter(isRagLabel))}
+          />
 
           <div class="tb-initiative-filter tb-initiative-filter-quick">
             <span>Quick Filters</span>
