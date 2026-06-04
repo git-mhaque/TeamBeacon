@@ -629,9 +629,9 @@ export function IntegrationsScreen() {
 
   const jiraSyncActionTitle = useMemo(() => {
     if (syncError) return "Sync status unavailable";
-    if (!jiraSyncStatus || jiraSyncStatus.state === "idle") return "Ready to sync";
+    if (!jiraSyncStatus || jiraSyncStatus.state === "idle") return "Sync Now";
     if (jiraSyncStatus.state === "running") return "Sync in progress";
-    return "Ready to sync";
+    return "Sync Now";
   }, [syncError, jiraSyncStatus]);
 
   const jiraSyncPercent = useMemo(() => {
@@ -855,8 +855,7 @@ export function IntegrationsScreen() {
               <section class={`tb-jira-last-sync-section ${jiraLastSyncToneClass}`} aria-label="JIRA last sync">
                 <div class="tb-jira-sync-head">
                   <div class="tb-jira-sync-title-block">
-                    <span class="tb-jira-sync-kicker">Last Sync</span>
-                    <strong class="tb-jira-sync-title">Previous run</strong>
+                    <strong class="tb-jira-sync-title">Last Sync</strong>
                   </div>
                   <span class={`tb-status-pill ${jiraLastSyncToneClass}`}>
                     <span>{jiraLastSyncStateText}</span>
@@ -890,7 +889,6 @@ export function IntegrationsScreen() {
               <section class={`tb-jira-sync-action-section ${jiraSyncActionToneClass}`} aria-label="JIRA sync action">
                 <div class="tb-jira-sync-head">
                   <div class="tb-jira-sync-title-block">
-                    <span class="tb-jira-sync-kicker">Sync Now</span>
                     <strong class="tb-jira-sync-title">{jiraSyncActionTitle}</strong>
                   </div>
                   <span class={`tb-status-pill ${jiraSyncActionToneClass}`}>

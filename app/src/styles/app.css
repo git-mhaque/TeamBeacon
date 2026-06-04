@@ -2279,15 +2279,9 @@ body {
   gap: 0.08rem;
 }
 
-.tb-jira-sync-kicker {
-  color: #2b4f81;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
 .tb-jira-sync-title {
   color: #223752;
-  font-size: 0.84rem;
+  font-size: 0.96rem;
   line-height: 1.25;
 }
 

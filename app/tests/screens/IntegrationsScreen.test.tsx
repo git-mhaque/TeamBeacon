@@ -98,12 +98,12 @@ describe("IntegrationsScreen", () => {
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
     const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
     expect(within(lastSyncRegion).getByText("Last Sync")).toBeInTheDocument();
-    expect(within(lastSyncRegion).getByText("Previous run")).toBeInTheDocument();
+    expect(within(lastSyncRegion).queryByText("Previous run")).not.toBeInTheDocument();
     expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
     expect(within(lastSyncRegion).getByText("Completed")).toBeInTheDocument();
     const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
     expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
-    expect(within(syncActionRegion).getByText("Ready to sync")).toBeInTheDocument();
+    expect(within(syncActionRegion).queryByText("Ready to sync")).not.toBeInTheDocument();
     expect(within(syncActionRegion).getByText("Ready")).toBeInTheDocument();
     expect(within(syncActionRegion).queryByText("Success")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Diagnostics" })).toBeInTheDocument();
@@ -294,7 +294,7 @@ describe("IntegrationsScreen", () => {
     expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
     expect(within(lastSyncRegion).queryByText("Syncing")).not.toBeInTheDocument();
     const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
-    expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
+    expect(within(syncActionRegion).queryByText("Ready to sync")).not.toBeInTheDocument();
     expect(within(syncActionRegion).getByText("Syncing")).toBeInTheDocument();
     expect(screen.getByText("Step 4 of 6: Issues and changelog")).toBeInTheDocument();
     expect(screen.getByText("10 of 39 issues downloaded")).toBeInTheDocument();
