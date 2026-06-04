@@ -1932,7 +1932,7 @@ export function InitiativesScreen() {
                   </th>
                 ) : null}
                 {visibleColumnSet.has("progress") ? (
-                  <th>
+                  <th class="tb-initiative-progress-head">
                     <button
                       type="button"
                       class={`tb-table-sort${sortField === "progress" ? " is-active" : ""}`}
@@ -2043,12 +2043,12 @@ export function InitiativesScreen() {
                         {visibleColumnSet.has("group") ? <td>{row.groupText}</td> : null}
                         {visibleColumnSet.has("type") ? <td>{row.typeText}</td> : null}
                         {visibleColumnSet.has("progress") ? (
-                          <td>
+                          <td class="tb-initiative-progress-cell">
                             <div class="tb-initiative-progress">
                               <div class="tb-initiative-progress-track">
                                 <span style={{ width: `${progressPercent}%` }} />
                               </div>
-                              <span>{formatPercent(progressPercent)}</span>
+                              <span>{Math.round(progressPercent)}% ({row.completedCards}/{row.totalCards})</span>
                             </div>
                           </td>
                         ) : null}

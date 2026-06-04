@@ -1856,6 +1856,12 @@ body {
   border-bottom: none;
 }
 
+.tb-initiative-table th.tb-initiative-progress-head,
+.tb-initiative-table td.tb-initiative-progress-cell {
+  min-width: 8.75rem;
+  width: 8.75rem;
+}
+
 .tb-initiative-epic {
   display: grid;
   gap: 0.12rem;
@@ -1884,6 +1890,7 @@ body {
   color: #365985;
   font-size: 0.76rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .tb-initiative-progress-track {

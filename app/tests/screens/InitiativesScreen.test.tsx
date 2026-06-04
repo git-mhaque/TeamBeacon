@@ -237,6 +237,7 @@ describe("InitiativesScreen", () => {
     const initiativeRow = screen.getByText("CEG-101").closest("tr");
     expect(initiativeRow).not.toBeNull();
     const rowCells = within(initiativeRow as HTMLElement).getAllByRole("cell");
+    expect(within(rowCells[3]).getByText("70% (7/10)")).toBeInTheDocument();
     expect(within(rowCells[4]).getByText("7 / 10")).toBeInTheDocument();
     expect(within(rowCells[4]).getByText("Period:")).toBeInTheDocument();
     expect(within(rowCells[4]).getByText("5%")).toBeInTheDocument();
