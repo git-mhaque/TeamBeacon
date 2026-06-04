@@ -3575,6 +3575,8 @@ body {
 .tb-release-cycle-view {
   display: grid;
   gap: 0.7rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tb-release-cycle-actions {
@@ -3584,21 +3586,24 @@ body {
 
 .tb-release-cycle-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.58rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(9.75rem, 100%), 1fr));
+  gap: 0.46rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tb-release-cycle-summary article {
   border: 1px solid #d2def1;
   border-radius: 0.72rem;
   background: linear-gradient(180deg, #fbfdff 0%, #f4f8ff 100%);
-  padding: 0.58rem 0.68rem;
+  min-width: 0;
+  padding: 0.46rem 0.58rem;
 }
 
 .tb-release-cycle-summary span {
   display: block;
   color: #50698d;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3606,9 +3611,9 @@ body {
 
 .tb-release-cycle-summary strong {
   display: block;
-  margin-top: 0.18rem;
+  margin-top: 0.14rem;
   color: #132f52;
-  font-size: 1.08rem;
+  font-size: 1rem;
   line-height: 1.1;
 }
 
@@ -3616,17 +3621,24 @@ body {
   border: 1px solid #d2def1;
   border-radius: 0.5rem;
   background: #f7fbff;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 0.62rem 0.72rem 0.58rem;
 }
 
 .tb-release-cycle-chart {
   height: 16.2rem;
+  max-width: 100%;
   min-height: 16.2rem;
+  min-width: 0;
 }
 
 .tb-release-cycle-chart-canvas {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: 100%;
 }
 
