@@ -301,6 +301,7 @@ export type CurrentSprintWorkIssue = {
   groupName?: string | null;
   workTypeName?: string | null;
   assigneeAccountId?: string | null;
+  assigneeDisplayName?: string | null;
   epicUrl?: string | null;
   issueUrl?: string | null;
 };

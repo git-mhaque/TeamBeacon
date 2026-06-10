@@ -51,6 +51,18 @@ function formatStoryPoints(value: number | null | undefined): string {
   return value.toFixed(1).replace(/\.0$/, "");
 }
 
+function formatCardCount(value: number): string {
+  return `${value} ${value === 1 ? "card" : "cards"}`;
+}
+
+function formatCardProgress(done: number, total: number): string {
+  return `${done} / ${total} ${total === 1 ? "card" : "cards"}`;
+}
+
+function formatOwnerCount(value: number): string {
+  return `${value} ${value === 1 ? "owner" : "owners"}`;
+}
+
 function formatPercent(value: number): string {
   if (!Number.isFinite(value)) return "0%";
   return `${value.toFixed(1).replace(/\.0$/, "")}%`;
@@ -160,6 +172,17 @@ type StateBreakdownRow = {
   toneClass: string;
 };
 
+type TeamAllocationRow = {
+  key: string;
+  label: string;
+  doneCards: number;
+  totalCards: number;
+  doneStoryPoints: number;
+  totalStoryPoints: number;
+  totalWidthPercent: number;
+  doneWidthPercent: number;
+};
+
 type WorkMixSlice = {
   label: string;
   count: number;
@@ -235,6 +258,66 @@ function sumStoryPoints(issues: CurrentSprintWorkIssue[]): number {
     }
   }
   return total;
+}
+
+function resolveAssigneeLabel(issue: CurrentSprintWorkIssue): string {
+  return (
+    normalizeFilterValue(issue.assigneeDisplayName) ??
+    normalizeFilterValue(issue.assigneeAccountId) ??
+    "Unassigned"
+  );
+}
+
+function issueStoryPoints(issue: CurrentSprintWorkIssue): number {
+  return typeof issue.storyPoints === "number" && Number.isFinite(issue.storyPoints) ? issue.storyPoints : 0;
+}
+
+function buildTeamAllocationRows(work: CurrentSprintWorkResponse["work"]): TeamAllocationRow[] {
+  const rows = new Map<string, Omit<TeamAllocationRow, "totalWidthPercent" | "doneWidthPercent">>();
+  const addIssue = (issue: CurrentSprintWorkIssue, done: boolean) => {
+    const label = resolveAssigneeLabel(issue);
+    const key = label === "Unassigned" ? FILTER_UNASSIGNED : normalizeFilterValue(issue.assigneeAccountId) ?? label;
+    const row = rows.get(key) ?? {
+      key,
+      label,
+      doneCards: 0,
+      totalCards: 0,
+      doneStoryPoints: 0,
+      totalStoryPoints: 0,
+    };
+    if (row.label === key && label !== key) {
+      row.label = label;
+    }
+    const storyPoints = issueStoryPoints(issue);
+    row.totalCards += 1;
+    row.totalStoryPoints += storyPoints;
+    if (done) {
+      row.doneCards += 1;
+      row.doneStoryPoints += storyPoints;
+    }
+    rows.set(key, row);
+  };
+
+  for (const issue of work.done) addIssue(issue, true);
+  for (const issue of work.inProgress) addIssue(issue, false);
+  for (const issue of work.planned) addIssue(issue, false);
+
+  const maxCards = Math.max(1, ...[...rows.values()].map((row) => row.totalCards));
+  return [...rows.values()]
+    .sort((left, right) => {
+      if (left.label === "Unassigned" && right.label !== "Unassigned") return 1;
+      if (right.label === "Unassigned" && left.label !== "Unassigned") return -1;
+      return (
+        right.totalCards - left.totalCards ||
+        right.totalStoryPoints - left.totalStoryPoints ||
+        left.label.localeCompare(right.label, undefined, { sensitivity: "base" })
+      );
+    })
+    .map((row) => ({
+      ...row,
+      totalWidthPercent: (row.totalCards / maxCards) * 100,
+      doneWidthPercent: row.totalCards > 0 ? (row.doneCards / row.totalCards) * 100 : 0,
+    }));
 }
 
 function buildWorkMixSlices(issues: CurrentSprintWorkIssue[], field: "group" | "type"): WorkMixSlice[] {
@@ -422,7 +505,12 @@ export function SprintBoardScreen() {
     [allWorkItems],
   );
   const assigneeFilterOptions = useMemo(
-    () => buildFilterOptions(allWorkItems, "All assignees", (issue) => normalizeFilterValue(issue.assigneeAccountId)),
+    () =>
+      buildFilterOptions(
+        allWorkItems,
+        "All assignees",
+        (issue) => normalizeFilterValue(issue.assigneeDisplayName) ?? normalizeFilterValue(issue.assigneeAccountId),
+      ),
     [allWorkItems],
   );
 
@@ -455,7 +543,10 @@ export function SprintBoardScreen() {
       matchesFilter(groupFilter, normalizeFilterValue(issue.groupName)) &&
       matchesFilter(typeFilter, normalizeFilterValue(issue.workTypeName)) &&
       matchesFilter(epicFilter, resolveEpicFilterValue(issue)) &&
-      matchesFilter(assigneeFilter, normalizeFilterValue(issue.assigneeAccountId)),
+      matchesFilter(
+        assigneeFilter,
+        normalizeFilterValue(issue.assigneeDisplayName) ?? normalizeFilterValue(issue.assigneeAccountId),
+      ),
     [assigneeFilter, epicFilter, groupFilter, typeFilter],
   );
 
@@ -485,6 +576,11 @@ export function SprintBoardScreen() {
 
   const groupMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "group"), [allWorkItems]);
   const typeMixSlices = useMemo(() => buildWorkMixSlices(allWorkItems, "type"), [allWorkItems]);
+  const teamAllocationRows = useMemo(() => buildTeamAllocationRows(work), [work]);
+  const assignedOwnerCount = useMemo(
+    () => teamAllocationRows.filter((row) => row.label !== "Unassigned").length,
+    [teamAllocationRows],
+  );
   const statePieSlices = useMemo<WorkMixSlice[]>(
     () =>
       stateBreakdownRows.map((row) => ({
@@ -689,6 +785,67 @@ export function SprintBoardScreen() {
             ) : null}
           </article>
         </div>
+
+        <article class="tb-sprint-summary-card tb-team-allocation-card">
+          <div class="tb-team-allocation-heading">
+            <div>
+              <h4>Team Allocation</h4>
+              <p class="tb-muted-note">Assigned sprint work by owner, with completed card progress inside each bar.</p>
+            </div>
+            {!workLoading ? (
+              <div class="tb-team-allocation-summary" aria-label="Team allocation summary">
+                <span>{formatOwnerCount(assignedOwnerCount)}</span>
+                <span>{formatCardCount(work.totals.total)}</span>
+                <span>{formatStoryPoints(work.totals.storyPoints.total)} SP</span>
+              </div>
+            ) : null}
+          </div>
+
+          {workLoading ? <p class="tb-muted-note">Loading team allocation...</p> : null}
+          {!workLoading && teamAllocationRows.length === 0 ? (
+            <p class="tb-muted-note">No team allocation data available.</p>
+          ) : null}
+          {!workLoading && teamAllocationRows.length > 0 ? (
+            <div class="tb-team-allocation-list">
+              <div class="tb-team-allocation-row tb-team-allocation-label-row" aria-hidden="true">
+                <span>Owner</span>
+                <span>Cards</span>
+                <span>Card Done</span>
+                <span>SP Done</span>
+              </div>
+              {teamAllocationRows.map((row) => (
+                <div class="tb-team-allocation-row" key={row.key}>
+                  <strong class="tb-team-allocation-member" title={row.label}>
+                    {row.label}
+                  </strong>
+                  <div
+                    class="tb-team-allocation-track"
+                    role="img"
+                    aria-label={`${row.label} allocation: ${row.doneCards} of ${formatCardCount(row.totalCards)} done, ${formatStoryPoints(
+                      row.doneStoryPoints,
+                    )} of ${formatStoryPoints(row.totalStoryPoints)} SP done`}
+                  >
+                    <span
+                      class="tb-team-allocation-total"
+                      style={{ width: `${row.totalWidthPercent}%` }}
+                      title={`${formatCardCount(row.totalCards)} assigned`}
+                    >
+                      <span
+                        class="tb-team-allocation-done"
+                        style={{ width: `${row.doneWidthPercent}%` }}
+                        title={`${formatCardCount(row.doneCards)} completed`}
+                      />
+                    </span>
+                  </div>
+                  <span class="tb-team-allocation-stat">{formatCardProgress(row.doneCards, row.totalCards)}</span>
+                  <span class="tb-team-allocation-stat">{`${formatStoryPoints(row.doneStoryPoints)} / ${formatStoryPoints(
+                    row.totalStoryPoints,
+                  )} SP`}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </article>
         {sprintError && !sprintLoading ? <p class="tb-error-note">Current sprint status: {sprintError}</p> : null}
       </section>
 

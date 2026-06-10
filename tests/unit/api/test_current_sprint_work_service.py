@@ -52,6 +52,19 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
                 )
                 conn.executemany(
                     """
+                    INSERT INTO team_members (
+                      account_id,
+                      display_name,
+                      alias_code
+                    ) VALUES (?, ?, ?)
+                    """,
+                    [
+                        ("user-dev", "Dev Owner", "DEV"),
+                        ("user-qa", "QA Owner", "QA"),
+                    ],
+                )
+                conn.executemany(
+                    """
                     INSERT INTO issues (
                       issue_key,
                       issue_id,
@@ -61,14 +74,24 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
                       status_name,
                       status_category,
                       story_points,
+                      assignee_account_id,
                       epic_key,
                       sprint_external_id
-                    ) VALUES (?, ?, 'CEGBUPOL', 'Story', ?, ?, ?, ?, ?, 33001)
+                    ) VALUES (?, ?, 'CEGBUPOL', 'Story', ?, ?, ?, ?, ?, ?, 33001)
                     """,
                     [
-                        ("CEGBUPOL-1001", "1001", "Implement retry policy", "Done", "Done", 8, "CEGBUPOL-9000"),
-                        ("CEGBUPOL-1002", "1002", "Stabilize deployment job", "In Progress", "In Progress", 5, "CEGBUPOL-9000"),
-                        ("CEGBUPOL-1003", "1003", "Finalize rollout checklist", "To Do", "To Do", 3, "CEGBUPOL-9000"),
+                        ("CEGBUPOL-1001", "1001", "Implement retry policy", "Done", "Done", 8, "user-dev", "CEGBUPOL-9000"),
+                        (
+                            "CEGBUPOL-1002",
+                            "1002",
+                            "Stabilize deployment job",
+                            "In Progress",
+                            "In Progress",
+                            5,
+                            "user-dev",
+                            "CEGBUPOL-9000",
+                        ),
+                        ("CEGBUPOL-1003", "1003", "Finalize rollout checklist", "To Do", "To Do", 3, "user-qa", "CEGBUPOL-9000"),
                     ],
                 )
                 conn.execute(
@@ -110,6 +133,9 @@ class CurrentSprintWorkServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["work"]["done"][0]["storyPoints"], 8.0)
             self.assertEqual(payload["work"]["inProgress"][0]["storyPoints"], 5.0)
             self.assertEqual(payload["work"]["planned"][0]["storyPoints"], 3.0)
+            self.assertEqual(payload["work"]["done"][0]["assigneeDisplayName"], "Dev Owner")
+            self.assertEqual(payload["work"]["inProgress"][0]["assigneeDisplayName"], "Dev Owner")
+            self.assertEqual(payload["work"]["planned"][0]["assigneeDisplayName"], "QA Owner")
             self.assertEqual(payload["work"]["done"][0]["epicKey"], "CEGBUPOL-9000")
             self.assertEqual(payload["work"]["done"][0]["epicName"], "Sprint Reliability Epic")
             visible_issue_keys = [

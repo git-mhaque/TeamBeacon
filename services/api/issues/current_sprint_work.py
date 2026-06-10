@@ -187,11 +187,13 @@ def get_current_sprint_work(
               i.status_category,
               i.story_points,
               i.assignee_account_id,
+              tm.display_name AS assignee_display_name,
               i.epic_key,
               e.summary AS epic_summary,
               eg.name AS group_name,
               wt.name AS work_type_name
             FROM issues i
+            LEFT JOIN team_members tm ON tm.account_id = i.assignee_account_id
             LEFT JOIN issues e ON e.issue_key = i.epic_key
             LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
             LEFT JOIN epic_metadata_groups emg ON emg.epic_metadata_id = em.id
@@ -213,12 +215,14 @@ def get_current_sprint_work(
               i.status_category,
               i.story_points,
               i.assignee_account_id,
+              tm.display_name AS assignee_display_name,
               i.epic_key,
               e.summary AS epic_summary,
               eg.name AS group_name,
               wt.name AS work_type_name,
               i.raw_json
             FROM issues i
+            LEFT JOIN team_members tm ON tm.account_id = i.assignee_account_id
             LEFT JOIN issues e ON e.issue_key = i.epic_key
             LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
             LEFT JOIN epic_metadata_groups emg ON emg.epic_metadata_id = em.id
@@ -252,6 +256,7 @@ def get_current_sprint_work(
             "status_category": row["status_category"],
             "story_points": row["story_points"],
             "assignee_account_id": row["assignee_account_id"],
+            "assignee_display_name": row["assignee_display_name"],
             "epic_key": row["epic_key"],
             "epic_summary": row["epic_summary"],
             "group_name": row["group_name"],
@@ -286,6 +291,7 @@ def get_current_sprint_work(
                 "status_category": row["status_category"],
                 "story_points": row["story_points"],
                 "assignee_account_id": row["assignee_account_id"],
+                "assignee_display_name": row["assignee_display_name"],
                 "epic_key": row["epic_key"],
                 "epic_summary": row["epic_summary"],
                 "group_name": row["group_name"],
@@ -308,6 +314,7 @@ def get_current_sprint_work(
             "groupName": row["group_name"],
             "workTypeName": row["work_type_name"],
             "assigneeAccountId": row["assignee_account_id"],
+            "assigneeDisplayName": row["assignee_display_name"],
             "epicUrl": (
                 f"{jira_base_url}/browse/{row['epic_key']}"
                 if jira_base_url and row["epic_key"]

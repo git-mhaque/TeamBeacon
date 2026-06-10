@@ -32,6 +32,7 @@ describe("SprintBoardScreen", () => {
               groupName: "Core Platform",
               workTypeName: "Feature",
               assigneeAccountId: "acct-1",
+              assigneeDisplayName: "Alex Chen",
               issueUrl: "https://jira.example.com/browse/CEG-901",
               epicUrl: "https://jira.example.com/browse/CEG-100",
             },
@@ -47,7 +48,8 @@ describe("SprintBoardScreen", () => {
               epicName: "Executive Reporting",
               groupName: "Core Platform",
               workTypeName: "Reliability",
-              assigneeAccountId: "acct-2",
+              assigneeAccountId: "acct-1",
+              assigneeDisplayName: "Alex Chen",
             },
           ],
           planned: [
@@ -62,6 +64,7 @@ describe("SprintBoardScreen", () => {
               groupName: "Ops Excellence",
               workTypeName: "Feature",
               assigneeAccountId: null,
+              assigneeDisplayName: null,
             },
           ],
           totals: {
@@ -166,6 +169,23 @@ describe("SprintBoardScreen", () => {
     expect(screen.getByRole("heading", { name: "Work Mix by Type" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Work mix by group chart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Work mix by type chart" })).toBeInTheDocument();
+    const allocationPanel = screen.getByRole("heading", { name: "Team Allocation" }).closest("article");
+    expect(allocationPanel).not.toBeNull();
+    if (!allocationPanel) {
+      throw new Error("Team Allocation section not found.");
+    }
+    const scopedAllocation = within(allocationPanel);
+    expect(scopedAllocation.getByText("Alex Chen")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("1 / 2 cards")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("8 / 13 SP")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("Unassigned")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("0 / 1 card")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("0 / 3 SP")).toBeInTheDocument();
+    expect(
+      scopedAllocation.getByRole("img", {
+        name: "Alex Chen allocation: 1 of 2 cards done, 8 of 13 SP done",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ops Excellence").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reliability").length).toBeGreaterThan(0);

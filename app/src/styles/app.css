@@ -1484,6 +1484,101 @@ body {
   font-weight: 700;
 }
 
+.tb-team-allocation-card {
+  margin-top: 0.62rem;
+}
+
+.tb-team-allocation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.78rem;
+}
+
+.tb-team-allocation-heading p {
+  margin: 0.18rem 0 0;
+}
+
+.tb-team-allocation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.28rem;
+}
+
+.tb-team-allocation-summary span {
+  border: 1px solid #cbd9ef;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #2f5688;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.2rem 0.46rem;
+  white-space: nowrap;
+}
+
+.tb-team-allocation-list {
+  margin-top: 0.58rem;
+  display: grid;
+  gap: 0.34rem;
+}
+
+.tb-team-allocation-row {
+  display: grid;
+  grid-template-columns: minmax(7.6rem, 1fr) minmax(12rem, 2fr) minmax(5.8rem, auto) minmax(5rem, auto);
+  align-items: center;
+  gap: 0.48rem;
+}
+
+.tb-team-allocation-label-row {
+  color: #4a6488;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tb-team-allocation-member {
+  color: #213a5c;
+  font-size: 0.8rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-team-allocation-track {
+  height: 0.78rem;
+  border: 1px solid #c9d8ee;
+  border-radius: 999px;
+  background: #eef4fb;
+  overflow: hidden;
+}
+
+.tb-team-allocation-total {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #d7e3f2;
+  overflow: hidden;
+}
+
+.tb-team-allocation-done {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1f8f63;
+}
+
+.tb-team-allocation-stat {
+  color: #2f4f78;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .tb-initiative-period {
   margin: 0 0 0.1rem;
 }
@@ -4070,6 +4165,26 @@ body {
     justify-items: start;
   }
 
+  .tb-team-allocation-heading {
+    flex-direction: column;
+  }
+
+  .tb-team-allocation-summary {
+    justify-content: flex-start;
+  }
+
+  .tb-team-allocation-row {
+    grid-template-columns: minmax(7rem, 1fr) minmax(10rem, 1.6fr);
+  }
+
+  .tb-team-allocation-label-row {
+    display: none;
+  }
+
+  .tb-team-allocation-stat {
+    text-align: left;
+  }
+
   .tb-modal-two-up {
     grid-template-columns: 1fr;
   }
@@ -4222,6 +4337,15 @@ body {
 
   .tb-cards-window-table {
     min-width: 0;
+  }
+
+  .tb-team-allocation-row {
+    grid-template-columns: 1fr;
+    gap: 0.26rem;
+  }
+
+  .tb-team-allocation-track {
+    width: 100%;
   }
 
   .tb-trend-tabs {
