@@ -51,6 +51,19 @@ describe("SprintBoardScreen", () => {
               assigneeAccountId: "acct-1",
               assigneeDisplayName: "Alex Chen",
             },
+            {
+              issueKey: "CEG-904",
+              summary: "Resolve blocked rollout validation",
+              status: "Blocked",
+              statusCategory: "In Progress",
+              storyPoints: 2,
+              epicKey: "CEG-100",
+              epicName: "Executive Reporting",
+              groupName: "Core Platform",
+              workTypeName: "Reliability",
+              assigneeAccountId: "acct-1",
+              assigneeDisplayName: "Alex Chen",
+            },
           ],
           planned: [
             {
@@ -69,14 +82,14 @@ describe("SprintBoardScreen", () => {
           ],
           totals: {
             done: 1,
-            inProgress: 1,
+            inProgress: 2,
             planned: 1,
-            total: 3,
+            total: 4,
             storyPoints: {
               done: 8,
-              inProgress: 5,
+              inProgress: 7,
               planned: 3,
-              total: 16,
+              total: 18,
             },
           },
         },
@@ -175,15 +188,19 @@ describe("SprintBoardScreen", () => {
       throw new Error("Team Allocation section not found.");
     }
     const scopedAllocation = within(allocationPanel);
+    expect(scopedAllocation.getByText("Done")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("In Progress")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("Blocked")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("Planned")).toBeInTheDocument();
     expect(scopedAllocation.getByText("Alex Chen")).toBeInTheDocument();
-    expect(scopedAllocation.getByText("1 / 2 cards")).toBeInTheDocument();
-    expect(scopedAllocation.getByText("8 / 13 SP")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("1 / 3 cards")).toBeInTheDocument();
+    expect(scopedAllocation.getByText("8 / 15 SP")).toBeInTheDocument();
     expect(scopedAllocation.getByText("Unassigned")).toBeInTheDocument();
     expect(scopedAllocation.getByText("0 / 1 card")).toBeInTheDocument();
     expect(scopedAllocation.getByText("0 / 3 SP")).toBeInTheDocument();
     expect(
       scopedAllocation.getByRole("img", {
-        name: "Alex Chen allocation: 1 of 2 cards done, 8 of 13 SP done",
+        name: "Alex Chen allocation: 1 / 3 cards done, 1 card in progress, 1 card blocked, 0 cards planned, 8 of 15 SP done",
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
@@ -201,7 +218,7 @@ describe("SprintBoardScreen", () => {
     }
     const scopedWork = within(workPanel);
     const plannedHeading = scopedWork.getByRole("heading", { name: "Planned (1 | 3 SP)" });
-    const inProgressHeading = scopedWork.getByRole("heading", { name: "In Progress (1 | 5 SP)" });
+    const inProgressHeading = scopedWork.getByRole("heading", { name: "In Progress (2 | 7 SP)" });
     const doneHeading = scopedWork.getByRole("heading", { name: "Done (1 | 8 SP)" });
     expect(plannedHeading.compareDocumentPosition(inProgressHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inProgressHeading.compareDocumentPosition(doneHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -233,7 +250,7 @@ describe("SprintBoardScreen", () => {
     fireEvent.change(assigneeFilter, { target: { value: assigneeFilter.options[0].value } });
     fireEvent.change(epicFilter, { target: { value: "Executive Reporting" } });
     expect(scopedWork.getByRole("heading", { name: "Planned (0 | 0 SP)" })).toBeInTheDocument();
-    expect(scopedWork.getByRole("heading", { name: "In Progress (1 | 5 SP)" })).toBeInTheDocument();
+    expect(scopedWork.getByRole("heading", { name: "In Progress (2 | 7 SP)" })).toBeInTheDocument();
     expect(scopedWork.getByRole("heading", { name: "Done (1 | 8 SP)" })).toBeInTheDocument();
   });
 });

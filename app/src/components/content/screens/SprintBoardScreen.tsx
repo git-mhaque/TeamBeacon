@@ -176,11 +176,19 @@ type TeamAllocationRow = {
   key: string;
   label: string;
   doneCards: number;
+  inProgressCards: number;
+  blockedCards: number;
+  plannedCards: number;
   totalCards: number;
   doneStoryPoints: number;
   totalStoryPoints: number;
   totalWidthPercent: number;
-  doneWidthPercent: number;
+  segmentPercents: {
+    done: number;
+    inProgress: number;
+    blocked: number;
+    planned: number;
+  };
 };
 
 type WorkMixSlice = {
@@ -272,15 +280,32 @@ function issueStoryPoints(issue: CurrentSprintWorkIssue): number {
   return typeof issue.storyPoints === "number" && Number.isFinite(issue.storyPoints) ? issue.storyPoints : 0;
 }
 
+function isBlockedWorkIssue(issue: CurrentSprintWorkIssue): boolean {
+  const status = (issue.status ?? "").trim().toLowerCase();
+  const category = (issue.statusCategory ?? "").trim().toLowerCase();
+  return status.includes("blocked") || category.includes("blocked");
+}
+
+function formatTeamAllocationAria(row: TeamAllocationRow): string {
+  return `${row.label} allocation: ${formatCardProgress(row.doneCards, row.totalCards)} done, ${formatCardCount(
+    row.inProgressCards,
+  )} in progress, ${formatCardCount(row.blockedCards)} blocked, ${formatCardCount(
+    row.plannedCards,
+  )} planned, ${formatStoryPoints(row.doneStoryPoints)} of ${formatStoryPoints(row.totalStoryPoints)} SP done`;
+}
+
 function buildTeamAllocationRows(work: CurrentSprintWorkResponse["work"]): TeamAllocationRow[] {
-  const rows = new Map<string, Omit<TeamAllocationRow, "totalWidthPercent" | "doneWidthPercent">>();
-  const addIssue = (issue: CurrentSprintWorkIssue, done: boolean) => {
+  const rows = new Map<string, Omit<TeamAllocationRow, "totalWidthPercent" | "segmentPercents">>();
+  const addIssue = (issue: CurrentSprintWorkIssue, bucket: "done" | "inProgress" | "planned") => {
     const label = resolveAssigneeLabel(issue);
     const key = label === "Unassigned" ? FILTER_UNASSIGNED : normalizeFilterValue(issue.assigneeAccountId) ?? label;
     const row = rows.get(key) ?? {
       key,
       label,
       doneCards: 0,
+      inProgressCards: 0,
+      blockedCards: 0,
+      plannedCards: 0,
       totalCards: 0,
       doneStoryPoints: 0,
       totalStoryPoints: 0,
@@ -291,16 +316,22 @@ function buildTeamAllocationRows(work: CurrentSprintWorkResponse["work"]): TeamA
     const storyPoints = issueStoryPoints(issue);
     row.totalCards += 1;
     row.totalStoryPoints += storyPoints;
-    if (done) {
+    if (isBlockedWorkIssue(issue)) {
+      row.blockedCards += 1;
+    } else if (bucket === "done") {
       row.doneCards += 1;
       row.doneStoryPoints += storyPoints;
+    } else if (bucket === "inProgress") {
+      row.inProgressCards += 1;
+    } else {
+      row.plannedCards += 1;
     }
     rows.set(key, row);
   };
 
-  for (const issue of work.done) addIssue(issue, true);
-  for (const issue of work.inProgress) addIssue(issue, false);
-  for (const issue of work.planned) addIssue(issue, false);
+  for (const issue of work.done) addIssue(issue, "done");
+  for (const issue of work.inProgress) addIssue(issue, "inProgress");
+  for (const issue of work.planned) addIssue(issue, "planned");
 
   const maxCards = Math.max(1, ...[...rows.values()].map((row) => row.totalCards));
   return [...rows.values()]
@@ -316,7 +347,12 @@ function buildTeamAllocationRows(work: CurrentSprintWorkResponse["work"]): TeamA
     .map((row) => ({
       ...row,
       totalWidthPercent: (row.totalCards / maxCards) * 100,
-      doneWidthPercent: row.totalCards > 0 ? (row.doneCards / row.totalCards) * 100 : 0,
+      segmentPercents: {
+        done: row.totalCards > 0 ? (row.doneCards / row.totalCards) * 100 : 0,
+        inProgress: row.totalCards > 0 ? (row.inProgressCards / row.totalCards) * 100 : 0,
+        blocked: row.totalCards > 0 ? (row.blockedCards / row.totalCards) * 100 : 0,
+        planned: row.totalCards > 0 ? (row.plannedCards / row.totalCards) * 100 : 0,
+      },
     }));
 }
 
@@ -807,6 +843,24 @@ export function SprintBoardScreen() {
           ) : null}
           {!workLoading && teamAllocationRows.length > 0 ? (
             <div class="tb-team-allocation-list">
+              <div class="tb-team-allocation-legend" aria-label="Team allocation status legend">
+                <span>
+                  <i class="tb-team-allocation-key is-done" aria-hidden="true" />
+                  Done
+                </span>
+                <span>
+                  <i class="tb-team-allocation-key is-in-progress" aria-hidden="true" />
+                  In Progress
+                </span>
+                <span>
+                  <i class="tb-team-allocation-key is-blocked" aria-hidden="true" />
+                  Blocked
+                </span>
+                <span>
+                  <i class="tb-team-allocation-key is-planned" aria-hidden="true" />
+                  Planned
+                </span>
+              </div>
               <div class="tb-team-allocation-row tb-team-allocation-label-row" aria-hidden="true">
                 <span>Owner</span>
                 <span>Cards</span>
@@ -821,9 +875,7 @@ export function SprintBoardScreen() {
                   <div
                     class="tb-team-allocation-track"
                     role="img"
-                    aria-label={`${row.label} allocation: ${row.doneCards} of ${formatCardCount(row.totalCards)} done, ${formatStoryPoints(
-                      row.doneStoryPoints,
-                    )} of ${formatStoryPoints(row.totalStoryPoints)} SP done`}
+                    aria-label={formatTeamAllocationAria(row)}
                   >
                     <span
                       class="tb-team-allocation-total"
@@ -831,9 +883,24 @@ export function SprintBoardScreen() {
                       title={`${formatCardCount(row.totalCards)} assigned`}
                     >
                       <span
-                        class="tb-team-allocation-done"
-                        style={{ width: `${row.doneWidthPercent}%` }}
+                        class="tb-team-allocation-segment is-done"
+                        style={{ width: `${row.segmentPercents.done}%` }}
                         title={`${formatCardCount(row.doneCards)} completed`}
+                      />
+                      <span
+                        class="tb-team-allocation-segment is-in-progress"
+                        style={{ width: `${row.segmentPercents.inProgress}%` }}
+                        title={`${formatCardCount(row.inProgressCards)} in progress`}
+                      />
+                      <span
+                        class="tb-team-allocation-segment is-blocked"
+                        style={{ width: `${row.segmentPercents.blocked}%` }}
+                        title={`${formatCardCount(row.blockedCards)} blocked`}
+                      />
+                      <span
+                        class="tb-team-allocation-segment is-planned"
+                        style={{ width: `${row.segmentPercents.planned}%` }}
+                        title={`${formatCardCount(row.plannedCards)} planned`}
                       />
                     </span>
                   </div>

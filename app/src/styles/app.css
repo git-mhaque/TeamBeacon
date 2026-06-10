@@ -1524,6 +1524,28 @@ body {
   gap: 0.34rem;
 }
 
+.tb-team-allocation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem 0.72rem;
+  color: #314e78;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tb-team-allocation-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+}
+
+.tb-team-allocation-key {
+  display: inline-block;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 0.18rem;
+}
+
 .tb-team-allocation-row {
   display: grid;
   grid-template-columns: minmax(7.6rem, 1fr) minmax(12rem, 2fr) minmax(5.8rem, auto) minmax(5rem, auto);
@@ -1557,18 +1579,46 @@ body {
 }
 
 .tb-team-allocation-total {
-  display: block;
+  display: flex;
   height: 100%;
   border-radius: inherit;
-  background: #d7e3f2;
+  background: transparent;
   overflow: hidden;
 }
 
-.tb-team-allocation-done {
+.tb-team-allocation-segment {
   display: block;
   height: 100%;
-  border-radius: inherit;
+}
+
+.tb-team-allocation-segment:first-child {
+  border-bottom-left-radius: inherit;
+  border-top-left-radius: inherit;
+}
+
+.tb-team-allocation-segment:last-child {
+  border-bottom-right-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.tb-team-allocation-key.is-done,
+.tb-team-allocation-segment.is-done {
   background: #1f8f63;
+}
+
+.tb-team-allocation-key.is-in-progress,
+.tb-team-allocation-segment.is-in-progress {
+  background: #b77700;
+}
+
+.tb-team-allocation-key.is-blocked,
+.tb-team-allocation-segment.is-blocked {
+  background: #c2372e;
+}
+
+.tb-team-allocation-key.is-planned,
+.tb-team-allocation-segment.is-planned {
+  background: #d7e3f2;
 }
 
 .tb-team-allocation-stat {
