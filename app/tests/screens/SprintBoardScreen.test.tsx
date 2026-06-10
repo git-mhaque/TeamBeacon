@@ -188,21 +188,27 @@ describe("SprintBoardScreen", () => {
       throw new Error("Team Allocation section not found.");
     }
     const scopedAllocation = within(allocationPanel);
-    expect(scopedAllocation.getByText("Done")).toBeInTheDocument();
-    expect(scopedAllocation.getByText("In Progress")).toBeInTheDocument();
-    expect(scopedAllocation.getByText("Blocked")).toBeInTheDocument();
-    expect(scopedAllocation.getByText("Planned")).toBeInTheDocument();
+    expect(scopedAllocation.getAllByText("Done").length).toBeGreaterThan(0);
+    expect(scopedAllocation.getAllByText("In Progress").length).toBeGreaterThan(0);
+    expect(scopedAllocation.getAllByText("Blocked").length).toBeGreaterThan(0);
+    expect(scopedAllocation.getAllByText("Planned").length).toBeGreaterThan(0);
     expect(scopedAllocation.getByText("Alex Chen")).toBeInTheDocument();
     expect(scopedAllocation.getByText("1 / 3 cards")).toBeInTheDocument();
     expect(scopedAllocation.getByText("8 / 15 SP")).toBeInTheDocument();
     expect(scopedAllocation.getByText("Unassigned")).toBeInTheDocument();
     expect(scopedAllocation.getByText("0 / 1 card")).toBeInTheDocument();
     expect(scopedAllocation.getByText("0 / 3 SP")).toBeInTheDocument();
+    const allocationTable = scopedAllocation.getByRole("table", { name: "Team allocation by owner" });
     expect(
       scopedAllocation.getByRole("img", {
         name: "Alex Chen allocation: 1 / 3 cards done, 1 card in progress, 1 card blocked, 0 cards planned, 8 of 15 SP done",
       }),
     ).toBeInTheDocument();
+    fireEvent.click(scopedAllocation.getByRole("button", { name: "Sort by Owner (descending)" }));
+    fireEvent.click(scopedAllocation.getByRole("button", { name: "Sort by Owner (ascending)" }));
+    const allocationRows = within(allocationTable).getAllByRole("row");
+    expect(within(allocationRows[1]).getByText("Unassigned")).toBeInTheDocument();
+    expect(within(allocationRows[2]).getByText("Alex Chen")).toBeInTheDocument();
     expect(screen.getAllByText("Core Platform").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ops Excellence").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reliability").length).toBeGreaterThan(0);

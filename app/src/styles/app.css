@@ -1521,7 +1521,7 @@ body {
 .tb-team-allocation-list {
   margin-top: 0.58rem;
   display: grid;
-  gap: 0.34rem;
+  gap: 0.54rem;
 }
 
 .tb-team-allocation-legend {
@@ -1546,28 +1546,43 @@ body {
   border-radius: 0.18rem;
 }
 
-.tb-team-allocation-row {
-  display: grid;
-  grid-template-columns: minmax(7.6rem, 1fr) minmax(12rem, 2fr) minmax(5.8rem, auto) minmax(5rem, auto);
-  align-items: center;
-  gap: 0.48rem;
+.tb-team-allocation-table-wrap {
+  border-radius: 0.72rem;
 }
 
-.tb-team-allocation-label-row {
-  color: #4a6488;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.tb-team-allocation-table {
+  min-width: 920px;
+}
+
+.tb-team-allocation-table th.tb-team-allocation-cards-head,
+.tb-team-allocation-table td.tb-team-allocation-cards-cell {
+  min-width: 22rem;
+}
+
+.tb-team-allocation-table th.is-numeric .tb-table-sort {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.tb-team-allocation-table td {
+  vertical-align: middle;
 }
 
 .tb-team-allocation-member {
+  display: block;
   color: #213a5c;
   font-size: 0.8rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tb-team-allocation-bar-cell {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  align-items: center;
+  gap: 0.58rem;
 }
 
 .tb-team-allocation-track {
@@ -1621,12 +1636,23 @@ body {
   background: #d7e3f2;
 }
 
+.tb-team-allocation-card-count {
+  color: #365985;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .tb-team-allocation-stat {
   color: #2f4f78;
   font-size: 0.75rem;
   font-weight: 700;
   text-align: right;
   white-space: nowrap;
+}
+
+.tb-team-allocation-blocked {
+  color: #a7332f;
 }
 
 .tb-initiative-period {
@@ -4223,18 +4249,6 @@ body {
     justify-content: flex-start;
   }
 
-  .tb-team-allocation-row {
-    grid-template-columns: minmax(7rem, 1fr) minmax(10rem, 1.6fr);
-  }
-
-  .tb-team-allocation-label-row {
-    display: none;
-  }
-
-  .tb-team-allocation-stat {
-    text-align: left;
-  }
-
   .tb-modal-two-up {
     grid-template-columns: 1fr;
   }
@@ -4387,15 +4401,6 @@ body {
 
   .tb-cards-window-table {
     min-width: 0;
-  }
-
-  .tb-team-allocation-row {
-    grid-template-columns: 1fr;
-    gap: 0.26rem;
-  }
-
-  .tb-team-allocation-track {
-    width: 100%;
   }
 
   .tb-trend-tabs {
