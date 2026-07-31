@@ -1,6 +1,6 @@
 # TeamBeacon Local API
 
-Lightweight local API endpoints used by the desktop/web shell.
+Lightweight API endpoints used by the TeamBeacon web frontend and container runtime.
 
 ## Run
 From repository root:
@@ -179,4 +179,4 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
   - `epic_groups`, `work_types` (lookup/reference data)
   - `epic_metadata` (success checklist by epic)
   - `epic_metadata_groups`, `epic_metadata_work_types` (many-to-many mapping)
-- Intended for local desktop runtime and frontend proxy usage.
+- Serves the TeamBeacon web frontend in the container runtime and supports the separate frontend development server.

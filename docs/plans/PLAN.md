@@ -7,9 +7,9 @@ Deliver in thin vertical slices: integrate data first, then insights, then execu
 
 ## Phase 0 (Week 1): Foundation
 - Initialize repo structure and toolchain.
-- Scaffold `app/` (Oracle JET + Tauri), `services/api/`, and shared packages.
+- Scaffold `app/` (Oracle JET web frontend), `services/api/`, and shared packages.
 - Define DB schema v1 and migrations.
-- Implement secure secret handling via OS keychain.
+- Implement secure secret handling via environment variables or mounted secret files.
 - Establish baseline UI mockups for all MVP workflows.
 
 Exit criteria:
@@ -56,7 +56,7 @@ Exit criteria:
 - Prepare release packaging and onboarding docs.
 
 Exit criteria:
-- Stable desktop build for primary OS target.
+- Stable container image and browser deployment.
 - MVP release checklist completed.
 
 ## 3. Risks and Mitigations
@@ -68,7 +68,7 @@ Exit criteria:
   - Mitigation: transparent metric formulas and drill-down links.
 
 ## 4. Immediate Next Tasks
-1. Finalize OJET desktop stack hardening (`Oracle JET + Tauri + local Python API + SQLite`).
+1. Modernize the web frontend stack while preserving the containerized Python API and SQLite runtime.
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.

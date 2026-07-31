@@ -609,14 +609,13 @@ function resolveApiBase(): string {
   }
 
   if (typeof window !== "undefined" && typeof window.location.origin === "string" && window.location.origin) {
-    const { hostname, origin, port, protocol } = window.location;
+    const { hostname, origin, port } = window.location;
     const normalizedOrigin = origin.replace(/\/+$/, "");
     const isLocalHost = hostname === "127.0.0.1" || hostname === "localhost";
     const isLocalWebDevServer = isLocalHost && (port === "5174" || port === "5173");
-    const isTauriShell = protocol === "tauri:";
 
-    // Local OJET/Tauri dev shells call the API on :8000, not the frontend dev server origin.
-    if (isLocalWebDevServer || isTauriShell) {
+    // The local frontend dev server calls the API on :8000.
+    if (isLocalWebDevServer) {
       return "http://127.0.0.1:8000";
     }
     return normalizedOrigin;

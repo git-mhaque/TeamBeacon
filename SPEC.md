@@ -1,7 +1,7 @@
 # TeamBeacon Product Specification (SPEC)
 
 ## 1. Purpose
-TeamBeacon is a desktop-first engineering management app that aggregates delivery and operations data from hosted JIRA and Confluence (via PAT-authenticated APIs). It provides initiative, team, and individual insights, plus executive reporting.
+TeamBeacon is a self-hosted engineering management web app that aggregates delivery and operations data from hosted JIRA and Confluence (via PAT-authenticated APIs). It provides initiative, team, and individual insights, plus executive reporting.
 
 ## 2. Primary User
 - Software Engineering Manager leading 9-11 engineers across multiple initiatives/services.
@@ -126,7 +126,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.
 - Resilient sync with retry/backoff and clear error states.
-- Usable on macOS/Windows for desktop users.
+- Usable in modern browsers on macOS and Windows.
 - Fast dashboard loads from local cache.
 
 ## 8. Success Metrics
@@ -137,7 +137,7 @@ TeamBeacon is a desktop-first engineering management app that aggregates deliver
 ## 9. Suggested Repository Structure
 ```text
 TeamBeacon/
-  app/                     # Desktop UI (Oracle JET + Tauri)
+  app/                     # Web UI (Oracle JET)
   services/api/            # Python local API service for sync + analytics
   packages/connectors/     # JIRA + Confluence API clients
   docs/

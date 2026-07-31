@@ -1,9 +1,9 @@
 # TeamBeacon
 
-TeamBeacon is a local-first engineering intelligence app that sits on top of existing delivery data sources and helps Engineering Managers operate with clearer signals, lower cognitive load, and better delivery outcomes.
+TeamBeacon is a self-hosted engineering intelligence web app that sits on top of existing delivery data sources and helps Engineering Managers operate with clearer signals, lower cognitive load, and better delivery outcomes.
 
 ## 🎯 Overview
-- Local-first workflow on the manager's machine.
+- Containerized workflow that can run locally on the manager's machine.
 - Non-destructive integration model (does not modify upstream source data).
 - Metadata-driven insight layer (Group/Type/Epic configuration).
 - AI-powered insights with pluggable provider support (OCI, Ollama, OpenAI).
@@ -47,7 +47,7 @@ For product messaging, capability narrative, and value framing, see:
 ## 🧱 Repository Layout
 ```text
 TeamBeacon/                  # Repository root
-  app/                       # Oracle JET frontend + Tauri desktop shell
+  app/                       # Oracle JET web frontend
   services/                  # Runtime services
     api/                     # Local API endpoints and orchestration
   packages/                  # Shared Python packages
@@ -67,10 +67,7 @@ TeamBeacon/                  # Repository root
 - `python3` (3.11+ recommended) for API/runtime and backend tests.
 - `node` and `npm` (Node 22 recommended, aligned with CI) for frontend build/test.
 - `sqlite3` CLI for local DB schema setup and ad-hoc DB checks.
-- Rust toolchain (`rustup`, `cargo`, `rustc`) for Tauri desktop commands.
-- Tauri CLI via cargo: `cargo install tauri-cli`
 - OCI Python SDK (required only when `INTELLIGENCE_PROVIDER=oci`): `python3 -m pip install oci`
-- Platform prerequisites for Tauri desktop builds (macOS): Xcode Command Line Tools (`xcode-select --install`)
 
 ## 🚀 Quick Start (Docker Compose)
 1. Clone and enter the repository:
@@ -134,13 +131,6 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 cd app
 npm run build
 npm run test:coverage
-```
-
-## 🖥️ Desktop Shell (Tauri)
-From `app/`:
-```bash
-npm run desktop:dev
-npm run desktop:build
 ```
 
 ## ✅ CI Pipeline

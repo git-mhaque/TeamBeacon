@@ -6,7 +6,7 @@ TeamBeacon/
   AGENTS.md
   README.md
   SPEC.md
-  app/                          # Desktop UI (Oracle JET + Tauri)
+  app/                          # Web UI (Oracle JET)
   docs/
     architecture/ARCHITECTURE.md
     design/teambeacon-ojet-mockups.html
@@ -30,7 +30,6 @@ TeamBeacon/
 Tooling is minimal right now. Use:
 - `cp config/.env.example config/.env` to initialize local connector config.
 - `cd app && npm run dev` to run OJET UI plus local API for integration endpoints.
-- `cd app && npm run desktop:dev` to run the Tauri desktop shell (auto-loads `~/.cargo/env` if needed).
 - `python3 -m services.api.server --host localhost --port 8000` to run API separately (optional).
 - `mkdir -p data && sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
@@ -44,7 +43,7 @@ Tooling is minimal right now. Use:
 - `open docs/design/teambeacon-ojet-mockups.html` to review current UI/UX mockups.
 - `git log --oneline -n 10` to review recent commit conventions.
 
-When FastAPI/Tauri projects are bootstrapped, add runnable commands to `README.md` and keep this section updated.
+When frontend or FastAPI tooling changes, add runnable commands to `README.md` and keep this section updated.
 
 ## Coding Style & Naming Conventions
 - Follow language defaults with consistent indentation.

@@ -1,6 +1,6 @@
-# TeamBeacon Frontend (OJET + Tauri)
+# TeamBeacon Frontend (OJET)
 
-This directory is the single TeamBeacon frontend workspace using Oracle JET (vDOM) and the Tauri desktop shell.
+This directory contains the TeamBeacon Oracle JET web frontend. Production assets are served by the TeamBeacon Python API in the container image.
 
 ## Local Development
 1. Install dependencies:
@@ -32,18 +32,7 @@ Release web build:
 npm run build:release
 ```
 
-## Desktop (Tauri)
-Prerequisites:
-- Rust toolchain (`rustup`, `cargo`, `rustc`)
-- Platform dependencies for Tauri (Xcode command line tools on macOS)
-
-Commands:
-```bash
-npm run desktop:dev
-npm run desktop:build
-```
-
 ## Notes
 - The frontend consumes TeamBeacon backend endpoints under `/api/*`.
 - OJET build output is generated under `app/web`.
-- Tauri is configured to use OJET dev URL (`5174`) and production output (`web`).
+- The multi-stage Docker build copies `app/web` into the Python runtime image.

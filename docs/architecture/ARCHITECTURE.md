@@ -1,14 +1,14 @@
 # TeamBeacon Architecture
 
 ## 1. Overview
-TeamBeacon is a local-first desktop analytics system:
-- Desktop app for configuration, dashboards, and reports.
-- Local API service for ingestion, normalization, metrics, and reporting.
+TeamBeacon is a self-hosted web analytics system:
+- Browser app for configuration, dashboards, and reports.
+- Containerized API service for ingestion, normalization, metrics, reporting, and static frontend delivery.
 - SQLite as the source of truth for synced and computed data.
 
 ## 2. High-Level Components
 1. UI (`app/`)
-- Oracle JET (vDOM) frontend with Tauri desktop shell.
+- Oracle JET (vDOM) web frontend served by the API runtime in production.
 - Screens: Settings, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
 - UX reference: `docs/design/teambeacon-ojet-mockups.html`
 
@@ -29,7 +29,7 @@ TeamBeacon is a local-first desktop analytics system:
   - OCI GenAI (OCI SDK-backed)
   - Ollama local API
   - OpenAI-compatible API
-- Auth: PAT tokens, stored in OS keychain; app references keychain entries only.
+- Auth: PAT tokens supplied to the container through environment variables or mounted secret files.
 
 ## 4. Core Data Model
 - `integration_config`: base URLs, auth mode, sync settings.
@@ -69,7 +69,8 @@ Default thresholds:
 - Audit log for sync errors and report generation events.
 
 ## 8. Deployment Model
-- Single-user local deployment for MVP.
+- Single-container, single-user deployment for MVP.
+- The Python runtime serves both `/api/*` endpoints and the compiled SPA from one origin.
 - Future-ready for shared service mode (Postgres + hosted API) with same domain model.
 
 ## 9. UI Information Architecture

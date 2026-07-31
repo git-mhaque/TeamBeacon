@@ -2,7 +2,7 @@
   "name": "teambeacon-ui",
   "private": true,
   "version": "1.0.0",
-  "description": "TeamBeacon Oracle JET desktop frontend",
+  "description": "TeamBeacon Oracle JET web frontend",
   "scripts": {
     "api:dev": "./scripts/run-api.sh",
     "dev:web": "ojet serve web --server-port 5174 --server-only",
@@ -12,9 +12,7 @@
     "restore": "ojet restore",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "desktop:dev": "./scripts/tauri-with-rust.sh dev",
-    "desktop:build": "./scripts/tauri-with-rust.sh build"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@oracle/oraclejet": "~20.0.0",
