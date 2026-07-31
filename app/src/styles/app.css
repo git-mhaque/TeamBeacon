@@ -4734,16 +4734,13 @@ body {
 }
 
 .tb-main-integrations .tb-metrics-grid.tb-three-up {
-  grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.72fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.72rem;
-}
-
-.tb-main-integrations .tb-jira-card {
-  grid-row: 1 / span 2;
 }
 
 .tb-main-integrations .tb-metric-card {
   position: relative;
+  min-height: 9.2rem;
   overflow: hidden;
 }
 
@@ -4775,8 +4772,6 @@ body {
 
 .tb-main-integrations .tb-jira-sync-stack {
   margin-top: 0.72rem;
-  padding-top: 0.72rem;
-  border-top-color: #e1dad4;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
   align-items: stretch;
   gap: 0.7rem;
@@ -4865,10 +4860,6 @@ body {
 @media (max-width: 900px) {
   .tb-main-integrations .tb-metrics-grid.tb-three-up {
     grid-template-columns: 1fr;
-  }
-
-  .tb-main-integrations .tb-jira-card {
-    grid-row: auto;
   }
 
   .tb-main-integrations .tb-jira-sync-stack {
