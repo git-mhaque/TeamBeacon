@@ -4331,6 +4331,125 @@ body {
   background: #edf4ff;
 }
 
+/* Shared visual language for every modernized screen. */
+.tb-screen-grid > .tb-panel {
+  border-color: #dcd5ce;
+  border-radius: 0.7rem;
+  box-shadow: 0 0.35rem 1rem rgba(58, 44, 35, 0.055);
+}
+
+.tb-screen-grid > .tb-panel > .tb-panel-header {
+  align-items: center;
+  margin-bottom: 0.72rem;
+}
+
+.tb-screen-grid > .tb-panel > .tb-panel-header h3 {
+  color: #2c2926;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.tb-screen-grid .tb-metric-card {
+  border-color: #ded8d1;
+  border-radius: 0.62rem;
+  background: #ffffff;
+  box-shadow: 0 0.2rem 0.65rem rgba(62, 49, 40, 0.04);
+  padding: 0.78rem 0.82rem;
+}
+
+.tb-screen-grid .tb-metric-card h4 {
+  color: #655e58;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.tb-screen-grid .tb-metric-card p,
+.tb-screen-grid .tb-muted-note {
+  color: #625b55;
+  line-height: 1.4;
+}
+
+.tb-screen-grid .tb-value {
+  color: #292622;
+  font-size: 1.55rem;
+  letter-spacing: -0.025em;
+}
+
+.tb-screen-grid .tb-value-good {
+  color: var(--tb-good);
+}
+
+.tb-screen-grid .tb-value-warn {
+  color: var(--tb-warn);
+}
+
+.tb-screen-grid .tb-value-risk {
+  color: var(--tb-risk);
+}
+
+.tb-chip {
+  border-color: #c6dbe2;
+  background: #eef7f9;
+  color: #315f6c;
+  font-weight: 700;
+}
+
+.tb-summary {
+  border-color: #d8d0c8;
+  border-left-color: var(--tb-brand);
+  background: linear-gradient(145deg, #fcfaf8 0%, #f6f2ee 100%);
+  color: #403a35;
+}
+
+.tb-summary.is-loading {
+  border-color: #ddd6cf;
+  background: #f8f5f2;
+}
+
+.tb-modal-backdrop {
+  background: rgba(32, 27, 24, 0.48);
+}
+
+.tb-modal {
+  border-color: #d6cec6;
+  border-radius: 0.72rem;
+  box-shadow: 0 1.25rem 2.8rem rgba(38, 29, 24, 0.26);
+  padding: 0.9rem;
+}
+
+.tb-modal-head h3 {
+  color: #2c2926;
+  letter-spacing: -0.01em;
+}
+
+.tb-external-link {
+  color: #20607a;
+}
+
+.tb-external-link:hover {
+  color: #17495e;
+}
+
+.tb-status-pill.is-neutral,
+.tb-inline-status {
+  border-color: #d8d0c8;
+  background: #f7f4f1;
+  color: #5e5650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-app-frame,
+  .tb-sidebar,
+  .tb-nav-item,
+  .tb-btn,
+  .tb-initiative-table tbody tr {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
 /* Modern shell treatment for the first migrated screen. */
 .tb-main-initiatives .tb-screen-body {
   padding-top: 0.9rem;
