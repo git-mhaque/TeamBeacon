@@ -592,10 +592,13 @@ body {
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
-.tb-btn:hover:not(:disabled),
-.tb-btn:focus-visible {
+.tb-btn:hover:not(:disabled) {
   border-color: #bdaea3;
   background: #fcfaf8;
+}
+
+.tb-btn:focus-visible {
+  border-color: #b68980;
   box-shadow: 0 0 0 0.16rem rgba(150, 56, 43, 0.08);
   outline: none;
 }
@@ -603,6 +606,14 @@ body {
 .tb-btn-primary {
   border-color: var(--tb-brand-strong);
   background: linear-gradient(145deg, #a74434 0%, var(--tb-brand-strong) 100%);
+  color: #fff;
+}
+
+.tb-btn-primary:hover:not(:disabled),
+.tb-btn-primary:focus-visible {
+  border-color: #5f1d17;
+  background: linear-gradient(145deg, #96382b 0%, #681f18 100%);
+  box-shadow: 0 0 0 0.18rem rgba(150, 56, 43, 0.2);
   color: #fff;
 }
 
@@ -626,6 +637,14 @@ body {
 .tb-btn-danger {
   border-color: #c95b66;
   background: linear-gradient(145deg, #d95461 0%, #bf3f4d 100%);
+  color: #fff;
+}
+
+.tb-btn-danger:hover:not(:disabled),
+.tb-btn-danger:focus-visible {
+  border-color: #9f2f3b;
+  background: linear-gradient(145deg, #c84451 0%, #a8323f 100%);
+  box-shadow: 0 0 0 0.18rem rgba(191, 63, 77, 0.2);
   color: #fff;
 }
 
