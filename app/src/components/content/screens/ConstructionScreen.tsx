@@ -8,8 +8,6 @@ type Props = {
 };
 
 export function ConstructionScreen({ description, icon: Icon, id, title }: Props) {
-  const headingId = `${id}-heading`;
-
   return (
     <section className="tb-construction-state" aria-label={`${title} under construction`}>
       <span className="tb-construction-symbol" role="img" aria-label="Under construction">
@@ -17,7 +15,9 @@ export function ConstructionScreen({ description, icon: Icon, id, title }: Props
       </span>
       <div className="tb-construction-copy">
         <p className="tb-eyebrow">TeamBeacon workspace</p>
-        <h3 id={headingId}>{title}</h3>
+        <p className="tb-construction-title" id={`${id}-title`}>
+          {title}
+        </p>
         <p>{description}</p>
       </div>
     </section>

@@ -532,9 +532,10 @@ body {
   color: #8a5b53;
 }
 
-.tb-construction-copy h3 {
+.tb-construction-title {
   margin: 0.25rem 0 0;
   color: #2c2926;
+  font-weight: 700;
   font-size: 1.35rem;
   letter-spacing: -0.02em;
 }
