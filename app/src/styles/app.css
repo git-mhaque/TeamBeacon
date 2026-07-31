@@ -4692,6 +4692,154 @@ body {
   color: #7b7068;
 }
 
+/* Settings */
+.tb-main-integrations .tb-screen-grid {
+  gap: 0.85rem;
+}
+
+.tb-main-integrations .tb-metrics-grid.tb-three-up {
+  grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.72fr);
+  gap: 0.72rem;
+}
+
+.tb-main-integrations .tb-jira-card {
+  grid-row: 1 / span 2;
+}
+
+.tb-main-integrations .tb-metric-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.tb-main-integrations .tb-metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.22rem;
+  background: #5d7279;
+}
+
+.tb-main-integrations .tb-metric-card:nth-child(2)::before {
+  background: #4f7f6a;
+}
+
+.tb-main-integrations .tb-metric-card:nth-child(3)::before {
+  background: #7b6b91;
+}
+
+.tb-main-integrations .tb-metric-card > h4,
+.tb-main-integrations .tb-metric-card > strong,
+.tb-main-integrations .tb-metric-card > p {
+  margin-left: 0.12rem;
+}
+
+.tb-main-integrations .tb-metric-card > .tb-value {
+  font-size: 1.4rem;
+}
+
+.tb-main-integrations .tb-jira-sync-stack {
+  margin-top: 0.72rem;
+  padding-top: 0.72rem;
+  border-top-color: #e1dad4;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
+  align-items: stretch;
+  gap: 0.7rem;
+}
+
+.tb-main-integrations .tb-jira-last-sync-section,
+.tb-main-integrations .tb-jira-sync-action-section {
+  border: 1px solid #e0d9d2;
+  border-radius: 0.58rem;
+  background: #faf8f6;
+  padding: 0.7rem;
+}
+
+.tb-main-integrations .tb-jira-sync-action-section {
+  border-top: 1px solid #e0d9d2;
+}
+
+.tb-main-integrations .tb-jira-sync-title {
+  color: #3e3833;
+  font-size: 0.82rem;
+}
+
+.tb-main-integrations .tb-jira-sync-facts strong {
+  color: #514943;
+}
+
+.tb-main-integrations .tb-sync-step-segment {
+  background: #ddd8d2;
+}
+
+.tb-main-integrations .tb-sync-step-segment.is-current,
+.tb-main-integrations .tb-sync-progress-fill {
+  background: #287491;
+}
+
+.tb-main-integrations .tb-sync-progress-track {
+  border-color: #cbd9de;
+  background: #e9f1f3;
+}
+
+.tb-main-integrations .tb-sync-progress-percent {
+  color: #315f6c;
+}
+
+.tb-main-integrations .tb-lookup-grid {
+  gap: 0.72rem;
+}
+
+.tb-main-integrations .tb-lookup-card {
+  border-color: #ddd6cf;
+  border-radius: 0.62rem;
+  background: #faf8f6;
+  padding: 0.78rem;
+}
+
+.tb-main-integrations .tb-lookup-card h4 {
+  color: #3b3631;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tb-main-integrations .tb-lookup-add-row input,
+.tb-main-integrations .tb-lookup-item-row input,
+.tb-main-integrations .tb-sync-date-field input {
+  border-color: #d4ccc4;
+  border-radius: 0.48rem;
+  background: #ffffff;
+  color: #37322e;
+}
+
+.tb-main-integrations .tb-lookup-add-row input:focus,
+.tb-main-integrations .tb-lookup-item-row input:focus,
+.tb-main-integrations .tb-sync-date-field input:focus {
+  border-color: #b68980;
+  box-shadow: 0 0 0 0.16rem rgba(150, 56, 43, 0.1);
+  outline: none;
+}
+
+.tb-main-integrations .tb-lookup-item-row {
+  min-height: 2.45rem;
+  border-top: 1px solid #e4ded8;
+  padding-top: 0.34rem;
+}
+
+@media (max-width: 900px) {
+  .tb-main-integrations .tb-metrics-grid.tb-three-up {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-main-integrations .tb-jira-card {
+    grid-row: auto;
+  }
+
+  .tb-main-integrations .tb-jira-sync-stack {
+    grid-template-columns: 1fr;
+  }
+}
+
 @page {
   size: A4 portrait;
   margin: 12mm;
