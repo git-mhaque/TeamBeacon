@@ -4,6 +4,14 @@ import { vi } from "vitest";
 import { IntegrationsScreen } from "../../src/components/content/screens/IntegrationsScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 
+function expandJiraDataSync(): HTMLElement {
+  const region = screen.getByRole("region", { name: "JIRA data sync" });
+  if (!region.hasAttribute("open")) {
+    fireEvent.click(within(region).getByText("Data sync"));
+  }
+  return region;
+}
+
 describe("IntegrationsScreen", () => {
   it("renders JIRA and active AI provider connectivity status from the backend", async () => {
     const fetchSpy = setupFetchMock({
@@ -96,16 +104,15 @@ describe("IntegrationsScreen", () => {
     });
 
     expect(screen.getAllByText(/Last checked:/i)).toHaveLength(3);
-    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
-    expect(within(lastSyncRegion).getByText("Last Sync")).toBeInTheDocument();
-    expect(within(lastSyncRegion).queryByText("Previous run")).not.toBeInTheDocument();
-    expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
-    expect(within(lastSyncRegion).getByText("Completed")).toBeInTheDocument();
-    const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
-    expect(within(syncActionRegion).getByText("Sync Now")).toBeInTheDocument();
-    expect(within(syncActionRegion).queryByText("Ready to sync")).not.toBeInTheDocument();
-    expect(within(syncActionRegion).getByText("Ready")).toBeInTheDocument();
-    expect(within(syncActionRegion).queryByText("Success")).not.toBeInTheDocument();
+    const jiraSyncRegion = screen.getByRole("region", { name: "JIRA data sync" });
+    expect(jiraSyncRegion).not.toHaveAttribute("open");
+    expect(within(jiraSyncRegion).getByText("Data sync")).toBeInTheDocument();
+    expect(within(jiraSyncRegion).getByText("Success")).toBeInTheDocument();
+    expandJiraDataSync();
+    expect(within(jiraSyncRegion).getByText("Last sync")).toBeInTheDocument();
+    expect(within(jiraSyncRegion).queryByText("Previous run")).not.toBeInTheDocument();
+    expect(within(jiraSyncRegion).getByText("Completed")).toBeInTheDocument();
+    expect(within(jiraSyncRegion).queryByText("Ready")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Diagnostics" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Diagnostics" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Field Mapping Readiness" })).not.toBeInTheDocument();
@@ -210,7 +217,9 @@ describe("IntegrationsScreen", () => {
     });
 
     render(<IntegrationsScreen />);
-    expect(await screen.findByRole("button", { name: "Sync Data" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "JIRA data sync" })).toBeInTheDocument();
+    expandJiraDataSync();
+    expect(screen.getByRole("button", { name: "Sync Data" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Sync Data" }));
     expect(screen.getByRole("dialog", { name: "Start JIRA Sync" })).toBeInTheDocument();
@@ -290,12 +299,10 @@ describe("IntegrationsScreen", () => {
     render(<IntegrationsScreen />);
 
     expect(await screen.findByText("Sync in progress")).toBeInTheDocument();
-    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
-    expect(within(lastSyncRegion).getByText("Success")).toBeInTheDocument();
-    expect(within(lastSyncRegion).queryByText("Syncing")).not.toBeInTheDocument();
-    const syncActionRegion = screen.getByRole("region", { name: "JIRA sync action" });
-    expect(within(syncActionRegion).queryByText("Ready to sync")).not.toBeInTheDocument();
-    expect(within(syncActionRegion).getByText("Syncing")).toBeInTheDocument();
+    const jiraSyncRegion = screen.getByRole("region", { name: "JIRA data sync" });
+    await waitFor(() => expect(jiraSyncRegion).toHaveAttribute("open"));
+    expect(within(jiraSyncRegion).getByText("Success")).toBeInTheDocument();
+    expect(within(jiraSyncRegion).getByText("Syncing")).toBeInTheDocument();
     expect(screen.getByText("Step 4 of 6: Issues and changelog")).toBeInTheDocument();
     expect(screen.getByText("10 of 39 issues downloaded")).toBeInTheDocument();
     expect(screen.getByText("155 changelog events captured")).toBeInTheDocument();
@@ -501,9 +508,10 @@ describe("IntegrationsScreen", () => {
 
     render(<IntegrationsScreen />);
 
-    expect(await screen.findByText("4549 issues synced")).toBeInTheDocument();
-    const lastSyncRegion = screen.getByRole("region", { name: "JIRA last sync" });
-    expect(within(lastSyncRegion).queryByText("4549 issues changed")).not.toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "JIRA data sync" })).toBeInTheDocument();
+    const jiraSyncRegion = expandJiraDataSync();
+    expect(await within(jiraSyncRegion).findByText("4549 issues synced")).toBeInTheDocument();
+    expect(within(jiraSyncRegion).queryByText("4549 issues changed")).not.toBeInTheDocument();
   });
 
   it("uses overlay confirmation before deleting epic metadata lookup values", async () => {

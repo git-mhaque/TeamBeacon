@@ -173,6 +173,7 @@ export function IntegrationsScreen() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSyncOptionsOpen, setIsSyncOptionsOpen] = useState(false);
   const [isJiraDiagnosticsOpen, setIsJiraDiagnosticsOpen] = useState(false);
+  const [isJiraSyncExpanded, setIsJiraSyncExpanded] = useState(false);
   const [selectedSyncMode, setSelectedSyncMode] = useState<JiraSyncMode>("since_last");
   const [selectedSinceDate, setSelectedSinceDate] = useState(todayLocalDate);
 
@@ -594,6 +595,12 @@ export function IntegrationsScreen() {
 
   const isJiraSyncRunning = jiraSyncStatus?.state === "running";
 
+  useEffect(() => {
+    if (isJiraSyncRunning || syncError) {
+      setIsJiraSyncExpanded(true);
+    }
+  }, [isJiraSyncRunning, syncError]);
+
   const jiraLastSyncToneClass = useMemo(() => {
     if (syncError) return "is-risk";
     if (!jiraSyncStatus) return "is-neutral";
@@ -849,6 +856,148 @@ export function IntegrationsScreen() {
             <strong className={`tb-value ${jiraToneClass}`}>{jiraValue}</strong>
             <p>{jiraHint}</p>
             <p>Last checked: {formatCheckedAt(jiraStatus?.checkedAt)}</p>
+
+            <details
+              className="tb-jira-sync-disclosure"
+              aria-label="JIRA data sync"
+              role="region"
+              open={isJiraSyncExpanded}
+              onToggle={(event) => setIsJiraSyncExpanded(event.currentTarget.open)}
+            >
+              <summary className="tb-jira-sync-disclosure-summary">
+                <span className="tb-jira-sync-disclosure-label">Data sync</span>
+                <span className={`tb-status-pill ${isJiraSyncRunning ? jiraSyncActionToneClass : jiraLastSyncToneClass}`}>
+                  {isJiraSyncRunning ? (
+                    <span className="tb-inline-spinner" aria-hidden="true" />
+                  ) : null}
+                  <span>{isJiraSyncRunning ? jiraSyncActionStateText : jiraLastSyncStateText}</span>
+                </span>
+              </summary>
+
+              <div className="tb-jira-sync-disclosure-body">
+                <div className="tb-jira-sync-summary">
+                  <div className="tb-jira-sync-head">
+                    <div className="tb-jira-sync-title-block">
+                      <strong className="tb-jira-sync-title">Last sync</strong>
+                    </div>
+                    {isJiraSyncRunning ? (
+                      <span className={`tb-status-pill ${jiraLastSyncToneClass}`}>{jiraLastSyncStateText}</span>
+                    ) : null}
+                  </div>
+                  <div className="tb-jira-sync-facts">
+                    <span>
+                      <strong>Completed</strong>
+                      {jiraLastSyncCompletedText}
+                    </span>
+                    {jiraLastSyncModeText ? (
+                      <span>
+                        <strong>Mode</strong>
+                        {jiraLastSyncModeText}
+                      </span>
+                    ) : null}
+                    {jiraLastSyncResultText ? (
+                      <span>
+                        <strong>Result</strong>
+                        {jiraLastSyncResultText}
+                      </span>
+                    ) : null}
+                  </div>
+                  {jiraLastSyncMessageText ? (
+                    <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
+                      {jiraLastSyncMessageText}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className={`tb-jira-sync-control ${jiraSyncActionToneClass}`}>
+                  {isJiraSyncRunning || syncError ? (
+                    <div className="tb-jira-sync-head">
+                      <div className="tb-jira-sync-title-block">
+                        <strong className="tb-jira-sync-title">{jiraSyncActionTitle}</strong>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {isJiraSyncRunning && jiraSyncStepLabel ? (
+                    <span className="tb-jira-sync-step-meta">
+                      {jiraSyncStepCounter ? `${jiraSyncStepCounter}: ` : null}
+                      {jiraSyncStepLabel}
+                    </span>
+                  ) : null}
+
+                  {isJiraSyncRunning ? (
+                    <div className="tb-sync-stepper" aria-label="JIRA sync steps">
+                      {JIRA_SYNC_STEPS.map((stepName, index) => {
+                        const stepNumber = index + 1;
+                        const isComplete = jiraCurrentStepNumber !== null && stepNumber < jiraCurrentStepNumber;
+                        const isCurrent = jiraCurrentStepNumber === stepNumber;
+                        return (
+                          <span
+                            key={stepName}
+                            className={`tb-sync-step-segment${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
+                            title={stepName}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {showJiraIssueActivity ? (
+                    <div className="tb-sync-measured-progress">
+                      <div className="tb-sync-progress-meta">
+                        {jiraIssueProgressText ? <span>{jiraIssueProgressText}</span> : null}
+                        {jiraChangelogText ? <span>{jiraChangelogText}</span> : null}
+                        {jiraCandidateProgressText ? <span>{jiraCandidateProgressText}</span> : null}
+                      </div>
+                      <div className="tb-sync-progress-line">
+                        <span
+                          className={`tb-sync-progress-track${hasJiraIssueProgressPercent ? "" : " is-indeterminate"}`}
+                          role="progressbar"
+                          aria-label="JIRA issue sync progress"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? jiraSyncPercent : undefined}
+                          aria-valuetext={hasJiraIssueProgressPercent ? undefined : "In progress"}
+                        >
+                          <span
+                            className="tb-sync-progress-fill"
+                            style={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? { width: `${jiraSyncPercent}%` } : undefined}
+                          />
+                        </span>
+                        {hasJiraIssueProgressPercent && jiraSyncPercent !== null ? (
+                          <span className="tb-sync-progress-percent">
+                            {jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {jiraSyncMessageText ? (
+                    <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
+                      {jiraSyncMessageText}
+                    </p>
+                  ) : null}
+
+                  <div className="tb-card-actions tb-jira-sync-actions">
+                    <button
+                      type="button"
+                      className="tb-btn tb-btn-sm"
+                      onClick={openSyncOptions}
+                      disabled={isJiraSyncRunning}
+                    >
+                      Sync Data
+                    </button>
+                    <button type="button" className="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
+                      Sync History
+                    </button>
+                    <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
+                      Diagnostics
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
           </article>
 
           <article className="tb-metric-card">
@@ -866,132 +1015,6 @@ export function IntegrationsScreen() {
             <p>Provider: {aiProviderName}</p>
             <p>Model: {aiModelName}</p>
           </article>
-        </div>
-
-        <div className="tb-jira-sync-stack">
-          <section className={`tb-jira-last-sync-section ${jiraLastSyncToneClass}`} aria-label="JIRA last sync">
-            <div className="tb-jira-sync-head">
-              <div className="tb-jira-sync-title-block">
-                <strong className="tb-jira-sync-title">Last Sync</strong>
-              </div>
-              <span className={`tb-status-pill ${jiraLastSyncToneClass}`}>
-                <span>{jiraLastSyncStateText}</span>
-              </span>
-            </div>
-            <div className="tb-jira-sync-facts">
-              <span>
-                <strong>Completed</strong>
-                {jiraLastSyncCompletedText}
-              </span>
-              {jiraLastSyncModeText ? (
-                <span>
-                  <strong>Mode</strong>
-                  {jiraLastSyncModeText}
-                </span>
-              ) : null}
-              {jiraLastSyncResultText ? (
-                <span>
-                  <strong>Result</strong>
-                  {jiraLastSyncResultText}
-                </span>
-              ) : null}
-            </div>
-            {jiraLastSyncMessageText ? (
-              <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
-                {jiraLastSyncMessageText}
-              </p>
-            ) : null}
-          </section>
-
-          <section className={`tb-jira-sync-action-section ${jiraSyncActionToneClass}`} aria-label="JIRA sync action">
-            <div className="tb-jira-sync-head">
-              <div className="tb-jira-sync-title-block">
-                <strong className="tb-jira-sync-title">{jiraSyncActionTitle}</strong>
-              </div>
-              <span className={`tb-status-pill ${jiraSyncActionToneClass}`}>
-                {isJiraSyncRunning ? (
-                  <span className="tb-inline-spinner" aria-hidden="true" />
-                ) : null}
-                <span>{jiraSyncActionStateText}</span>
-              </span>
-            </div>
-
-            {isJiraSyncRunning && jiraSyncStepLabel ? (
-              <span className="tb-jira-sync-step-meta">
-                {jiraSyncStepCounter ? `${jiraSyncStepCounter}: ` : null}
-                {jiraSyncStepLabel}
-              </span>
-            ) : null}
-
-            {isJiraSyncRunning ? (
-              <div className="tb-sync-stepper" aria-label="JIRA sync steps">
-                {JIRA_SYNC_STEPS.map((stepName, index) => {
-                  const stepNumber = index + 1;
-                  const isComplete = jiraCurrentStepNumber !== null && stepNumber < jiraCurrentStepNumber;
-                  const isCurrent = jiraCurrentStepNumber === stepNumber;
-                  return (
-                    <span
-                      key={stepName}
-                      className={`tb-sync-step-segment${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
-                      title={stepName}
-                    />
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {showJiraIssueActivity ? (
-              <div className="tb-sync-measured-progress">
-                <div className="tb-sync-progress-meta">
-                  {jiraIssueProgressText ? <span>{jiraIssueProgressText}</span> : null}
-                  {jiraChangelogText ? <span>{jiraChangelogText}</span> : null}
-                  {jiraCandidateProgressText ? <span>{jiraCandidateProgressText}</span> : null}
-                </div>
-                <div className="tb-sync-progress-line">
-                  <span
-                    className={`tb-sync-progress-track${hasJiraIssueProgressPercent ? "" : " is-indeterminate"}`}
-                    role="progressbar"
-                    aria-label="JIRA issue sync progress"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? jiraSyncPercent : undefined}
-                    aria-valuetext={hasJiraIssueProgressPercent ? undefined : "In progress"}
-                  >
-                    <span
-                      className="tb-sync-progress-fill"
-                      style={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? { width: `${jiraSyncPercent}%` } : undefined}
-                    />
-                  </span>
-                  {hasJiraIssueProgressPercent && jiraSyncPercent !== null ? (
-                    <span className="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {jiraSyncMessageText ? (
-              <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
-                {jiraSyncMessageText}
-              </p>
-            ) : null}
-
-            <div className="tb-card-actions tb-jira-sync-actions">
-              <button
-                type="button"
-                className="tb-btn tb-btn-sm"
-                onClick={openSyncOptions}
-                disabled={isJiraSyncRunning}
-              >
-                Sync Data
-              </button>
-              <button type="button" className="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
-                Sync History
-              </button>
-              <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
-                Diagnostics
-              </button>
-            </div>
-          </section>
         </div>
       </section>
 
