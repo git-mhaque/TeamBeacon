@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CurrentSprint,
   CurrentSprintChangeIssue,
@@ -102,8 +101,8 @@ function Ticket({
 }) {
   const toneClass = resolveStatusTone(issue.statusCategory, issue.status ?? null);
   return (
-    <div class="tb-ticket">
-      <div class="tb-ticket-head">
+    <div className="tb-ticket">
+      <div className="tb-ticket-head">
         {issue.issueUrl ? (
           <a href={issue.issueUrl} target="_blank" rel="noopener noreferrer">
             <strong>{issue.issueKey}</strong>
@@ -112,11 +111,11 @@ function Ticket({
           <strong>{issue.issueKey}</strong>
         )}
         {issue.status ? (
-          <span class={`tb-inline-status ${toneClass}`}>{issue.status}</span>
+          <span className={`tb-inline-status ${toneClass}`}>{issue.status}</span>
         ) : null}
       </div>
-      <p class="tb-ticket-summary">{issue.summary}</p>
-      <p class="tb-ticket-meta">
+      <p className="tb-ticket-summary">{issue.summary}</p>
+      <p className="tb-ticket-meta">
         Epic:{" "}
         {issue.epicName && issue.epicUrl ? (
           <a href={issue.epicUrl} target="_blank" rel="noopener noreferrer">
@@ -126,7 +125,7 @@ function Ticket({
           issue.epicName ?? "-"
         )}
       </p>
-      <p class="tb-ticket-meta">Story Points: {formatStoryPoints(issue.storyPoints)}</p>
+      <p className="tb-ticket-meta">Story Points: {formatStoryPoints(issue.storyPoints)}</p>
     </div>
   );
 }
@@ -145,16 +144,16 @@ function Column({
   positiveEmpty?: boolean;
 }) {
   return (
-    <article class="tb-column">
+    <article className="tb-column">
       <h4>{title}</h4>
-      {loading ? <p class="tb-muted-note">Loading...</p> : null}
-      {!loading && items.length === 0 && !positiveEmpty ? <p class="tb-muted-note">{emptyLabel}</p> : null}
+      {loading ? <p className="tb-muted-note">Loading...</p> : null}
+      {!loading && items.length === 0 && !positiveEmpty ? <p className="tb-muted-note">{emptyLabel}</p> : null}
       {!loading && items.length === 0 && positiveEmpty ? (
-        <div class="tb-column-empty-good">
-          <span class="tb-column-empty-good-icon" aria-hidden="true">
-            <span class="tb-column-empty-good-check" />
+        <div className="tb-column-empty-good">
+          <span className="tb-column-empty-good-icon" aria-hidden="true">
+            <span className="tb-column-empty-good-check" />
           </span>
-          <p class="tb-column-empty-good-text">{emptyLabel}</p>
+          <p className="tb-column-empty-good-text">{emptyLabel}</p>
         </div>
       ) : null}
       {!loading ? items.map((item) => <Ticket key={item.issueKey} issue={item} />) : null}
@@ -689,14 +688,14 @@ export function SprintBoardScreen() {
     (field: TeamAllocationSortField, label: string) => (
       <button
         type="button"
-        class={`tb-table-sort${teamAllocationSortField === field ? " is-active" : ""}`}
+        className={`tb-table-sort${teamAllocationSortField === field ? " is-active" : ""}`}
         onClick={() => handleTeamAllocationSort(field)}
         aria-label={`Sort by ${label} (${
           teamAllocationSortField === field && teamAllocationSortDirection === "asc" ? "ascending" : "descending"
         })`}
       >
         <span>{label}</span>
-        <span class="tb-table-sort-indicator" aria-hidden="true">
+        <span className="tb-table-sort-indicator" aria-hidden="true">
           {resolveTeamAllocationSortIndicator(field)}
         </span>
       </button>
@@ -720,23 +719,23 @@ export function SprintBoardScreen() {
   );
 
   return (
-    <div class="tb-screen-grid">
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+    <div className="tb-screen-grid">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Sprint Overview</h3>
-            <p class="tb-muted-note">Active sprint metadata from local synced JIRA data.</p>
+            <p className="tb-muted-note">Active sprint metadata from local synced JIRA data.</p>
           </div>
         </header>
-        <div class="tb-metrics-grid tb-five-up">
-          <article class="tb-metric-card">
+        <div className="tb-metrics-grid tb-five-up">
+          <article className="tb-metric-card">
             <h4>Sprint Name</h4>
-            <strong class="tb-value">
+            <strong className="tb-value">
               {sprintLoading ? (
                 "Loading..."
               ) : sprint?.name ? (
                 sprint.sprintUrl ? (
-                  <a class="tb-external-link" href={sprint.sprintUrl} target="_blank" rel="noopener noreferrer">
+                  <a className="tb-external-link" href={sprint.sprintUrl} target="_blank" rel="noopener noreferrer">
                     {sprint.name}
                   </a>
                 ) : (
@@ -748,42 +747,42 @@ export function SprintBoardScreen() {
             </strong>
             <p>{sprint?.state ? `State: ${sprint.state}` : "No active sprint state available."}</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Start Date</h4>
-            <strong class="tb-value">{sprintLoading ? "Loading..." : formatDate(sprint?.startDate)}</strong>
+            <strong className="tb-value">{sprintLoading ? "Loading..." : formatDate(sprint?.startDate)}</strong>
             <p>Sprint start date from JIRA sprint metadata.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>End Date</h4>
-            <strong class="tb-value">{sprintLoading ? "Loading..." : formatDate(sprint?.endDate)}</strong>
+            <strong className="tb-value">{sprintLoading ? "Loading..." : formatDate(sprint?.endDate)}</strong>
             <p>Sprint target end date from JIRA sprint metadata.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Remaining Days</h4>
-            <strong class={`tb-value ${remainingDaysToneClass}`}>
+            <strong className={`tb-value ${remainingDaysToneClass}`}>
               {sprintLoading ? "Loading..." : sprint?.remainingDays ?? "-"}
             </strong>
             <p>{sprint?.endDate ? `Until ${formatDate(sprint.endDate)}` : "End date not available."}</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Days Over</h4>
-            <strong class={`tb-value ${daysOverToneClass}`}>{sprintLoading ? "Loading..." : sprint?.daysOver ?? "-"}</strong>
+            <strong className={`tb-value ${daysOverToneClass}`}>{sprintLoading ? "Loading..." : sprint?.daysOver ?? "-"}</strong>
             <p>{sprint?.endDate ? `Since ${formatDate(sprint.endDate)}` : "End date not available."}</p>
           </article>
         </div>
-        <div class="tb-sprint-summary-grid">
-          <article class="tb-sprint-summary-card">
+        <div className="tb-sprint-summary-grid">
+          <article className="tb-sprint-summary-card">
             <h4>State Breakdown</h4>
-            <p class="tb-muted-note">In Progress, Planned, and Done split by card count and story points.</p>
+            <p className="tb-muted-note">In Progress, Planned, and Done split by card count and story points.</p>
 
-            <div class="tb-sprint-stack-group">
-              <div class="tb-sprint-stack-row">
-                <div class="tb-sprint-stack-label">
+            <div className="tb-sprint-stack-group">
+              <div className="tb-sprint-stack-row">
+                <div className="tb-sprint-stack-label">
                   <span>Cards</span>
                   <strong>{workLoading ? "-" : work.totals.total}</strong>
                 </div>
                 <div
-                  class="tb-sprint-stack-bar"
+                  className="tb-sprint-stack-bar"
                   role="img"
                   aria-label={`Card breakdown: ${stateBreakdownRows
                     .map((row) => `${row.label} ${row.cards}`)
@@ -792,7 +791,7 @@ export function SprintBoardScreen() {
                   {stateBreakdownRows.map((row) => (
                     <span
                       key={`cards-${row.key}`}
-                      class={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
+                      className={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
                       style={{ width: `${row.cardsPercent}%` }}
                       title={`${row.label}: ${row.cards} cards (${formatPercent(row.cardsPercent)})`}
                     />
@@ -800,13 +799,13 @@ export function SprintBoardScreen() {
                 </div>
               </div>
 
-              <div class="tb-sprint-stack-row">
-                <div class="tb-sprint-stack-label">
+              <div className="tb-sprint-stack-row">
+                <div className="tb-sprint-stack-label">
                   <span>Story Points</span>
                   <strong>{workLoading ? "-" : formatStoryPoints(work.totals.storyPoints.total)}</strong>
                 </div>
                 <div
-                  class="tb-sprint-stack-bar"
+                  className="tb-sprint-stack-bar"
                   role="img"
                   aria-label={`Story point breakdown: ${stateBreakdownRows
                     .map((row) => `${row.label} ${formatStoryPoints(row.storyPoints)} SP`)
@@ -815,7 +814,7 @@ export function SprintBoardScreen() {
                   {stateBreakdownRows.map((row) => (
                     <span
                       key={`sp-${row.key}`}
-                      class={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
+                      className={`tb-sprint-stack-segment tb-sprint-segment-${row.toneClass}`}
                       style={{ width: `${row.storyPointsPercent}%` }}
                       title={`${row.label}: ${formatStoryPoints(row.storyPoints)} SP (${formatPercent(row.storyPointsPercent)})`}
                     />
@@ -824,10 +823,10 @@ export function SprintBoardScreen() {
               </div>
             </div>
 
-            <ul class="tb-sprint-breakdown-list">
+            <ul className="tb-sprint-breakdown-list">
               {stateBreakdownRows.map((row) => (
                 <li key={`legend-${row.key}`}>
-                  <span class={`tb-sprint-swatch tb-sprint-segment-${row.toneClass}`} aria-hidden="true" />
+                  <span className={`tb-sprint-swatch tb-sprint-segment-${row.toneClass}`} aria-hidden="true" />
                   <strong>{row.label}</strong>
                   <span>{row.cards} cards</span>
                   <span>{formatStoryPoints(row.storyPoints)} SP</span>
@@ -836,9 +835,9 @@ export function SprintBoardScreen() {
             </ul>
 
             {!workLoading ? (
-              <div class="tb-sprint-pie-wrap">
+              <div className="tb-sprint-pie-wrap">
                 <div
-                  class="tb-sprint-donut"
+                  className="tb-sprint-donut"
                   style={{ background: buildDonutBackground(statePieSlices) }}
                   role="img"
                   aria-label={`State breakdown donut: ${stateBreakdownRows
@@ -847,10 +846,10 @@ export function SprintBoardScreen() {
                 >
                   {work.totals.total <= 0 ? <span>No data</span> : null}
                 </div>
-                <ul class="tb-exec-donut-legend">
+                <ul className="tb-exec-donut-legend">
                   {statePieSlices.map((slice) => (
                     <li key={`state-pie-${slice.label}`}>
-                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
                       <span>{slice.label}</span>
                       <span>{slice.count} ({formatPercent(slice.percent)})</span>
                     </li>
@@ -860,23 +859,23 @@ export function SprintBoardScreen() {
             ) : null}
           </article>
 
-          <article class="tb-sprint-summary-card tb-sprint-mix-card">
+          <article className="tb-sprint-summary-card tb-sprint-mix-card">
             <h4>Work Mix by Group</h4>
-            {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
+            {workLoading ? <p className="tb-muted-note">Loading work mix...</p> : null}
             {!workLoading ? (
-              <div class="tb-exec-donut-wrap">
+              <div className="tb-exec-donut-wrap">
                 <div
-                  class="tb-exec-donut"
+                  className="tb-exec-donut"
                   style={{ background: buildDonutBackground(groupMixSlices) }}
                   role="img"
                   aria-label="Work mix by group chart"
                 >
                   {groupMixSlices.length === 0 ? <span>No data</span> : null}
                 </div>
-                <ul class="tb-exec-donut-legend">
+                <ul className="tb-exec-donut-legend">
                   {groupMixSlices.map((slice) => (
                     <li key={`group-${slice.label}`}>
-                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
                       <span>{slice.label}</span>
                       <span>{slice.count} ({formatPercent(slice.percent)})</span>
                     </li>
@@ -886,23 +885,23 @@ export function SprintBoardScreen() {
             ) : null}
           </article>
 
-          <article class="tb-sprint-summary-card tb-sprint-mix-card">
+          <article className="tb-sprint-summary-card tb-sprint-mix-card">
             <h4>Work Mix by Type</h4>
-            {workLoading ? <p class="tb-muted-note">Loading work mix...</p> : null}
+            {workLoading ? <p className="tb-muted-note">Loading work mix...</p> : null}
             {!workLoading ? (
-              <div class="tb-exec-donut-wrap">
+              <div className="tb-exec-donut-wrap">
                 <div
-                  class="tb-exec-donut"
+                  className="tb-exec-donut"
                   style={{ background: buildDonutBackground(typeMixSlices) }}
                   role="img"
                   aria-label="Work mix by type chart"
                 >
                   {typeMixSlices.length === 0 ? <span>No data</span> : null}
                 </div>
-                <ul class="tb-exec-donut-legend">
+                <ul className="tb-exec-donut-legend">
                   {typeMixSlices.map((slice) => (
                     <li key={`type-${slice.label}`}>
-                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
                       <span>{slice.label}</span>
                       <span>{slice.count} ({formatPercent(slice.percent)})</span>
                     </li>
@@ -913,14 +912,14 @@ export function SprintBoardScreen() {
           </article>
         </div>
 
-        <article class="tb-sprint-summary-card tb-team-allocation-card">
-          <div class="tb-team-allocation-heading">
+        <article className="tb-sprint-summary-card tb-team-allocation-card">
+          <div className="tb-team-allocation-heading">
             <div>
               <h4>Team Allocation</h4>
-              <p class="tb-muted-note">Assigned sprint work by owner, with completed card progress inside each bar.</p>
+              <p className="tb-muted-note">Assigned sprint work by owner, with completed card progress inside each bar.</p>
             </div>
             {!workLoading ? (
-              <div class="tb-team-allocation-summary" aria-label="Team allocation summary">
+              <div className="tb-team-allocation-summary" aria-label="Team allocation summary">
                 <span>{formatOwnerCount(assignedOwnerCount)}</span>
                 <span>{formatCardCount(work.totals.total)}</span>
                 <span>{formatStoryPoints(work.totals.storyPoints.total)} SP</span>
@@ -928,93 +927,93 @@ export function SprintBoardScreen() {
             ) : null}
           </div>
 
-          {workLoading ? <p class="tb-muted-note">Loading team allocation...</p> : null}
+          {workLoading ? <p className="tb-muted-note">Loading team allocation...</p> : null}
           {!workLoading && teamAllocationRows.length === 0 ? (
-            <p class="tb-muted-note">No team allocation data available.</p>
+            <p className="tb-muted-note">No team allocation data available.</p>
           ) : null}
           {!workLoading && teamAllocationRows.length > 0 ? (
-            <div class="tb-team-allocation-list">
-              <div class="tb-team-allocation-legend" aria-label="Team allocation status legend">
+            <div className="tb-team-allocation-list">
+              <div className="tb-team-allocation-legend" aria-label="Team allocation status legend">
                 <span>
-                  <i class="tb-team-allocation-key is-done" aria-hidden="true" />
+                  <i className="tb-team-allocation-key is-done" aria-hidden="true" />
                   Done
                 </span>
                 <span>
-                  <i class="tb-team-allocation-key is-in-progress" aria-hidden="true" />
+                  <i className="tb-team-allocation-key is-in-progress" aria-hidden="true" />
                   In Progress
                 </span>
                 <span>
-                  <i class="tb-team-allocation-key is-blocked" aria-hidden="true" />
+                  <i className="tb-team-allocation-key is-blocked" aria-hidden="true" />
                   Blocked
                 </span>
                 <span>
-                  <i class="tb-team-allocation-key is-planned" aria-hidden="true" />
+                  <i className="tb-team-allocation-key is-planned" aria-hidden="true" />
                   Planned
                 </span>
               </div>
-              <div class="tb-initiative-table-wrap tb-team-allocation-table-wrap">
-                <table class="tb-initiative-table tb-team-allocation-table" aria-label="Team allocation by owner">
+              <div className="tb-initiative-table-wrap tb-team-allocation-table-wrap">
+                <table className="tb-initiative-table tb-team-allocation-table" aria-label="Team allocation by owner">
                   <thead>
                     <tr>
                       <th>{renderTeamAllocationSortHeader("owner", "Owner")}</th>
-                      <th class="tb-team-allocation-cards-head">{renderTeamAllocationSortHeader("cards", "Cards")}</th>
-                      <th class="is-numeric">{renderTeamAllocationSortHeader("done", "Done")}</th>
-                      <th class="is-numeric">{renderTeamAllocationSortHeader("inProgress", "In Progress")}</th>
-                      <th class="is-numeric">{renderTeamAllocationSortHeader("blocked", "Blocked")}</th>
-                      <th class="is-numeric">{renderTeamAllocationSortHeader("planned", "Planned")}</th>
-                      <th class="is-numeric">{renderTeamAllocationSortHeader("spDone", "SP Done")}</th>
+                      <th className="tb-team-allocation-cards-head">{renderTeamAllocationSortHeader("cards", "Cards")}</th>
+                      <th className="is-numeric">{renderTeamAllocationSortHeader("done", "Done")}</th>
+                      <th className="is-numeric">{renderTeamAllocationSortHeader("inProgress", "In Progress")}</th>
+                      <th className="is-numeric">{renderTeamAllocationSortHeader("blocked", "Blocked")}</th>
+                      <th className="is-numeric">{renderTeamAllocationSortHeader("planned", "Planned")}</th>
+                      <th className="is-numeric">{renderTeamAllocationSortHeader("spDone", "SP Done")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedTeamAllocationRows.map((row) => (
                       <tr key={row.key}>
                         <td>
-                          <strong class="tb-team-allocation-member" title={row.label}>
+                          <strong className="tb-team-allocation-member" title={row.label}>
                             {row.label}
                           </strong>
                         </td>
-                        <td class="tb-team-allocation-cards-cell">
-                          <div class="tb-team-allocation-bar-cell">
+                        <td className="tb-team-allocation-cards-cell">
+                          <div className="tb-team-allocation-bar-cell">
                             <div
-                              class="tb-team-allocation-track"
+                              className="tb-team-allocation-track"
                               role="img"
                               aria-label={formatTeamAllocationAria(row)}
                             >
                               <span
-                                class="tb-team-allocation-total"
+                                className="tb-team-allocation-total"
                                 style={{ width: `${row.totalWidthPercent}%` }}
                                 title={`${formatCardCount(row.totalCards)} assigned`}
                               >
                                 <span
-                                  class="tb-team-allocation-segment is-done"
+                                  className="tb-team-allocation-segment is-done"
                                   style={{ width: `${row.segmentPercents.done}%` }}
                                   title={`${formatCardCount(row.doneCards)} completed`}
                                 />
                                 <span
-                                  class="tb-team-allocation-segment is-in-progress"
+                                  className="tb-team-allocation-segment is-in-progress"
                                   style={{ width: `${row.segmentPercents.inProgress}%` }}
                                   title={`${formatCardCount(row.inProgressCards)} in progress`}
                                 />
                                 <span
-                                  class="tb-team-allocation-segment is-blocked"
+                                  className="tb-team-allocation-segment is-blocked"
                                   style={{ width: `${row.segmentPercents.blocked}%` }}
                                   title={`${formatCardCount(row.blockedCards)} blocked`}
                                 />
                                 <span
-                                  class="tb-team-allocation-segment is-planned"
+                                  className="tb-team-allocation-segment is-planned"
                                   style={{ width: `${row.segmentPercents.planned}%` }}
                                   title={`${formatCardCount(row.plannedCards)} planned`}
                                 />
                               </span>
                             </div>
-                            <span class="tb-team-allocation-card-count">{formatCardCount(row.totalCards)}</span>
+                            <span className="tb-team-allocation-card-count">{formatCardCount(row.totalCards)}</span>
                           </div>
                         </td>
-                        <td class="tb-team-allocation-stat">{formatCardProgress(row.doneCards, row.totalCards)}</td>
-                        <td class="tb-team-allocation-stat">{row.inProgressCards}</td>
-                        <td class="tb-team-allocation-stat tb-team-allocation-blocked">{row.blockedCards}</td>
-                        <td class="tb-team-allocation-stat">{row.plannedCards}</td>
-                        <td class="tb-team-allocation-stat">{`${formatStoryPoints(row.doneStoryPoints)} / ${formatStoryPoints(
+                        <td className="tb-team-allocation-stat">{formatCardProgress(row.doneCards, row.totalCards)}</td>
+                        <td className="tb-team-allocation-stat">{row.inProgressCards}</td>
+                        <td className="tb-team-allocation-stat tb-team-allocation-blocked">{row.blockedCards}</td>
+                        <td className="tb-team-allocation-stat">{row.plannedCards}</td>
+                        <td className="tb-team-allocation-stat">{`${formatStoryPoints(row.doneStoryPoints)} / ${formatStoryPoints(
                           row.totalStoryPoints,
                         )} SP`}</td>
                       </tr>
@@ -1025,17 +1024,17 @@ export function SprintBoardScreen() {
             </div>
           ) : null}
         </article>
-        {sprintError && !sprintLoading ? <p class="tb-error-note">Current sprint status: {sprintError}</p> : null}
+        {sprintError && !sprintLoading ? <p className="tb-error-note">Current sprint status: {sprintError}</p> : null}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Sprint Scope Changes & Blockers</h3>
-            <p class="tb-muted-note">Scope volatility and blocked cards observed after sprint start.</p>
+            <p className="tb-muted-note">Scope volatility and blocked cards observed after sprint start.</p>
           </div>
         </header>
-        <div class="tb-kanban">
+        <div className="tb-kanban">
           <Column
             title={`Added (${changes.addedAfterStart.count} | ${formatStoryPoints(changes.addedAfterStart.storyPointsTotal)} SP)`}
             items={changes.addedAfterStart.issueCards}
@@ -1058,18 +1057,18 @@ export function SprintBoardScreen() {
             positiveEmpty
           />
         </div>
-        {changesError && !changesLoading ? <p class="tb-error-note">Current sprint changes: {changesError}</p> : null}
+        {changesError && !changesLoading ? <p className="tb-error-note">Current sprint changes: {changesError}</p> : null}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Current Sprint Work</h3>
-            <p class="tb-muted-note">Planned, in-progress, and completed issues from the active sprint.</p>
+            <p className="tb-muted-note">Planned, in-progress, and completed issues from the active sprint.</p>
           </div>
         </header>
-        <div class="tb-initiative-toolbar tb-initiative-toolbar-sprint">
-          <label class="tb-initiative-filter">
+        <div className="tb-initiative-toolbar tb-initiative-toolbar-sprint">
+          <label className="tb-initiative-filter">
             <span>Group</span>
             <select
               value={groupFilter}
@@ -1082,7 +1081,7 @@ export function SprintBoardScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-initiative-filter">
+          <label className="tb-initiative-filter">
             <span>Type</span>
             <select value={typeFilter} onChange={(event) => setTypeFilter((event.currentTarget as HTMLSelectElement).value)}>
               {typeFilterOptions.map((option) => (
@@ -1092,7 +1091,7 @@ export function SprintBoardScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-initiative-filter">
+          <label className="tb-initiative-filter">
             <span>Epic</span>
             <select value={epicFilter} onChange={(event) => setEpicFilter((event.currentTarget as HTMLSelectElement).value)}>
               {epicFilterOptions.map((option) => (
@@ -1102,7 +1101,7 @@ export function SprintBoardScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-initiative-filter">
+          <label className="tb-initiative-filter">
             <span>Assignee</span>
             <select
               value={assigneeFilter}
@@ -1116,7 +1115,7 @@ export function SprintBoardScreen() {
             </select>
           </label>
         </div>
-        <div class="tb-kanban">
+        <div className="tb-kanban">
           <Column
             title={`Planned (${filteredPlannedWork.length} | ${formatStoryPoints(filteredPlannedStoryPoints)} SP)`}
             items={filteredPlannedWork}
@@ -1138,7 +1137,7 @@ export function SprintBoardScreen() {
             emptyLabel={hasActiveWorkFilters ? "No items in Done for the selected filters." : "No items in Done."}
           />
         </div>
-        {workError && !workLoading ? <p class="tb-error-note">Current sprint work: {workError}</p> : null}
+        {workError && !workLoading ? <p className="tb-error-note">Current sprint work: {workError}</p> : null}
       </section>
     </div>
   );

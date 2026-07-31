@@ -1,9 +1,14 @@
-import { h } from "preact";
+
+import { ShieldCheck } from "lucide-react";
+import { ConstructionScreen } from "./ConstructionScreen";
 
 export function SecurityScreen() {
   return (
-    <section class="tb-construction-empty" aria-label="Security Insights under construction">
-      <span class="tb-construction-icon" role="img" aria-label="Under construction">🚧</span>
-    </section>
+    <ConstructionScreen
+      description="This security insights workspace is under construction."
+      icon={ShieldCheck}
+      id="security-insights-construction"
+      title="Security Insights"
+    />
   );
 }

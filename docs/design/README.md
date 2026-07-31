@@ -1,10 +1,10 @@
 # TeamBeacon UI Mockups
 
-This folder contains Oracle JET-oriented screen mockups for the desktop-first TeamBeacon experience.
+This folder contains historical visual references for the desktop-first TeamBeacon experience. The active React/Vite direction and functional-parity constraints are documented in `../plans/FRONTEND_MODERNIZATION_PLAN.md`.
 
 ## Files
-- `teambeacon-ojet-mockups.html`: visual prototype for current TeamBeacon screens.
-- `redwood-ojet-dashboard.html`: focused Redwood Oracle JET Initiative Insights dashboard mockup.
+- `teambeacon-ojet-mockups.html`: legacy visual prototype and screen inventory.
+- `redwood-ojet-dashboard.html`: legacy focused Initiative Insights dashboard exploration.
 - `team-dashboard-export-mockup.html`: professional Team Dashboard export mockup with colorful indicators and print-ready styling.
 
 ## Included Screens

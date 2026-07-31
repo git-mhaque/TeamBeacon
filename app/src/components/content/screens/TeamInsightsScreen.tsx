@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TeamInsightAvailableStatus, TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { TrendBarChart, type TrendBarChartPoint } from "./TrendBarChart";
@@ -957,44 +956,44 @@ export function TeamInsightsScreen() {
     : "Older sprints are shown on the left and recent sprints on the right.";
 
   return (
-    <div class="tb-screen-grid">
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+    <div className="tb-screen-grid">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Sprint Trend</h3>
           </div>
         </header>
-        <div class={`tb-metrics-grid ${showCompletedStoryPointsChart ? "tb-four-up" : "tb-three-up"}`}>
-          <article class="tb-metric-card">
+        <div className={`tb-metrics-grid ${showCompletedStoryPointsChart ? "tb-four-up" : "tb-three-up"}`}>
+          <article className="tb-metric-card">
             <h4>Median Cycle Time</h4>
-            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
+            <strong className="tb-value tb-value-good">{formatDays(insights.metrics.medianCycleTimeDays)}</strong>
             <p>Middle cycle-time value across tracked cards.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Avg Cycle Time</h4>
-            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
+            <strong className="tb-value tb-value-good">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
             <p>Average across tracked cards in trend window.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Cycle Time Std Dev</h4>
-            <strong class="tb-value tb-value-good">{formatDays(insights.metrics.cycleTimeStdDevDays)}</strong>
+            <strong className="tb-value tb-value-good">{formatDays(insights.metrics.cycleTimeStdDevDays)}</strong>
             <p>Variation across tracked-card cycle times in trend window.</p>
           </article>
           {showCompletedStoryPointsChart ? (
-            <article class="tb-metric-card">
+            <article className="tb-metric-card">
               <h4>Avg SP</h4>
-              <strong class="tb-value tb-value-good">{formatStoryPoints(insights.metrics.avgCompletedStoryPoints)} SP</strong>
+              <strong className="tb-value tb-value-good">{formatStoryPoints(insights.metrics.avgCompletedStoryPoints)} SP</strong>
               <p>Average completed story points per sprint.</p>
             </article>
           ) : null}
         </div>
-        <article class="tb-metric-card tb-trend-tab-card">
-          <div class="tb-trend-tabs" role="tablist" aria-label="Sprint trend charts">
+        <article className="tb-metric-card tb-trend-tab-card">
+          <div className="tb-trend-tabs" role="tablist" aria-label="Sprint trend charts">
             <button
               id="tb-trend-tab-cycle-time"
               type="button"
               role="tab"
-              class={`tb-trend-tab${activeTrendChart === "cycleTime" ? " is-active" : ""}`}
+              className={`tb-trend-tab${activeTrendChart === "cycleTime" ? " is-active" : ""}`}
               aria-selected={activeTrendChart === "cycleTime"}
               aria-controls="tb-trend-panel-cycle-time"
               tabIndex={activeTrendChart === "cycleTime" ? 0 : -1}
@@ -1007,7 +1006,7 @@ export function TeamInsightsScreen() {
                 id="tb-trend-tab-completed-sp"
                 type="button"
                 role="tab"
-                class={`tb-trend-tab${activeTrendChart === "completedStoryPoints" ? " is-active" : ""}`}
+                className={`tb-trend-tab${activeTrendChart === "completedStoryPoints" ? " is-active" : ""}`}
                 aria-selected={activeTrendChart === "completedStoryPoints"}
                 aria-controls="tb-trend-panel-completed-sp"
                 tabIndex={activeTrendChart === "completedStoryPoints" ? 0 : -1}
@@ -1020,11 +1019,11 @@ export function TeamInsightsScreen() {
           {activeTrendChart === "cycleTime" ? (
             <section
               id="tb-trend-panel-cycle-time"
-              class="tb-trend-tab-panel"
+              className="tb-trend-tab-panel"
               role="tabpanel"
               aria-labelledby="tb-trend-tab-cycle-time"
             >
-              <div class="tb-trend-chart-frame">
+              <div className="tb-trend-chart-frame">
                 <TrendBarChart
                   ariaLabel="Average cycle time sprint bar chart"
                   canvasTestId="cycle-time-trend-chart"
@@ -1037,17 +1036,17 @@ export function TeamInsightsScreen() {
                   showTargetLine={showTargetCycleTime}
                   targetValue={targetCycleTimeDays}
                 />
-                <p class="tb-trend-x-axis-label">Sprints (old to new)</p>
+                <p className="tb-trend-x-axis-label">Sprints (old to new)</p>
               </div>
             </section>
           ) : (
             <section
               id="tb-trend-panel-completed-sp"
-              class="tb-trend-tab-panel"
+              className="tb-trend-tab-panel"
               role="tabpanel"
               aria-labelledby="tb-trend-tab-completed-sp"
             >
-              <div class="tb-trend-chart-frame">
+              <div className="tb-trend-chart-frame">
                 <TrendBarChart
                   ariaLabel="Completed story points sprint bar chart"
                   canvasTestId="completed-story-points-trend-chart"
@@ -1058,44 +1057,44 @@ export function TeamInsightsScreen() {
                   showValueLabels={showTrendValueLabels}
                   showActiveSprintMarker={showActiveSprintMarker}
                 />
-                <p class="tb-trend-x-axis-label">Sprints (old to new)</p>
+                <p className="tb-trend-x-axis-label">Sprints (old to new)</p>
               </div>
             </section>
           )}
         </article>
-        <p class="tb-trend-order-pill tb-trend-chart-note">
+        <p className="tb-trend-order-pill tb-trend-chart-note">
           {trendChartNote}
         </p>
-        {loading ? <p class="tb-muted-note">Loading sprint trend...</p> : null}
-        {error ?? insights.error ? <p class="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}
-        {!loading && insights.trend.length === 0 ? <p class="tb-muted-note">No recent sprint trend data found.</p> : null}
+        {loading ? <p className="tb-muted-note">Loading sprint trend...</p> : null}
+        {error ?? insights.error ? <p className="tb-muted-note">Team insights error: {error ?? insights.error}</p> : null}
+        {!loading && insights.trend.length === 0 ? <p className="tb-muted-note">No recent sprint trend data found.</p> : null}
         {isSettingsOpen ? (
-          <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Team Insights Settings">
-            <div class="tb-modal-backdrop" onClick={closeSettings} />
-            <div class="tb-modal tb-modal-team-settings">
-              <header class="tb-modal-head">
+          <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Team Insights Settings">
+            <div className="tb-modal-backdrop" onClick={closeSettings} />
+            <div className="tb-modal tb-modal-team-settings">
+              <header className="tb-modal-head">
                 <h3>Team Insights Settings</h3>
-                <button type="button" class="tb-btn tb-btn-sm" onClick={closeSettings}>
+                <button type="button" className="tb-btn tb-btn-sm" onClick={closeSettings}>
                   Close
                 </button>
               </header>
 
-              <p class="tb-muted-note tb-team-settings-intro">
+              <p className="tb-muted-note tb-team-settings-intro">
                 Tune the sprint-trend display and decide exactly which workflow statuses count toward cycle time.
               </p>
 
-              <div class="tb-team-settings-grid">
-                <section class="tb-team-settings-card" aria-label="Chart Display">
-                  <div class="tb-team-settings-card-head">
+              <div className="tb-team-settings-grid">
+                <section className="tb-team-settings-card" aria-label="Chart Display">
+                  <div className="tb-team-settings-card-head">
                     <div>
                       <h4>Chart Display</h4>
-                      <p class="tb-muted-note">Choose which helpers and charts appear in Sprint Trend.</p>
+                      <p className="tb-muted-note">Choose which helpers and charts appear in Sprint Trend.</p>
                     </div>
                   </div>
-                  <div class="tb-team-settings-toggle-list">
-                    <div class="tb-team-settings-toggle-row">
-                      <div class="tb-team-settings-toggle-copy">
-                        <label class="tb-modal-check">
+                  <div className="tb-team-settings-toggle-list">
+                    <div className="tb-team-settings-toggle-row">
+                      <div className="tb-team-settings-toggle-copy">
+                        <label className="tb-modal-check">
                           <input
                             type="checkbox"
                             checked={draftShowSprintNames}
@@ -1103,13 +1102,13 @@ export function TeamInsightsScreen() {
                           />
                           <span>Show sprint names on charts</span>
                         </label>
-                        <p class="tb-muted-note">Use the Jira sprint name on the x-axis instead of Sprint 1, Sprint 2, and so on.</p>
+                        <p className="tb-muted-note">Use the Jira sprint name on the x-axis instead of Sprint 1, Sprint 2, and so on.</p>
                       </div>
                     </div>
 
-                    <div class="tb-team-settings-toggle-row">
-                      <div class="tb-team-settings-toggle-copy">
-                        <label class="tb-modal-check">
+                    <div className="tb-team-settings-toggle-row">
+                      <div className="tb-team-settings-toggle-copy">
+                        <label className="tb-modal-check">
                           <input
                             type="checkbox"
                             checked={draftShowCompletedStoryPointsChart}
@@ -1117,13 +1116,13 @@ export function TeamInsightsScreen() {
                           />
                           <span>Show SP chart</span>
                         </label>
-                        <p class="tb-muted-note">Avg Cycle Time is always visible. This adds the completed story points metric and tab.</p>
+                        <p className="tb-muted-note">Avg Cycle Time is always visible. This adds the completed story points metric and tab.</p>
                       </div>
                     </div>
 
-                    <div class="tb-team-settings-toggle-row">
-                      <div class="tb-team-settings-toggle-copy">
-                        <label class="tb-modal-check">
+                    <div className="tb-team-settings-toggle-row">
+                      <div className="tb-team-settings-toggle-copy">
+                        <label className="tb-modal-check">
                           <input
                             type="checkbox"
                             checked={draftShowTrendValueLabels}
@@ -1131,13 +1130,13 @@ export function TeamInsightsScreen() {
                           />
                           <span>Show bar value labels</span>
                         </label>
-                        <p class="tb-muted-note">Show the exact value above each bar instead of extra chart labels.</p>
+                        <p className="tb-muted-note">Show the exact value above each bar instead of extra chart labels.</p>
                       </div>
                     </div>
 
-                    <div class="tb-team-settings-toggle-row">
-                      <div class="tb-team-settings-toggle-copy">
-                        <label class="tb-modal-check">
+                    <div className="tb-team-settings-toggle-row">
+                      <div className="tb-team-settings-toggle-copy">
+                        <label className="tb-modal-check">
                           <input
                             type="checkbox"
                             checked={draftShowActiveSprintMarker}
@@ -1145,22 +1144,22 @@ export function TeamInsightsScreen() {
                           />
                           <span>Show active sprint marker</span>
                         </label>
-                        <p class="tb-muted-note">Keep the green dot on the current sprint for quick orientation.</p>
+                        <p className="tb-muted-note">Keep the green dot on the current sprint for quick orientation.</p>
                       </div>
                     </div>
                   </div>
 
-                  <div class="tb-team-settings-divider" />
+                  <div className="tb-team-settings-divider" />
 
-                  <section class="tb-team-settings-subsection" aria-label="Target Cycle Time">
-                    <div class="tb-team-settings-subsection-head">
+                  <section className="tb-team-settings-subsection" aria-label="Target Cycle Time">
+                    <div className="tb-team-settings-subsection-head">
                       <h5>Target Cycle Time</h5>
-                      <p class="tb-muted-note">Add a target line behind the Avg Cycle Time bars.</p>
+                      <p className="tb-muted-note">Add a target line behind the Avg Cycle Time bars.</p>
                     </div>
-                    <div class="tb-team-settings-target-grid">
-                      <div class="tb-team-settings-toggle-row">
-                        <div class="tb-team-settings-toggle-copy">
-                          <label class="tb-modal-check">
+                    <div className="tb-team-settings-target-grid">
+                      <div className="tb-team-settings-toggle-row">
+                        <div className="tb-team-settings-toggle-copy">
+                          <label className="tb-modal-check">
                             <input
                               type="checkbox"
                               checked={draftShowTargetCycleTime}
@@ -1168,13 +1167,13 @@ export function TeamInsightsScreen() {
                             />
                             <span>Show target cycle time</span>
                           </label>
-                          <p class="tb-muted-note">Use this to compare each sprint against a consistent cycle-time goal.</p>
+                          <p className="tb-muted-note">Use this to compare each sprint against a consistent cycle-time goal.</p>
                         </div>
                       </div>
 
-                      <label class="tb-modal-field tb-team-settings-field">
+                      <label className="tb-modal-field tb-team-settings-field">
                         <span>Target Cycle Time</span>
-                        <div class="tb-team-settings-number-input">
+                        <div className="tb-team-settings-number-input">
                           <input
                             aria-label="Target Cycle Time"
                             type="number"
@@ -1184,59 +1183,59 @@ export function TeamInsightsScreen() {
                             value={draftTargetCycleTimeInput}
                             onInput={(event) => setDraftTargetCycleTimeInput((event.currentTarget as HTMLInputElement).value)}
                           />
-                          <span class="tb-team-settings-input-suffix">days</span>
+                          <span className="tb-team-settings-input-suffix">days</span>
                         </div>
                       </label>
                     </div>
                   </section>
                 </section>
 
-                <section class="tb-team-settings-panel" aria-label="Cycle Time Definition">
-                  <div class="tb-team-settings-panel-head">
-                    <div class="tb-team-settings-panel-copy">
-                      <div class="tb-team-settings-heading-row">
+                <section className="tb-team-settings-panel" aria-label="Cycle Time Definition">
+                  <div className="tb-team-settings-panel-head">
+                    <div className="tb-team-settings-panel-copy">
+                      <div className="tb-team-settings-heading-row">
                         <h4>Cycle Time Definition</h4>
                         {availableCycleTimeStatusCount > 0 ? (
-                          <span class="tb-team-settings-count-pill">
+                          <span className="tb-team-settings-count-pill">
                             {draftSelectedCycleTimeStatusCount} of {availableCycleTimeStatusCount} statuses selected
                           </span>
                         ) : null}
                       </div>
-                      <p class="tb-muted-note">
+                      <p className="tb-muted-note">
                         We sum time spent in the checked workflow statuses only. Tracked cards with no time in checked
                         statuses are excluded from cycle-time metrics.
                       </p>
                     </div>
-                    <div class="tb-team-settings-actions">
-                      <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftCycleTimeStatuses}>
+                    <div className="tb-team-settings-actions">
+                      <button type="button" className="tb-btn tb-btn-sm" onClick={selectAllDraftCycleTimeStatuses}>
                         Select all
                       </button>
-                      <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftCycleTimeStatuses}>
+                      <button type="button" className="tb-btn tb-btn-sm" onClick={clearDraftCycleTimeStatuses}>
                         Clear all
                       </button>
                     </div>
                   </div>
   
                   {hasNoDraftCycleTimeStatuses ? (
-                    <p class="tb-team-settings-warning">
+                    <p className="tb-team-settings-warning">
                       No statuses are selected. Tracked cards will be excluded from cycle-time metrics until at least
                       one workflow status is checked.
                     </p>
                   ) : null}
 
                   {cycleTimeStatusGroups.length === 0 ? (
-                    <p class="tb-muted-note">Workflow statuses will appear here once sprint history is available.</p>
+                    <p className="tb-muted-note">Workflow statuses will appear here once sprint history is available.</p>
                   ) : (
-                    <div class="tb-team-settings-status-groups">
+                    <div className="tb-team-settings-status-groups">
                       {cycleTimeStatusGroups.map((group) => (
-                        <section key={group.category} class="tb-cycle-status-group">
-                          <header class="tb-cycle-status-group-head">
+                        <section key={group.category} className="tb-cycle-status-group">
+                          <header className="tb-cycle-status-group-head">
                             <h5>{group.category}</h5>
-                            <span class="tb-cycle-status-group-count">{group.statuses.length}</span>
+                            <span className="tb-cycle-status-group-count">{group.statuses.length}</span>
                           </header>
-                          <div class="tb-cycle-status-grid">
+                          <div className="tb-cycle-status-grid">
                             {group.statuses.map((status) => (
-                              <label key={status.statusKey} class="tb-modal-check tb-cycle-status-option">
+                              <label key={status.statusKey} className="tb-modal-check tb-cycle-status-option">
                                 <input
                                   type="checkbox"
                                   checked={draftSelectedCycleTimeStatusKeys.includes(status.statusKey)}
@@ -1253,11 +1252,11 @@ export function TeamInsightsScreen() {
                 </section>
               </div>
 
-              <footer class="tb-modal-actions">
-                <button type="button" class="tb-btn" onClick={closeSettings}>
+              <footer className="tb-modal-actions">
+                <button type="button" className="tb-btn" onClick={closeSettings}>
                   Cancel
                 </button>
-                <button type="button" class="tb-btn tb-btn-primary" onClick={saveSettings}>
+                <button type="button" className="tb-btn tb-btn-primary" onClick={saveSettings}>
                   Save
                 </button>
               </footer>
@@ -1265,17 +1264,17 @@ export function TeamInsightsScreen() {
           </div>
         ) : null}
       </section>
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Cards in Selected Window ({formatTrendWindowLabel(trendWindowSelection)})</h3>
           </div>
-          <div class="tb-panel-header-actions">
-            <span class="tb-chip">{visibleCardsInWindowCount} of {cardsInWindowTotalCards} cards visible</span>
+          <div className="tb-panel-header-actions">
+            <span className="tb-chip">{visibleCardsInWindowCount} of {cardsInWindowTotalCards} cards visible</span>
           </div>
         </header>
-        <div class="tb-cards-window-filters">
-          <label class="tb-cards-window-filter">
+        <div className="tb-cards-window-filters">
+          <label className="tb-cards-window-filter">
             <span>Search</span>
             <input
               aria-label="Search by key or summary"
@@ -1285,7 +1284,7 @@ export function TeamInsightsScreen() {
               onInput={(event) => setCardKeyFilter((event.currentTarget as HTMLInputElement).value)}
             />
           </label>
-          <label class="tb-cards-window-filter">
+          <label className="tb-cards-window-filter">
             <span>Sprint</span>
             <select
               aria-label="Filter sprint"
@@ -1300,7 +1299,7 @@ export function TeamInsightsScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-cards-window-filter">
+          <label className="tb-cards-window-filter">
             <span>Status</span>
             <select
               aria-label="Filter status"
@@ -1315,7 +1314,7 @@ export function TeamInsightsScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-cards-window-filter">
+          <label className="tb-cards-window-filter">
             <span>Type</span>
             <select
               aria-label="Filter type"
@@ -1330,7 +1329,7 @@ export function TeamInsightsScreen() {
               ))}
             </select>
           </label>
-          <label class="tb-cards-window-filter">
+          <label className="tb-cards-window-filter">
             <span>Epic</span>
             <select
               aria-label="Filter epic"
@@ -1346,61 +1345,61 @@ export function TeamInsightsScreen() {
             </select>
           </label>
         </div>
-        {loading ? <p class="tb-muted-note">Loading cards in selected window...</p> : null}
+        {loading ? <p className="tb-muted-note">Loading cards in selected window...</p> : null}
         {!loading && cardsInWindowRows.length === 0 ? (
-          <p class="tb-muted-note">No cards found for the selected sprint window.</p>
+          <p className="tb-muted-note">No cards found for the selected sprint window.</p>
         ) : null}
         {!loading && sortedCardsInWindowRows.length === 0 && cardsInWindowRows.length > 0 ? (
-          <p class="tb-muted-note">No cards match the current filters.</p>
+          <p className="tb-muted-note">No cards match the current filters.</p>
         ) : null}
         {sortedCardsInWindowRows.length > 0 ? (
-          <div class="tb-cards-window-layout">
-            <div class="tb-cards-window-table-wrap">
-              <table class="tb-cards-window-table" aria-label="Cards in selected window table">
+          <div className="tb-cards-window-layout">
+            <div className="tb-cards-window-table-wrap">
+              <table className="tb-cards-window-table" aria-label="Cards in selected window table">
                 <thead>
                   <tr>
                     <th>
                       <button
                         type="button"
-                        class={`tb-table-sort${cardsInWindowSortField === "issueKey" ? " is-active" : ""}`}
+                        className={`tb-table-sort${cardsInWindowSortField === "issueKey" ? " is-active" : ""}`}
                         onClick={() => handleCardsInWindowSortHeaderClick("issueKey")}
                         aria-label={`Sort by Key (${cardsInWindowSortField === "issueKey" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Key</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("issueKey")}</span>
+                        <span className="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("issueKey")}</span>
                       </button>
                     </th>
                     <th>
                       <button
                         type="button"
-                        class={`tb-table-sort${cardsInWindowSortField === "summary" ? " is-active" : ""}`}
+                        className={`tb-table-sort${cardsInWindowSortField === "summary" ? " is-active" : ""}`}
                         onClick={() => handleCardsInWindowSortHeaderClick("summary")}
                         aria-label={`Sort by Summary (${cardsInWindowSortField === "summary" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Summary</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("summary")}</span>
+                        <span className="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("summary")}</span>
                       </button>
                     </th>
                     <th>
                       <button
                         type="button"
-                        class={`tb-table-sort${cardsInWindowSortField === "status" ? " is-active" : ""}`}
+                        className={`tb-table-sort${cardsInWindowSortField === "status" ? " is-active" : ""}`}
                         onClick={() => handleCardsInWindowSortHeaderClick("status")}
                         aria-label={`Sort by Status (${cardsInWindowSortField === "status" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Status</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("status")}</span>
+                        <span className="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("status")}</span>
                       </button>
                     </th>
-                    <th class="is-numeric tb-cards-window-cycle-time-head">
+                    <th className="is-numeric tb-cards-window-cycle-time-head">
                       <button
                         type="button"
-                        class={`tb-table-sort${cardsInWindowSortField === "cycleTime" ? " is-active" : ""}`}
+                        className={`tb-table-sort${cardsInWindowSortField === "cycleTime" ? " is-active" : ""}`}
                         onClick={() => handleCardsInWindowSortHeaderClick("cycleTime")}
                         aria-label={`Sort by Cycle Time (${cardsInWindowSortField === "cycleTime" && cardsInWindowSortDirection === "asc" ? "ascending" : "descending"})`}
                       >
                         <span>Cycle Time</span>
-                        <span class="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("cycleTime")}</span>
+                        <span className="tb-table-sort-indicator" aria-hidden="true">{resolveCardsInWindowSortIndicator("cycleTime")}</span>
                       </button>
                     </th>
                   </tr>
@@ -1409,20 +1408,20 @@ export function TeamInsightsScreen() {
                   {sortedCardsInWindowRows.map((row) => (
                     <tr
                       key={`cards-window-${row.issueKey}`}
-                      class={row.issueKey === selectedCardIssueKey ? "is-selected" : ""}
+                      className={row.issueKey === selectedCardIssueKey ? "is-selected" : ""}
                     >
-                      <td class="tb-cards-window-key-cell">
+                      <td className="tb-cards-window-key-cell">
                         <button
                           type="button"
-                          class={`tb-cards-window-ticket-button${row.issueKey === selectedCardIssueKey ? " is-selected" : ""}`}
+                          className={`tb-cards-window-ticket-button${row.issueKey === selectedCardIssueKey ? " is-selected" : ""}`}
                           onClick={() => setSelectedCardIssueKey(row.issueKey)}
                         >
-                          <span class="tb-cards-window-ticket-key">{row.issueKey}</span>
+                          <span className="tb-cards-window-ticket-key">{row.issueKey}</span>
                         </button>
                       </td>
-                      <td class="tb-cards-window-summary-cell">{row.summary}</td>
+                      <td className="tb-cards-window-summary-cell">{row.summary}</td>
                       <td>{row.status}</td>
-                      <td class="tb-status-cycle-cell-numeric tb-cards-window-cycle-time-cell">
+                      <td className="tb-status-cycle-cell-numeric tb-cards-window-cycle-time-cell">
                         {formatDays(resolveCardCycleTimeDays(row))}
                       </td>
                     </tr>
@@ -1430,36 +1429,36 @@ export function TeamInsightsScreen() {
                 </tbody>
               </table>
             </div>
-            <aside class="tb-cards-window-detail-card">
+            <aside className="tb-cards-window-detail-card">
               <h4>Card Statuses</h4>
               {selectedCardRow ? (
                 <>
                   {selectedCardRow.issueUrl ? (
                     <a
-                      class="tb-cards-window-detail-issue-link"
+                      className="tb-cards-window-detail-issue-link"
                       href={selectedCardRow.issueUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <span class="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
-                      <span class="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
+                      <span className="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
+                      <span className="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
                     </a>
                   ) : (
-                    <div class="tb-cards-window-detail-issue-link is-static">
-                      <span class="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
-                      <span class="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
+                    <div className="tb-cards-window-detail-issue-link is-static">
+                      <span className="tb-cards-window-detail-issue-key">{selectedCardRow.issueKey}</span>
+                      <span className="tb-cards-window-detail-issue-summary">{selectedCardRow.summary}</span>
                     </div>
                   )}
-                  <p class="tb-muted-note">Bold statuses contribute to cycle-time calculations.</p>
+                  <p className="tb-muted-note">Bold statuses contribute to cycle-time calculations.</p>
                   {selectedCardStatusTimeline.length > 0 ? (
-                    <div class="tb-cards-window-detail-wrap">
-                      <table class="tb-cards-window-detail-table" aria-label="Selected card status timeline">
+                    <div className="tb-cards-window-detail-wrap">
+                      <table className="tb-cards-window-detail-table" aria-label="Selected card status timeline">
                         <thead>
                           <tr>
                             <th>Status</th>
                             <th>Changed At</th>
-                            <th class="is-numeric">Days</th>
-                            <th class="is-numeric">% Time</th>
+                            <th className="is-numeric">Days</th>
+                            <th className="is-numeric">% Time</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1469,10 +1468,10 @@ export function TeamInsightsScreen() {
                                 {entry.isCycleTimeStatus ? <strong>{entry.status}</strong> : entry.status}
                               </td>
                               <td>{formatDateTime(entry.changedAt)}</td>
-                              <td class="tb-status-cycle-cell-numeric">
+                              <td className="tb-status-cycle-cell-numeric">
                                 {entry.isCycleTimeStatus ? <strong>{formatDays(entry.days)}</strong> : formatDays(entry.days)}
                               </td>
-                              <td class="tb-status-cycle-cell-numeric">
+                              <td className="tb-status-cycle-cell-numeric">
                                 {entry.isCycleTimeStatus ? <strong>{formatPercent(entry.percentOfTicketTime)}</strong> : formatPercent(entry.percentOfTicketTime)}
                               </td>
                             </tr>
@@ -1481,24 +1480,24 @@ export function TeamInsightsScreen() {
                       </table>
                     </div>
                   ) : (
-                    <p class="tb-muted-note">No status timeline found for this card.</p>
+                    <p className="tb-muted-note">No status timeline found for this card.</p>
                   )}
                   {selectedCardStatusBreakdown.length > 0 ? (
-                    <section class="tb-cards-window-pie-card">
+                    <section className="tb-cards-window-pie-card">
                       <h5>Time Distribution by Status</h5>
-                      <div class="tb-cards-window-pie-wrap">
+                      <div className="tb-cards-window-pie-wrap">
                         <div
-                          class="tb-cards-window-pie"
+                          className="tb-cards-window-pie"
                           role="img"
                           aria-label="Selected card status time distribution pie chart"
                           style={{ background: selectedCardStatusPieGradient }}
                         />
-                        <ul class="tb-cards-window-pie-legend">
+                        <ul className="tb-cards-window-pie-legend">
                           {selectedCardStatusBreakdown.map((slice) => (
                             <li key={`card-pie-${selectedCardRow.issueKey}-${slice.statusKey}`}>
-                              <span class="tb-cards-window-pie-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
-                              <span class="tb-cards-window-pie-legend-label">{slice.status}</span>
-                              <span class="tb-cards-window-pie-legend-value">{formatPercent(slice.percentOfTicketTime)}</span>
+                              <span className="tb-cards-window-pie-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
+                              <span className="tb-cards-window-pie-legend-label">{slice.status}</span>
+                              <span className="tb-cards-window-pie-legend-value">{formatPercent(slice.percentOfTicketTime)}</span>
                             </li>
                           ))}
                         </ul>
@@ -1507,7 +1506,7 @@ export function TeamInsightsScreen() {
                   ) : null}
                 </>
               ) : (
-                <p class="tb-muted-note">Select a ticket to view status history details.</p>
+                <p className="tb-muted-note">Select a ticket to view status history details.</p>
               )}
             </aside>
           </div>

@@ -1,9 +1,14 @@
-import { h } from "preact";
+
+import { Activity } from "lucide-react";
+import { ConstructionScreen } from "./ConstructionScreen";
 
 export function IncidentResponseScreen() {
   return (
-    <section class="tb-construction-empty" aria-label="Operations Insights under construction">
-      <span class="tb-construction-icon" role="img" aria-label="Under construction">🚧</span>
-    </section>
+    <ConstructionScreen
+      description="This operations insights workspace is under construction."
+      icon={Activity}
+      id="operations-insights-construction"
+      title="Operations Insights"
+    />
   );
 }

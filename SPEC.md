@@ -41,7 +41,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Initiative-level progress and risks.
   - AI draft generation using selected provider/model from Settings.
 - UX mockups:
-  - Maintain mockup coverage for current OJET screens in `docs/design/teambeacon-ojet-mockups.html`.
+  - Maintain design documentation for current screens and preserve functional parity during frontend modernization.
 
 ## 5. Out of Scope (MVP)
 - Two-way updates to JIRA/Confluence.
@@ -137,7 +137,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 ## 9. Suggested Repository Structure
 ```text
 TeamBeacon/
-  app/                     # Web UI (Oracle JET)
+  app/                     # Web UI (React + Vite)
   services/api/            # Python local API service for sync + analytics
   packages/connectors/     # JIRA + Confluence API clients
   docs/
@@ -148,7 +148,8 @@ TeamBeacon/
 ```
 
 ## 10. Design Artifacts
-- Primary UX reference: `docs/design/teambeacon-ojet-mockups.html`
+- Primary frontend direction: `docs/plans/FRONTEND_MODERNIZATION_PLAN.md`
+- Historical UX references: `docs/design/teambeacon-ojet-mockups.html` and `docs/design/redwood-ojet-dashboard.html`
 - Supporting notes: `docs/design/README.md`
 - Mockups must reflect:
   - Settings (connections, field mapping, epic metadata)

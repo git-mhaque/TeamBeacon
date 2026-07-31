@@ -47,7 +47,7 @@ For product messaging, capability narrative, and value framing, see:
 ## 🧱 Repository Layout
 ```text
 TeamBeacon/                  # Repository root
-  app/                       # Oracle JET web frontend
+  app/                       # React + Vite web frontend
   services/                  # Runtime services
     api/                     # Local API endpoints and orchestration
   packages/                  # Shared Python packages
@@ -130,6 +130,7 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```bash
 cd app
 npm run build
+npm run lint
 npm run test:coverage
 ```
 
@@ -138,7 +139,7 @@ npm run test:coverage
 - Checks:
   - Backend unit tests
   - Backend API integration tests
-  - Frontend (OJET) build + coverage tests: `cd app && npm ci && npm run build && npm run test:coverage`
+  - Frontend typecheck, React/Vite build, lint, and coverage tests
   - Docker image build on PRs; build + publish to GHCR on `main`
 
 ## 📚 Documentation
@@ -150,5 +151,6 @@ npm run test:coverage
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap
+- [docs/plans/FRONTEND_MODERNIZATION_PLAN.md](docs/plans/FRONTEND_MODERNIZATION_PLAN.md): proposed frontend design and stack migration plan
 - [docs/design/README.md](docs/design/README.md): design artifact overview
 - [docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI-specific smoke test (use when `INTELLIGENCE_PROVIDER=oci`)

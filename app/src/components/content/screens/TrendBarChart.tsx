@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "react";
 import * as ChartModule from "chart.js/auto";
 import type { Chart as ChartInstance, ChartConfiguration, Plugin } from "chart.js";
 
@@ -325,10 +324,10 @@ export function TrendBarChart({
   }, [config]);
 
   return (
-    <div class="tb-trend-chart">
+    <div className="tb-trend-chart">
       <canvas
         ref={canvasRef}
-        class="tb-trend-chart-canvas"
+        className="tb-trend-chart-canvas"
         role="img"
         aria-label={ariaLabel}
         data-testid={canvasTestId}
