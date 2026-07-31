@@ -1,6 +1,6 @@
 # TeamBeacon Frontend Modernization Plan
 
-- Status: In progress
+- Status: Screen migration complete; hardening in progress
 - Date: 31 July 2026
 - Scope: Web frontend design and implementation stack
 - Decision owner: TeamBeacon maintainers
@@ -35,13 +35,18 @@ The modernization is an implementation and visual-design change only. It must no
 
 ### 1.2 Implementation Checkpoint
 
-The foundation and first visual slice are being implemented in place on `codex/frontend-shell-initiative`:
+The functional-parity screen migration is complete on `codex/frontend-shell-initiative`:
 
 - React 19, Vite 8, strict TypeScript, Tailwind CSS 4, Lucide icons, Vitest, React Testing Library, and ESLint are active.
-- The existing eight-screen component-state navigation remains in place.
-- The compact shell and Initiative Insights are the first visual migration slice.
-- The existing Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
-- Additional target libraries in this plan should be introduced only when a migrated component needs them and parity tests justify the change.
+- The existing eight-screen component-state navigation remains in place behind a compact, hamburger-expandable application rail.
+- Initiative Insights uses browser-page vertical scrolling so the Progress Matrix no longer introduces a nested vertical scrollbar.
+- Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Dashboard, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell.
+- Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
+- Existing metrics, filters, actions, dialogs, exports, preference keys, and API calls remain unchanged.
+- The Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
+- Additional target libraries in this plan should still be introduced only when a component needs them and parity tests justify the change.
+
+Remaining work is the hardening phase: resolve baseline lint warnings, raise changed-module coverage toward the documented threshold, add route-level code splitting, complete browser accessibility and responsive checks, and run the production-container smoke suite.
 
 ## 2. Outcomes
 

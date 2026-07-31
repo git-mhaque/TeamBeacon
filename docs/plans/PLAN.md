@@ -68,8 +68,8 @@ Exit criteria:
   - Mitigation: transparent metric formulas and drill-down links.
 
 ## 4. Immediate Next Tasks
-1. Execute the [Frontend Modernization Plan](FRONTEND_MODERNIZATION_PLAN.md) while preserving the containerized Python API and SQLite runtime.
+1. Complete the hardening gates in the [Frontend Modernization Plan](FRONTEND_MODERNIZATION_PLAN.md) while preserving the containerized Python API and SQLite runtime.
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.
-5. Modernize the shell and screens incrementally under the functional-parity constraints in `FRONTEND_MODERNIZATION_PLAN.md`.
+5. Add route-level code splitting, browser accessibility checks, and production-container smoke coverage for the modernized frontend.
