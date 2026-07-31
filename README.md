@@ -150,5 +150,6 @@ npm run test:coverage
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap
+- [docs/plans/FRONTEND_MODERNIZATION_PLAN.md](docs/plans/FRONTEND_MODERNIZATION_PLAN.md): proposed frontend design and stack migration plan
 - [docs/design/README.md](docs/design/README.md): design artifact overview
 - [docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI-specific smoke test (use when `INTELLIGENCE_PROVIDER=oci`)

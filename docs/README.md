@@ -6,6 +6,7 @@ This directory contains product, architecture, plan, and design artifacts for Te
 - [../SPEC.md](../SPEC.md): product requirements, MVP boundaries, and success metrics.
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): technical architecture and data flow.
 - [plans/PLAN.md](plans/PLAN.md): phased execution plan and delivery milestones.
+- [plans/FRONTEND_MODERNIZATION_PLAN.md](plans/FRONTEND_MODERNIZATION_PLAN.md): proposed frontend design system, target stack, migration phases, and acceptance gates.
 - [design/README.md](design/README.md): design artifact guide.
 - [../services/api/README.md](../services/api/README.md): local API routes, including AI provider and Team Insights endpoints.
 
