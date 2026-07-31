@@ -12,10 +12,12 @@ import {
   LayoutDashboard,
   ListTodo,
   Menu,
+  PanelLeftClose,
   Rocket,
   Settings,
   ShieldCheck,
   UsersRound,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -564,11 +566,8 @@ export function Content({ appName }: Props) {
 
   return (
     <div className={`tb-app-frame${isSidebarExpanded ? " is-nav-expanded" : ""}`}>
-      <aside
-        id="tb-primary-sidebar"
-        className={`tb-sidebar${isSidebarExpanded ? " is-expanded" : ""}`}
-      >
-        <div className="tb-brand">
+      <header className="tb-app-header">
+        <div className="tb-app-header-start">
           <button
             type="button"
             className="tb-sidebar-toggle"
@@ -578,14 +577,33 @@ export function Content({ appName }: Props) {
             title={isSidebarExpanded ? "Collapse navigation" : "Expand navigation"}
             onClick={() => setIsSidebarExpanded((current) => !current)}
           >
-            <Menu aria-hidden="true" strokeWidth={2} />
+            {isSidebarExpanded ? (
+              <>
+                <PanelLeftClose
+                  className="tb-sidebar-toggle-desktop-icon"
+                  aria-hidden="true"
+                  strokeWidth={2}
+                />
+                <X className="tb-sidebar-toggle-mobile-icon" aria-hidden="true" strokeWidth={2} />
+              </>
+            ) : (
+              <Menu aria-hidden="true" strokeWidth={2} />
+            )}
           </button>
-          <div className="tb-brand-copy" aria-hidden={!isSidebarExpanded}>
-            <p className="tb-eyebrow">{appName}</p>
+          <div className="tb-app-header-brand">
+            <div className="tb-app-header-brand-lockup">
+              <p>{appName}</p>
+              <small>Illuminating Engineering Insights</small>
+            </div>
             <h1>Manager Console</h1>
-            <small>Illuminating Engineering Insights</small>
           </div>
         </div>
+      </header>
+
+      <aside
+        id="tb-primary-sidebar"
+        className={`tb-sidebar${isSidebarExpanded ? " is-expanded" : ""}`}
+      >
         <nav className="tb-nav">
           {NAV_ITEMS.map((item) => (
             <button
@@ -620,7 +638,6 @@ export function Content({ appName }: Props) {
       <main className={`tb-main tb-main-${active}`}>
         <header className="tb-topbar">
           <div className="tb-topbar-title">
-            <p>{appName} · Manager Console</p>
             <h2>{heading}</h2>
           </div>
           {active === "initiatives" ? (

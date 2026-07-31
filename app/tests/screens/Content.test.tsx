@@ -176,7 +176,11 @@ describe("Content", () => {
     render(<Content appName="TeamBeacon" />);
 
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Illuminating Engineering Insights")).toBeInTheDocument();
+    const appHeader = document.querySelector(".tb-app-header");
+    expect(appHeader).not.toBeNull();
+    expect(within(appHeader as HTMLElement).getByText("TeamBeacon")).toBeInTheDocument();
+    expect(within(appHeader as HTMLElement).getByRole("heading", { name: "Manager Console" })).toBeInTheDocument();
+    expect(within(appHeader as HTMLElement).getByText("Illuminating Engineering Insights")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Integrations Settings" })).not.toBeInTheDocument();
 
     const nav = screen.getByRole("navigation");
@@ -198,11 +202,15 @@ describe("Content", () => {
     const navigationToggle = screen.getByRole("button", { name: "Expand navigation" });
     expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(navigationToggle);
-    expect(screen.getByRole("button", { name: "Collapse navigation" })).toHaveAttribute("aria-expanded", "true");
+    const collapseNavigationButton = screen.getByRole("button", { name: "Collapse navigation" });
+    expect(collapseNavigationButton).toHaveAttribute("aria-expanded", "true");
+    expect(collapseNavigationButton.querySelector(".tb-sidebar-toggle-desktop-icon")).toBeInTheDocument();
+    expect(collapseNavigationButton.querySelector(".tb-sidebar-toggle-mobile-icon")).toBeInTheDocument();
     expect(document.querySelector(".tb-app-frame")).toHaveClass("is-nav-expanded");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByRole("button", { name: "Expand navigation" })).toHaveAttribute("aria-expanded", "false");
     expect(document.querySelector(".tb-app-frame")).not.toHaveClass("is-nav-expanded");
+    expect(within(appHeader as HTMLElement).getByText("TeamBeacon")).toBeInTheDocument();
 
     expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
