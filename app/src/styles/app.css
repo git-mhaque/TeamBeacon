@@ -510,6 +510,53 @@ body {
   filter: drop-shadow(0 0.65rem 1rem rgba(22, 38, 68, 0.18));
 }
 
+.tb-construction-state {
+  min-height: clamp(20rem, calc(100vh - 8rem), 40rem);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.tb-construction-symbol {
+  width: 4.25rem;
+  height: 4.25rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfc0ba;
+  border-radius: 1.1rem;
+  background: #f8ece9;
+  color: var(--tb-brand);
+  box-shadow: 0 0.45rem 1.1rem rgba(58, 44, 35, 0.08);
+}
+
+.tb-construction-symbol svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tb-construction-copy {
+  max-width: 28rem;
+}
+
+.tb-construction-copy .tb-eyebrow {
+  color: #8a5b53;
+}
+
+.tb-construction-copy h3 {
+  margin: 0.25rem 0 0;
+  color: #2c2926;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.tb-construction-copy > p:last-child {
+  margin: 0.35rem 0 0;
+  color: #6b635c;
+  font-size: 0.82rem;
+}
+
 .tb-panel {
   min-width: 0;
   border: 1px solid var(--tb-line);
