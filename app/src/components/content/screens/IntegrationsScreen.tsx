@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addEpicGroup,
   addWorkType,
@@ -833,35 +832,35 @@ export function IntegrationsScreen() {
     : "auto-detected";
 
   return (
-    <div class="tb-screen-grid">
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+    <div className="tb-screen-grid">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Source Connections</h3>
-            <p class="tb-muted-note">Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
+            <p className="tb-muted-note">Live connectivity checks from frontend to TeamBeacon backend integrations.</p>
           </div>
-          <button type="button" class="tb-btn tb-btn-primary" onClick={checkSourceConnections}>
+          <button type="button" className="tb-btn tb-btn-primary" onClick={checkSourceConnections}>
             {loading || aiLoading || confluenceLoading ? "Checking..." : "Check Now"}
           </button>
         </header>
-        <div class="tb-metrics-grid tb-three-up">
-          <article class="tb-metric-card tb-jira-card">
+        <div className="tb-metrics-grid tb-three-up">
+          <article className="tb-metric-card tb-jira-card">
             <h4>JIRA Connection</h4>
-            <strong class={`tb-value ${jiraToneClass}`}>{jiraValue}</strong>
+            <strong className={`tb-value ${jiraToneClass}`}>{jiraValue}</strong>
             <p>{jiraHint}</p>
             <p>Last checked: {formatCheckedAt(jiraStatus?.checkedAt)}</p>
 
-            <div class="tb-jira-sync-stack">
-              <section class={`tb-jira-last-sync-section ${jiraLastSyncToneClass}`} aria-label="JIRA last sync">
-                <div class="tb-jira-sync-head">
-                  <div class="tb-jira-sync-title-block">
-                    <strong class="tb-jira-sync-title">Last Sync</strong>
+            <div className="tb-jira-sync-stack">
+              <section className={`tb-jira-last-sync-section ${jiraLastSyncToneClass}`} aria-label="JIRA last sync">
+                <div className="tb-jira-sync-head">
+                  <div className="tb-jira-sync-title-block">
+                    <strong className="tb-jira-sync-title">Last Sync</strong>
                   </div>
-                  <span class={`tb-status-pill ${jiraLastSyncToneClass}`}>
+                  <span className={`tb-status-pill ${jiraLastSyncToneClass}`}>
                     <span>{jiraLastSyncStateText}</span>
                   </span>
                 </div>
-                <div class="tb-jira-sync-facts">
+                <div className="tb-jira-sync-facts">
                   <span>
                     <strong>Completed</strong>
                     {jiraLastSyncCompletedText}
@@ -880,34 +879,34 @@ export function IntegrationsScreen() {
                   ) : null}
                 </div>
                 {jiraLastSyncMessageText ? (
-                  <p class={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
+                  <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
                     {jiraLastSyncMessageText}
                   </p>
                 ) : null}
               </section>
 
-              <section class={`tb-jira-sync-action-section ${jiraSyncActionToneClass}`} aria-label="JIRA sync action">
-                <div class="tb-jira-sync-head">
-                  <div class="tb-jira-sync-title-block">
-                    <strong class="tb-jira-sync-title">{jiraSyncActionTitle}</strong>
+              <section className={`tb-jira-sync-action-section ${jiraSyncActionToneClass}`} aria-label="JIRA sync action">
+                <div className="tb-jira-sync-head">
+                  <div className="tb-jira-sync-title-block">
+                    <strong className="tb-jira-sync-title">{jiraSyncActionTitle}</strong>
                   </div>
-                  <span class={`tb-status-pill ${jiraSyncActionToneClass}`}>
+                  <span className={`tb-status-pill ${jiraSyncActionToneClass}`}>
                     {isJiraSyncRunning ? (
-                      <span class="tb-inline-spinner" aria-hidden="true" />
+                      <span className="tb-inline-spinner" aria-hidden="true" />
                     ) : null}
                     <span>{jiraSyncActionStateText}</span>
                   </span>
                 </div>
 
                 {isJiraSyncRunning && jiraSyncStepLabel ? (
-                  <span class="tb-jira-sync-step-meta">
+                  <span className="tb-jira-sync-step-meta">
                     {jiraSyncStepCounter ? `${jiraSyncStepCounter}: ` : null}
                     {jiraSyncStepLabel}
                   </span>
                 ) : null}
 
                 {isJiraSyncRunning ? (
-                  <div class="tb-sync-stepper" aria-label="JIRA sync steps">
+                  <div className="tb-sync-stepper" aria-label="JIRA sync steps">
                     {JIRA_SYNC_STEPS.map((stepName, index) => {
                       const stepNumber = index + 1;
                       const isComplete = jiraCurrentStepNumber !== null && stepNumber < jiraCurrentStepNumber;
@@ -915,7 +914,7 @@ export function IntegrationsScreen() {
                       return (
                         <span
                           key={stepName}
-                          class={`tb-sync-step-segment${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
+                          className={`tb-sync-step-segment${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
                           title={stepName}
                         />
                       );
@@ -924,15 +923,15 @@ export function IntegrationsScreen() {
                 ) : null}
 
                 {showJiraIssueActivity ? (
-                  <div class="tb-sync-measured-progress">
-                    <div class="tb-sync-progress-meta">
+                  <div className="tb-sync-measured-progress">
+                    <div className="tb-sync-progress-meta">
                       {jiraIssueProgressText ? <span>{jiraIssueProgressText}</span> : null}
                       {jiraChangelogText ? <span>{jiraChangelogText}</span> : null}
                       {jiraCandidateProgressText ? <span>{jiraCandidateProgressText}</span> : null}
                     </div>
-                    <div class="tb-sync-progress-line">
+                    <div className="tb-sync-progress-line">
                       <span
-                        class={`tb-sync-progress-track${hasJiraIssueProgressPercent ? "" : " is-indeterminate"}`}
+                        className={`tb-sync-progress-track${hasJiraIssueProgressPercent ? "" : " is-indeterminate"}`}
                         role="progressbar"
                         aria-label="JIRA issue sync progress"
                         aria-valuemin={0}
@@ -941,36 +940,36 @@ export function IntegrationsScreen() {
                         aria-valuetext={hasJiraIssueProgressPercent ? undefined : "In progress"}
                       >
                         <span
-                          class="tb-sync-progress-fill"
+                          className="tb-sync-progress-fill"
                           style={hasJiraIssueProgressPercent && jiraSyncPercent !== null ? { width: `${jiraSyncPercent}%` } : undefined}
                         />
                       </span>
                       {hasJiraIssueProgressPercent && jiraSyncPercent !== null ? (
-                        <span class="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
+                        <span className="tb-sync-progress-percent">{jiraSyncPercent.toFixed(1).replace(/\.0$/, "")}%</span>
                       ) : null}
                     </div>
                   </div>
                 ) : null}
 
                 {jiraSyncMessageText ? (
-                  <p class={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
+                  <p className={`tb-jira-sync-message${jiraSkippedChangelogText ? " is-warning" : ""}`}>
                     {jiraSyncMessageText}
                   </p>
                 ) : null}
 
-                <div class="tb-card-actions tb-jira-sync-actions">
+                <div className="tb-card-actions tb-jira-sync-actions">
                   <button
                     type="button"
-                    class="tb-btn tb-btn-sm"
+                    className="tb-btn tb-btn-sm"
                     onClick={openSyncOptions}
                     disabled={isJiraSyncRunning}
                   >
                     Sync Data
                   </button>
-                  <button type="button" class="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
+                  <button type="button" className="tb-btn tb-btn-sm" onClick={openHistoryOverlay}>
                     Sync History
                   </button>
-                  <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
+                  <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(true)}>
                     Diagnostics
                   </button>
                 </div>
@@ -978,16 +977,16 @@ export function IntegrationsScreen() {
             </div>
           </article>
 
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Confluence Connection</h4>
-            <strong class={`tb-value ${confluenceToneClass}`}>{confluenceValue}</strong>
+            <strong className={`tb-value ${confluenceToneClass}`}>{confluenceValue}</strong>
             <p>{confluenceHint}</p>
             <p>Last checked: {formatCheckedAt(confluenceStatus?.checkedAt)}</p>
           </article>
 
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>AI Model Connection</h4>
-            <strong class={`tb-value ${aiToneClass}`}>{aiValue}</strong>
+            <strong className={`tb-value ${aiToneClass}`}>{aiValue}</strong>
             <p>{aiHint}</p>
             <p>Last checked: {formatCheckedAt(aiStatus?.checkedAt)}</p>
             <p>Provider: {aiProviderName}</p>
@@ -996,34 +995,34 @@ export function IntegrationsScreen() {
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Epic Metadata Configuration</h3>
-            <p class="tb-muted-note">Manage reusable epic groups and work types used by epic configuration.</p>
+            <p className="tb-muted-note">Manage reusable epic groups and work types used by epic configuration.</p>
           </div>
         </header>
 
-        {metaError ? <p class="tb-error-note">Epic metadata error: {metaError}</p> : null}
+        {metaError ? <p className="tb-error-note">Epic metadata error: {metaError}</p> : null}
 
-        <div class="tb-lookup-grid">
-          <article class="tb-lookup-card">
+        <div className="tb-lookup-grid">
+          <article className="tb-lookup-card">
             <h4>Epic Groups</h4>
-            <div class="tb-lookup-add-row">
+            <div className="tb-lookup-add-row">
               <input
                 type="text"
                 value={groupDraft}
                 onInput={(event) => setGroupDraft((event.currentTarget as HTMLInputElement).value)}
                 placeholder="Add epic group"
               />
-              <button type="button" class="tb-btn tb-btn-sm" onClick={() => handleAddEpicGroup()}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={() => handleAddEpicGroup()}>
                 Add
               </button>
             </div>
-            <div class="tb-lookup-item-list">
-              {epicLookup.groups.length === 0 ? <span class="tb-chip">No groups</span> : null}
+            <div className="tb-lookup-item-list">
+              {epicLookup.groups.length === 0 ? <span className="tb-chip">No groups</span> : null}
               {epicLookup.groups.map((group) => (
-                <div key={group.id} class="tb-lookup-item-row">
+                <div key={group.id} className="tb-lookup-item-row">
                   {editingGroupId === group.id ? (
                     <input
                       type="text"
@@ -1032,24 +1031,24 @@ export function IntegrationsScreen() {
                       placeholder="Epic group name"
                     />
                   ) : (
-                    <span class="tb-chip">{group.name}</span>
+                    <span className="tb-chip">{group.name}</span>
                   )}
-                  <div class="tb-action-row">
+                  <div className="tb-action-row">
                     {editingGroupId === group.id ? (
                       <>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={() => handleSaveEditedGroup()}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={() => handleSaveEditedGroup()}>
                           Save
                         </button>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={cancelEditGroup}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={cancelEditGroup}>
                           Cancel
                         </button>
                       </>
                     ) : (
                       <>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={() => beginEditGroup(group.id, group.name)}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={() => beginEditGroup(group.id, group.name)}>
                           Edit
                         </button>
-                        <button type="button" class="tb-btn tb-btn-sm tb-btn-danger" onClick={() => requestDeleteGroup(group.id, group.name)}>
+                        <button type="button" className="tb-btn tb-btn-sm tb-btn-danger" onClick={() => requestDeleteGroup(group.id, group.name)}>
                           Delete
                         </button>
                       </>
@@ -1060,23 +1059,23 @@ export function IntegrationsScreen() {
             </div>
           </article>
 
-          <article class="tb-lookup-card">
+          <article className="tb-lookup-card">
             <h4>Work Types</h4>
-            <div class="tb-lookup-add-row">
+            <div className="tb-lookup-add-row">
               <input
                 type="text"
                 value={workTypeDraft}
                 onInput={(event) => setWorkTypeDraft((event.currentTarget as HTMLInputElement).value)}
                 placeholder="Add work type"
               />
-              <button type="button" class="tb-btn tb-btn-sm" onClick={() => handleAddWorkType()}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={() => handleAddWorkType()}>
                 Add
               </button>
             </div>
-            <div class="tb-lookup-item-list">
-              {epicLookup.workTypes.length === 0 ? <span class="tb-chip">No work types</span> : null}
+            <div className="tb-lookup-item-list">
+              {epicLookup.workTypes.length === 0 ? <span className="tb-chip">No work types</span> : null}
               {epicLookup.workTypes.map((workType) => (
-                <div key={workType.id} class="tb-lookup-item-row">
+                <div key={workType.id} className="tb-lookup-item-row">
                   {editingWorkTypeId === workType.id ? (
                     <input
                       type="text"
@@ -1085,24 +1084,24 @@ export function IntegrationsScreen() {
                       placeholder="Work type name"
                     />
                   ) : (
-                    <span class="tb-chip">{workType.name}</span>
+                    <span className="tb-chip">{workType.name}</span>
                   )}
-                  <div class="tb-action-row">
+                  <div className="tb-action-row">
                     {editingWorkTypeId === workType.id ? (
                       <>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={() => handleSaveEditedWorkType()}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={() => handleSaveEditedWorkType()}>
                           Save
                         </button>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={cancelEditWorkType}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={cancelEditWorkType}>
                           Cancel
                         </button>
                       </>
                     ) : (
                       <>
-                        <button type="button" class="tb-btn tb-btn-sm" onClick={() => beginEditWorkType(workType.id, workType.name)}>
+                        <button type="button" className="tb-btn tb-btn-sm" onClick={() => beginEditWorkType(workType.id, workType.name)}>
                           Edit
                         </button>
-                        <button type="button" class="tb-btn tb-btn-sm tb-btn-danger" onClick={() => requestDeleteWorkType(workType.id, workType.name)}>
+                        <button type="button" className="tb-btn tb-btn-sm tb-btn-danger" onClick={() => requestDeleteWorkType(workType.id, workType.name)}>
                           Delete
                         </button>
                       </>
@@ -1116,31 +1115,31 @@ export function IntegrationsScreen() {
       </section>
 
       {metaSuccess ? (
-        <div class="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
-          <div class="tb-overlay-toast is-success">{metaSuccess}</div>
+        <div className="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
+          <div className="tb-overlay-toast is-success">{metaSuccess}</div>
         </div>
       ) : null}
 
       {isJiraDiagnosticsOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Diagnostics">
-          <div class="tb-modal-backdrop" onClick={() => setIsJiraDiagnosticsOpen(false)} />
-          <div class="tb-modal tb-modal-diagnostics">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Diagnostics">
+          <div className="tb-modal-backdrop" onClick={() => setIsJiraDiagnosticsOpen(false)} />
+          <div className="tb-modal tb-modal-diagnostics">
+            <header className="tb-modal-head">
               <div>
                 <h3>Diagnostics</h3>
-                <p class="tb-muted-note">Board and project checks from live API response.</p>
+                <p className="tb-muted-note">Board and project checks from live API response.</p>
               </div>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(false)}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsJiraDiagnosticsOpen(false)}>
                 Close
               </button>
             </header>
 
-            <div class="tb-metrics-grid tb-three-up">
-              <article class="tb-metric-card">
+            <div className="tb-metrics-grid tb-three-up">
+              <article className="tb-metric-card">
                 <h4>Configured Board</h4>
-                <strong class={`tb-value ${jiraStatus?.connected ? "tb-value-good" : "tb-value-warn"}`}>
+                <strong className={`tb-value ${jiraStatus?.connected ? "tb-value-good" : "tb-value-warn"}`}>
                   {configuredBoardUrl ? (
-                    <a class="tb-external-link" href={configuredBoardUrl} target="_blank" rel="noopener noreferrer">
+                    <a className="tb-external-link" href={configuredBoardUrl} target="_blank" rel="noopener noreferrer">
                       {configuredBoardText}
                     </a>
                   ) : (
@@ -1148,11 +1147,11 @@ export function IntegrationsScreen() {
                   )}
                 </strong>
               </article>
-              <article class="tb-metric-card">
+              <article className="tb-metric-card">
                 <h4>Sample Issue</h4>
-                <strong class={`tb-value ${jiraStatus?.sampleIssueKey ? "tb-value-good" : "tb-value-warn"}`}>
+                <strong className={`tb-value ${jiraStatus?.sampleIssueKey ? "tb-value-good" : "tb-value-warn"}`}>
                   {sampleIssueUrl && jiraStatus?.sampleIssueKey ? (
-                    <a class="tb-external-link" href={sampleIssueUrl} target="_blank" rel="noopener noreferrer">
+                    <a className="tb-external-link" href={sampleIssueUrl} target="_blank" rel="noopener noreferrer">
                       {jiraStatus.sampleIssueKey}
                     </a>
                   ) : (
@@ -1160,11 +1159,11 @@ export function IntegrationsScreen() {
                   )}
                 </strong>
               </article>
-              <article class="tb-metric-card">
+              <article className="tb-metric-card">
                 <h4>Configured Project</h4>
-                <strong class={`tb-value ${jiraStatus?.config.projectKey ? "tb-value-good" : "tb-value-warn"}`}>
+                <strong className={`tb-value ${jiraStatus?.config.projectKey ? "tb-value-good" : "tb-value-warn"}`}>
                   {configuredProjectUrl && jiraStatus?.config.projectKey ? (
-                    <a class="tb-external-link" href={configuredProjectUrl} target="_blank" rel="noopener noreferrer">
+                    <a className="tb-external-link" href={configuredProjectUrl} target="_blank" rel="noopener noreferrer">
                       {jiraStatus.config.projectKey}
                     </a>
                   ) : (
@@ -1174,29 +1173,29 @@ export function IntegrationsScreen() {
               </article>
             </div>
 
-            <hr class="tb-section-divider" />
+            <hr className="tb-section-divider" />
 
-            <header class="tb-panel-header">
+            <header className="tb-panel-header">
               <div>
                 <h3>Field Mapping Readiness</h3>
-                <p class="tb-muted-note">Track required custom fields before sync pipelines run.</p>
+                <p className="tb-muted-note">Track required custom fields before sync pipelines run.</p>
               </div>
-              <span class={`tb-status-pill ${jiraStatus?.connected ? "is-good" : "is-warn"}`}>
+              <span className={`tb-status-pill ${jiraStatus?.connected ? "is-good" : "is-warn"}`}>
                 {jiraStatus?.connected ? "JIRA Mapping Loaded" : "Pending Live Check"}
               </span>
             </header>
-            <ul class="tb-integration-list">
+            <ul className="tb-integration-list">
               <li>
-                <span class="tb-integration-label">Story Points</span>
-                <span class="tb-status-pill is-good">{storyPointsField}</span>
+                <span className="tb-integration-label">Story Points</span>
+                <span className="tb-status-pill is-good">{storyPointsField}</span>
               </li>
               <li>
-                <span class="tb-integration-label">Sprint Fields</span>
-                <span class="tb-status-pill is-good">{sprintFields}</span>
+                <span className="tb-integration-label">Sprint Fields</span>
+                <span className="tb-status-pill is-good">{sprintFields}</span>
               </li>
               <li>
-                <span class="tb-integration-label">Epic Link</span>
-                <span class="tb-status-pill is-good">{epicLinkField}</span>
+                <span className="tb-integration-label">Epic Link</span>
+                <span className="tb-status-pill is-good">{epicLinkField}</span>
               </li>
             </ul>
           </div>
@@ -1204,16 +1203,16 @@ export function IntegrationsScreen() {
       ) : null}
 
       {isSyncOptionsOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Start JIRA Sync">
-          <div class="tb-modal-backdrop" onClick={() => setIsSyncOptionsOpen(false)} />
-          <div class="tb-modal tb-modal-sync">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Start JIRA Sync">
+          <div className="tb-modal-backdrop" onClick={() => setIsSyncOptionsOpen(false)} />
+          <div className="tb-modal tb-modal-sync">
+            <header className="tb-modal-head">
               <h3>Start JIRA Sync</h3>
             </header>
-            <p class="tb-muted-note">Choose how much data to refresh before starting the sync.</p>
+            <p className="tb-muted-note">Choose how much data to refresh before starting the sync.</p>
 
-            <div class="tb-sync-option-list">
-              <label class={`tb-sync-option ${selectedSyncMode === "since_last" ? "is-selected" : ""}`}>
+            <div className="tb-sync-option-list">
+              <label className={`tb-sync-option ${selectedSyncMode === "since_last" ? "is-selected" : ""}`}>
                 <input
                   type="radio"
                   name="jira-sync-mode"
@@ -1227,7 +1226,7 @@ export function IntegrationsScreen() {
                 </span>
               </label>
 
-              <label class={`tb-sync-option ${selectedSyncMode === "full" ? "is-selected" : ""}`}>
+              <label className={`tb-sync-option ${selectedSyncMode === "full" ? "is-selected" : ""}`}>
                 <input
                   type="radio"
                   name="jira-sync-mode"
@@ -1241,7 +1240,7 @@ export function IntegrationsScreen() {
                 </span>
               </label>
 
-              <label class={`tb-sync-option ${selectedSyncMode === "since_date" ? "is-selected" : ""}`}>
+              <label className={`tb-sync-option ${selectedSyncMode === "since_date" ? "is-selected" : ""}`}>
                 <input
                   type="radio"
                   name="jira-sync-mode"
@@ -1257,7 +1256,7 @@ export function IntegrationsScreen() {
             </div>
 
             {selectedSyncMode === "since_date" ? (
-              <label class="tb-sync-date-field">
+              <label className="tb-sync-date-field">
                 <span>Start date (UTC)</span>
                 <input
                   type="date"
@@ -1268,17 +1267,17 @@ export function IntegrationsScreen() {
               </label>
             ) : null}
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Last synced: {jiraLastSyncedText}. If no previous sync exists, incremental mode falls back to full sync.
             </p>
 
-            <footer class="tb-modal-actions">
-              <button type="button" class="tb-btn" onClick={() => setIsSyncOptionsOpen(false)}>
+            <footer className="tb-modal-actions">
+              <button type="button" className="tb-btn" onClick={() => setIsSyncOptionsOpen(false)}>
                 Cancel
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-primary"
+                className="tb-btn tb-btn-primary"
                 onClick={() => {
                   if (selectedSyncMode === "since_date" && !selectedSinceDate) {
                     setSyncError("Please select a start date for date-based sync.");
@@ -1300,26 +1299,26 @@ export function IntegrationsScreen() {
       ) : null}
 
       {isHistoryOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="JIRA Sync History">
-          <div class="tb-modal-backdrop" onClick={() => setIsHistoryOpen(false)} />
-          <div class="tb-modal tb-modal-history">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="JIRA Sync History">
+          <div className="tb-modal-backdrop" onClick={() => setIsHistoryOpen(false)} />
+          <div className="tb-modal tb-modal-history">
+            <header className="tb-modal-head">
               <h3>JIRA Sync History</h3>
-              <div class="tb-action-row">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={() => loadJiraSyncHistory()}>
+              <div className="tb-action-row">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={() => loadJiraSyncHistory()}>
                   Refresh
                 </button>
-                <button type="button" class="tb-btn tb-btn-sm" onClick={() => setIsHistoryOpen(false)}>
+                <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsHistoryOpen(false)}>
                   Close
                 </button>
               </div>
             </header>
 
-            {historyError ? <p class="tb-error-note">Failed to load history: {historyError}</p> : null}
-            {historyLoading ? <p class="tb-muted-note">Loading sync history...</p> : null}
+            {historyError ? <p className="tb-error-note">Failed to load history: {historyError}</p> : null}
+            {historyLoading ? <p className="tb-muted-note">Loading sync history...</p> : null}
 
-            <div class="tb-sync-history-wrap">
-              <table class="tb-sync-history-table">
+            <div className="tb-sync-history-wrap">
+              <table className="tb-sync-history-table">
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -1354,21 +1353,21 @@ export function IntegrationsScreen() {
       ) : null}
 
       {pendingLookupDelete ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Confirm Metadata Delete">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Confirm Metadata Delete">
           <div
-            class="tb-modal-backdrop"
+            className="tb-modal-backdrop"
             onClick={() => {
               if (!lookupDeleteLoading) {
                 setPendingLookupDelete(null);
               }
             }}
           />
-          <div class="tb-modal">
-            <header class="tb-modal-head">
+          <div className="tb-modal">
+            <header className="tb-modal-head">
               <h3>{pendingLookupDelete.type === "group" ? "Delete Epic Group" : "Delete Work Type"}</h3>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm"
+                className="tb-btn tb-btn-sm"
                 onClick={() => setPendingLookupDelete(null)}
                 disabled={lookupDeleteLoading}
               >
@@ -1376,17 +1375,17 @@ export function IntegrationsScreen() {
               </button>
             </header>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Are you sure you want to delete <strong>{pendingLookupDelete.name}</strong>?
             </p>
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               This change impacts all epic metadata configuration forms that reference this value.
             </p>
 
-            <footer class="tb-modal-actions">
+            <footer className="tb-modal-actions">
               <button
                 type="button"
-                class="tb-btn"
+                className="tb-btn"
                 onClick={() => setPendingLookupDelete(null)}
                 disabled={lookupDeleteLoading}
               >
@@ -1394,7 +1393,7 @@ export function IntegrationsScreen() {
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-danger"
+                className="tb-btn tb-btn-danger"
                 onClick={() => confirmLookupDelete()}
                 disabled={lookupDeleteLoading}
               >

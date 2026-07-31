@@ -6,7 +6,7 @@ TeamBeacon/
   AGENTS.md
   README.md
   SPEC.md
-  app/                          # Web UI (Oracle JET)
+  app/                          # Web UI (React + Vite)
   docs/
     architecture/ARCHITECTURE.md
     design/teambeacon-ojet-mockups.html
@@ -29,18 +29,18 @@ TeamBeacon/
 ## Build, Test, and Development Commands
 Tooling is minimal right now. Use:
 - `cp config/.env.example config/.env` to initialize local connector config.
-- `cd app && npm run dev` to run OJET UI plus local API for integration endpoints.
+- `cd app && npm run dev` to run the Vite UI plus local API for integration endpoints.
 - `python3 -m services.api.server --host localhost --port 8000` to run API separately (optional).
 - `mkdir -p data && sqlite3 data/teambeacon.db < services/api/db/migrations/0001_initial.sql` to initialize local DB schema.
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
 - `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
 - `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v` for local API integration tests.
 - `RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v` for live integration tests.
-- `cd app && npm run build` for production build validation.
+- `cd app && npm run typecheck && npm run lint && npm run build` for frontend static and production build validation.
 - `cd app && npm run test:coverage` for frontend coverage validation.
 - `docker compose up -d --build` to run the containerized web+API stack (local image mode; builds from `Dockerfile`).
 - `docker build -t teambeacon:local .` to build the distributable TeamBeacon image.
-- `open docs/design/teambeacon-ojet-mockups.html` to review current UI/UX mockups.
+- Review `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` for the active UI direction and parity constraints.
 - `git log --oneline -n 10` to review recent commit conventions.
 
 When frontend or FastAPI tooling changes, add runnable commands to `README.md` and keep this section updated.
@@ -75,7 +75,7 @@ Strict pre-commit quality gate:
 - Run and pass front-end tests for impacted UI workspaces (mandatory for UI changes).
 - Keep combined test coverage for changed code at `90%+`.
 - Run style/lint checks before commit. For current baseline run:
-  - `cd app && npm run build && npm run test:coverage`
+  - `cd app && npm run typecheck && npm run lint && npm run build && npm run test:coverage`
   - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py services/api/*.py services/api/integrations/*.py`
 - If new language/tooling is introduced, add and document an explicit lint command in `README.md` and enforce it in PR validation.
 
@@ -87,5 +87,5 @@ PRs should include:
 
 ## Documentation Maintenance
 - Keep `SPEC.md`, `docs/architecture/ARCHITECTURE.md`, and `docs/plans/PLAN.md` aligned when scope changes.
-- Update `docs/design/teambeacon-ojet-mockups.html` when UI flows materially change.
+- Keep `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` aligned with frontend stack and migration decisions.
 - Add links in `README.md` for any new top-level docs.

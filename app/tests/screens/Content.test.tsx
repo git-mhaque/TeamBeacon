@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
@@ -193,6 +193,16 @@ describe("Content", () => {
       "Team Dashboard",
       "Settings",
     ]);
+    expect(within(nav).getAllByRole("button")).toHaveLength(8);
+    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(8);
+    const navigationToggle = screen.getByRole("button", { name: "Expand navigation" });
+    expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(navigationToggle);
+    expect(screen.getByRole("button", { name: "Collapse navigation" })).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelector(".tb-app-frame")).toHaveClass("is-nav-expanded");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Expand navigation" })).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector(".tb-app-frame")).not.toHaveClass("is-nav-expanded");
 
     expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
     expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
@@ -217,6 +227,9 @@ describe("Content", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
     expect(await screen.findByRole("heading", { name: "Initiative Insights" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Configured Initiative Summary" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Initiative Progress Matrix" })).toBeInTheDocument();
+    expect(screen.queryByText("Attention Queue")).not.toBeInTheDocument();
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Configure Epic" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();

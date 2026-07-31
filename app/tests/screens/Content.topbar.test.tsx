@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 const mockedContentState = vi.hoisted(() => {
@@ -28,7 +28,7 @@ const mockedContentState = vi.hoisted(() => {
 });
 
 vi.mock("../../src/components/content/screens/TeamInsightsScreen", async () => {
-  const { useEffect, useState } = await import("preact/hooks");
+  const { useEffect, useState } = await import("react");
 
   return {
     OPEN_TEAM_INSIGHTS_SETTINGS_EVENT: mockedContentState.openTeamInsightsSettingsEvent,
@@ -77,7 +77,7 @@ vi.mock("../../src/components/content/screens/TeamInsightsScreen", async () => {
 });
 
 vi.mock("../../src/components/content/screens/TeamDashboardScreen", async () => {
-  const { useEffect, useState } = await import("preact/hooks");
+  const { useEffect, useState } = await import("react");
 
   return {
     OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT: mockedContentState.openTeamDashboardReportingPeriodEvent,
@@ -122,7 +122,7 @@ vi.mock("../../src/components/content/screens/TeamDashboardScreen", async () => 
 });
 
 vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
-  const { useEffect, useState } = await import("preact/hooks");
+  const { useEffect, useState } = await import("react");
 
   return {
     OPEN_INITIATIVES_CONFIGURE_EVENT: mockedContentState.openInitiativesConfigureEvent,

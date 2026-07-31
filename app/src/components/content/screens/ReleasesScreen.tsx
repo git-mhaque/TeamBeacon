@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as ChartModule from "chart.js/auto";
 import type { Chart as ChartInstance, ChartConfiguration } from "chart.js";
 import {
@@ -339,10 +338,10 @@ function ReleaseCycleLineChart({
   }, [config]);
 
   return (
-    <div class="tb-release-cycle-chart">
+    <div className="tb-release-cycle-chart">
       <canvas
         ref={canvasRef}
-        class="tb-release-cycle-chart-canvas"
+        className="tb-release-cycle-chart-canvas"
         role="img"
         aria-label="Release cycle time line chart"
         data-testid="release-cycle-time-chart"
@@ -572,55 +571,55 @@ export function ReleasesScreen() {
     }];
 
   return (
-    <div class="tb-screen-grid">
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+    <div className="tb-screen-grid">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Release Overview</h3>
           </div>
         </header>
 
-        <div class="tb-metrics-grid tb-four-up">
-          <article class="tb-metric-card">
+        <div className="tb-metrics-grid tb-four-up">
+          <article className="tb-metric-card">
             <h4>Ongoing Releases</h4>
-            <strong class="tb-value">
+            <strong className="tb-value">
               {insights.metrics.ongoingCount}
             </strong>
             <p>Active releases currently tracked.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Overdue Releases</h4>
-            <strong class={`tb-value ${insights.metrics.overdueCount > 0 ? "tb-value-risk" : "tb-value-good"}`}>
+            <strong className={`tb-value ${insights.metrics.overdueCount > 0 ? "tb-value-risk" : "tb-value-good"}`}>
               {insights.metrics.overdueCount}
             </strong>
             <p>{insights.metrics.dueSoonCount} due soon.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Avg Cycle Time</h4>
-            <strong class="tb-value">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
+            <strong className="tb-value">{formatDays(insights.metrics.avgCycleTimeDays)}</strong>
             <p>Completed releases with start and release dates.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Release Cadence</h4>
-            <strong class="tb-value">{formatDays(insights.metrics.avgCadenceDays)}</strong>
+            <strong className="tb-value">{formatDays(insights.metrics.avgCadenceDays)}</strong>
             <p>Average days between releases.</p>
           </article>
         </div>
 
-        {error ? <p class="tb-error-note">{error}</p> : null}
+        {error ? <p className="tb-error-note">{error}</p> : null}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Release Cycle Time Trend</h3>
-            <p class="tb-muted-note">Selected completed releases from start date to release date.</p>
+            <p className="tb-muted-note">Selected completed releases from start date to release date.</p>
           </div>
-          <div class="tb-panel-header-actions tb-release-cycle-actions">
-            <span class="tb-chip">{selectedTrendReleases.length} shown</span>
+          <div className="tb-panel-header-actions tb-release-cycle-actions">
+            <span className="tb-chip">{selectedTrendReleases.length} shown</span>
             <button
               type="button"
-              class="tb-btn tb-btn-sm"
+              className="tb-btn tb-btn-sm"
               disabled={sortedRecentReleases.length === 0}
               onClick={openReleaseSelector}
             >
@@ -630,8 +629,8 @@ export function ReleasesScreen() {
         </header>
 
         {selectedTrendReleases.length > 0 ? (
-          <div class="tb-release-cycle-view">
-            <div class="tb-release-cycle-summary">
+          <div className="tb-release-cycle-view">
+            <div className="tb-release-cycle-summary">
               <article>
                 <span>Measured</span>
                 <strong>{selectedCycleTimes.length}/{selectedTrendReleases.length}</strong>
@@ -650,22 +649,22 @@ export function ReleasesScreen() {
               </article>
             </div>
 
-            <div class="tb-release-cycle-chart-frame" data-testid="release-cycle-time-trend">
+            <div className="tb-release-cycle-chart-frame" data-testid="release-cycle-time-trend">
               <ReleaseCycleLineChart
                 releases={chartReleases}
                 averageCycleTime={selectedAverageCycleTime}
                 maxCycleTime={maxSelectedCycleTime}
               />
-              <div class="tb-release-cycle-legend" aria-label="Release cycle chart legend">
-                <span><i class="tb-release-cycle-line-swatch" />Cycle time</span>
-                <span><i class="tb-release-cycle-average-swatch" />Average</span>
-                <span><i class="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
+              <div className="tb-release-cycle-legend" aria-label="Release cycle chart legend">
+                <span><i className="tb-release-cycle-line-swatch" />Cycle time</span>
+                <span><i className="tb-release-cycle-average-swatch" />Average</span>
+                <span><i className="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
               </div>
-              <p class="tb-trend-x-axis-label">Oldest to newest among selected releases</p>
+              <p className="tb-trend-x-axis-label">Oldest to newest among selected releases</p>
             </div>
 
             {releasesWithMissingCycleTime.length > 0 ? (
-              <div class="tb-release-cycle-gaps" role="list" aria-label="Release cycle missing values">
+              <div className="tb-release-cycle-gaps" role="list" aria-label="Release cycle missing values">
                 {releasesWithMissingCycleTime.map(({ release, reason }) => (
                   <span key={release.versionId} role="listitem">
                     {release.name}: {reason}
@@ -674,7 +673,7 @@ export function ReleasesScreen() {
               </div>
             ) : null}
 
-            <div class="tb-release-cycle-key" role="list" aria-label="Line chart release labels">
+            <div className="tb-release-cycle-key" role="list" aria-label="Line chart release labels">
               {chartReleases.map((release, index) => (
                 <span key={release.versionId} role="listitem">
                   <strong>{compactReleaseLabel(index)}</strong>
@@ -684,30 +683,30 @@ export function ReleasesScreen() {
             </div>
           </div>
         ) : (
-          <div class="tb-summary">
+          <div className="tb-summary">
             Select completed releases to show the cycle-time trend.
           </div>
         )}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Ongoing Releases</h3>
-            <p class="tb-muted-note">Readiness and delivery risk for active, non-archived releases.</p>
+            <p className="tb-muted-note">Readiness and delivery risk for active, non-archived releases.</p>
           </div>
         </header>
 
         {sortedOngoingReleases.length > 0 ? (
-          <div class="tb-release-table-wrap">
-            <table class="tb-release-table">
+          <div className="tb-release-table-wrap">
+            <table className="tb-release-table">
               <thead>
                 <tr>
                   <th>Release</th>
                   <th>Target</th>
-                  <th class="is-numeric">Age</th>
-                  <th class="is-readiness">Readiness</th>
-                  <th class="is-numeric">Scope</th>
+                  <th className="is-numeric">Age</th>
+                  <th className="is-readiness">Readiness</th>
+                  <th className="is-numeric">Scope</th>
                   <th>Risk</th>
                 </tr>
               </thead>
@@ -715,29 +714,29 @@ export function ReleasesScreen() {
                 {sortedOngoingReleases.map((release) => (
                   <tr key={release.versionId}>
                     <td>
-                      <div class="tb-release-name-cell">
+                      <div className="tb-release-name-cell">
                         <strong>{release.name}</strong>
                         <span>{releaseSecondaryLine(release)}</span>
                       </div>
                     </td>
                     <td>{formatDate(release.releaseDate)}</td>
-                    <td class="tb-release-numeric">{formatDays(release.ageDays)}</td>
+                    <td className="tb-release-numeric">{formatDays(release.ageDays)}</td>
                     <td>
-                      <div class="tb-release-readiness">
-                        <div class="tb-release-readiness-track">
+                      <div className="tb-release-readiness">
+                        <div className="tb-release-readiness-track">
                           <span style={{ width: `${Math.max(0, Math.min(100, release.readinessPercent))}%` }} />
                         </div>
                         <span>{formatPercent(release.readinessPercent)} | {readinessLabel(release)}</span>
                       </div>
                     </td>
-                    <td class="tb-release-numeric">
+                    <td className="tb-release-numeric">
                       {release.issueCount} / {formatStoryPoints(release.storyPoints)}
                     </td>
                     <td>
-                      <span class={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>
+                      <span className={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>
                         {release.riskLevel}
                       </span>
-                      <p class="tb-release-risk-detail">{release.riskSummary}</p>
+                      <p className="tb-release-risk-detail">{release.riskSummary}</p>
                     </td>
                   </tr>
                 ))}
@@ -745,45 +744,45 @@ export function ReleasesScreen() {
             </table>
           </div>
         ) : (
-          <div class="tb-summary">No ongoing releases found in the current sync.</div>
+          <div className="tb-summary">No ongoing releases found in the current sync.</div>
         )}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Release Risk Signals</h3>
-            <p class="tb-muted-note">Signals derived from dates, readiness, and linked release scope.</p>
+            <p className="tb-muted-note">Signals derived from dates, readiness, and linked release scope.</p>
           </div>
         </header>
-        <div class="tb-release-risk-grid">
+        <div className="tb-release-risk-grid">
           {visibleRiskSignals.map((signal) => (
-            <article key={`${signal.title}-${signal.detail}`} class="tb-metric-card">
+            <article key={`${signal.title}-${signal.detail}`} className="tb-metric-card">
               <h4>{signal.title}</h4>
-              <strong class={`tb-release-risk-heading ${riskValueClass(signal.level)}`}>{signal.level}</strong>
+              <strong className={`tb-release-risk-heading ${riskValueClass(signal.level)}`}>{signal.level}</strong>
               <p>{signal.detail}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Recent Completed Releases</h3>
-            <p class="tb-muted-note">Delivered scope, cycle time, and completion quality for completed releases.</p>
+            <p className="tb-muted-note">Delivered scope, cycle time, and completion quality for completed releases.</p>
           </div>
         </header>
 
         {recentCompletedReleases.length > 0 ? (
-          <div class="tb-initiative-table-wrap tb-release-recent-table-wrap">
-            <table class="tb-initiative-table tb-release-recent-table" aria-label="Recent completed releases">
+          <div className="tb-initiative-table-wrap tb-release-recent-table-wrap">
+            <table className="tb-initiative-table tb-release-recent-table" aria-label="Recent completed releases">
               <thead>
                 <tr>
                   <th>Release</th>
                   <th>Released</th>
-                  <th class="tb-release-recent-numeric">Cycle Time</th>
-                  <th class="tb-release-recent-numeric">Scope</th>
+                  <th className="tb-release-recent-numeric">Cycle Time</th>
+                  <th className="tb-release-recent-numeric">Scope</th>
                   <th>Completion</th>
                   <th>Mix</th>
                   <th>Risk</th>
@@ -793,28 +792,28 @@ export function ReleasesScreen() {
                 {recentCompletedReleases.map((release) => (
                   <tr key={release.versionId}>
                     <td>
-                      <div class="tb-release-name-cell">
+                      <div className="tb-release-name-cell">
                         <strong>{release.name}</strong>
                         <span>{formatDate(release.startDate)} to {formatDate(release.releaseDate)}</span>
                       </div>
                     </td>
                     <td>{formatDate(release.releaseDate)}</td>
-                    <td class="tb-release-recent-numeric">{cycleTimeStatusLabel(release)}</td>
-                    <td class="tb-release-recent-numeric">
+                    <td className="tb-release-recent-numeric">{cycleTimeStatusLabel(release)}</td>
+                    <td className="tb-release-recent-numeric">
                       {release.issueCount} cards / {formatStoryPoints(release.doneStoryPoints)}
                     </td>
                     <td>
-                      <div class="tb-release-readiness">
-                        <div class="tb-release-readiness-track">
+                      <div className="tb-release-readiness">
+                        <div className="tb-release-readiness-track">
                           <span style={{ width: `${Math.max(0, Math.min(100, release.readinessPercent))}%` }} />
                         </div>
                         <span>{formatPercent(release.readinessPercent)} | {readinessLabel(release)}</span>
                       </div>
                     </td>
-                    <td class="tb-release-mix-cell">{releaseMixLabel(release)}</td>
+                    <td className="tb-release-mix-cell">{releaseMixLabel(release)}</td>
                     <td>
-                      <span class={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>{release.riskLevel}</span>
-                      <p class="tb-release-risk-detail">{release.riskSummary}</p>
+                      <span className={`tb-release-risk ${riskToneClass(release.riskLevel)}`}>{release.riskLevel}</span>
+                      <p className="tb-release-risk-detail">{release.riskSummary}</p>
                     </td>
                   </tr>
                 ))}
@@ -822,70 +821,70 @@ export function ReleasesScreen() {
             </table>
           </div>
         ) : (
-          <div class="tb-summary">No completed releases with linked scope are available yet.</div>
+          <div className="tb-summary">No completed releases with linked scope are available yet.</div>
         )}
       </section>
 
       {isReleaseSelectorOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Releases">
-          <div class="tb-modal-backdrop" onClick={closeReleaseSelector} />
-          <div class="tb-modal tb-modal-wide tb-release-selector-modal">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Releases">
+          <div className="tb-modal-backdrop" onClick={closeReleaseSelector} />
+          <div className="tb-modal tb-modal-wide tb-release-selector-modal">
+            <header className="tb-modal-head">
               <div>
                 <h3>Select Releases</h3>
-                <p class="tb-muted-note">Completed releases available from the local sync.</p>
+                <p className="tb-muted-note">Completed releases available from the local sync.</p>
               </div>
-              <span class="tb-chip">{draftSelectedReleaseIds.length} selected</span>
+              <span className="tb-chip">{draftSelectedReleaseIds.length} selected</span>
             </header>
 
-            <div class="tb-release-selector-toolbar">
+            <div className="tb-release-selector-toolbar">
               <input
-                class="tb-release-selector-search"
+                className="tb-release-selector-search"
                 type="search"
                 aria-label="Search releases"
                 placeholder="Search releases"
                 value={releaseSelectorSearch}
                 onInput={(event) => setReleaseSelectorSearch((event.currentTarget as HTMLInputElement).value)}
               />
-              <div class="tb-release-selector-actions">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={selectAllDraftReleases}>
+              <div className="tb-release-selector-actions">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={selectAllDraftReleases}>
                   Select all
                 </button>
-                <button type="button" class="tb-btn tb-btn-sm" onClick={clearDraftReleases}>
+                <button type="button" className="tb-btn tb-btn-sm" onClick={clearDraftReleases}>
                   Clear
                 </button>
               </div>
             </div>
 
-            <div class="tb-release-selector-list" role="group" aria-label="Completed release selection">
+            <div className="tb-release-selector-list" role="group" aria-label="Completed release selection">
               {filteredSelectorReleases.length > 0 ? (
                 filteredSelectorReleases.map((release) => (
-                  <label key={release.versionId} class="tb-release-selector-option">
+                  <label key={release.versionId} className="tb-release-selector-option">
                     <input
                       type="checkbox"
                       checked={draftSelectedReleaseIdSet.has(release.versionId)}
                       onChange={() => toggleDraftRelease(release.versionId)}
                     />
-                    <span class="tb-release-selector-option-copy">
+                    <span className="tb-release-selector-option-copy">
                       <strong>{release.name}</strong>
                       <span>{formatDate(release.releaseDate)} | {cycleTimeStatusLabel(release)}</span>
                     </span>
                   </label>
                 ))
               ) : (
-                <div class="tb-summary tb-release-selector-empty">
+                <div className="tb-summary tb-release-selector-empty">
                   No releases match this search.
                 </div>
               )}
             </div>
 
-            <footer class="tb-modal-actions">
-              <button type="button" class="tb-btn" onClick={closeReleaseSelector}>
+            <footer className="tb-modal-actions">
+              <button type="button" className="tb-btn" onClick={closeReleaseSelector}>
                 Cancel
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-primary"
+                className="tb-btn tb-btn-primary"
                 disabled={draftSelectedReleaseIds.length === 0}
                 onClick={applyReleaseSelection}
               >

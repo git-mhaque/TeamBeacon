@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { vi } from "vitest";
 import { IntegrationsScreen } from "../../src/components/content/screens/IntegrationsScreen";

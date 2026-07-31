@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { SprintBoardScreen } from "../../src/components/content/screens/SprintBoardScreen";
 import { setupFetchMock } from "../utils/fetchMock";
 

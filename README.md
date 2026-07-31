@@ -47,7 +47,7 @@ For product messaging, capability narrative, and value framing, see:
 ## 🧱 Repository Layout
 ```text
 TeamBeacon/                  # Repository root
-  app/                       # Oracle JET web frontend
+  app/                       # React + Vite web frontend
   services/                  # Runtime services
     api/                     # Local API endpoints and orchestration
   packages/                  # Shared Python packages
@@ -130,6 +130,7 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```bash
 cd app
 npm run build
+npm run lint
 npm run test:coverage
 ```
 
@@ -138,7 +139,7 @@ npm run test:coverage
 - Checks:
   - Backend unit tests
   - Backend API integration tests
-  - Frontend (OJET) build + coverage tests: `cd app && npm ci && npm run build && npm run test:coverage`
+  - Frontend typecheck, React/Vite build, lint, and coverage tests
   - Docker image build on PRs; build + publish to GHCR on `main`
 
 ## 📚 Documentation

@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   chatWithOciGenAi,
   EpicSummaryReportingPeriod,
@@ -363,7 +362,7 @@ function buildTeamDashboardExportHtml(params: {
 }): string {
   const completedSections = params.completedWork.length > 0
     ? params.completedWork.map((entry) => `
-        <section class="section-block">
+        <section className="section-block">
           <h4>${escapeHtml(entry.group)}</h4>
           <ul>
             ${entry.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
@@ -371,7 +370,7 @@ function buildTeamDashboardExportHtml(params: {
         </section>
       `).join("")
     : `
-      <section class="section-block">
+      <section className="section-block">
         <h4>No Completed Work</h4>
         <ul><li>No completed work summary is available for this period.</li></ul>
       </section>
@@ -390,16 +389,16 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.name)}</td>
           <td>${row.completedInPeriod}</td>
           <td>
-            <div class="mix-bar-cell">
-              <span class="mix-bar-track">
-                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+            <div className="mix-bar-cell">
+              <span className="mix-bar-track">
+                <span className="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
               </span>
-              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+              <span className="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
             </div>
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="3" class="empty">No group mix data available.</td></tr>`;
+    : `<tr><td colspan="3" className="empty">No group mix data available.</td></tr>`;
 
   const typeRows = params.typeMixRows.length > 0
     ? params.typeMixRows.map((row, index) => `
@@ -407,16 +406,16 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.name)}</td>
           <td>${row.completedInPeriod}</td>
           <td>
-            <div class="mix-bar-cell">
-              <span class="mix-bar-track">
-                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+            <div className="mix-bar-cell">
+              <span className="mix-bar-track">
+                <span className="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
               </span>
-              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+              <span className="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
             </div>
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="3" class="empty">No work-type mix data available.</td></tr>`;
+    : `<tr><td colspan="3" className="empty">No work-type mix data available.</td></tr>`;
 
   const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
 
@@ -428,26 +427,26 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.group)}</td>
           <td>${escapeHtml(row.initiative)}</td>
           <td>
-            <div class="progress-cell">
-              <span class="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
-              <span class="progress-track">
-                <span class="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
+            <div className="progress-cell">
+              <span className="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
+              <span className="progress-track">
+                <span className="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
               </span>
             </div>
           </td>
           <td>
-            <div class="progress-cell">
-              <span class="progress-label">${escapeHtml(row.overallProgressLabel)}</span>
-              <span class="progress-track">
-                <span class="progress-fill progress-overall ${ragClass}" style="width:${clampPercent(row.overallProgressPercent).toFixed(1)}%;"></span>
+            <div className="progress-cell">
+              <span className="progress-label">${escapeHtml(row.overallProgressLabel)}</span>
+              <span className="progress-track">
+                <span className="progress-fill progress-overall ${ragClass}" style="width:${clampPercent(row.overallProgressPercent).toFixed(1)}%;"></span>
               </span>
             </div>
           </td>
-          <td class="${ragClass}">${escapeHtml(row.rag)}</td>
+          <td className="${ragClass}">${escapeHtml(row.rag)}</td>
         </tr>
       `;
     }).join("")
-    : `<tr><td colspan="5" class="empty">No initiatives selected for this export.</td></tr>`;
+    : `<tr><td colspan="5" className="empty">No initiatives selected for this export.</td></tr>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -818,25 +817,25 @@ function buildTeamDashboardExportHtml(params: {
       }
     </style>
   </head>
-  <body class="${modeClass}">
-    <main class="page">
-      <section class="hero">
+  <body className="${modeClass}">
+    <main className="page">
+      <section className="hero">
         <h1>Team Dashboard</h1>
-        <div class="meta">
-          <span class="chip">Reporting Period: ${escapeHtml(params.reportingPeriodLabel)}</span>
-          <span class="chip">${params.reportingPeriodDays} day(s) | ${escapeHtml(params.timezone)}</span>
-          <span class="chip">Generated: ${escapeHtml(formatDraftTimestamp(params.generatedAt))}</span>
+        <div className="meta">
+          <span className="chip">Reporting Period: ${escapeHtml(params.reportingPeriodLabel)}</span>
+          <span className="chip">${params.reportingPeriodDays} day(s) | ${escapeHtml(params.timezone)}</span>
+          <span className="chip">Generated: ${escapeHtml(formatDraftTimestamp(params.generatedAt))}</span>
         </div>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Executive Summary</h2>
-        <p class="summary">${escapeHtml(params.executiveSummary)}</p>
+        <p className="summary">${escapeHtml(params.executiveSummary)}</p>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Wins and Risks</h2>
-        <div class="grid-2">
+        <div className="grid-2">
           <section>
             <h3>Wins</h3>
             <ul>${winsList}</ul>
@@ -848,34 +847,34 @@ function buildTeamDashboardExportHtml(params: {
         </div>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Report Signals</h2>
-        <div class="signals">
-          <article class="metric">
-            <div class="label">Ongoing Initiatives</div>
-            <div class="value">${params.totalInitiatives}</div>
-            <p class="metric-note">Included for this reporting period.</p>
+        <div className="signals">
+          <article className="metric">
+            <div className="label">Ongoing Initiatives</div>
+            <div className="value">${params.totalInitiatives}</div>
+            <p className="metric-note">Included for this reporting period.</p>
           </article>
-          <article class="metric">
-            <div class="label">Period Progress</div>
-            <div class="value ${params.totalCompletedInPeriod > 0 ? "value-good" : "value-warn"}">${params.totalCompletedInPeriod} cards</div>
-            <p class="metric-note">Completed in the selected reporting period.</p>
+          <article className="metric">
+            <div className="label">Period Progress</div>
+            <div className="value ${params.totalCompletedInPeriod > 0 ? "value-good" : "value-warn"}">${params.totalCompletedInPeriod} cards</div>
+            <p className="metric-note">Completed in the selected reporting period.</p>
           </article>
-          <article class="metric">
-            <div class="label">Initiative RAG</div>
-            <div class="value value-rag">
-              <span class="rag-breakdown">
-                <span class="rag-red">${params.redCount} R</span>
-                <span class="rag-amber">${params.amberCount} A</span>
-                <span class="rag-green">${params.greenCount} G</span>
+          <article className="metric">
+            <div className="label">Initiative RAG</div>
+            <div className="value value-rag">
+              <span className="rag-breakdown">
+                <span className="rag-red">${params.redCount} R</span>
+                <span className="rag-amber">${params.amberCount} A</span>
+                <span className="rag-green">${params.greenCount} G</span>
               </span>
             </div>
-            <p class="metric-note">For selected initiatives.</p>
+            <p className="metric-note">For selected initiatives.</p>
           </article>
         </div>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Progress for Key Initiatives</h2>
         <table>
           <thead>
@@ -891,9 +890,9 @@ function buildTeamDashboardExportHtml(params: {
         </table>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Work Mix by Group and Type</h2>
-        <div class="section-stack">
+        <div className="section-stack">
           <section>
             <h3>By Group</h3>
             <table>
@@ -915,12 +914,12 @@ function buildTeamDashboardExportHtml(params: {
         </div>
       </section>
 
-      <section class="panel">
+      <section className="panel">
         <h2>Completed Work Summary</h2>
-        <div class="section-stack">${completedSections}</div>
+        <div className="section-stack">${completedSections}</div>
       </section>
 
-      <p class="footer">Generated by TeamBeacon Team Dashboard</p>
+      <p className="footer">Generated by TeamBeacon Team Dashboard</p>
     </main>
   </body>
 </html>`;
@@ -2616,20 +2615,20 @@ export function TeamDashboardScreen() {
   }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
 
   return (
-    <div class="tb-screen-grid">
-      <p class="tb-muted-note tb-exec-reporting-period-note">
+    <div className="tb-screen-grid">
+      <p className="tb-muted-note tb-exec-reporting-period-note">
         Reporting period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
       </p>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Executive Summary</h3>
           </div>
-          <div class="tb-btn-row">
+          <div className="tb-btn-row">
             <button
               type="button"
-              class="tb-btn tb-btn-sm tb-no-print"
+              className="tb-btn tb-btn-sm tb-no-print"
               onClick={refreshExecutiveSummary}
               disabled={executiveSummaryLoading}
             >
@@ -2638,33 +2637,33 @@ export function TeamDashboardScreen() {
           </div>
         </header>
 
-        <div class={`tb-summary tb-summary-plain${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
+        <div className={`tb-summary tb-summary-plain${executiveSummaryLoading ? " is-loading" : ""}`} aria-live="polite">
           {executiveSummaryLoading ? (
             <p>Generating executive summary with {aiProviderName}...</p>
           ) : (
             <p>{executiveSummaryDraft}</p>
           )}
         </div>
-        <hr class="tb-section-divider" />
-        <div class="tb-exec-summary-meta">
+        <hr className="tb-section-divider" />
+        <div className="tb-exec-summary-meta">
           <span>Generated with {aiProviderName}</span>
           <span>Model: {executiveSummaryModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(executiveSummaryGeneratedAt)}</span>
           <span>{executiveSummaryWordCount} words</span>
         </div>
-        {executiveSummaryError ? <p class="tb-error-note">Executive summary draft error: {executiveSummaryError}</p> : null}
-        {error ? <p class="tb-error-note">Executive report error: {error}</p> : null}
+        {executiveSummaryError ? <p className="tb-error-note">Executive summary draft error: {executiveSummaryError}</p> : null}
+        {error ? <p className="tb-error-note">Executive report error: {error}</p> : null}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Wins and Risks</h3>
           </div>
-          <div class="tb-btn-row">
+          <div className="tb-btn-row">
             <button
               type="button"
-              class="tb-btn tb-btn-sm tb-no-print"
+              className="tb-btn tb-btn-sm tb-no-print"
               onClick={refreshWinsRisks}
               disabled={winsRisksLoading}
             >
@@ -2673,12 +2672,12 @@ export function TeamDashboardScreen() {
           </div>
         </header>
 
-        {winsRisksError ? <p class="tb-error-note">Wins and risks draft error: {winsRisksError}</p> : null}
+        {winsRisksError ? <p className="tb-error-note">Wins and risks draft error: {winsRisksError}</p> : null}
 
-        <div class="tb-exec-two-up">
+        <div className="tb-exec-two-up">
           <div>
-            <h4 class="tb-exec-list-title">Wins</h4>
-            <ul class="tb-list tb-exec-narrative-list">
+            <h4 className="tb-exec-list-title">Wins</h4>
+            <ul className="tb-list tb-exec-narrative-list">
               {winsDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -2687,8 +2686,8 @@ export function TeamDashboardScreen() {
             </ul>
           </div>
           <div>
-            <h4 class="tb-exec-list-title">Risks</h4>
-            <ul class="tb-list tb-exec-narrative-list">
+            <h4 className="tb-exec-list-title">Risks</h4>
+            <ul className="tb-list tb-exec-narrative-list">
               {risksDraft.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -2697,8 +2696,8 @@ export function TeamDashboardScreen() {
               </ul>
           </div>
         </div>
-        <hr class="tb-section-divider" />
-        <div class="tb-exec-summary-meta">
+        <hr className="tb-section-divider" />
+        <div className="tb-exec-summary-meta">
           <span>Generated with {aiProviderName}</span>
           <span>Model: {winsRisksModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(winsRisksGeneratedAt)}</span>
@@ -2706,38 +2705,38 @@ export function TeamDashboardScreen() {
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Report Signals</h3>
-            <p class="tb-muted-note">High-level confidence snapshot for final review.</p>
+            <p className="tb-muted-note">High-level confidence snapshot for final review.</p>
           </div>
         </header>
-        <div class="tb-metrics-grid tb-three-up">
-          <article class="tb-metric-card">
+        <div className="tb-metrics-grid tb-three-up">
+          <article className="tb-metric-card">
             <h4>Ongoing Initiatives</h4>
-            <strong class="tb-value">{loading ? "..." : visibleInitiativeSignals.totalEpics}</strong>
+            <strong className="tb-value">{loading ? "..." : visibleInitiativeSignals.totalEpics}</strong>
             <p>Selected for Progress for Key Initiatives.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Period Progress</h4>
-            <strong class={`tb-value ${visibleInitiativeSignals.totalCompletedInPeriod > 0 ? "tb-value-good" : "tb-value-warn"}`}>
+            <strong className={`tb-value ${visibleInitiativeSignals.totalCompletedInPeriod > 0 ? "tb-value-good" : "tb-value-warn"}`}>
               {loading ? "..." : `${visibleInitiativeSignals.totalCompletedInPeriod} cards`}
             </strong>
             <p>Completed in the selected reporting period.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Initiative RAG</h4>
-            <strong class="tb-value tb-value-rag">
+            <strong className="tb-value tb-value-rag">
               {loading ? (
                 "..."
               ) : (
-                <span class="tb-initiative-rag-breakdown">
-                  <span class="tb-initiative-rag-text tb-initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
-                  <span class="tb-initiative-rag-separator">|</span>
-                  <span class="tb-initiative-rag-text tb-initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
-                  <span class="tb-initiative-rag-separator">|</span>
-                  <span class="tb-initiative-rag-text tb-initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
+                <span className="tb-initiative-rag-breakdown">
+                  <span className="tb-initiative-rag-text tb-initiative-rag-red">{visibleInitiativeSignals.redCount} Red</span>
+                  <span className="tb-initiative-rag-separator">|</span>
+                  <span className="tb-initiative-rag-text tb-initiative-rag-amber">{visibleInitiativeSignals.amberCount} Amber</span>
+                  <span className="tb-initiative-rag-separator">|</span>
+                  <span className="tb-initiative-rag-text tb-initiative-rag-green">{visibleInitiativeSignals.greenCount} Green</span>
                 </span>
               )}
             </strong>
@@ -2746,16 +2745,16 @@ export function TeamDashboardScreen() {
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Progress for Key Initiatives</h3>
-            <p class="tb-muted-note">Selected initiatives used for executive narrative generation.</p>
+            <p className="tb-muted-note">Selected initiatives used for executive narrative generation.</p>
           </div>
         </header>
 
-        <div class="tb-sync-history-wrap tb-sync-history-wrap-no-scroll">
-          <table class="tb-sync-history-table">
+        <div className="tb-sync-history-wrap tb-sync-history-wrap-no-scroll">
+          <table className="tb-sync-history-table">
             <thead>
               <tr>
                 <th>Group</th>
@@ -2772,7 +2771,7 @@ export function TeamDashboardScreen() {
                   <td>
                     {jiraBaseUrl ? (
                       <a
-                        class="tb-external-link"
+                        className="tb-external-link"
                         href={`${jiraBaseUrl}/browse/${row.epicKey}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -2787,15 +2786,15 @@ export function TeamDashboardScreen() {
                     {row.completedInPeriodValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
                   </td>
                   <td>
-                    <div class="tb-history-progress">
-                      <span class="tb-history-progress-track">
-                        <span class="tb-history-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
+                    <div className="tb-history-progress">
+                      <span className="tb-history-progress-track">
+                        <span className="tb-history-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
                       </span>
-                      <span class="tb-history-progress-label">{formatPercent(row.completionPercent)}</span>
+                      <span className="tb-history-progress-label">{formatPercent(row.completionPercent)}</span>
                     </div>
                   </td>
                   <td title={row.ragTooltip}>
-                    <span class={`tb-status-pill ${ragToneClass(row.rag)}`}>{row.rag}</span>
+                    <span className={`tb-status-pill ${ragToneClass(row.rag)}`}>{row.rag}</span>
                   </td>
                 </tr>
               ))}
@@ -2813,20 +2812,20 @@ export function TeamDashboardScreen() {
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Work Mix by Group and Type</h3>
-            <p class="tb-muted-note">Share of completed cards in the selected reporting period.</p>
+            <p className="tb-muted-note">Share of completed cards in the selected reporting period.</p>
           </div>
         </header>
 
-        <div class="tb-exec-workmix-stack">
-          <section class="tb-exec-workmix-row">
+        <div className="tb-exec-workmix-stack">
+          <section className="tb-exec-workmix-row">
             <div>
-              <h4 class="tb-exec-list-title">Groups</h4>
-              <div class="tb-sync-history-wrap">
-                <table class="tb-sync-history-table">
+              <h4 className="tb-exec-list-title">Groups</h4>
+              <div className="tb-sync-history-wrap">
+                <table className="tb-sync-history-table">
                   <thead>
                     <tr>
                       <th>Group</th>
@@ -2852,20 +2851,20 @@ export function TeamDashboardScreen() {
               </div>
             </div>
             <div>
-              <h4 class="tb-exec-list-title">Group Mix</h4>
-              <div class="tb-exec-donut-wrap">
+              <h4 className="tb-exec-list-title">Group Mix</h4>
+              <div className="tb-exec-donut-wrap">
                 <div
-                  class="tb-exec-donut"
+                  className="tb-exec-donut"
                   style={{ background: buildDonutBackground(groupDistributionSlices) }}
                   role="img"
                   aria-label="Group effort distribution chart"
                 >
                   {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
                 </div>
-                <ul class="tb-exec-donut-legend">
+                <ul className="tb-exec-donut-legend">
                   {groupDistributionSlices.map((slice) => (
                     <li key={slice.label}>
-                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
                       <span>{slice.label}</span>
                       <span>{formatPercent(slice.percent)}</span>
                     </li>
@@ -2875,11 +2874,11 @@ export function TeamDashboardScreen() {
             </div>
           </section>
 
-          <section class="tb-exec-workmix-row">
+          <section className="tb-exec-workmix-row">
             <div>
-              <h4 class="tb-exec-list-title">Types</h4>
-              <div class="tb-sync-history-wrap">
-                <table class="tb-sync-history-table">
+              <h4 className="tb-exec-list-title">Types</h4>
+              <div className="tb-sync-history-wrap">
+                <table className="tb-sync-history-table">
                   <thead>
                     <tr>
                       <th>Type</th>
@@ -2905,20 +2904,20 @@ export function TeamDashboardScreen() {
               </div>
             </div>
             <div>
-              <h4 class="tb-exec-list-title">Type Mix</h4>
-              <div class="tb-exec-donut-wrap">
+              <h4 className="tb-exec-list-title">Type Mix</h4>
+              <div className="tb-exec-donut-wrap">
                 <div
-                  class="tb-exec-donut"
+                  className="tb-exec-donut"
                   style={{ background: buildDonutBackground(typeDistributionSlices) }}
                   role="img"
                   aria-label="Type effort distribution chart"
                 >
                   {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
                 </div>
-                <ul class="tb-exec-donut-legend">
+                <ul className="tb-exec-donut-legend">
                   {typeDistributionSlices.map((slice) => (
                     <li key={slice.label}>
-                      <span class="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
                       <span>{slice.label}</span>
                       <span>{formatPercent(slice.percent)}</span>
                     </li>
@@ -2930,15 +2929,15 @@ export function TeamDashboardScreen() {
         </div>
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Completed Work Summary</h3>
           </div>
-          <div class="tb-btn-row">
+          <div className="tb-btn-row">
             <button
               type="button"
-              class="tb-btn tb-btn-sm tb-no-print"
+              className="tb-btn tb-btn-sm tb-no-print"
               onClick={refreshCompletedWorkSummary}
               disabled={completedWorkLoading}
             >
@@ -2947,26 +2946,26 @@ export function TeamDashboardScreen() {
           </div>
         </header>
 
-        {completedWorkError ? <p class="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
+        {completedWorkError ? <p className="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
 
-        <div class="tb-exec-completed-summary">
+        <div className="tb-exec-completed-summary">
           {completedWorkDraft.map((entry) => (
             <div key={entry.group}>
-              <h4 class="tb-exec-list-title">{entry.group}</h4>
-              <ul class="tb-list tb-exec-narrative-list">
+              <h4 className="tb-exec-list-title">{entry.group}</h4>
+              <ul className="tb-list tb-exec-narrative-list">
                 {entry.bullets.map((item) => (
                   <li key={`${entry.group}:${item}`}>{item}</li>
                 ))}
               </ul>
             </div>
           ))}
-          {completedWorkLoading ? <p class="tb-muted-note">Generating completed work summary with {aiProviderName}...</p> : null}
+          {completedWorkLoading ? <p className="tb-muted-note">Generating completed work summary with {aiProviderName}...</p> : null}
           {!completedWorkLoading && completedWorkDraft.length === 0 ? (
-            <p class="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
+            <p className="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
           ) : null}
         </div>
-        <hr class="tb-section-divider" />
-        <div class="tb-exec-summary-meta">
+        <hr className="tb-section-divider" />
+        <div className="tb-exec-summary-meta">
           <span>Generated with {aiProviderName}</span>
           <span>Model: {completedWorkModelId ?? "default"}</span>
           <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
@@ -2975,27 +2974,27 @@ export function TeamDashboardScreen() {
       </section>
 
       {isReportingConfigOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
-          <div class="tb-modal-backdrop" onClick={closeReportingConfig} />
-          <div class="tb-modal tb-modal-reporting">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
+          <div className="tb-modal-backdrop" onClick={closeReportingConfig} />
+          <div className="tb-modal tb-modal-reporting">
+            <header className="tb-modal-head">
               <div>
                 <h3>Configure Reporting Period</h3>
-                <p class="tb-muted-note">Set the reporting window used across Team Dashboard sections.</p>
+                <p className="tb-muted-note">Set the reporting window used across Team Dashboard sections.</p>
               </div>
-              <div class="tb-action-row">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
+              <div className="tb-action-row">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
                   Cancel
                 </button>
-                <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
                   Save
                 </button>
               </div>
             </header>
 
-            <div class="tb-exec-period-toolbar">
-              <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
-                <label class="tb-exec-period-field">
+            <div className="tb-exec-period-toolbar">
+              <div className={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
+                <label className="tb-exec-period-field">
                   <span>Reporting Period</span>
                   <select
                     value={reportingPreset}
@@ -3010,7 +3009,7 @@ export function TeamDashboardScreen() {
 
                 {reportingPreset === "custom" ? (
                   <>
-                    <label class="tb-exec-period-field">
+                    <label className="tb-exec-period-field">
                       <span>Start</span>
                       <input
                         type="date"
@@ -3018,7 +3017,7 @@ export function TeamDashboardScreen() {
                         onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
                       />
                     </label>
-                    <label class="tb-exec-period-field">
+                    <label className="tb-exec-period-field">
                       <span>End</span>
                       <input
                         type="date"
@@ -3031,34 +3030,34 @@ export function TeamDashboardScreen() {
               </div>
             </div>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Active period: {reportingPeriodLabel} ({reportingPeriodDays} days, {effectivePeriodTimezone})
             </p>
-            {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
+            {reportingValidationError ? <p className="tb-error-note">{reportingValidationError}</p> : null}
           </div>
         </div>
       ) : null}
 
       {isInitiativeConfigOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Initiative Epics">
-          <div class="tb-modal-backdrop" onClick={closeInitiativeConfig} />
-          <div class="tb-modal tb-modal-wide">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Initiative Epics">
+          <div className="tb-modal-backdrop" onClick={closeInitiativeConfig} />
+          <div className="tb-modal tb-modal-wide">
+            <header className="tb-modal-head">
               <div>
                 <h3>Configure Initiative Epics</h3>
-                <p class="tb-muted-note">Choose which epics appear in Progress for Key Initiatives.</p>
+                <p className="tb-muted-note">Choose which epics appear in Progress for Key Initiatives.</p>
               </div>
-              <div class="tb-action-row">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={closeInitiativeConfig}>
+              <div className="tb-action-row">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={closeInitiativeConfig}>
                   Cancel
                 </button>
-                <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveInitiativeConfig}>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveInitiativeConfig}>
                   Save
                 </button>
               </div>
             </header>
 
-            <label class="tb-exec-search">
+            <label className="tb-exec-search">
               <span>Search epics</span>
               <input
                 type="text"
@@ -3068,27 +3067,27 @@ export function TeamDashboardScreen() {
               />
             </label>
 
-            <div class="tb-modal-two-up">
+            <div className="tb-modal-two-up">
               <section>
-                <header class="tb-panel-header-actions">
+                <header className="tb-panel-header-actions">
                   <strong>Available ({availableConfigRows.length})</strong>
                   <button
                     type="button"
-                    class="tb-btn tb-btn-sm"
+                    className="tb-btn tb-btn-sm"
                     onClick={() => setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey))}
                   >
                     Select All
                   </button>
                 </header>
-                <p class="tb-muted-note">Double-click to add.</p>
+                <p className="tb-muted-note">Double-click to add.</p>
 
-                <div class="tb-exec-config-list">
+                <div className="tb-exec-config-list">
                   {availableConfigRows.map((row) => (
                     <button
                       key={row.epicKey}
                       type="button"
-                      class="tb-exec-config-item tb-exec-config-item-button"
-                      onDblClick={() => addInitiativeDraftKey(row.epicKey)}
+                      className="tb-exec-config-item tb-exec-config-item-button"
+                      onDoubleClick={() => addInitiativeDraftKey(row.epicKey)}
                     >
                       <div>
                         <strong>{row.epicName || row.epicKey}</strong>
@@ -3096,30 +3095,30 @@ export function TeamDashboardScreen() {
                       </div>
                     </button>
                   ))}
-                  {availableConfigRows.length === 0 ? <p class="tb-muted-note">No epics match the current search.</p> : null}
+                  {availableConfigRows.length === 0 ? <p className="tb-muted-note">No epics match the current search.</p> : null}
                 </div>
               </section>
 
               <section>
-                <header class="tb-panel-header-actions">
+                <header className="tb-panel-header-actions">
                   <strong>Selected ({selectedConfigRows.length})</strong>
                   <button
                     type="button"
-                    class="tb-btn tb-btn-sm"
+                    className="tb-btn tb-btn-sm"
                     onClick={() => setInitiativeConfigDraftKeys([])}
                   >
                     Clear All
                   </button>
                 </header>
-                <p class="tb-muted-note">Double-click to remove. Drag to reorder.</p>
+                <p className="tb-muted-note">Double-click to remove. Drag to reorder.</p>
 
-                <div class="tb-exec-config-list">
+                <div className="tb-exec-config-list">
                   {selectedConfigRows.map((row) => (
                     <div
                       key={row.epicKey}
-                      class={`tb-exec-config-item tb-exec-config-item-draggable${initiativeConfigDraggingKey === row.epicKey ? " is-dragging" : ""}`}
+                      className={`tb-exec-config-item tb-exec-config-item-draggable${initiativeConfigDraggingKey === row.epicKey ? " is-dragging" : ""}`}
                       draggable
-                      onDblClick={() => removeInitiativeDraftKey(row.epicKey)}
+                      onDoubleClick={() => removeInitiativeDraftKey(row.epicKey)}
                       onDragStart={() => setInitiativeConfigDraggingKey(row.epicKey)}
                       onDragEnd={() => setInitiativeConfigDraggingKey(null)}
                       onDragOver={(event) => {
@@ -3132,7 +3131,7 @@ export function TeamDashboardScreen() {
                         setInitiativeConfigDraggingKey(null);
                       }}
                     >
-                      <span class="tb-exec-drag-handle" aria-hidden="true">
+                      <span className="tb-exec-drag-handle" aria-hidden="true">
                         ::
                       </span>
                       <div>
@@ -3141,7 +3140,7 @@ export function TeamDashboardScreen() {
                       </div>
                     </div>
                   ))}
-                  {selectedConfigRows.length === 0 ? <p class="tb-muted-note">No epics selected yet.</p> : null}
+                  {selectedConfigRows.length === 0 ? <p className="tb-muted-note">No epics selected yet.</p> : null}
                 </div>
               </section>
             </div>

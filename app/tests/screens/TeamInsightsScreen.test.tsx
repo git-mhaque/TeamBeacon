@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { vi } from "vitest";
 import * as persistence from "../../src/lib/persistence";
 import { setupFetchMock } from "../utils/fetchMock";

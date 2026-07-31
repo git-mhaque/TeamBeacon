@@ -1,4 +1,4 @@
-import { render } from "@testing-library/preact";
+import { render } from "@testing-library/react";
 import { vi } from "vitest";
 import { TrendBarChart } from "../../src/components/content/screens/TrendBarChart";
 

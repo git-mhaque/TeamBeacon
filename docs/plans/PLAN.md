@@ -7,7 +7,7 @@ Deliver in thin vertical slices: integrate data first, then insights, then execu
 
 ## Phase 0 (Week 1): Foundation
 - Initialize repo structure and toolchain.
-- Scaffold `app/` (Oracle JET web frontend), `services/api/`, and shared packages.
+- Scaffold `app/` web frontend, `services/api/`, and shared packages.
 - Define DB schema v1 and migrations.
 - Implement secure secret handling via environment variables or mounted secret files.
 - Establish baseline UI mockups for all MVP workflows.
@@ -72,4 +72,4 @@ Exit criteria:
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.
-5. Keep `docs/design/teambeacon-ojet-mockups.html` aligned with implemented app screens.
+5. Modernize the shell and screens incrementally under the functional-parity constraints in `FRONTEND_MODERNIZATION_PLAN.md`.

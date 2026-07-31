@@ -8,9 +8,10 @@ TeamBeacon is a self-hosted web analytics system:
 
 ## 2. High-Level Components
 1. UI (`app/`)
-- Oracle JET (vDOM) web frontend served by the API runtime in production.
+- React 19 single-page frontend built with Vite and served by the API runtime in production.
 - Screens: Settings, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
-- UX reference: `docs/design/teambeacon-ojet-mockups.html`
+- Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
+- The production artifact remains `app/web`, preserving the container and Python static-serving contract.
 
 2. API (`services/api/`)
 - Python local HTTP service exposing internal endpoints, OpenAPI schema, and Swagger UI.
@@ -75,18 +76,19 @@ Default thresholds:
 
 ## 9. UI Information Architecture
 - Primary navigation:
-  - Settings
   - Initiative Insights
-  - Team Insights
   - Sprint Insights
+  - Team Insights
   - Security
   - Incident Response
   - Releases
   - Team Dashboard
+  - Settings
 - Interaction pattern:
-  - Left rail for filters/context scope.
+  - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 - Design source:
-  - `docs/design/teambeacon-ojet-mockups.html` should be updated with major flow changes.
+  - `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` defines the active frontend direction and parity constraints.
+  - Existing files under `docs/design/` remain historical references for screen inventory and prior visual exploration.

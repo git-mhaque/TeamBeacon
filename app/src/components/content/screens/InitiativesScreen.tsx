@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   chatWithOciGenAi,
   ConfiguredEpicSummaryResponse,
@@ -524,12 +523,12 @@ function MultiSelectFilter({
   }, [closeMenu, isOpen]);
 
   return (
-    <div class="tb-initiative-filter tb-initiative-multiselect" ref={dropdownRef}>
+    <div className="tb-initiative-filter tb-initiative-multiselect" ref={dropdownRef}>
       <span id={labelId}>{label}</span>
       <button
         ref={triggerRef}
         type="button"
-        class={`tb-initiative-multiselect-trigger${isOpen ? " is-open" : ""}`}
+        className={`tb-initiative-multiselect-trigger${isOpen ? " is-open" : ""}`}
         role="combobox"
         aria-labelledby={labelId}
         aria-describedby={valueId}
@@ -550,20 +549,20 @@ function MultiSelectFilter({
           }
         }}
       >
-        <span id={valueId} class="tb-initiative-multiselect-value">{summary}</span>
-        <span class={`tb-initiative-multiselect-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
+        <span id={valueId} className="tb-initiative-multiselect-value">{summary}</span>
+        <span className={`tb-initiative-multiselect-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
       </button>
 
       {isOpen ? (
         <div
           id={listboxId}
-          class="tb-initiative-multiselect-menu"
+          className="tb-initiative-multiselect-menu"
           role="listbox"
           aria-label={`${label} options`}
           aria-multiselectable="true"
         >
           {selectedValues.length > 0 ? (
-            <button type="button" class="tb-initiative-multiselect-clear" onClick={() => onChange([])}>
+            <button type="button" className="tb-initiative-multiselect-clear" onClick={() => onChange([])}>
               Clear selection
             </button>
           ) : null}
@@ -572,7 +571,7 @@ function MultiSelectFilter({
             return (
               <label
                 key={option.value}
-                class={`tb-initiative-multiselect-option${selected ? " is-selected" : ""}`}
+                className={`tb-initiative-multiselect-option${selected ? " is-selected" : ""}`}
                 role="option"
                 aria-selected={selected ? "true" : "false"}
               >
@@ -764,7 +763,7 @@ export function InitiativesScreen() {
   const [deletingEpicKey, setDeletingEpicKey] = useState<string | null>(null);
   const [completedSummaryContext, setCompletedSummaryContext] = useState<CompletedSummaryContext | null>(null);
   const [completedSummaryCards, setCompletedSummaryCards] = useState<EpicCompletedCard[]>([]);
-  const [completedSummaryPerEpicCounts, setCompletedSummaryPerEpicCounts] = useState<Record<string, number>>({});
+  const [, setCompletedSummaryPerEpicCounts] = useState<Record<string, number>>({});
   const [completedSummaryReportingPeriod, setCompletedSummaryReportingPeriod] = useState<
     ConfiguredEpicSummaryResponse["reportingPeriod"]
   >(undefined);
@@ -1893,51 +1892,51 @@ export function InitiativesScreen() {
   }, [activeReportingPeriod, activeView.id, activeView.name, aiProviderName]);
 
   return (
-    <div class="tb-screen-grid">
-      <div class="tb-initiative-context-bar">
-        <p class="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
-        <button type="button" class="tb-btn tb-btn-sm tb-no-print" onClick={openReportingConfig}>
+    <div className="tb-screen-grid">
+      <div className="tb-initiative-context-bar">
+        <p className="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
+        <button type="button" className="tb-btn tb-btn-sm tb-no-print" onClick={openReportingConfig}>
           Reporting Period
         </button>
       </div>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
           <div>
             <h3>Configured Initiative Summary</h3>
           </div>
         </header>
 
-        <div class="tb-metrics-grid tb-four-up">
-          <article class="tb-metric-card">
+        <div className="tb-metrics-grid tb-four-up">
+          <article className="tb-metric-card">
             <h4>Configured Epics</h4>
-            <strong class="tb-value">{totalConfigured}</strong>
+            <strong className="tb-value">{totalConfigured}</strong>
             <p>{activeView.id === "all" ? "Epics with metadata configured in TeamBeacon." : `Epics in ${activeView.name}.`}</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Avg Completion</h4>
-            <strong class="tb-value tb-value-good">{formatPercent(averageCompletion)}</strong>
+            <strong className="tb-value tb-value-good">{formatPercent(averageCompletion)}</strong>
             <p>Average completion percentage across configured epics.</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Initiative RAG</h4>
-            <strong class="tb-value tb-value-rag">
-              <span class="tb-initiative-rag-breakdown">
-                <span class="tb-initiative-rag-text tb-initiative-rag-red">{ragCounts.Red} Red</span>
-                <span class="tb-initiative-rag-separator">|</span>
-                <span class="tb-initiative-rag-text tb-initiative-rag-amber">{ragCounts.Amber} Amber</span>
-                <span class="tb-initiative-rag-separator">|</span>
-                <span class="tb-initiative-rag-text tb-initiative-rag-green">{ragCounts.Green} Green</span>
+            <strong className="tb-value tb-value-rag">
+              <span className="tb-initiative-rag-breakdown">
+                <span className="tb-initiative-rag-text tb-initiative-rag-red">{ragCounts.Red} Red</span>
+                <span className="tb-initiative-rag-separator">|</span>
+                <span className="tb-initiative-rag-text tb-initiative-rag-amber">{ragCounts.Amber} Amber</span>
+                <span className="tb-initiative-rag-separator">|</span>
+                <span className="tb-initiative-rag-text tb-initiative-rag-green">{ragCounts.Green} Green</span>
               </span>
             </strong>
             <p>{activeView.id === "all" ? "For configured initiatives." : "For selected initiative view."}</p>
           </article>
-          <article class="tb-metric-card">
+          <article className="tb-metric-card">
             <h4>Completed In Period</h4>
-            <strong class="tb-value">
+            <strong className="tb-value">
               <button
                 type="button"
-                class="tb-initiative-period-trigger tb-initiative-period-trigger-metric"
+                className="tb-initiative-period-trigger tb-initiative-period-trigger-metric"
                 onClick={() => void openConfiguredCompletedSummary()}
                 aria-label="Summarize completed cards across configured initiatives"
               >
@@ -1948,26 +1947,26 @@ export function InitiativesScreen() {
           </article>
         </div>
 
-        {error && !loading ? <p class="tb-error-note">Initiative summary: {error}</p> : null}
-        {metaError ? <p class="tb-error-note">Epic metadata: {metaError}</p> : null}
-        {viewError ? <p class="tb-error-note">Initiative views: {viewError}</p> : null}
+        {error && !loading ? <p className="tb-error-note">Initiative summary: {error}</p> : null}
+        {metaError ? <p className="tb-error-note">Epic metadata: {metaError}</p> : null}
+        {viewError ? <p className="tb-error-note">Initiative views: {viewError}</p> : null}
       </section>
 
-      <section class="tb-panel">
-        <header class="tb-panel-header">
-          <div class="tb-initiative-matrix-title">
+      <section className="tb-panel">
+        <header className="tb-panel-header">
+          <div className="tb-initiative-matrix-title">
             <h3>Initiative Progress Matrix</h3>
-            <span class="tb-chip tb-initiative-visible-count">{filteredRows.length} visible</span>
+            <span className="tb-chip tb-initiative-visible-count">{filteredRows.length} visible</span>
           </div>
-          <div class="tb-panel-header-actions">
-            <button type="button" class="tb-btn tb-btn-sm tb-initiative-matrix-action" onClick={openColumnOverlay}>
+          <div className="tb-panel-header-actions">
+            <button type="button" className="tb-btn tb-btn-sm tb-initiative-matrix-action" onClick={openColumnOverlay}>
               Columns
             </button>
           </div>
         </header>
 
-        <div class="tb-initiative-toolbar">
-          <label class="tb-initiative-filter">
+        <div className="tb-initiative-toolbar">
+          <label className="tb-initiative-filter">
             <span>Search</span>
             <input
               type="text"
@@ -2004,12 +2003,12 @@ export function InitiativesScreen() {
             onChange={(values) => setRagFilters(values.filter(isRagLabel))}
           />
 
-          <div class="tb-initiative-filter tb-initiative-filter-quick">
+          <div className="tb-initiative-filter tb-initiative-filter-quick">
             <span>Quick Filters</span>
-            <div class="tb-initiative-quick-filters" role="group" aria-label="Quick filters">
+            <div className="tb-initiative-quick-filters" role="group" aria-label="Quick filters">
               <button
                 type="button"
-                class={`tb-initiative-filter-toggle${positiveDeltaOnly ? " is-active" : ""}`}
+                className={`tb-initiative-filter-toggle${positiveDeltaOnly ? " is-active" : ""}`}
                 aria-pressed={positiveDeltaOnly}
                 onClick={() => setPositiveDeltaOnly((current) => !current)}
               >
@@ -2017,7 +2016,7 @@ export function InitiativesScreen() {
               </button>
               <button
                 type="button"
-                class={`tb-initiative-filter-toggle${timeBoundOnly ? " is-active" : ""}`}
+                className={`tb-initiative-filter-toggle${timeBoundOnly ? " is-active" : ""}`}
                 aria-pressed={timeBoundOnly}
                 onClick={() => setTimeBoundOnly((current) => !current)}
               >
@@ -2027,19 +2026,19 @@ export function InitiativesScreen() {
           </div>
         </div>
 
-        <div class="tb-initiative-table-wrap">
-          <table class="tb-initiative-table">
+        <div className="tb-initiative-table-wrap">
+          <table className="tb-initiative-table">
             <thead>
               <tr>
                 <th>
                   <button
                     type="button"
-                    class={`tb-table-sort${sortField === "epic" ? " is-active" : ""}`}
+                    className={`tb-table-sort${sortField === "epic" ? " is-active" : ""}`}
                     onClick={() => handleSortHeaderClick("epic")}
                     aria-label={`Sort by Epic (${sortField === "epic" && sortDirection === "asc" ? "ascending" : "descending"})`}
                   >
                     <span>Epic</span>
-                    <span class="tb-table-sort-indicator" aria-hidden="true">
+                    <span className="tb-table-sort-indicator" aria-hidden="true">
                       {sortField === "epic" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                     </span>
                   </button>
@@ -2048,12 +2047,12 @@ export function InitiativesScreen() {
                   <th>
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "group" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "group" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("group")}
                       aria-label={`Sort by Group (${sortField === "group" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Group</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "group" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
@@ -2063,27 +2062,27 @@ export function InitiativesScreen() {
                   <th>
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "type" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "type" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("type")}
                       aria-label={`Sort by Type (${sortField === "type" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Type</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "type" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
                   </th>
                 ) : null}
                 {visibleColumnSet.has("progress") ? (
-                  <th class="tb-initiative-progress-head">
+                  <th className="tb-initiative-progress-head">
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "progress" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "progress" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("progress")}
                       aria-label={`Sort by Progress (${sortField === "progress" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Progress</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "progress" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
@@ -2093,27 +2092,27 @@ export function InitiativesScreen() {
                   <th>
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "completed" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "completed" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("completed")}
                       aria-label={`Sort by Completed (${sortField === "completed" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Completed</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "completed" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
                   </th>
                 ) : null}
                 {visibleColumnSet.has("delta") ? (
-                  <th class="tb-initiative-delta-head">
+                  <th className="tb-initiative-delta-head">
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "delta" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "delta" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("delta")}
                       aria-label={`Sort by Delta (${sortField === "delta" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Delta</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "delta" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
@@ -2123,12 +2122,12 @@ export function InitiativesScreen() {
                   <th>
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "rag" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "rag" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("rag")}
                       aria-label={`Sort by RAG (${sortField === "rag" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>RAG</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "rag" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
@@ -2138,12 +2137,12 @@ export function InitiativesScreen() {
                   <th>
                     <button
                       type="button"
-                      class={`tb-table-sort${sortField === "criteria" ? " is-active" : ""}`}
+                      className={`tb-table-sort${sortField === "criteria" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("criteria")}
                       aria-label={`Sort by Criteria / Insight (${sortField === "criteria" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
                       <span>Criteria / Insight</span>
-                      <span class="tb-table-sort-indicator" aria-hidden="true">
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "criteria" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
                     </button>
@@ -2155,13 +2154,13 @@ export function InitiativesScreen() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={tableColumnCount} class="tb-initiative-empty">Loading configured initiatives...</td>
+                  <td colSpan={tableColumnCount} className="tb-initiative-empty">Loading configured initiatives...</td>
                 </tr>
               ) : null}
 
               {!loading && sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={tableColumnCount} class="tb-initiative-empty">No initiative rows match the active filters.</td>
+                  <td colSpan={tableColumnCount} className="tb-initiative-empty">No initiative rows match the active filters.</td>
                 </tr>
               ) : null}
 
@@ -2172,23 +2171,23 @@ export function InitiativesScreen() {
                     return (
                       <tr key={row.epicKey}>
                         <td>
-                          <div class="tb-initiative-epic">
+                          <div className="tb-initiative-epic">
                             {epicHref ? (
-                              <a href={epicHref} target="_blank" rel="noopener noreferrer" class="tb-initiative-epic-key">
+                              <a href={epicHref} target="_blank" rel="noopener noreferrer" className="tb-initiative-epic-key">
                                 {row.epicKey}
                               </a>
                             ) : (
-                              <strong class="tb-initiative-epic-key">{row.epicKey}</strong>
+                              <strong className="tb-initiative-epic-key">{row.epicKey}</strong>
                             )}
-                            <p class="tb-initiative-epic-name">{row.epicName || "(Untitled epic)"}</p>
+                            <p className="tb-initiative-epic-name">{row.epicName || "(Untitled epic)"}</p>
                           </div>
                         </td>
                         {visibleColumnSet.has("group") ? <td>{row.groupText}</td> : null}
                         {visibleColumnSet.has("type") ? <td>{row.typeText}</td> : null}
                         {visibleColumnSet.has("progress") ? (
-                          <td class="tb-initiative-progress-cell">
-                            <div class="tb-initiative-progress">
-                              <div class="tb-initiative-progress-track">
+                          <td className="tb-initiative-progress-cell">
+                            <div className="tb-initiative-progress">
+                              <div className="tb-initiative-progress-track">
                                 <span style={{ width: `${progressPercent}%` }} />
                               </div>
                               <span>{Math.round(progressPercent)}% ({row.completedCards}/{row.totalCards})</span>
@@ -2197,9 +2196,9 @@ export function InitiativesScreen() {
                         ) : null}
                         {visibleColumnSet.has("completed") ? (
                           <td>
-                            <div class="tb-initiative-metric-stack">
+                            <div className="tb-initiative-metric-stack">
                               <strong>{row.completedCards} / {row.totalCards}</strong>
-                              <p class="tb-muted-note tb-initiative-metric-detail">
+                              <p className="tb-muted-note tb-initiative-metric-detail">
                                 <span>Period:</span>
                                 <span>{formatPercent(row.deltaPercentValue)}</span>
                               </p>
@@ -2207,10 +2206,10 @@ export function InitiativesScreen() {
                           </td>
                         ) : null}
                         {visibleColumnSet.has("delta") ? (
-                          <td class="tb-initiative-delta-cell">
+                          <td className="tb-initiative-delta-cell">
                             <button
                               type="button"
-                              class="tb-initiative-period-trigger"
+                              className="tb-initiative-period-trigger"
                               onClick={() => void openCompletedSummary(row)}
                               aria-label={`Summarize completed cards for ${row.epicKey}`}
                             >
@@ -2220,26 +2219,26 @@ export function InitiativesScreen() {
                         ) : null}
                         {visibleColumnSet.has("rag") ? (
                           <td>
-                            <span class={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
+                            <span className={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
                               {row.ragLabel}
                             </span>
                           </td>
                         ) : null}
                         {visibleColumnSet.has("criteria") ? (
                           <td>
-                            <p class="tb-initiative-insight" title={row.ragReason}>
+                            <p className="tb-initiative-insight" title={row.ragReason}>
                               {row.insightComment?.trim() || row.ragReason}
                             </p>
                           </td>
                         ) : null}
                         <td>
-                          <div class="tb-action-row">
-                            <button type="button" class="tb-btn tb-btn-sm" onClick={() => openEditDialog(row)}>
+                          <div className="tb-action-row">
+                            <button type="button" className="tb-btn tb-btn-sm" onClick={() => openEditDialog(row)}>
                               Edit
                             </button>
                             <button
                               type="button"
-                              class="tb-btn tb-btn-sm tb-btn-danger"
+                              className="tb-btn tb-btn-sm tb-btn-danger"
                               onClick={() => {
                                 setMetaError(null);
                                 setMetaSuccess(null);
@@ -2261,27 +2260,27 @@ export function InitiativesScreen() {
       </section>
 
       {isReportingConfigOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
-          <div class="tb-modal-backdrop" onClick={closeReportingConfig} />
-          <div class="tb-modal tb-modal-reporting">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
+          <div className="tb-modal-backdrop" onClick={closeReportingConfig} />
+          <div className="tb-modal tb-modal-reporting">
+            <header className="tb-modal-head">
               <div>
                 <h3>Configure Reporting Period</h3>
-                <p class="tb-muted-note">Set the reporting window used across Initiative Insights summaries and completed-card analysis.</p>
+                <p className="tb-muted-note">Set the reporting window used across Initiative Insights summaries and completed-card analysis.</p>
               </div>
-              <div class="tb-action-row">
-                <button type="button" class="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
+              <div className="tb-action-row">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={closeReportingConfig}>
                   Cancel
                 </button>
-                <button type="button" class="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveReportingConfig}>
                   Save
                 </button>
               </div>
             </header>
 
-            <div class="tb-exec-period-toolbar">
-              <div class={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
-                <label class="tb-exec-period-field">
+            <div className="tb-exec-period-toolbar">
+              <div className={`tb-exec-period-row${reportingPreset === "custom" ? " is-custom" : ""}`}>
+                <label className="tb-exec-period-field">
                   <span>Reporting Period</span>
                   <select
                     value={reportingPreset}
@@ -2296,7 +2295,7 @@ export function InitiativesScreen() {
 
                 {reportingPreset === "custom" ? (
                   <>
-                    <label class="tb-exec-period-field">
+                    <label className="tb-exec-period-field">
                       <span>Start</span>
                       <input
                         type="date"
@@ -2304,7 +2303,7 @@ export function InitiativesScreen() {
                         onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
                       />
                     </label>
-                    <label class="tb-exec-period-field">
+                    <label className="tb-exec-period-field">
                       <span>End</span>
                       <input
                         type="date"
@@ -2317,32 +2316,32 @@ export function InitiativesScreen() {
               </div>
             </div>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Active period: {activeReportingPeriodLabel} ({activeReportingPeriod.days} days, {activeReportingPeriod.timezone})
             </p>
-            {reportingValidationError ? <p class="tb-error-note">{reportingValidationError}</p> : null}
+            {reportingValidationError ? <p className="tb-error-note">{reportingValidationError}</p> : null}
           </div>
         </div>
       ) : null}
 
       {isColumnOverlayOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Initiative Columns">
-          <div class="tb-modal-backdrop" onClick={closeColumnOverlay} />
-          <div class="tb-modal tb-modal-columns">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Select Initiative Columns">
+          <div className="tb-modal-backdrop" onClick={closeColumnOverlay} />
+          <div className="tb-modal tb-modal-columns">
+            <header className="tb-modal-head">
               <h3>Select Columns</h3>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={closeColumnOverlay}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={closeColumnOverlay}>
                 Close
               </button>
             </header>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Choose which initiative matrix columns are visible. Sorting is applied by clicking any visible header.
             </p>
 
-            <div class="tb-column-overlay-list" role="group" aria-label="Initiative column selection">
+            <div className="tb-column-overlay-list" role="group" aria-label="Initiative column selection">
               {OPTIONAL_COLUMN_DEFINITIONS.map((column) => (
-                <label key={column.id} class="tb-column-toggle">
+                <label key={column.id} className="tb-column-toggle">
                   <input
                     type="checkbox"
                     checked={visibleColumnSet.has(column.id)}
@@ -2353,16 +2352,16 @@ export function InitiativesScreen() {
               ))}
             </div>
 
-            <footer class="tb-modal-actions">
+            <footer className="tb-modal-actions">
               <button
                 type="button"
-                class="tb-btn"
+                className="tb-btn"
                 onClick={showAllColumns}
                 disabled={visibleOptionalColumns.length === OPTIONAL_COLUMN_DEFINITIONS.length}
               >
                 Show all
               </button>
-              <button type="button" class="tb-btn tb-btn-primary" onClick={closeColumnOverlay}>
+              <button type="button" className="tb-btn tb-btn-primary" onClick={closeColumnOverlay}>
                 Done
               </button>
             </footer>
@@ -2372,25 +2371,25 @@ export function InitiativesScreen() {
 
       {isViewEditorOpen ? (
         <div
-          class="tb-modal-layer"
+          className="tb-modal-layer"
           role="dialog"
           aria-modal="true"
           aria-label={viewEditorMode === "edit" ? "Edit Initiative View" : "Create Initiative View"}
         >
-          <div class="tb-modal-backdrop" onClick={closeViewEditor} />
-          <div class="tb-modal tb-modal-wide tb-modal-initiative-view">
-            <header class="tb-modal-head">
+          <div className="tb-modal-backdrop" onClick={closeViewEditor} />
+          <div className="tb-modal tb-modal-wide tb-modal-initiative-view">
+            <header className="tb-modal-head">
               <div>
                 <h3>{viewEditorMode === "edit" ? "Edit Initiative View" : "Create Initiative View"}</h3>
-                <p class="tb-muted-note">Choose configured epics for this saved view.</p>
+                <p className="tb-muted-note">Choose configured epics for this saved view.</p>
               </div>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={closeViewEditor} disabled={viewEditorSaving}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={closeViewEditor} disabled={viewEditorSaving}>
                 Close
               </button>
             </header>
 
-            <div class="tb-modal-two-up">
-              <label class="tb-modal-field">
+            <div className="tb-modal-two-up">
+              <label className="tb-modal-field">
                 <span>View Name</span>
                 <input
                   type="text"
@@ -2399,7 +2398,7 @@ export function InitiativesScreen() {
                   placeholder="Q1 FY27"
                 />
               </label>
-              <label class="tb-modal-field">
+              <label className="tb-modal-field">
                 <span>Description</span>
                 <input
                   type="text"
@@ -2410,9 +2409,9 @@ export function InitiativesScreen() {
               </label>
             </div>
 
-            <div class="tb-initiative-view-picker">
-              <section class="tb-initiative-view-picker-panel">
-                <label class="tb-modal-field">
+            <div className="tb-initiative-view-picker">
+              <section className="tb-initiative-view-picker-panel">
+                <label className="tb-modal-field">
                   <span>Search Epics</span>
                   <input
                     type="text"
@@ -2421,12 +2420,12 @@ export function InitiativesScreen() {
                     placeholder="Epic key, name, group, or type"
                   />
                 </label>
-                <div class="tb-initiative-view-list" role="group" aria-label="Available configured epics">
+                <div className="tb-initiative-view-list" role="group" aria-label="Available configured epics">
                   {viewAvailableRows.map((row) => (
                     <button
                       key={row.epicKey}
                       type="button"
-                      class="tb-initiative-view-list-item"
+                      className="tb-initiative-view-list-item"
                       onClick={() => addViewDraftEpicKey(row.epicKey)}
                       aria-label={`Add ${row.epicKey} to view`}
                     >
@@ -2435,22 +2434,22 @@ export function InitiativesScreen() {
                     </button>
                   ))}
                   {viewAvailableRows.length === 0 ? (
-                    <p class="tb-muted-note tb-initiative-view-empty">No available epics match the current search.</p>
+                    <p className="tb-muted-note tb-initiative-view-empty">No available epics match the current search.</p>
                   ) : null}
                 </div>
               </section>
 
-              <section class="tb-initiative-view-picker-panel">
-                <div class="tb-initiative-view-picker-head">
+              <section className="tb-initiative-view-picker-panel">
+                <div className="tb-initiative-view-picker-head">
                   <span>Included Epics</span>
-                  <span class="tb-chip">{viewSelectedRows.length}</span>
+                  <span className="tb-chip">{viewSelectedRows.length}</span>
                 </div>
-                <div class="tb-initiative-view-list" role="group" aria-label="Selected view epics">
+                <div className="tb-initiative-view-list" role="group" aria-label="Selected view epics">
                   {viewSelectedRows.map((row) => (
                     <button
                       key={row.epicKey}
                       type="button"
-                      class="tb-initiative-view-list-item is-selected"
+                      className="tb-initiative-view-list-item is-selected"
                       onClick={() => removeViewDraftEpicKey(row.epicKey)}
                       aria-label={`Remove ${row.epicKey} from view`}
                     >
@@ -2459,19 +2458,19 @@ export function InitiativesScreen() {
                     </button>
                   ))}
                   {viewSelectedRows.length === 0 ? (
-                    <p class="tb-muted-note tb-initiative-view-empty">No epics included yet.</p>
+                    <p className="tb-muted-note tb-initiative-view-empty">No epics included yet.</p>
                   ) : null}
                 </div>
               </section>
             </div>
 
-            {viewEditorError ? <p class="tb-error-note">{viewEditorError}</p> : null}
+            {viewEditorError ? <p className="tb-error-note">{viewEditorError}</p> : null}
 
-            <footer class="tb-modal-actions tb-modal-actions-split">
+            <footer className="tb-modal-actions tb-modal-actions-split">
               {viewEditorMode === "edit" && editingView && typeof editingView.id === "number" ? (
                 <button
                   type="button"
-                  class="tb-btn tb-btn-danger"
+                  className="tb-btn tb-btn-danger"
                   onClick={() => {
                     setPendingDeleteView(editingView);
                     setIsViewEditorOpen(false);
@@ -2483,11 +2482,11 @@ export function InitiativesScreen() {
               ) : (
                 <span />
               )}
-              <span class="tb-action-row">
-                <button type="button" class="tb-btn" onClick={closeViewEditor} disabled={viewEditorSaving}>
+              <span className="tb-action-row">
+                <button type="button" className="tb-btn" onClick={closeViewEditor} disabled={viewEditorSaving}>
                   Cancel
                 </button>
-                <button type="button" class="tb-btn tb-btn-primary" onClick={() => void saveViewEditor()} disabled={viewEditorSaving}>
+                <button type="button" className="tb-btn tb-btn-primary" onClick={() => void saveViewEditor()} disabled={viewEditorSaving}>
                   {viewEditorSaving ? "Saving..." : viewEditorMode === "edit" ? "Save View" : "Create View"}
                 </button>
               </span>
@@ -2497,34 +2496,34 @@ export function InitiativesScreen() {
       ) : null}
 
       {pendingDeleteView ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Delete Initiative View">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Delete Initiative View">
           <div
-            class="tb-modal-backdrop"
+            className="tb-modal-backdrop"
             onClick={() => {
               if (!deletingViewId) {
                 setPendingDeleteView(null);
               }
             }}
           />
-          <div class="tb-modal">
-            <header class="tb-modal-head">
+          <div className="tb-modal">
+            <header className="tb-modal-head">
               <h3>Delete Initiative View</h3>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm"
+                className="tb-btn tb-btn-sm"
                 onClick={() => setPendingDeleteView(null)}
                 disabled={Boolean(deletingViewId)}
               >
                 Close
               </button>
             </header>
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Delete <strong>{pendingDeleteView.name}</strong>? Epic metadata will remain configured.
             </p>
-            <footer class="tb-modal-actions">
+            <footer className="tb-modal-actions">
               <button
                 type="button"
-                class="tb-btn"
+                className="tb-btn"
                 onClick={() => setPendingDeleteView(null)}
                 disabled={Boolean(deletingViewId)}
               >
@@ -2532,7 +2531,7 @@ export function InitiativesScreen() {
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-danger"
+                className="tb-btn tb-btn-danger"
                 onClick={() => void confirmDeleteView()}
                 disabled={Boolean(deletingViewId)}
               >
@@ -2544,38 +2543,38 @@ export function InitiativesScreen() {
       ) : null}
 
       {pendingDeleteEpic ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Remove Epic Configuration">
           <div
-            class="tb-modal-backdrop"
+            className="tb-modal-backdrop"
             onClick={() => {
               if (!deletingEpicKey) {
                 setPendingDeleteEpic(null);
               }
             }}
           />
-          <div class="tb-modal">
-            <header class="tb-modal-head">
+          <div className="tb-modal">
+            <header className="tb-modal-head">
               <h3>Remove Epic Configuration</h3>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm"
+                className="tb-btn tb-btn-sm"
                 onClick={() => setPendingDeleteEpic(null)}
                 disabled={Boolean(deletingEpicKey)}
               >
                 Close
               </button>
             </header>
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Remove configuration for <strong>{pendingDeleteEpic.epicKey}</strong>
               {pendingDeleteEpic.epicName ? ` (${pendingDeleteEpic.epicName})` : ""}?
             </p>
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               This removes success criteria, group mapping, and work type mapping for this epic.
             </p>
-            <footer class="tb-modal-actions">
+            <footer className="tb-modal-actions">
               <button
                 type="button"
-                class="tb-btn"
+                className="tb-btn"
                 onClick={() => setPendingDeleteEpic(null)}
                 disabled={Boolean(deletingEpicKey)}
               >
@@ -2583,7 +2582,7 @@ export function InitiativesScreen() {
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-danger"
+                className="tb-btn tb-btn-danger"
                 onClick={() => confirmDeleteEpic()}
                 disabled={Boolean(deletingEpicKey)}
               >
@@ -2595,17 +2594,17 @@ export function InitiativesScreen() {
       ) : null}
 
       {completedSummaryContext ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Completed Cards Summary">
-          <div class="tb-modal-backdrop" onClick={closeCompletedSummary} />
-          <div class="tb-modal tb-modal-wide">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Completed Cards Summary">
+          <div className="tb-modal-backdrop" onClick={closeCompletedSummary} />
+          <div className="tb-modal tb-modal-wide">
+            <header className="tb-modal-head">
               <h3>Completed Cards Summary</h3>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={closeCompletedSummary}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={closeCompletedSummary}>
                 Close
               </button>
             </header>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               {completedSummaryContext.scope === "epic" ? (
                 <span>
                   Epic: <strong>{completedSummaryContext.epicKey}</strong>
@@ -2618,22 +2617,22 @@ export function InitiativesScreen() {
                 </span>
               )}
             </p>
-            <p class="tb-muted-note">Reporting period: {periodLabel(completedSummaryReportingPeriod ?? reportingPeriod)}</p>
+            <p className="tb-muted-note">Reporting period: {periodLabel(completedSummaryReportingPeriod ?? reportingPeriod)}</p>
 
-            {completedSummaryError ? <p class="tb-error-note">{completedSummaryError}</p> : null}
+            {completedSummaryError ? <p className="tb-error-note">{completedSummaryError}</p> : null}
 
             <section>
-              <h4 class="tb-initiative-completed-section-title">AI Summary</h4>
-              {completedSummaryLoading ? <p class="tb-muted-note">Loading completed cards...</p> : null}
-              {completedSummaryTextLoading ? <p class="tb-muted-note">Generating summary with {aiProviderName}...</p> : null}
-              {completedSummaryTextError ? <p class="tb-error-note">{completedSummaryTextError}</p> : null}
+              <h4 className="tb-initiative-completed-section-title">AI Summary</h4>
+              {completedSummaryLoading ? <p className="tb-muted-note">Loading completed cards...</p> : null}
+              {completedSummaryTextLoading ? <p className="tb-muted-note">Generating summary with {aiProviderName}...</p> : null}
+              {completedSummaryTextError ? <p className="tb-error-note">{completedSummaryTextError}</p> : null}
               {completedSummaryText ? (
-                <div class="tb-summary">
+                <div className="tb-summary">
                   <p>{completedSummaryText}</p>
                 </div>
               ) : null}
               {(completedSummaryModelId || completedSummaryGeneratedAt) && !completedSummaryTextLoading ? (
-                <p class="tb-muted-note">
+                <p className="tb-muted-note">
                   Generated with {aiProviderName}
                   {completedSummaryModelId ? ` | Model: ${completedSummaryModelId}` : ""}
                   {completedSummaryGeneratedAt ? ` | Updated: ${formatTimestamp(completedSummaryGeneratedAt)}` : ""}
@@ -2642,19 +2641,19 @@ export function InitiativesScreen() {
             </section>
 
             <section>
-              <h4 class="tb-initiative-completed-section-title">Completed Cards ({completedSummaryCount})</h4>
+              <h4 className="tb-initiative-completed-section-title">Completed Cards ({completedSummaryCount})</h4>
               {completedSummaryTruncated ? (
-                <p class="tb-muted-note">Showing the first {completedSummaryCards.length} cards due to response limit.</p>
+                <p className="tb-muted-note">Showing the first {completedSummaryCards.length} cards due to response limit.</p>
               ) : null}
               {!completedSummaryLoading && completedSummaryCards.length === 0 ? (
-                <p class="tb-muted-note">No completed cards were returned for this period.</p>
+                <p className="tb-muted-note">No completed cards were returned for this period.</p>
               ) : null}
               {completedSummaryCards.length > 0 ? (
-                <div class="tb-initiative-completed-list">
+                <div className="tb-initiative-completed-list">
                   {completedSummaryCards.map((card) => (
-                    <article key={card.issueKey} class="tb-initiative-completed-card">
-                      <p class="tb-initiative-completed-line-primary">{card.summary || "No summary available."}</p>
-                      <p class="tb-initiative-completed-line-meta">
+                    <article key={card.issueKey} className="tb-initiative-completed-card">
+                      <p className="tb-initiative-completed-line-primary">{card.summary || "No summary available."}</p>
+                      <p className="tb-initiative-completed-line-meta">
                         {card.issueKey}
                         {card.epicName ? ` • ${card.epicName}` : card.epicKey ? ` • ${card.epicKey}` : ""}
                         {card.status ? ` • ${card.status}` : ""}
@@ -2671,14 +2670,14 @@ export function InitiativesScreen() {
       ) : null}
 
       {isConfigureOpen ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Epic Metadata">
-          <div class="tb-modal-backdrop" onClick={closeConfigureDialog} />
-          <div class="tb-modal tb-modal-wide">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Epic Metadata">
+          <div className="tb-modal-backdrop" onClick={closeConfigureDialog} />
+          <div className="tb-modal tb-modal-wide">
+            <header className="tb-modal-head">
               <h3>Configure Epic Metadata</h3>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm"
+                className="tb-btn tb-btn-sm"
                 onClick={closeConfigureDialog}
                 disabled={configureSaving}
               >
@@ -2686,7 +2685,7 @@ export function InitiativesScreen() {
               </button>
             </header>
 
-            <label class="tb-modal-field tb-autocomplete">
+            <label className="tb-modal-field tb-autocomplete">
               <span>Search Unconfigured Epic</span>
               <input
                 type="text"
@@ -2701,18 +2700,18 @@ export function InitiativesScreen() {
                 placeholder="Epic key or name"
               />
               {isConfigureSearchFocused ? (
-                <div class="tb-candidate-list" role="listbox" aria-label="Epic candidates">
-                  {configureCandidatesError ? <p class="tb-error-note">{configureCandidatesError}</p> : null}
-                  {configureCandidatesLoading ? <p class="tb-muted-note">Searching epics...</p> : null}
+                <div className="tb-candidate-list" role="listbox" aria-label="Epic candidates">
+                  {configureCandidatesError ? <p className="tb-error-note">{configureCandidatesError}</p> : null}
+                  {configureCandidatesLoading ? <p className="tb-muted-note">Searching epics...</p> : null}
                   {!configureCandidatesLoading && !configureCandidatesError && configureCandidates.length === 0 ? (
-                    <p class="tb-muted-note">No unconfigured epics found.</p>
+                    <p className="tb-muted-note">No unconfigured epics found.</p>
                   ) : null}
                   {!configureCandidatesLoading
                     ? configureCandidates.map((candidate) => (
                         <button
                           key={candidate.epicKey}
                           type="button"
-                          class={`tb-candidate-item${selectedConfigureCandidate?.epicKey === candidate.epicKey ? " is-selected" : ""}`}
+                          className={`tb-candidate-item${selectedConfigureCandidate?.epicKey === candidate.epicKey ? " is-selected" : ""}`}
                           onMouseDown={(event) => {
                             event.preventDefault();
                             setSelectedConfigureCandidate(candidate);
@@ -2730,14 +2729,14 @@ export function InitiativesScreen() {
             </label>
 
             {selectedConfigureCandidate ? (
-              <p class="tb-muted-note">
+              <p className="tb-muted-note">
                 Selected epic: <strong>{selectedConfigureCandidate.epicKey}</strong>
                 {selectedConfigureCandidate.epicName ? ` (${selectedConfigureCandidate.epicName})` : ""}
               </p>
             ) : null}
 
-            <div class="tb-modal-two-up">
-              <label class="tb-modal-field">
+            <div className="tb-modal-two-up">
+              <label className="tb-modal-field">
                 <span>Epic Group (one)</span>
                 <select
                   value={configureSelectedGroupId}
@@ -2750,7 +2749,7 @@ export function InitiativesScreen() {
                 </select>
               </label>
 
-              <label class="tb-modal-field">
+              <label className="tb-modal-field">
                 <span>Work Type (one)</span>
                 <select
                   value={configureSelectedWorkTypeId}
@@ -2764,7 +2763,7 @@ export function InitiativesScreen() {
               </label>
             </div>
 
-            <label class="tb-modal-check">
+            <label className="tb-modal-check">
               <input
                 type="checkbox"
                 checked={configureTimelineEnabled}
@@ -2780,8 +2779,8 @@ export function InitiativesScreen() {
               <span>Enable timeline dates</span>
             </label>
 
-            <div class="tb-modal-two-up">
-              <label class="tb-modal-field">
+            <div className="tb-modal-two-up">
+              <label className="tb-modal-field">
                 <span>Timeline Start Date</span>
                 <input
                   type="date"
@@ -2791,7 +2790,7 @@ export function InitiativesScreen() {
                 />
               </label>
 
-              <label class="tb-modal-field">
+              <label className="tb-modal-field">
                 <span>Target Completion Date</span>
                 <input
                   type="date"
@@ -2802,7 +2801,7 @@ export function InitiativesScreen() {
               </label>
             </div>
 
-            <label class="tb-modal-field">
+            <label className="tb-modal-field">
               <span>Success Criteria (one per line)</span>
               <textarea
                 rows={6}
@@ -2811,15 +2810,15 @@ export function InitiativesScreen() {
               />
             </label>
 
-            {configureError ? <p class="tb-error-note">{configureError}</p> : null}
+            {configureError ? <p className="tb-error-note">{configureError}</p> : null}
 
-            <footer class="tb-modal-actions">
-              <button type="button" class="tb-btn" onClick={closeConfigureDialog} disabled={configureSaving}>
+            <footer className="tb-modal-actions">
+              <button type="button" className="tb-btn" onClick={closeConfigureDialog} disabled={configureSaving}>
                 Cancel
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-primary"
+                className="tb-btn tb-btn-primary"
                 onClick={() => saveConfiguredEpic()}
                 disabled={configureSaving || !selectedConfigureCandidate}
               >
@@ -2831,29 +2830,29 @@ export function InitiativesScreen() {
       ) : null}
 
       {metaSuccess ? (
-        <div class="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
-          <div class="tb-overlay-toast is-success">{metaSuccess}</div>
+        <div className="tb-overlay-toast-layer" aria-live="polite" aria-atomic="true">
+          <div className="tb-overlay-toast is-success">{metaSuccess}</div>
         </div>
       ) : null}
 
       {isEditOpen && editingEpic ? (
-        <div class="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Edit Epic Metadata">
-          <div class="tb-modal-backdrop" onClick={closeEditDialog} />
-          <div class="tb-modal tb-modal-wide">
-            <header class="tb-modal-head">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Edit Epic Metadata">
+          <div className="tb-modal-backdrop" onClick={closeEditDialog} />
+          <div className="tb-modal tb-modal-wide">
+            <header className="tb-modal-head">
               <h3>Edit Epic Metadata</h3>
-              <button type="button" class="tb-btn tb-btn-sm" onClick={closeEditDialog} disabled={editSaving}>
+              <button type="button" className="tb-btn tb-btn-sm" onClick={closeEditDialog} disabled={editSaving}>
                 Close
               </button>
             </header>
 
-            <p class="tb-muted-note">
+            <p className="tb-muted-note">
               Epic: <strong>{editingEpic.epicKey}</strong>
               {editingEpic.epicName ? ` (${editingEpic.epicName})` : ""}
             </p>
 
-            <div class="tb-modal-two-up">
-              <label class="tb-modal-field">
+            <div className="tb-modal-two-up">
+              <label className="tb-modal-field">
                 <span>Epic Group (one)</span>
                 <select
                   value={editSelectedGroupId}
@@ -2866,7 +2865,7 @@ export function InitiativesScreen() {
                 </select>
               </label>
 
-              <label class="tb-modal-field">
+              <label className="tb-modal-field">
                 <span>Work Type (one)</span>
                 <select
                   value={editSelectedWorkTypeId}
@@ -2880,7 +2879,7 @@ export function InitiativesScreen() {
               </label>
             </div>
 
-            <label class="tb-modal-check">
+            <label className="tb-modal-check">
               <input
                 type="checkbox"
                 checked={editTimelineEnabled}
@@ -2896,8 +2895,8 @@ export function InitiativesScreen() {
               <span>Enable timeline dates</span>
             </label>
 
-            <div class="tb-modal-two-up">
-              <label class="tb-modal-field">
+            <div className="tb-modal-two-up">
+              <label className="tb-modal-field">
                 <span>Timeline Start Date</span>
                 <input
                   type="date"
@@ -2907,7 +2906,7 @@ export function InitiativesScreen() {
                 />
               </label>
 
-              <label class="tb-modal-field">
+              <label className="tb-modal-field">
                 <span>Target Completion Date</span>
                 <input
                   type="date"
@@ -2918,7 +2917,7 @@ export function InitiativesScreen() {
               </label>
             </div>
 
-            <label class="tb-modal-field">
+            <label className="tb-modal-field">
               <span>Success Criteria (one per line)</span>
               <textarea
                 rows={6}
@@ -2927,13 +2926,13 @@ export function InitiativesScreen() {
               />
             </label>
 
-            {editError ? <p class="tb-error-note">{editError}</p> : null}
+            {editError ? <p className="tb-error-note">{editError}</p> : null}
 
-            <footer class="tb-modal-actions">
-              <button type="button" class="tb-btn" onClick={closeEditDialog} disabled={editSaving}>
+            <footer className="tb-modal-actions">
+              <button type="button" className="tb-btn" onClick={closeEditDialog} disabled={editSaving}>
                 Cancel
               </button>
-              <button type="button" class="tb-btn tb-btn-primary" onClick={() => saveEditedEpic()} disabled={editSaving}>
+              <button type="button" className="tb-btn tb-btn-primary" onClick={() => saveEditedEpic()} disabled={editSaving}>
                 {editSaving ? "Saving..." : "Save Changes"}
               </button>
             </footer>

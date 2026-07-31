@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/preact";
+import { render, screen } from "@testing-library/react";
 import { IncidentResponseScreen } from "../../src/components/content/screens/IncidentResponseScreen";
 
 describe("IncidentResponseScreen", () => {

@@ -5,8 +5,19 @@
  * as shown at https://oss.oracle.com/licenses/upl/
  * @ignore
  */
-import { h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Activity,
+  Gauge,
+  LayoutDashboard,
+  ListTodo,
+  Menu,
+  Rocket,
+  Settings,
+  ShieldCheck,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import {
   INITIATIVES_VIEW_STATE_EVENT,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
@@ -50,6 +61,7 @@ type NavItem = {
   label: string;
   blurb: string;
   showConstruction: boolean;
+  icon: LucideIcon;
 };
 
 type Props = {
@@ -74,14 +86,14 @@ const DEFAULT_INITIATIVE_TOPBAR_STATE: InitiativeTopbarState = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false },
-  { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false },
-  { id: "team", label: "Team Insights", blurb: "Sprint Trend / Cycle Time", showConstruction: false },
-  { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true },
-  { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true },
-  { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false },
-  { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false },
-  { id: "integrations", label: "Settings", blurb: "Connections / Metadata Configuration", showConstruction: false },
+  { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false, icon: Gauge },
+  { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false, icon: ListTodo },
+  { id: "team", label: "Team Insights", blurb: "Sprint Trend / Cycle Time", showConstruction: false, icon: UsersRound },
+  { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
+  { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
+  { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
+  { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
+  { id: "integrations", label: "Settings", blurb: "Connections / Metadata Configuration", showConstruction: false, icon: Settings },
 ];
 
 function screenTitle(id: ScreenId): string {
@@ -195,13 +207,13 @@ function TrendWindowDropdown({ value, onChange }: TrendWindowDropdownProps) {
   }, [isOpen, value]);
 
   return (
-    <div class="tb-topbar-trend-window">
+    <div className="tb-topbar-trend-window">
       <span id="tb-trend-window-label">Trend Window</span>
-      <div class="tb-topbar-trend-window-dropdown" ref={dropdownRef}>
+      <div className="tb-topbar-trend-window-dropdown" ref={dropdownRef}>
         <button
           ref={triggerRef}
           type="button"
-          class={`tb-topbar-trend-window-trigger${isOpen ? " is-open" : ""}`}
+          className={`tb-topbar-trend-window-trigger${isOpen ? " is-open" : ""}`}
           role="combobox"
           aria-labelledby="tb-trend-window-label"
           aria-describedby="tb-trend-window-value"
@@ -239,16 +251,16 @@ function TrendWindowDropdown({ value, onChange }: TrendWindowDropdownProps) {
             }
           }}
         >
-          <span id="tb-trend-window-value" class="tb-topbar-trend-window-value">
+          <span id="tb-trend-window-value" className="tb-topbar-trend-window-value">
             {formatTrendWindowLabel(value)}
           </span>
-          <span class={`tb-topbar-trend-window-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
+          <span className={`tb-topbar-trend-window-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
         </button>
 
         {isOpen ? (
           <div
             id="tb-trend-window-listbox"
-            class="tb-topbar-trend-window-menu"
+            className="tb-topbar-trend-window-menu"
             role="listbox"
             aria-label="Trend Window options"
           >
@@ -263,7 +275,7 @@ function TrendWindowDropdown({ value, onChange }: TrendWindowDropdownProps) {
                   }}
                   type="button"
                   role="option"
-                  class={`tb-topbar-trend-window-option${selected ? " is-selected" : ""}`}
+                  className={`tb-topbar-trend-window-option${selected ? " is-selected" : ""}`}
                   aria-selected={selected ? "true" : "false"}
                   onClick={() => selectValue(optionValue)}
                   onKeyDown={(event) => {
@@ -365,17 +377,17 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
 
   useEffect(() => {
     if (!isOpen) return;
-    focusOption(activeView.id);
+    optionRefs.current[String(activeView.id)]?.focus();
   }, [activeView.id, isOpen]);
 
   return (
-    <div class="tb-initiative-view-select tb-topbar-initiative-view tb-no-print">
+    <div className="tb-initiative-view-select tb-topbar-initiative-view tb-no-print">
       <span id="tb-initiative-view-label">Select View</span>
-      <div class="tb-initiative-view-dropdown" ref={dropdownRef}>
+      <div className="tb-initiative-view-dropdown" ref={dropdownRef}>
         <button
           ref={triggerRef}
           type="button"
-          class={`tb-initiative-view-trigger${isOpen ? " is-open" : ""}`}
+          className={`tb-initiative-view-trigger${isOpen ? " is-open" : ""}`}
           role="combobox"
           aria-labelledby="tb-initiative-view-label"
           aria-describedby="tb-initiative-view-value"
@@ -413,16 +425,16 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
             }
           }}
         >
-          <span id="tb-initiative-view-value" class="tb-initiative-view-value">
+          <span id="tb-initiative-view-value" className="tb-initiative-view-value">
             {formatInitiativeViewOption(activeView)}
           </span>
-          <span class={`tb-initiative-view-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
+          <span className={`tb-initiative-view-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true"></span>
         </button>
 
         {isOpen ? (
           <div
             id="tb-initiative-view-listbox"
-            class="tb-initiative-view-menu"
+            className="tb-initiative-view-menu"
             role="listbox"
             aria-label="Initiative View options"
           >
@@ -437,7 +449,7 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
                   }}
                   type="button"
                   role="option"
-                  class={`tb-initiative-view-option${selected ? " is-selected" : ""}`}
+                  className={`tb-initiative-view-option${selected ? " is-selected" : ""}`}
                   aria-selected={selected ? "true" : "false"}
                   onClick={() => selectView(view.id)}
                   onKeyDown={(event) => {
@@ -481,6 +493,7 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
 
 export function Content({ appName }: Props) {
   const [active, setActive] = useState<ScreenId>("integrations");
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [teamTrendWindowSelection, setTeamTrendWindowSelection] = useState<number>(12);
   const [initiativeTopbarState, setInitiativeTopbarState] = useState<InitiativeTopbarState>(
     DEFAULT_INITIATIVE_TOPBAR_STATE,
@@ -534,48 +547,84 @@ export function Content({ appName }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isSidebarExpanded) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSidebarExpanded(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSidebarExpanded]);
+
   return (
-    <div class="tb-app-frame">
-      <aside class="tb-sidebar">
-        <div class="tb-brand">
-          <div class="tb-brand-mark" aria-hidden="true">TB</div>
-          <div>
-            <p class="tb-eyebrow">{appName}</p>
+    <div className={`tb-app-frame${isSidebarExpanded ? " is-nav-expanded" : ""}`}>
+      <aside
+        id="tb-primary-sidebar"
+        className={`tb-sidebar${isSidebarExpanded ? " is-expanded" : ""}`}
+      >
+        <div className="tb-brand">
+          <button
+            type="button"
+            className="tb-sidebar-toggle"
+            aria-controls="tb-primary-sidebar"
+            aria-expanded={isSidebarExpanded}
+            aria-label={isSidebarExpanded ? "Collapse navigation" : "Expand navigation"}
+            title={isSidebarExpanded ? "Collapse navigation" : "Expand navigation"}
+            onClick={() => setIsSidebarExpanded((current) => !current)}
+          >
+            <Menu aria-hidden="true" strokeWidth={2} />
+          </button>
+          <div className="tb-brand-copy" aria-hidden={!isSidebarExpanded}>
+            <p className="tb-eyebrow">{appName}</p>
             <h1>Manager Console</h1>
             <small>Illuminating Engineering Insights</small>
           </div>
         </div>
-        <nav class="tb-nav">
+        <nav className="tb-nav">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               type="button"
-              class={`tb-nav-item${active === item.id ? " is-active" : ""}`}
+              className={`tb-nav-item${active === item.id ? " is-active" : ""}`}
+              aria-label={`${item.label}: ${item.blurb}`}
+              data-tooltip={item.label}
               onClick={() => setActive(item.id)}
             >
-              <div class="tb-nav-title-row">
-                <span class="tb-nav-title">{item.label}</span>
-                {item.showConstruction ? (
-                  <span
-                    class="tb-nav-construction"
-                    title="Under construction"
-                    aria-label={`${item.label} is under construction`}
-                  >
-                    🚧
-                  </span>
-                ) : null}
+              <item.icon className="tb-nav-icon" aria-hidden="true" strokeWidth={1.8} />
+              <div className="tb-nav-copy">
+                <div className="tb-nav-title-row">
+                  <span className="tb-nav-title">{item.label}</span>
+                </div>
+                <small>{item.blurb}</small>
               </div>
-              <small>{item.blurb}</small>
+              {item.showConstruction ? (
+                <span
+                  className="tb-nav-construction"
+                  title="Under construction"
+                  aria-label={`${item.label} is under construction`}
+                >
+                  <span aria-hidden="true">•</span>
+                </span>
+              ) : null}
             </button>
           ))}
         </nav>
       </aside>
 
-      <main class="tb-main">
-        <header class="tb-topbar">
-          <h2>{heading}</h2>
+      <main className={`tb-main tb-main-${active}`}>
+        <header className="tb-topbar">
+          <div className="tb-topbar-title">
+            <p>{appName} · Manager Console</p>
+            <h2>{heading}</h2>
+          </div>
           {active === "initiatives" ? (
-            <div class="tb-topbar-actions tb-topbar-actions-initiative">
+            <div className="tb-topbar-actions tb-topbar-actions-initiative">
               <InitiativeViewDropdown
                 views={initiativeTopbarState.views}
                 activeViewId={initiativeTopbarState.activeViewId}
@@ -583,14 +632,14 @@ export function Content({ appName }: Props) {
               />
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_MANAGE_VIEW_EVENT))}
               >
                 Manage View
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_INITIATIVES_CONFIGURE_EVENT))}
               >
                 Configure Initiative
@@ -598,14 +647,14 @@ export function Content({ appName }: Props) {
             </div>
           ) : null}
           {active === "team" ? (
-            <div class="tb-topbar-actions">
+            <div className="tb-topbar-actions">
               <TrendWindowDropdown
                 value={teamTrendWindowSelection}
                 onChange={updateTeamTrendWindowSelection}
               />
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 aria-label="Team Insights Settings"
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_INSIGHTS_SETTINGS_EVENT))}
               >
@@ -614,24 +663,24 @@ export function Content({ appName }: Props) {
             </div>
           ) : null}
           {active === "executive" ? (
-            <div class="tb-topbar-actions">
+            <div className="tb-topbar-actions">
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT))}
               >
                 Reporting Period
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT))}
               >
                 Configure Initiatives
               </button>
               <button
                 type="button"
-                class="tb-btn tb-btn-sm tb-no-print"
+                className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(EXPORT_TEAM_DASHBOARD_HTML_EVENT))}
               >
                 Export Dashboard
@@ -639,7 +688,7 @@ export function Content({ appName }: Props) {
             </div>
           ) : null}
         </header>
-        <section class="tb-screen-body">{renderScreen(active)}</section>
+        <section className="tb-screen-body">{renderScreen(active)}</section>
       </main>
     </div>
   );
