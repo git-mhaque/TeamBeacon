@@ -205,11 +205,11 @@ function ReleaseCycleLineChart({
           {
             label: "Cycle time",
             data: measuredValues,
-            borderColor: "#1f67c1",
-            backgroundColor: "rgba(47, 123, 216, 0.14)",
+            borderColor: "#287491",
+            backgroundColor: "rgba(40, 116, 145, 0.12)",
             borderWidth: 2,
             pointBackgroundColor: "#ffffff",
-            pointBorderColor: "#175cae",
+            pointBorderColor: "#1c607a",
             pointBorderWidth: 2,
             pointRadius: 4,
             pointHoverRadius: 5,
@@ -233,7 +233,7 @@ function ReleaseCycleLineChart({
             ? [{
               label: "Average",
               data: releases.map(() => averageCycleTime),
-              borderColor: "#8d6b20",
+              borderColor: "#9a6a18",
               borderDash: [6, 4],
               borderWidth: 1.4,
               pointRadius: 0,
@@ -289,7 +289,7 @@ function ReleaseCycleLineChart({
             },
             ticks: {
               autoSkip: false,
-              color: "#2a456d",
+              color: "#5a514a",
               font: {
                 size: 11,
                 weight: "700",
@@ -298,7 +298,7 @@ function ReleaseCycleLineChart({
               minRotation: 0,
             },
             border: {
-              color: "#bfd0e8",
+              color: "#d2cac3",
               width: 2,
             },
           },
@@ -307,7 +307,7 @@ function ReleaseCycleLineChart({
             min: 0,
             suggestedMax,
             ticks: {
-              color: "#2a456d",
+              color: "#5a514a",
               font: {
                 size: 11,
                 weight: "700",
@@ -316,11 +316,11 @@ function ReleaseCycleLineChart({
               callback: (value: unknown) => `${formatNumber(Number(value))} d`,
             },
             grid: {
-              color: "#e1e9f6",
-              tickColor: "#bfd0e8",
+              color: "#e7e1dc",
+              tickColor: "#d2cac3",
             },
             border: {
-              color: "#bfd0e8",
+              color: "#d2cac3",
               width: 2,
             },
           },

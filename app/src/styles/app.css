@@ -5247,6 +5247,167 @@ body {
   }
 }
 
+/* Release Insights */
+.tb-main-releases .tb-screen-grid {
+  gap: 0.85rem;
+}
+
+.tb-main-releases .tb-metric-card {
+  position: relative;
+  min-height: 6.7rem;
+  overflow: hidden;
+  padding-left: 0.92rem;
+}
+
+.tb-main-releases .tb-metrics-grid > .tb-metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.2rem;
+  background: #62777e;
+}
+
+.tb-main-releases .tb-metrics-grid > .tb-metric-card:nth-child(2)::before {
+  background: var(--tb-risk);
+}
+
+.tb-main-releases .tb-metrics-grid > .tb-metric-card:nth-child(3)::before {
+  background: #287491;
+}
+
+.tb-main-releases .tb-metrics-grid > .tb-metric-card:nth-child(4)::before {
+  background: #7b6b91;
+}
+
+.tb-main-releases .tb-release-cycle-view {
+  gap: 0.72rem;
+}
+
+.tb-main-releases .tb-release-cycle-summary {
+  gap: 0.58rem;
+}
+
+.tb-main-releases .tb-release-cycle-summary article {
+  border-color: #ded7d0;
+  border-radius: 0.58rem;
+  background: #faf8f6;
+  padding: 0.58rem 0.66rem;
+}
+
+.tb-main-releases .tb-release-cycle-summary span {
+  color: #6a615a;
+}
+
+.tb-main-releases .tb-release-cycle-summary strong {
+  color: #302c28;
+  font-size: 1.12rem;
+}
+
+.tb-main-releases .tb-release-cycle-chart-frame {
+  border-color: #ddd6cf;
+  border-radius: 0.62rem;
+  background: #ffffff;
+  padding: 0.72rem 0.82rem 0.64rem;
+}
+
+.tb-main-releases .tb-release-cycle-legend,
+.tb-main-releases .tb-release-cycle-key span {
+  color: #5c544d;
+}
+
+.tb-main-releases .tb-release-cycle-line-swatch {
+  background: #287491;
+}
+
+.tb-main-releases .tb-release-cycle-key strong {
+  border-color: #c6dbe2;
+  background: #eef7f9;
+  color: #315f6c;
+}
+
+.tb-main-releases .tb-release-table-wrap,
+.tb-main-releases .tb-release-recent-table-wrap {
+  border-color: #d9d2cb;
+  border-radius: 0.62rem;
+}
+
+.tb-main-releases .tb-release-table th,
+.tb-main-releases .tb-initiative-table th {
+  border-bottom-color: #d6cec7;
+  background: #ede9e4;
+  color: #514943;
+  font-size: 0.67rem;
+  letter-spacing: 0.05em;
+}
+
+.tb-main-releases .tb-release-table td,
+.tb-main-releases .tb-initiative-table td {
+  border-bottom-color: #e2dcd6;
+  color: #393530;
+}
+
+.tb-main-releases .tb-release-table tbody tr:hover,
+.tb-main-releases .tb-initiative-table tbody tr:hover {
+  background: #fcfaf8;
+}
+
+.tb-main-releases .tb-release-name-cell strong {
+  color: #20607a;
+}
+
+.tb-main-releases .tb-release-name-cell span,
+.tb-main-releases .tb-release-mix-cell,
+.tb-main-releases .tb-release-risk-detail {
+  color: #625b55;
+}
+
+.tb-main-releases .tb-release-readiness-track {
+  border-color: #cbd9de;
+  background: #e9f1f3;
+}
+
+.tb-main-releases .tb-release-readiness-track span {
+  background: linear-gradient(90deg, #3185ab 0%, #186789 100%);
+}
+
+.tb-main-releases .tb-release-readiness > span {
+  color: #4d6268;
+}
+
+.tb-main-releases .tb-release-risk-grid {
+  gap: 0.68rem;
+}
+
+.tb-main-releases .tb-release-risk-grid .tb-metric-card {
+  min-height: 7rem;
+}
+
+.tb-main-releases .tb-release-selector-search {
+  border-color: #d4ccc4;
+  background: #ffffff;
+  color: #37322e;
+}
+
+.tb-main-releases .tb-release-selector-search:focus {
+  border-color: #b68980;
+  box-shadow: 0 0 0 0.16rem rgba(150, 56, 43, 0.1);
+  outline: none;
+}
+
+.tb-main-releases .tb-release-selector-option {
+  border-color: #ded7d0;
+  background: #faf8f6;
+  color: #403a35;
+}
+
+.tb-main-releases .tb-release-selector-option-copy strong {
+  color: #37322e;
+}
+
+.tb-main-releases .tb-release-selector-option-copy span {
+  color: #655d56;
+}
+
 @page {
   size: A4 portrait;
   margin: 12mm;
