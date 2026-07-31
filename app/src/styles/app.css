@@ -5408,6 +5408,205 @@ body {
   color: #655d56;
 }
 
+/* Team Dashboard */
+.tb-main-executive .tb-screen-grid {
+  gap: 0.85rem;
+}
+
+.tb-main-executive .tb-exec-reporting-period-note {
+  width: fit-content;
+  margin: 0;
+  border: 1px solid #d8d0c8;
+  border-radius: 999px;
+  background: #f7f4f1;
+  color: #5e5650;
+  font-size: 0.72rem;
+  font-weight: 650;
+  padding: 0.25rem 0.58rem;
+}
+
+.tb-main-executive .tb-screen-grid > .tb-panel:first-of-type {
+  border-left: 0.24rem solid var(--tb-brand);
+  background: linear-gradient(145deg, #ffffff 0%, #fcfaf8 100%);
+}
+
+.tb-main-executive .tb-summary-plain {
+  color: #3f3934;
+  font-size: 0.88rem;
+  line-height: 1.62;
+}
+
+.tb-main-executive .tb-section-divider {
+  border-top-color: #e2dcd6;
+}
+
+.tb-main-executive .tb-exec-summary-meta {
+  color: #655d56;
+}
+
+.tb-main-executive .tb-exec-summary-meta span {
+  border-color: #ddd6cf;
+  background: #f7f4f1;
+}
+
+.tb-main-executive .tb-exec-two-up {
+  gap: 0.72rem;
+}
+
+.tb-main-executive .tb-exec-two-up > div {
+  border: 1px solid #ded7d0;
+  border-left: 0.22rem solid var(--tb-good);
+  border-radius: 0.58rem;
+  background: #faf8f6;
+  padding: 0.75rem 0.82rem;
+}
+
+.tb-main-executive .tb-exec-two-up > div:nth-child(2) {
+  border-left-color: var(--tb-risk);
+}
+
+.tb-main-executive .tb-exec-list-title {
+  color: #4d4640;
+  font-size: 0.75rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.tb-main-executive .tb-exec-narrative-list li,
+.tb-main-executive .tb-list li {
+  color: #47413c;
+}
+
+.tb-main-executive .tb-metric-card {
+  position: relative;
+  min-height: 6.8rem;
+  overflow: hidden;
+  padding-left: 0.92rem;
+}
+
+.tb-main-executive .tb-metrics-grid > .tb-metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.2rem;
+  background: #62777e;
+}
+
+.tb-main-executive .tb-metrics-grid > .tb-metric-card:nth-child(2)::before {
+  background: var(--tb-good);
+}
+
+.tb-main-executive .tb-metrics-grid > .tb-metric-card:nth-child(3)::before {
+  background: var(--tb-warn);
+}
+
+.tb-main-executive .tb-sync-history-wrap {
+  border-color: #d9d2cb;
+  border-radius: 0.62rem;
+}
+
+.tb-main-executive .tb-sync-history-table th {
+  border-bottom-color: #d6cec7;
+  background: #ede9e4;
+  color: #514943;
+  font-size: 0.67rem;
+  letter-spacing: 0.05em;
+}
+
+.tb-main-executive .tb-sync-history-table td {
+  border-bottom-color: #e2dcd6;
+  color: #393530;
+}
+
+.tb-main-executive .tb-history-progress-track {
+  border-color: #cbd9de;
+  background: #e9f1f3;
+}
+
+.tb-main-executive .tb-history-progress-fill {
+  background: linear-gradient(90deg, #3185ab 0%, #186789 100%);
+}
+
+.tb-main-executive .tb-history-progress-label {
+  color: #4d6268;
+}
+
+.tb-main-executive .tb-exec-workmix-stack {
+  gap: 0.72rem;
+}
+
+.tb-main-executive .tb-exec-workmix-row {
+  border: 1px solid #ded7d0;
+  border-radius: 0.62rem;
+  background: #faf8f6;
+  padding: 0.75rem;
+}
+
+.tb-main-executive .tb-exec-donut {
+  border-color: #d8d0c8;
+  box-shadow: 0 0.35rem 0.8rem rgba(58, 44, 35, 0.06);
+}
+
+.tb-main-executive .tb-exec-donut::after {
+  border-color: #e0d9d2;
+  box-shadow: none;
+}
+
+.tb-main-executive .tb-exec-donut-legend li {
+  color: #554e48;
+}
+
+.tb-main-executive .tb-exec-completed-summary > div {
+  border: 1px solid #ded7d0;
+  border-radius: 0.58rem;
+  background: #faf8f6;
+  padding: 0.72rem 0.78rem;
+}
+
+.tb-main-executive .tb-exec-period-field span,
+.tb-main-executive .tb-exec-search span {
+  color: #625a54;
+}
+
+.tb-main-executive .tb-exec-period-field select,
+.tb-main-executive .tb-exec-period-field input,
+.tb-main-executive .tb-exec-search input {
+  border-color: #d4ccc4;
+  background: #ffffff;
+  color: #37322e;
+}
+
+.tb-main-executive .tb-exec-config-list {
+  border-color: #ddd6cf;
+  background: #f8f6f3;
+}
+
+.tb-main-executive .tb-exec-config-item {
+  border-color: #ded7d0;
+  background: #ffffff;
+}
+
+.tb-main-executive .tb-exec-config-item strong {
+  color: #37322e;
+}
+
+.tb-main-executive .tb-exec-config-item p,
+.tb-main-executive .tb-exec-drag-handle {
+  color: #655d56;
+}
+
+.tb-main-executive .tb-exec-config-item-button:hover,
+.tb-main-executive .tb-exec-config-item-draggable.is-dragging {
+  border-color: #c89d95;
+  background: #f8ece9;
+}
+
+@media (max-width: 900px) {
+  .tb-main-executive .tb-exec-workmix-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @page {
   size: A4 portrait;
   margin: 12mm;

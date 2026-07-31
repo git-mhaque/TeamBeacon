@@ -362,7 +362,7 @@ function buildTeamDashboardExportHtml(params: {
 }): string {
   const completedSections = params.completedWork.length > 0
     ? params.completedWork.map((entry) => `
-        <section className="section-block">
+        <section class="section-block">
           <h4>${escapeHtml(entry.group)}</h4>
           <ul>
             ${entry.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
@@ -370,7 +370,7 @@ function buildTeamDashboardExportHtml(params: {
         </section>
       `).join("")
     : `
-      <section className="section-block">
+      <section class="section-block">
         <h4>No Completed Work</h4>
         <ul><li>No completed work summary is available for this period.</li></ul>
       </section>
@@ -389,16 +389,16 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.name)}</td>
           <td>${row.completedInPeriod}</td>
           <td>
-            <div className="mix-bar-cell">
-              <span className="mix-bar-track">
-                <span className="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+            <div class="mix-bar-cell">
+              <span class="mix-bar-track">
+                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
               </span>
-              <span className="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
             </div>
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="3" className="empty">No group mix data available.</td></tr>`;
+    : `<tr><td colspan="3" class="empty">No group mix data available.</td></tr>`;
 
   const typeRows = params.typeMixRows.length > 0
     ? params.typeMixRows.map((row, index) => `
@@ -406,16 +406,16 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.name)}</td>
           <td>${row.completedInPeriod}</td>
           <td>
-            <div className="mix-bar-cell">
-              <span className="mix-bar-track">
-                <span className="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
+            <div class="mix-bar-cell">
+              <span class="mix-bar-track">
+                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
               </span>
-              <span className="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
+              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
             </div>
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="3" className="empty">No work-type mix data available.</td></tr>`;
+    : `<tr><td colspan="3" class="empty">No work-type mix data available.</td></tr>`;
 
   const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
 
@@ -427,26 +427,26 @@ function buildTeamDashboardExportHtml(params: {
           <td>${escapeHtml(row.group)}</td>
           <td>${escapeHtml(row.initiative)}</td>
           <td>
-            <div className="progress-cell">
-              <span className="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
-              <span className="progress-track">
-                <span className="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
+            <div class="progress-cell">
+              <span class="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
+              <span class="progress-track">
+                <span class="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
               </span>
             </div>
           </td>
           <td>
-            <div className="progress-cell">
-              <span className="progress-label">${escapeHtml(row.overallProgressLabel)}</span>
-              <span className="progress-track">
-                <span className="progress-fill progress-overall ${ragClass}" style="width:${clampPercent(row.overallProgressPercent).toFixed(1)}%;"></span>
+            <div class="progress-cell">
+              <span class="progress-label">${escapeHtml(row.overallProgressLabel)}</span>
+              <span class="progress-track">
+                <span class="progress-fill progress-overall ${ragClass}" style="width:${clampPercent(row.overallProgressPercent).toFixed(1)}%;"></span>
               </span>
             </div>
           </td>
-          <td className="${ragClass}">${escapeHtml(row.rag)}</td>
+          <td class="${ragClass}">${escapeHtml(row.rag)}</td>
         </tr>
       `;
     }).join("")
-    : `<tr><td colspan="5" className="empty">No initiatives selected for this export.</td></tr>`;
+    : `<tr><td colspan="5" class="empty">No initiatives selected for this export.</td></tr>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -456,25 +456,25 @@ function buildTeamDashboardExportHtml(params: {
     <title>Team Dashboard</title>
     <style>
       :root {
-        --ink: #16233b;
-        --muted: #536481;
-        --line: #d9e2f0;
+        --ink: #282522;
+        --muted: #6b645e;
+        --line: #ddd7d0;
         --surface: #ffffff;
-        --surface-alt: #f8fbff;
-        --surface-accent: #f0f6ff;
-        --brand: #1f4f95;
-        --brand-soft: #eef4ff;
-        --brand-strong: #1c3e78;
-        --good: #1f8f63;
-        --warn: #b77700;
-        --risk: #c2372e;
+        --surface-alt: #faf8f6;
+        --surface-accent: #ede9e4;
+        --brand: #96382b;
+        --brand-soft: #f8ece9;
+        --brand-strong: #76271f;
+        --good: #2c7653;
+        --warn: #a76e00;
+        --risk: #bc392d;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         color: var(--ink);
-        font-family: "Oracle Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background: linear-gradient(145deg, #f1f6ff 0%, #e7f0ff 46%, #f8fbff 100%);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f4f2ef;
       }
       .mode-print {
         background: #ffffff;
@@ -527,14 +527,14 @@ function buildTeamDashboardExportHtml(params: {
       .hero {
         border: 1px solid var(--line);
         border-radius: 16px;
-        background: linear-gradient(130deg, #ffffff 0%, #f2f7ff 54%, #ecf3ff 100%);
+        background: linear-gradient(130deg, #ffffff 0%, #fcfaf8 100%);
         padding: 22px;
-        box-shadow: 0 18px 34px rgba(17, 38, 77, 0.12);
+        box-shadow: 0 18px 34px rgba(57, 45, 37, 0.1);
       }
       .hero h1 {
         margin: 0;
         font-size: 28px;
-        color: #16315a;
+        color: #2c2926;
         letter-spacing: 0.02em;
       }
       .hero p {
@@ -549,10 +549,10 @@ function buildTeamDashboardExportHtml(params: {
         gap: 8px;
       }
       .chip {
-        border: 1px solid #c8d7f1;
+        border: 1px solid #d9c3be;
         border-radius: 999px;
         background: var(--brand-soft);
-        color: #1f4f95;
+        color: var(--brand-strong);
         font-size: 12px;
         padding: 4px 10px;
       }
@@ -561,25 +561,25 @@ function buildTeamDashboardExportHtml(params: {
         border-radius: 14px;
         background: var(--surface);
         padding: 16px;
-        box-shadow: 0 12px 24px rgba(17, 38, 77, 0.08);
+        box-shadow: 0 12px 24px rgba(57, 45, 37, 0.07);
       }
       h2 {
         margin: 0 0 10px;
         font-size: 18px;
-        color: #203f6b;
+        color: #35302c;
       }
       h3 {
         margin: 0 0 8px;
         font-size: 14px;
-        color: #274b7a;
+        color: #4a433d;
       }
       h4 {
         margin: 0;
         font-size: 13px;
-        color: #2f5586;
+        color: #564e47;
       }
       .summary {
-        color: #233c60;
+        color: #403a35;
         line-height: 1.58;
         font-size: 14px;
         margin: 0;
@@ -604,7 +604,7 @@ function buildTeamDashboardExportHtml(params: {
       ul {
         margin: 8px 0 0;
         padding-left: 18px;
-        color: #304c76;
+        color: #4a433d;
         line-height: 1.5;
       }
       .signals {
@@ -706,18 +706,18 @@ function buildTeamDashboardExportHtml(params: {
       }
       thead th {
         text-align: left;
-        background: #edf4ff;
-        color: #21426f;
-        border-bottom: 1px solid #d2def0;
+        background: #ede9e4;
+        color: #514943;
+        border-bottom: 1px solid #d6cec7;
         padding: 8px 9px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: 11px;
       }
       tbody td {
-        border-bottom: 1px solid #e0e8f5;
+        border-bottom: 1px solid #e2dcd6;
         padding: 8px 9px;
-        color: #284264;
+        color: #393530;
       }
       tbody tr:last-child td {
         border-bottom: none;
@@ -817,25 +817,25 @@ function buildTeamDashboardExportHtml(params: {
       }
     </style>
   </head>
-  <body className="${modeClass}">
-    <main className="page">
-      <section className="hero">
+  <body class="${modeClass}">
+    <main class="page">
+      <section class="hero">
         <h1>Team Dashboard</h1>
-        <div className="meta">
-          <span className="chip">Reporting Period: ${escapeHtml(params.reportingPeriodLabel)}</span>
-          <span className="chip">${params.reportingPeriodDays} day(s) | ${escapeHtml(params.timezone)}</span>
-          <span className="chip">Generated: ${escapeHtml(formatDraftTimestamp(params.generatedAt))}</span>
+        <div class="meta">
+          <span class="chip">Reporting Period: ${escapeHtml(params.reportingPeriodLabel)}</span>
+          <span class="chip">${params.reportingPeriodDays} day(s) | ${escapeHtml(params.timezone)}</span>
+          <span class="chip">Generated: ${escapeHtml(formatDraftTimestamp(params.generatedAt))}</span>
         </div>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Executive Summary</h2>
-        <p className="summary">${escapeHtml(params.executiveSummary)}</p>
+        <p class="summary">${escapeHtml(params.executiveSummary)}</p>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Wins and Risks</h2>
-        <div className="grid-2">
+        <div class="grid-2">
           <section>
             <h3>Wins</h3>
             <ul>${winsList}</ul>
@@ -847,34 +847,34 @@ function buildTeamDashboardExportHtml(params: {
         </div>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Report Signals</h2>
-        <div className="signals">
-          <article className="metric">
-            <div className="label">Ongoing Initiatives</div>
-            <div className="value">${params.totalInitiatives}</div>
-            <p className="metric-note">Included for this reporting period.</p>
+        <div class="signals">
+          <article class="metric">
+            <div class="label">Ongoing Initiatives</div>
+            <div class="value">${params.totalInitiatives}</div>
+            <p class="metric-note">Included for this reporting period.</p>
           </article>
-          <article className="metric">
-            <div className="label">Period Progress</div>
-            <div className="value ${params.totalCompletedInPeriod > 0 ? "value-good" : "value-warn"}">${params.totalCompletedInPeriod} cards</div>
-            <p className="metric-note">Completed in the selected reporting period.</p>
+          <article class="metric">
+            <div class="label">Period Progress</div>
+            <div class="value ${params.totalCompletedInPeriod > 0 ? "value-good" : "value-warn"}">${params.totalCompletedInPeriod} cards</div>
+            <p class="metric-note">Completed in the selected reporting period.</p>
           </article>
-          <article className="metric">
-            <div className="label">Initiative RAG</div>
-            <div className="value value-rag">
-              <span className="rag-breakdown">
-                <span className="rag-red">${params.redCount} R</span>
-                <span className="rag-amber">${params.amberCount} A</span>
-                <span className="rag-green">${params.greenCount} G</span>
+          <article class="metric">
+            <div class="label">Initiative RAG</div>
+            <div class="value value-rag">
+              <span class="rag-breakdown">
+                <span class="rag-red">${params.redCount} R</span>
+                <span class="rag-amber">${params.amberCount} A</span>
+                <span class="rag-green">${params.greenCount} G</span>
               </span>
             </div>
-            <p className="metric-note">For selected initiatives.</p>
+            <p class="metric-note">For selected initiatives.</p>
           </article>
         </div>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Progress for Key Initiatives</h2>
         <table>
           <thead>
@@ -890,9 +890,9 @@ function buildTeamDashboardExportHtml(params: {
         </table>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Work Mix by Group and Type</h2>
-        <div className="section-stack">
+        <div class="section-stack">
           <section>
             <h3>By Group</h3>
             <table>
@@ -914,12 +914,12 @@ function buildTeamDashboardExportHtml(params: {
         </div>
       </section>
 
-      <section className="panel">
+      <section class="panel">
         <h2>Completed Work Summary</h2>
-        <div className="section-stack">${completedSections}</div>
+        <div class="section-stack">${completedSections}</div>
       </section>
 
-      <p className="footer">Generated by TeamBeacon Team Dashboard</p>
+      <p class="footer">Generated by TeamBeacon Team Dashboard</p>
     </main>
   </body>
 </html>`;
