@@ -21,6 +21,8 @@ For product messaging, capability narrative, and value framing, see:
 - [TeamBeacon Communication One-Pager](docs/communication/communication_one_pager.md)
 
 ## 🖼️ Feature Preview
+The following live-app captures use a synthetic demo workspace so project, sprint, and operational details remain safe to share.
+
 <table>
   <tr>
     <td align="center">
