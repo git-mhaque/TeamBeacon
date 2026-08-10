@@ -6510,6 +6510,11 @@ body {
 
 .tb-deep-dive-table-panel {
   padding: 0;
+  overflow: hidden;
+}
+
+.tb-main-initiative-deep-dive .tb-deep-dive-table-panel {
+  box-shadow: none;
 }
 
 .tb-deep-dive-table-heading {
@@ -6585,6 +6590,7 @@ body {
 
 .tb-deep-dive-table-scroll {
   overflow-x: auto;
+  background: #fff;
 }
 
 .tb-deep-dive-table {
@@ -6597,14 +6603,14 @@ body {
   font-size: 0.74rem;
 }
 
-.tb-deep-dive-table th:nth-child(1) { width: 7.2rem; }
-.tb-deep-dive-table th:nth-child(2) { width: 11.6rem; }
-.tb-deep-dive-table th:nth-child(3) { width: 7rem; }
-.tb-deep-dive-table th:nth-child(4) { width: 19rem; }
-.tb-deep-dive-table th:nth-child(5) { width: 7rem; }
+.tb-deep-dive-table th:nth-child(1) { width: 8%; }
+.tb-deep-dive-table th:nth-child(2) { width: 13%; }
+.tb-deep-dive-table th:nth-child(3) { width: 8.5%; }
+.tb-deep-dive-table th:nth-child(4) { width: 35.5%; }
+.tb-deep-dive-table th:nth-child(5) { width: 8%; }
 .tb-deep-dive-table th:nth-child(6),
-.tb-deep-dive-table th:nth-child(8) { width: 6.5rem; }
-.tb-deep-dive-table th:nth-child(7) { width: 7.7rem; }
+.tb-deep-dive-table th:nth-child(8) { width: 8.5%; }
+.tb-deep-dive-table th:nth-child(7) { width: 10%; }
 
 .tb-deep-dive-table th {
   position: sticky;
@@ -6643,7 +6649,12 @@ body {
 }
 
 .tb-deep-dive-title-cell {
-  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-deep-dive-title-text {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
 }

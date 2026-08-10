@@ -121,7 +121,10 @@ describe("InitiativeDeepDiveScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "New and completed cards by week" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "New and completed cards by week" })).toBeInTheDocument();
-    expect(screen.getByText("Ship initiative deep dive")).toBeInTheDocument();
+    expect(screen.getByText("Ship initiative deep dive")).toHaveAttribute(
+      "title",
+      "Ship initiative deep dive",
+    );
     expect(screen.getByText("Review flow metrics")).toBeInTheDocument();
     const activityTable = screen.getByRole("table");
     const columnHeaders = within(activityTable).getAllByRole("columnheader");

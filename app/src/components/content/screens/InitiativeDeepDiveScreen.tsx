@@ -519,7 +519,11 @@ export function InitiativeDeepDiveScreen() {
                           </a>
                         ) : <strong>{card.issueKey}</strong>}
                       </td>
-                      <td className="tb-deep-dive-title-cell">{card.summary}</td>
+                      <td className="tb-deep-dive-title-cell">
+                        <span className="tb-deep-dive-title-text" title={card.summary}>
+                          {card.summary}
+                        </span>
+                      </td>
                       <td><span className={`tb-deep-dive-status ${statusTone(card.statusCategory)}`}>{card.status}</span></td>
                       <td>{formatDateTime(card.createdAt)}</td>
                       <td>{formatDateTime(card.inProgressStartedAt)}</td>
