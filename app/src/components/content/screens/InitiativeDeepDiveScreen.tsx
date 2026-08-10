@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, RefreshCw } from "lucide-react";
+import { Check, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import {
   fetchEpicLookupConfig,
   fetchInitiativeDeepDive,
   type EpicLookupItem,
   type InitiativeDeepDiveActivity,
   type InitiativeDeepDiveCard,
+  type InitiativeDeepDiveEpicOption,
   type InitiativeDeepDiveResponse,
 } from "../../../lib/api";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
@@ -17,6 +18,7 @@ type SortDirection = "asc" | "desc";
 
 const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12];
 const INITIATIVE_DEEP_DIVE_SCOPE_KEY = "teambeacon.initiativeDeepDive.scope";
+const VISIBLE_SCOPE_PILLS = 3;
 
 type PersistedDeepDiveScope = {
   groupIds: number[];
@@ -176,6 +178,12 @@ function countForActivity(payload: InitiativeDeepDiveResponse, activity: Initiat
   return payload.tableCounts.all;
 }
 
+function sameSelection<T extends number | string>(left: T[], right: T[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightValues = new Set(right);
+  return left.every((value) => rightValues.has(value));
+}
+
 export function InitiativeDeepDiveScreen() {
   const [initialPersistedScope] = useState<PersistedDeepDiveScope>(readPersistedScope);
   const [groups, setGroups] = useState<EpicLookupItem[]>([]);
@@ -190,11 +198,16 @@ export function InitiativeDeepDiveScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasHydratedPersistedScope, setHasHydratedPersistedScope] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
-  const [isEpicMenuOpen, setIsEpicMenuOpen] = useState(false);
+  const [isScopePickerOpen, setIsScopePickerOpen] = useState(false);
+  const [draftGroupIds, setDraftGroupIds] = useState<number[]>([]);
+  const [draftEpicKeys, setDraftEpicKeys] = useState<string[]>([]);
+  const [draftEpicOptions, setDraftEpicOptions] = useState<InitiativeDeepDiveEpicOption[]>([]);
+  const [groupSearch, setGroupSearch] = useState("");
+  const [epicSearch, setEpicSearch] = useState("");
+  const [isDraftEpicLoading, setIsDraftEpicLoading] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const groupMenuRef = useRef<HTMLDivElement | null>(null);
-  const epicMenuRef = useRef<HTMLDivElement | null>(null);
+  const groupSearchRef = useRef<HTMLInputElement | null>(null);
   const persistedGroupIdsRef = useRef(initialPersistedScope.groupIds);
   const pendingPersistedEpicKeysRef = useRef(initialPersistedScope.epicKeys);
   const hasHydratedPersistedScopeRef = useRef(false);
@@ -230,6 +243,10 @@ export function InitiativeDeepDiveScreen() {
   const effectiveGroupIds = useMemo(
     () => selectedGroupIds.length === 0 ? groups.map((group) => group.id) : selectedGroupIds,
     [groups, selectedGroupIds],
+  );
+  const draftEffectiveGroupIds = useMemo(
+    () => draftGroupIds.length === 0 ? groups.map((group) => group.id) : draftGroupIds,
+    [draftGroupIds, groups],
   );
 
   useEffect(() => {
@@ -282,39 +299,82 @@ export function InitiativeDeepDiveScreen() {
   }, [hasHydratedPersistedScope, isLookupLoading, selectedEpicKeys, selectedGroupIds]);
 
   useEffect(() => {
-    if (!isGroupMenuOpen && !isEpicMenuOpen) return undefined;
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (!groupMenuRef.current?.contains(target)) {
-        setIsGroupMenuOpen(false);
-      }
-      if (!epicMenuRef.current?.contains(target)) {
-        setIsEpicMenuOpen(false);
-      }
-    };
+    if (!isScopePickerOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsGroupMenuOpen(false);
-        setIsEpicMenuOpen(false);
+        setIsScopePickerOpen(false);
       }
     };
-    document.addEventListener("mousedown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => groupSearchRef.current?.focus());
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isEpicMenuOpen, isGroupMenuOpen]);
+  }, [isScopePickerOpen]);
+
+  useEffect(() => {
+    if (!isScopePickerOpen || draftEffectiveGroupIds.length === 0) return undefined;
+    if (sameSelection(draftEffectiveGroupIds, effectiveGroupIds) && payload) {
+      setDraftEpicOptions(payload.epicOptions);
+      setIsDraftEpicLoading(false);
+      setDraftError(null);
+      return undefined;
+    }
+
+    let activeRequest = true;
+    setIsDraftEpicLoading(true);
+    setDraftError(null);
+    fetchInitiativeDeepDive({
+      groupIds: draftEffectiveGroupIds,
+      epicKeys: [],
+      chartWeeks: 12,
+      tableWindowWeeks,
+      activity: "all",
+      timezone,
+      limit: 1,
+    })
+      .then((previewPayload) => {
+        if (!activeRequest) return;
+        const availableEpicKeys = new Set(previewPayload.epicOptions.map((epic) => epic.epicKey));
+        setDraftEpicOptions(previewPayload.epicOptions);
+        setDraftEpicKeys((current) => {
+          const validKeys = current.filter((epicKey) => availableEpicKeys.has(epicKey));
+          return validKeys.length === previewPayload.epicOptions.length ? [] : validKeys;
+        });
+      })
+      .catch((requestError: unknown) => {
+        if (!activeRequest) return;
+        setDraftError(requestError instanceof Error ? requestError.message : "Unable to load epics for this group selection.");
+      })
+      .finally(() => {
+        if (activeRequest) setIsDraftEpicLoading(false);
+      });
+    return () => {
+      activeRequest = false;
+    };
+  }, [draftEffectiveGroupIds, effectiveGroupIds, isScopePickerOpen, payload, tableWindowWeeks, timezone]);
 
   const allGroupsSelected = selectedGroupIds.length === 0;
-  const groupSelectionLabel = allGroupsSelected
-    ? `All groups${groups.length > 0 ? ` (${groups.length})` : ""}`
-    : `${selectedGroupIds.length} of ${groups.length} groups`;
   const epicOptions = payload?.epicOptions ?? [];
   const allEpicsSelected = selectedEpicKeys.length === 0;
-  const epicSelectionLabel = allEpicsSelected
-    ? `All epics${epicOptions.length > 0 ? ` (${epicOptions.length})` : ""}`
-    : `${selectedEpicKeys.length} of ${epicOptions.length} epics`;
+  const selectedGroups = groups.filter((group) => selectedGroupIds.includes(group.id));
+  const selectedEpics = selectedEpicKeys.map((epicKey) => (
+    epicOptions.find((epic) => epic.epicKey === epicKey) ?? { epicKey, epicName: epicKey }
+  ));
+  const visibleSelectedGroups = selectedGroups.slice(0, VISIBLE_SCOPE_PILLS);
+  const visibleSelectedEpics = selectedEpics.slice(0, VISIBLE_SCOPE_PILLS);
+  const hiddenGroupCount = Math.max(0, selectedGroups.length - visibleSelectedGroups.length);
+  const hiddenEpicCount = Math.max(0, selectedEpics.length - visibleSelectedEpics.length);
+  const allDraftGroupsSelected = draftGroupIds.length === 0;
+  const allDraftEpicsSelected = draftEpicKeys.length === 0;
+  const filteredGroups = groups.filter((group) => group.name.toLowerCase().includes(groupSearch.trim().toLowerCase()));
+  const normalizedEpicSearch = epicSearch.trim().toLowerCase();
+  const filteredDraftEpics = draftEpicOptions.filter((epic) => (
+    epic.epicKey.toLowerCase().includes(normalizedEpicSearch)
+    || epic.epicName.toLowerCase().includes(normalizedEpicSearch)
+  ));
+  const scopeHasChanges = !sameSelection(selectedGroupIds, draftGroupIds)
+    || !sameSelection(selectedEpicKeys, draftEpicKeys);
   const sortedCards = useMemo(() => {
     const cards = [...(payload?.cards ?? [])];
     cards.sort((left, right) => compareCards(left, right, sortField, sortDirection));
@@ -326,34 +386,63 @@ export function InitiativeDeepDiveScreen() {
     setTableWindowWeeks(12);
     setActivity("all");
     setPayload(null);
-    setIsEpicMenuOpen(false);
     setError(null);
   };
 
-  const selectAllGroups = () => {
-    setSelectedGroupIds([]);
-    resetDependentScope();
+  const openScopePicker = () => {
+    setDraftGroupIds(selectedGroupIds);
+    setDraftEpicKeys(selectedEpicKeys);
+    setDraftEpicOptions(epicOptions);
+    setGroupSearch("");
+    setEpicSearch("");
+    setDraftError(null);
+    setIsScopePickerOpen(true);
   };
 
-  const toggleGroup = (groupId: number) => {
-    setSelectedGroupIds((current) => {
+  const toggleDraftGroup = (groupId: number) => {
+    setDraftGroupIds((current) => {
       const next = current.includes(groupId)
         ? current.filter((id) => id !== groupId)
         : [...current, groupId];
       if (next.length === 0 || next.length === groups.length) return [];
-      return next;
+      return groups.map((group) => group.id).filter((id) => next.includes(id));
     });
-    resetDependentScope();
+    setDraftEpicOptions([]);
+    setDraftError(null);
   };
 
-  const toggleEpic = (epicKey: string) => {
-    setSelectedEpicKeys((current) => {
+  const toggleDraftEpic = (epicKey: string) => {
+    setDraftEpicKeys((current) => {
       const next = current.includes(epicKey)
         ? current.filter((key) => key !== epicKey)
         : [...current, epicKey];
-      if (next.length === 0 || next.length === epicOptions.length) return [];
-      return next;
+      if (next.length === 0 || next.length === draftEpicOptions.length) return [];
+      return draftEpicOptions.map((epic) => epic.epicKey).filter((key) => next.includes(key));
     });
+  };
+
+  const applyDraftScope = () => {
+    const nextGroupIds = draftGroupIds.length === groups.length ? [] : draftGroupIds;
+    const nextEpicKeys = draftEpicKeys.length === draftEpicOptions.length ? [] : draftEpicKeys;
+    const changed = !sameSelection(selectedGroupIds, nextGroupIds) || !sameSelection(selectedEpicKeys, nextEpicKeys);
+    setSelectedGroupIds(nextGroupIds);
+    setSelectedEpicKeys(nextEpicKeys);
+    setIsScopePickerOpen(false);
+    if (changed) {
+      setTableWindowWeeks(12);
+      setActivity("all");
+      setPayload(null);
+      setError(null);
+    }
+  };
+
+  const removeAppliedGroup = (groupId: number) => {
+    setSelectedGroupIds((current) => current.filter((id) => id !== groupId));
+    resetDependentScope();
+  };
+
+  const removeAppliedEpic = (epicKey: string) => {
+    setSelectedEpicKeys((current) => current.filter((key) => key !== epicKey));
   };
 
   const handleWindowSelection = (weeks: TableWindowWeeks) => {
@@ -392,43 +481,162 @@ export function InitiativeDeepDiveScreen() {
           {payload ? <p className="tb-deep-dive-timezone">Weeks start Monday · {payload.timezone}</p> : null}
         </div>
 
-        <div className="tb-deep-dive-filters">
-          <div className="tb-field tb-deep-dive-epic-field" ref={groupMenuRef}>
-            <span id="initiative-group-filter-label">Group</span>
-            <button
-              type="button"
-              className="tb-deep-dive-epic-trigger"
-              aria-labelledby="initiative-group-filter-label"
-              aria-haspopup="true"
-              aria-expanded={isGroupMenuOpen}
-              disabled={groups.length === 0}
-              onClick={() => {
-                setIsEpicMenuOpen(false);
-                setIsGroupMenuOpen((current) => !current);
-              }}
-            >
-              <span>{groups.length === 0 ? "No groups configured" : groupSelectionLabel}</span>
-              <ChevronDown aria-hidden="true" size={16} />
-            </button>
-            {isGroupMenuOpen ? (
-              <div className="tb-deep-dive-epic-menu" role="group" aria-label="Group options">
-                <label className="tb-deep-dive-check-option is-all">
-                  <input
-                    type="checkbox"
-                    checked={allGroupsSelected}
-                    onChange={selectAllGroups}
-                  />
-                  <span className="tb-deep-dive-checkbox" aria-hidden="true">
-                    {allGroupsSelected ? <Check size={13} /> : null}
+        <div className="tb-deep-dive-scope-summary">
+          <div className="tb-deep-dive-scope-rows">
+            <div className="tb-deep-dive-scope-row" aria-label="Selected groups">
+              <div className="tb-deep-dive-scope-label">
+                <span>Groups</span>
+                <small>{allGroupsSelected ? `${groups.length} available` : `${selectedGroupIds.length} selected`}</small>
+              </div>
+              <div className="tb-deep-dive-scope-pills">
+                {allGroupsSelected ? (
+                  <span className="tb-deep-dive-scope-pill is-all">
+                    <Check size={13} aria-hidden="true" />
+                    <span className="tb-deep-dive-scope-pill-label">All groups</span>
                   </span>
-                  <span>All groups</span>
+                ) : (
+                  <>
+                    {visibleSelectedGroups.map((group) => (
+                      <span className="tb-deep-dive-scope-pill" key={group.id} title={group.name}>
+                        <span className="tb-deep-dive-scope-pill-label">{group.name}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove group ${group.name}`}
+                          onClick={() => removeAppliedGroup(group.id)}
+                        >
+                          <X size={13} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                    {hiddenGroupCount > 0 ? (
+                      <button type="button" className="tb-deep-dive-scope-more" onClick={openScopePicker}>
+                        +{hiddenGroupCount} more
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="tb-deep-dive-scope-row" aria-label="Selected epics">
+              <div className="tb-deep-dive-scope-label">
+                <span>Epics</span>
+                <small>{allEpicsSelected ? `${epicOptions.length} eligible` : `${selectedEpicKeys.length} selected`}</small>
+              </div>
+              <div className="tb-deep-dive-scope-pills">
+                {allEpicsSelected ? (
+                  <span className="tb-deep-dive-scope-pill is-all">
+                    <Check size={13} aria-hidden="true" />
+                    <span className="tb-deep-dive-scope-pill-label">
+                      All epics in selected groups{epicOptions.length > 0 ? ` (${epicOptions.length})` : ""}
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    {visibleSelectedEpics.map((epic) => (
+                      <span
+                        className="tb-deep-dive-scope-pill"
+                        key={epic.epicKey}
+                        title={`${epic.epicName} (${epic.epicKey})`}
+                      >
+                        <span className="tb-deep-dive-scope-pill-label">{epic.epicName}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove epic ${epic.epicName}`}
+                          onClick={() => removeAppliedEpic(epic.epicKey)}
+                        >
+                          <X size={13} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                    {hiddenEpicCount > 0 ? (
+                      <button type="button" className="tb-deep-dive-scope-more" onClick={openScopePicker}>
+                        +{hiddenEpicCount} more
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="tb-btn tb-deep-dive-edit-scope"
+            onClick={openScopePicker}
+            disabled={groups.length === 0 || (!payload && !error)}
+          >
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            Edit scope
+          </button>
+        </div>
+      </section>
+
+      {isScopePickerOpen ? (
+        <div
+          className="tb-modal-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="initiative-scope-picker-heading"
+        >
+          <div className="tb-modal-backdrop" onClick={() => setIsScopePickerOpen(false)} />
+          <div className="tb-modal tb-deep-dive-scope-dialog">
+            <header className="tb-modal-head tb-deep-dive-scope-dialog-head">
+              <div>
+                <p className="tb-eyebrow">Initiative scope</p>
+                <h3 id="initiative-scope-picker-heading">Choose groups and epics</h3>
+                <p>Epics are filtered by the groups selected on the left.</p>
+              </div>
+              <button
+                type="button"
+                className="tb-deep-dive-dialog-close"
+                aria-label="Close scope picker"
+                onClick={() => setIsScopePickerOpen(false)}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="tb-deep-dive-scope-picker">
+              <section className="tb-deep-dive-scope-pane" aria-labelledby="initiative-scope-groups-heading">
+                <div className="tb-deep-dive-scope-pane-heading">
+                  <h4 id="initiative-scope-groups-heading">Groups</h4>
+                  <span>{allDraftGroupsSelected ? "All selected" : `${draftGroupIds.length} selected`}</span>
+                </div>
+                <label className="tb-deep-dive-scope-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    ref={groupSearchRef}
+                    type="search"
+                    value={groupSearch}
+                    aria-label="Search groups"
+                    placeholder="Search groups…"
+                    onChange={(event) => setGroupSearch(event.target.value)}
+                  />
                 </label>
-                <div className="tb-deep-dive-epic-options">
-                  {groups.map((group) => {
-                    const checked = selectedGroupIds.includes(group.id);
+                <div className="tb-deep-dive-scope-options" role="group" aria-label="Group options">
+                  <label className="tb-deep-dive-check-option is-all">
+                    <input
+                      type="checkbox"
+                      checked={allDraftGroupsSelected}
+                      onChange={() => {
+                        setDraftGroupIds([]);
+                        if (!allDraftGroupsSelected) setDraftEpicOptions([]);
+                        setDraftError(null);
+                      }}
+                    />
+                    <span className="tb-deep-dive-checkbox" aria-hidden="true">
+                      {allDraftGroupsSelected ? <Check size={13} /> : null}
+                    </span>
+                    <span>
+                      <strong>All groups</strong>
+                      <small>Keep every configured group in scope</small>
+                    </span>
+                  </label>
+                  {filteredGroups.map((group) => {
+                    const checked = draftGroupIds.includes(group.id);
                     return (
                       <label className="tb-deep-dive-check-option" key={group.id}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleGroup(group.id)} />
+                        <input type="checkbox" checked={checked} onChange={() => toggleDraftGroup(group.id)} />
                         <span className="tb-deep-dive-checkbox" aria-hidden="true">
                           {checked ? <Check size={13} /> : null}
                         </span>
@@ -436,63 +644,90 @@ export function InitiativeDeepDiveScreen() {
                       </label>
                     );
                   })}
+                  {filteredGroups.length === 0 ? <p className="tb-deep-dive-option-empty">No matching groups.</p> : null}
                 </div>
-              </div>
-            ) : null}
-          </div>
+              </section>
 
-          <div className="tb-field tb-deep-dive-epic-field" ref={epicMenuRef}>
-            <span id="initiative-epic-filter-label">Epic</span>
-            <button
-              type="button"
-              className="tb-deep-dive-epic-trigger"
-              aria-labelledby="initiative-epic-filter-label"
-              aria-haspopup="true"
-              aria-expanded={isEpicMenuOpen}
-              disabled={effectiveGroupIds.length === 0 || !payload || epicOptions.length === 0}
-              onClick={() => {
-                setIsGroupMenuOpen(false);
-                setIsEpicMenuOpen((current) => !current);
-              }}
-            >
-              <span>{effectiveGroupIds.length === 0 ? "Select a group first" : epicSelectionLabel}</span>
-              <ChevronDown aria-hidden="true" size={16} />
-            </button>
-            {isEpicMenuOpen ? (
-              <div className="tb-deep-dive-epic-menu" role="group" aria-label="Epic options">
-                <label className="tb-deep-dive-check-option is-all">
+              <section className="tb-deep-dive-scope-pane" aria-labelledby="initiative-scope-epics-heading">
+                <div className="tb-deep-dive-scope-pane-heading">
+                  <h4 id="initiative-scope-epics-heading">Epics</h4>
+                  <span>{allDraftEpicsSelected ? "All selected" : `${draftEpicKeys.length} selected`}</span>
+                </div>
+                <label className="tb-deep-dive-scope-search">
+                  <Search size={15} aria-hidden="true" />
                   <input
-                    type="checkbox"
-                    checked={allEpicsSelected}
-                    onChange={() => setSelectedEpicKeys([])}
+                    type="search"
+                    value={epicSearch}
+                    aria-label="Search epics"
+                    placeholder="Search by title or key…"
+                    onChange={(event) => setEpicSearch(event.target.value)}
+                    disabled={isDraftEpicLoading}
                   />
-                  <span className="tb-deep-dive-checkbox" aria-hidden="true">
-                    {allEpicsSelected ? <Check size={13} /> : null}
-                  </span>
-                  <span>All epics</span>
                 </label>
-                <div className="tb-deep-dive-epic-options">
-                  {epicOptions.map((epic) => {
-                    const checked = selectedEpicKeys.includes(epic.epicKey);
-                    return (
-                      <label className="tb-deep-dive-check-option" key={epic.epicKey}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleEpic(epic.epicKey)} />
+                <div className="tb-deep-dive-scope-options" role="group" aria-label="Epic options" aria-busy={isDraftEpicLoading}>
+                  {isDraftEpicLoading ? (
+                    <div className="tb-deep-dive-options-loading"><RefreshCw size={15} aria-hidden="true" /> Loading eligible epics…</div>
+                  ) : draftError ? (
+                    <p className="tb-deep-dive-option-error">{draftError}</p>
+                  ) : (
+                    <>
+                      <label className="tb-deep-dive-check-option is-all">
+                        <input
+                          type="checkbox"
+                          checked={allDraftEpicsSelected}
+                          onChange={() => setDraftEpicKeys([])}
+                        />
                         <span className="tb-deep-dive-checkbox" aria-hidden="true">
-                          {checked ? <Check size={13} /> : null}
+                          {allDraftEpicsSelected ? <Check size={13} /> : null}
                         </span>
                         <span>
-                          <strong>{epic.epicKey}</strong>
-                          <small>{epic.epicName}</small>
+                          <strong>All epics in selected groups</strong>
+                          <small>{draftEpicOptions.length} eligible epics</small>
                         </span>
                       </label>
-                    );
-                  })}
+                      {filteredDraftEpics.map((epic) => {
+                        const checked = draftEpicKeys.includes(epic.epicKey);
+                        return (
+                          <label className="tb-deep-dive-check-option" key={epic.epicKey}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleDraftEpic(epic.epicKey)} />
+                            <span className="tb-deep-dive-checkbox" aria-hidden="true">
+                              {checked ? <Check size={13} /> : null}
+                            </span>
+                            <span>
+                              <strong>{epic.epicName}</strong>
+                              <small>{epic.epicKey}</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {filteredDraftEpics.length === 0 ? <p className="tb-deep-dive-option-empty">No matching epics.</p> : null}
+                    </>
+                  )}
                 </div>
+              </section>
+            </div>
+
+            <footer className="tb-deep-dive-scope-footer">
+              <p>
+                <strong>{allDraftGroupsSelected ? `All ${groups.length}` : draftGroupIds.length}</strong> groups
+                <span aria-hidden="true">·</span>
+                <strong>{allDraftEpicsSelected ? `All ${draftEpicOptions.length}` : draftEpicKeys.length}</strong> epics
+              </p>
+              <div>
+                <button type="button" className="tb-btn" onClick={() => setIsScopePickerOpen(false)}>Cancel</button>
+                <button
+                  type="button"
+                  className="tb-btn tb-btn-primary"
+                  disabled={!scopeHasChanges || isDraftEpicLoading || Boolean(draftError)}
+                  onClick={applyDraftScope}
+                >
+                  Apply scope
+                </button>
               </div>
-            ) : null}
+            </footer>
           </div>
         </div>
-      </section>
+      ) : null}
 
       {error ? (
         <section className="tb-panel tb-deep-dive-error" role="alert">
