@@ -6585,6 +6585,30 @@ body {
   padding-bottom: 0.72rem;
 }
 
+.tb-deep-dive-trend-range {
+  margin-top: 0.18rem !important;
+  color: #4f6179 !important;
+  font-size: 0.72rem !important;
+  font-weight: 650;
+}
+
+.tb-deep-dive-chart-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.tb-deep-dive-chart-actions > .tb-btn {
+  min-height: 2.35rem;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.tb-deep-dive-trend-dialog .tb-modal-head > div:first-child {
+  min-width: 0;
+}
+
 .tb-initiative-flow-chart {
   position: relative;
   height: clamp(17rem, 31vw, 23rem);
@@ -7052,6 +7076,16 @@ body {
 
   .tb-deep-dive-wip-summary {
     width: 100%;
+  }
+
+  .tb-deep-dive-chart-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tb-deep-dive-chart-actions > .tb-btn {
+    justify-content: center;
   }
 
   .tb-deep-dive-timezone,

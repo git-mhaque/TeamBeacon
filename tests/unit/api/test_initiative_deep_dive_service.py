@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -272,6 +272,10 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["selectionMode"], "all")
             self.assertEqual(payload["selectedEpicKeys"], [])
             self.assertEqual(len(payload["weekly"]), 12)
+            self.assertEqual(
+                payload["chartRange"],
+                {"startDate": "2026-05-25", "endDate": "2026-08-10", "days": 78},
+            )
             self.assertEqual(payload["weekly"][-1]["weekStart"], "2026-08-10")
             self.assertEqual(payload["weekly"][-2]["newCount"], 1)
             self.assertEqual(payload["weekly"][-2]["completedCount"], 2)
@@ -294,6 +298,34 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertNotIn("TB-6", cards_by_key, "A reopened card must not count as completed")
             self.assertNotIn("TB-8", cards_by_key, "Subtasks must not contribute to initiative flow")
             self.assertNotIn("TB-9", cards_by_key, "Cards from another group must be excluded")
+
+    def test_supports_custom_chart_range_with_partial_week_buckets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform_id, _ = self._seed_database(db_path)
+
+            payload = get_initiative_deep_dive(
+                group_id=platform_id,
+                chart_start="2026-08-01",
+                chart_end="2026-08-09",
+                timezone_name="Australia/Melbourne",
+                db_path=db_path,
+                now=datetime(2026, 8, 10, 12, 0, tzinfo=ZoneInfo("Australia/Melbourne")),
+            )
+
+            self.assertEqual(payload["chartRange"], {
+                "startDate": "2026-08-01",
+                "endDate": "2026-08-09",
+                "days": 9,
+            })
+            self.assertEqual(payload["chartWeeks"], 2)
+            self.assertEqual(
+                [(bucket["weekStart"], bucket["weekEnd"]) for bucket in payload["weekly"]],
+                [("2026-08-01", "2026-08-02"), ("2026-08-03", "2026-08-09")],
+            )
+            self.assertEqual(payload["weekly"][0]["newCount"], 0)
+            self.assertEqual(payload["weekly"][1]["newCount"], 1)
+            self.assertEqual(payload["weekly"][1]["completedCount"], 2)
 
     def test_filters_selected_epics_activity_and_current_wip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -381,6 +413,21 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
                 ({"group_id": platform_id, "table_window_weeks": 3}, "tableWindowWeeks"),
                 ({"group_id": platform_id, "chart_weeks": "invalid"}, "chartWeeks"),
                 ({"group_id": platform_id, "chart_weeks": 0}, "chartWeeks"),
+                ({"group_id": platform_id, "chart_start": "2026-08-01"}, "both be provided"),
+                ({"group_id": platform_id, "chart_start": "not-a-date", "chart_end": "2026-08-01"}, "chartStart"),
+                ({"group_id": platform_id, "chart_start": "2026-08-02", "chart_end": "2026-08-01"}, "cannot be after"),
+                ({
+                    "group_id": platform_id,
+                    "chart_start": "2026-08-01",
+                    "chart_end": "2026-08-11",
+                    "now": datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc),
+                }, "after today"),
+                ({
+                    "group_id": platform_id,
+                    "chart_start": "2025-08-09",
+                    "chart_end": "2026-08-10",
+                    "now": datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc),
+                }, "366 days"),
                 ({"group_id": platform_id, "activity": "stale"}, "activity"),
                 ({"group_id": platform_id, "timezone_name": "Mars/Olympus"}, "Unknown timezone"),
                 ({"group_id": platform_id, "limit": "invalid"}, "limit"),

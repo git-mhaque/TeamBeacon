@@ -88,13 +88,14 @@ Default thresholds:
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
-  - Initiative Deep Dive defaults to all groups, supports checkbox-based multi-group selection, cascades the combined scope into an all-or-multi-epic selector, renders a 12-week created/completed chart, and drives table filtering from 1/2/4/12-week tiles.
+  - Initiative Deep Dive defaults to all groups, supports checkbox-based multi-group selection, cascades the combined scope into an all-or-multi-epic selector, renders a preset-or-custom created/completed trend (12 weeks by default), and drives table filtering independently from 1/2/4/12-week tiles.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 
 ## 10. Initiative Deep Dive Query Model
 - `GET /api/initiative-deep-dive` owns the complete aggregation contract so weekly bars, period tiles, WIP counts, and table rows share one scope and timezone.
 - Repeated `groupId` query parameters form a union of configured group epics; shared epics and their cards are de-duplicated before metrics are calculated.
+- The trend accepts either `chartWeeks` or an inclusive `chartStart`/`chartEnd` pair. Custom boundaries remain exact and may yield partial first/last weekly buckets; table windows remain anchored to the current Monday-based period.
 - Group/epic membership and issue lineage are evaluated from the current local model; no historical group-membership snapshots are implied.
 - Creation and completion are dated events. In-progress is a current-state classification with the current run start derived from status changelog transitions.
 - The query excludes epics/subtasks, reuses the current full-sync scope guard, and returns no more than 1,000 newest activity rows.

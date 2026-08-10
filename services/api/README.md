@@ -120,11 +120,13 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
   - Optional query:
     - repeated `epicKey=<key>` values; omit for all configured epics in the group
     - `chartWeeks=12` (1-52)
+    - `chartStart=2026-07-24&chartEnd=2026-07-30` for an explicit inclusive trend range (both required, no future end date, maximum 366 days); explicit dates take precedence over `chartWeeks`
     - `tableWindowWeeks=1|2|4|12`
     - `activity=all|new|in_progress|completed|current_wip`
     - `timezone=Australia/Melbourne` (IANA timezone; defaults to `UTC`)
     - `limit=500` (1-1000)
-  - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`.
+  - `chartRange` returns the applied inclusive `startDate`, `endDate`, and day count.
+  - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`; explicit custom boundaries can produce partial first or last buckets.
   - `periods` returns the 1/2/4/12-week tile totals; `currentWipCount` remains an all-age snapshot.
   - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first.
   - Epics and subtasks are excluded.

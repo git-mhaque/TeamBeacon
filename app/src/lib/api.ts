@@ -224,6 +224,11 @@ export type InitiativeDeepDiveResponse = {
   selectedEpicKeys: string[];
   selectionMode: "all" | "selected";
   chartWeeks: number;
+  chartRange: {
+    startDate: string;
+    endDate: string;
+    days: number;
+  };
   weekly: InitiativeDeepDiveWeeklyBucket[];
   periods: InitiativeDeepDivePeriod[];
   selectedPeriod: {
@@ -1012,6 +1017,8 @@ export async function fetchInitiativeDeepDive(options: {
   groupIds: number[];
   epicKeys?: string[];
   chartWeeks?: number;
+  chartStart?: string;
+  chartEnd?: string;
   tableWindowWeeks?: 1 | 2 | 4 | 12;
   activity?: InitiativeDeepDiveActivity;
   timezone?: string;
@@ -1024,7 +1031,12 @@ export async function fetchInitiativeDeepDive(options: {
   for (const epicKey of options.epicKeys ?? []) {
     params.append("epicKey", epicKey);
   }
-  params.set("chartWeeks", String(options.chartWeeks ?? 12));
+  if (options.chartStart || options.chartEnd) {
+    if (options.chartStart) params.set("chartStart", options.chartStart);
+    if (options.chartEnd) params.set("chartEnd", options.chartEnd);
+  } else {
+    params.set("chartWeeks", String(options.chartWeeks ?? 12));
+  }
   params.set("tableWindowWeeks", String(options.tableWindowWeeks ?? 12));
   params.set("activity", options.activity ?? "all");
   params.set("timezone", options.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");

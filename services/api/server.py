@@ -512,6 +512,19 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "name": "chartWeeks",
                             "in": "query",
                             "schema": {"type": "integer", "minimum": 1, "maximum": 52, "default": 12},
+                            "description": "Relative Monday-based chart window. Ignored when chartStart/chartEnd are provided.",
+                        },
+                        {
+                            "name": "chartStart",
+                            "in": "query",
+                            "schema": {"type": "string", "format": "date"},
+                            "description": "Inclusive custom chart start; requires chartEnd.",
+                        },
+                        {
+                            "name": "chartEnd",
+                            "in": "query",
+                            "schema": {"type": "string", "format": "date"},
+                            "description": "Inclusive custom chart end; requires chartStart and cannot be after today.",
                         },
                         {
                             "name": "tableWindowWeeks",
@@ -1084,6 +1097,8 @@ def build_handler(
                         group_ids=group_ids,
                         epic_keys=query.get("epicKey", []),
                         chart_weeks=query.get("chartWeeks", ["12"])[0],
+                        chart_start=query.get("chartStart", [None])[0],
+                        chart_end=query.get("chartEnd", [None])[0],
                         table_window_weeks=query.get("tableWindowWeeks", ["12"])[0],
                         activity=query.get("activity", ["all"])[0],
                         timezone_name=query.get("timezone", [None])[0],

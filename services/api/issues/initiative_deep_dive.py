@@ -15,6 +15,7 @@ from services.api.issues.current_sprint_work import is_subtask_issue_type
 
 _ALLOWED_ACTIVITY_FILTERS = {"all", "new", "in_progress", "completed", "current_wip"}
 _ALLOWED_TABLE_WINDOWS = {1, 2, 4, 12}
+_MAX_CHART_RANGE_DAYS = 366
 _DONE_STATUS_NAMES = {"closed", "complete", "completed", "done", "resolved"}
 _IN_PROGRESS_STATUS_NAMES = {
     "analysis",
@@ -127,6 +128,59 @@ def _normalize_chart_window(chart_weeks: int | str) -> int:
     if normalized < 1 or normalized > 52:
         raise ValueError("chartWeeks must be between 1 and 52.")
     return normalized
+
+
+def _normalize_chart_date(value: str | None, *, field_name: str) -> date | None:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return None
+    try:
+        return date.fromisoformat(candidate)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a valid ISO date (YYYY-MM-DD).") from exc
+
+
+def _resolve_chart_range(
+    *,
+    chart_weeks: int | str,
+    chart_start: str | None,
+    chart_end: str | None,
+    local_today: date,
+) -> tuple[date, date]:
+    normalized_start = _normalize_chart_date(chart_start, field_name="chartStart")
+    normalized_end = _normalize_chart_date(chart_end, field_name="chartEnd")
+    if (normalized_start is None) != (normalized_end is None):
+        raise ValueError("chartStart and chartEnd must both be provided when setting a chart range.")
+    if normalized_start is None or normalized_end is None:
+        normalized_chart_weeks = _normalize_chart_window(chart_weeks)
+        return _week_start(local_today) - timedelta(weeks=normalized_chart_weeks - 1), local_today
+    if normalized_start > normalized_end:
+        raise ValueError("chartStart cannot be after chartEnd.")
+    if normalized_end > local_today:
+        raise ValueError("chartEnd cannot be after today in the selected timezone.")
+    range_days = (normalized_end - normalized_start).days + 1
+    if range_days > _MAX_CHART_RANGE_DAYS:
+        raise ValueError(f"chart range cannot exceed {_MAX_CHART_RANGE_DAYS} days.")
+    return normalized_start, normalized_end
+
+
+def _build_weekly_buckets(chart_start: date, chart_end: date) -> list[dict[str, Any]]:
+    buckets: list[dict[str, Any]] = []
+    cursor = chart_start
+    while cursor <= chart_end:
+        days_until_sunday = 6 - cursor.weekday()
+        bucket_end = min(cursor + timedelta(days=days_until_sunday), chart_end)
+        buckets.append(
+            {
+                "weekStart": cursor.isoformat(),
+                "weekEnd": bucket_end.isoformat(),
+                "newCount": 0,
+                "completedCount": 0,
+                "netFlow": 0,
+            }
+        )
+        cursor = bucket_end + timedelta(days=1)
+    return buckets
 
 
 def _normalize_limit(limit: int | str) -> int:
@@ -413,7 +467,8 @@ def _build_empty_response(
     selected_group_ids: list[int],
     epic_options: list[dict[str, Any]],
     selected_epic_keys: list[str],
-    chart_weeks: int,
+    chart_start_date: date,
+    chart_end_date: date,
     table_window_weeks: int,
     activity: str,
     timezone_name: str,
@@ -421,20 +476,7 @@ def _build_empty_response(
     limit: int,
 ) -> dict[str, Any]:
     current_week_start = _week_start(local_today)
-    chart_start = current_week_start - timedelta(weeks=chart_weeks - 1)
-    weekly = []
-    for index in range(chart_weeks):
-        start = chart_start + timedelta(weeks=index)
-        end = min(start + timedelta(days=6), local_today)
-        weekly.append(
-            {
-                "weekStart": start.isoformat(),
-                "weekEnd": end.isoformat(),
-                "newCount": 0,
-                "completedCount": 0,
-                "netFlow": 0,
-            }
-        )
+    weekly = _build_weekly_buckets(chart_start_date, chart_end_date)
     periods = []
     for weeks in (1, 2, 4, 12):
         start = current_week_start - timedelta(weeks=weeks - 1)
@@ -459,7 +501,12 @@ def _build_empty_response(
         "epicOptions": epic_options,
         "selectedEpicKeys": selected_epic_keys,
         "selectionMode": "selected" if selected_epic_keys else "all",
-        "chartWeeks": chart_weeks,
+        "chartWeeks": len(weekly),
+        "chartRange": {
+            "startDate": chart_start_date.isoformat(),
+            "endDate": chart_end_date.isoformat(),
+            "days": (chart_end_date - chart_start_date).days + 1,
+        },
         "weekly": weekly,
         "periods": periods,
         "selectedPeriod": {
@@ -484,6 +531,8 @@ def get_initiative_deep_dive(
     group_ids: Iterable[int | str] | int | str | None = None,
     epic_keys: Iterable[str] | None = None,
     chart_weeks: int | str = 12,
+    chart_start: str | None = None,
+    chart_end: str | None = None,
     table_window_weeks: int | str = 12,
     activity: str | None = "all",
     timezone_name: str | None = None,
@@ -494,7 +543,6 @@ def get_initiative_deep_dive(
 ) -> dict[str, Any]:
     normalized_group_ids = _normalize_group_ids(group_ids, group_id)
     requested_epic_keys = _normalize_epic_keys(epic_keys)
-    normalized_chart_weeks = _normalize_chart_window(chart_weeks)
     normalized_table_window = _normalize_table_window(table_window_weeks)
     normalized_activity = _normalize_activity_filter(activity)
     safe_limit = _normalize_limit(limit)
@@ -508,7 +556,12 @@ def get_initiative_deep_dive(
         local_now = now.astimezone(reporting_timezone)
     local_today = local_now.date()
     current_week_start = _week_start(local_today)
-    chart_start_date = current_week_start - timedelta(weeks=normalized_chart_weeks - 1)
+    chart_start_date, chart_end_date = _resolve_chart_range(
+        chart_weeks=chart_weeks,
+        chart_start=chart_start,
+        chart_end=chart_end,
+        local_today=local_today,
+    )
     table_start_date = current_week_start - timedelta(weeks=normalized_table_window - 1)
 
     resolved_db_path = db_path or _resolve_db_path()
@@ -536,7 +589,8 @@ def get_initiative_deep_dive(
                 selected_group_ids=normalized_group_ids,
                 epic_options=epic_options,
                 selected_epic_keys=requested_epic_keys,
-                chart_weeks=normalized_chart_weeks,
+                chart_start_date=chart_start_date,
+                chart_end_date=chart_end_date,
                 table_window_weeks=normalized_table_window,
                 activity=normalized_activity,
                 timezone_name=resolved_timezone_name,
@@ -602,19 +656,7 @@ def get_initiative_deep_dive(
         conn.close()
 
     epic_name_by_key = {str(epic["epicKey"]): str(epic["epicName"]) for epic in epic_options}
-    weekly_counts: list[dict[str, Any]] = []
-    for index in range(normalized_chart_weeks):
-        start = chart_start_date + timedelta(weeks=index)
-        end = min(start + timedelta(days=6), local_today)
-        weekly_counts.append(
-            {
-                "weekStart": start.isoformat(),
-                "weekEnd": end.isoformat(),
-                "newCount": 0,
-                "completedCount": 0,
-                "netFlow": 0,
-            }
-        )
+    weekly_counts = _build_weekly_buckets(chart_start_date, chart_end_date)
 
     card_events: list[dict[str, Any]] = []
     for row in scoped_rows:
@@ -632,12 +674,16 @@ def get_initiative_deep_dive(
         started_local_date = _event_local_date(started_at, reporting_timezone)
 
         for event_kind, event_date in (("new", created_local_date), ("completed", completed_local_date)):
-            if event_date is None or event_date < chart_start_date or event_date > local_today:
+            if event_date is None or event_date < chart_start_date or event_date > chart_end_date:
                 continue
-            bucket_index = (event_date - chart_start_date).days // 7
-            if 0 <= bucket_index < len(weekly_counts):
+            for bucket in weekly_counts:
+                bucket_start = date.fromisoformat(str(bucket["weekStart"]))
+                bucket_end = date.fromisoformat(str(bucket["weekEnd"]))
+                if not bucket_start <= event_date <= bucket_end:
+                    continue
                 count_key = "newCount" if event_kind == "new" else "completedCount"
-                weekly_counts[bucket_index][count_key] += 1
+                bucket[count_key] += 1
+                break
 
         card_events.append(
             {
@@ -771,7 +817,12 @@ def get_initiative_deep_dive(
         "epicOptions": epic_options,
         "selectedEpicKeys": requested_epic_keys,
         "selectionMode": "selected" if requested_epic_keys else "all",
-        "chartWeeks": normalized_chart_weeks,
+        "chartWeeks": len(weekly_counts),
+        "chartRange": {
+            "startDate": chart_start_date.isoformat(),
+            "endDate": chart_end_date.isoformat(),
+            "days": (chart_end_date - chart_start_date).days + 1,
+        },
         "weekly": weekly_counts,
         "periods": periods,
         "selectedPeriod": {

@@ -25,7 +25,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Generate RAG status and explanation.
 - Initiative Deep Dive:
   - Start with all epic groups selected, or select one-or-more groups, then choose all or one-or-more configured epics across those groups.
-  - Compare new and completed card counts in Monday-based weekly buckets, defaulting to 12 weeks.
+  - Compare new and completed card counts in weekly buckets over a persisted preset or custom date range, defaulting to 12 weeks.
   - Select a 1/2/4/12-week tile to filter work-item activity.
   - Inspect new, currently in-progress, and completed cards with newest qualifying activity first.
 - Team insights:
@@ -142,7 +142,8 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - A card created and completed in the same week contributes once to both series.
   - Reopened cards that remain open are not counted as completed; re-completed cards use their latest completion.
 - Period tiles and activity table:
-  - UI periods are 1, 2, 4, and 12 Monday-based weekly buckets; 12 weeks is the default.
+  - The chart range offers 4/8/12/26/52-week presets plus an inclusive custom date range; 12 weeks is the default. Custom boundaries can create partial first or last buckets.
+  - Table periods remain independent 1, 2, 4, and 12 Monday-based weekly buckets.
   - Selecting a tile changes the table period.
   - `New` matches cards created in the period.
   - `In Progress` matches cards currently in the Jira `In Progress` category whose current in-progress run began in the period.

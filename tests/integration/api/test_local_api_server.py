@@ -981,6 +981,11 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "selectedEpicKeys": kwargs.get("epic_keys") or [],
                 "selectionMode": "selected" if kwargs.get("epic_keys") else "all",
                 "chartWeeks": int(kwargs.get("chart_weeks", 12)),
+                "chartRange": {
+                    "startDate": kwargs.get("chart_start") or "2026-05-25",
+                    "endDate": kwargs.get("chart_end") or "2026-08-10",
+                    "days": 78,
+                },
                 "weekly": [],
                 "periods": [],
                 "selectedPeriod": {
@@ -1478,6 +1483,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             f"{self.base_url}/api/initiative-deep-dive?groupId=5&groupId=8"
             "&epicKey=CEGBUPOL-4482&epicKey=CEGBUPOL-3553"
             "&chartWeeks=12&tableWindowWeeks=4&activity=completed"
+            "&chartStart=2026-06-01&chartEnd=2026-08-09"
             "&timezone=Australia%2FMelbourne&limit=250"
         )
         with urlopen(url, timeout=5) as response:  # noqa: S310
@@ -1496,6 +1502,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "group_ids": ["5", "8"],
                 "epic_keys": ["CEGBUPOL-4482", "CEGBUPOL-3553"],
                 "chart_weeks": "12",
+                "chart_start": "2026-06-01",
+                "chart_end": "2026-08-09",
                 "table_window_weeks": "4",
                 "activity": "completed",
                 "timezone_name": "Australia/Melbourne",

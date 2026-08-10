@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { CalendarRange, Check, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import {
   fetchEpicLookupConfig,
   fetchInitiativeDeepDive,
@@ -15,10 +15,35 @@ import { InitiativeFlowChart } from "./InitiativeFlowChart";
 type TableWindowWeeks = 1 | 2 | 4 | 12;
 type TableSortField = "activity" | "issueKey" | "summary" | "epic" | "status" | "created" | "inProgress" | "completed";
 type SortDirection = "asc" | "desc";
+type TrendPreset = "last_4_weeks" | "last_8_weeks" | "last_12_weeks" | "last_26_weeks" | "last_52_weeks" | "custom";
+
+type TrendSelection = {
+  preset: TrendPreset;
+  startDate: string;
+  endDate: string;
+};
 
 const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12];
 const INITIATIVE_DEEP_DIVE_SCOPE_KEY = "teambeacon.initiativeDeepDive.scope";
+const INITIATIVE_DEEP_DIVE_TREND_KEY = "teambeacon.initiativeDeepDive.trend.period";
 const VISIBLE_SCOPE_PILLS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TREND_PRESET_WEEKS: Record<Exclude<TrendPreset, "custom">, number> = {
+  last_4_weeks: 4,
+  last_8_weeks: 8,
+  last_12_weeks: 12,
+  last_26_weeks: 26,
+  last_52_weeks: 52,
+};
+
+const TREND_PRESET_LABELS: Record<TrendPreset, string> = {
+  last_4_weeks: "Last 4 weeks",
+  last_8_weeks: "Last 8 weeks",
+  last_12_weeks: "Last 12 weeks",
+  last_26_weeks: "Last 26 weeks",
+  last_52_weeks: "Last 52 weeks",
+  custom: "Custom",
+};
 
 type PersistedDeepDiveScope = {
   groupIds: number[];
@@ -67,6 +92,71 @@ function parsePersistedScope(raw: string | null): PersistedDeepDiveScope {
 
 function readPersistedScope(): PersistedDeepDiveScope {
   return parsePersistedScope(getPreferenceSync(INITIATIVE_DEEP_DIVE_SCOPE_KEY));
+}
+
+function isTrendPreset(value: unknown): value is TrendPreset {
+  return value === "last_4_weeks"
+    || value === "last_8_weeks"
+    || value === "last_12_weeks"
+    || value === "last_26_weeks"
+    || value === "last_52_weeks"
+    || value === "custom";
+}
+
+function formatLocalIsoDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseIsoDateToUtcDay(value: string | null | undefined): number | null {
+  const candidate = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(candidate)) return null;
+  const [year, month, day] = candidate.split("-").map(Number);
+  const utcDay = Date.UTC(year, month - 1, day);
+  if (new Date(utcDay).toISOString().slice(0, 10) !== candidate) return null;
+  return utcDay;
+}
+
+function buildRelativeWeekRange(weeks: number): Pick<TrendSelection, "startDate" | "endDate"> {
+  const safeWeeks = Math.max(1, Math.floor(weeks));
+  const endDate = new Date();
+  endDate.setHours(0, 0, 0, 0);
+  const currentWeekStart = new Date(endDate);
+  const daysSinceMonday = (currentWeekStart.getDay() + 6) % 7;
+  currentWeekStart.setDate(currentWeekStart.getDate() - daysSinceMonday);
+  const startDate = new Date(currentWeekStart);
+  startDate.setDate(startDate.getDate() - ((safeWeeks - 1) * 7));
+  return {
+    startDate: formatLocalIsoDate(startDate),
+    endDate: formatLocalIsoDate(endDate),
+  };
+}
+
+function defaultTrendSelection(): TrendSelection {
+  return { preset: "last_12_weeks", ...buildRelativeWeekRange(12) };
+}
+
+function readPersistedTrendSelection(): TrendSelection {
+  const fallback = defaultTrendSelection();
+  const raw = getPreferenceSync(INITIATIVE_DEEP_DIVE_TREND_KEY);
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as Partial<TrendSelection>;
+    if (!isTrendPreset(parsed.preset)) return fallback;
+    if (parsed.preset !== "custom") {
+      return { preset: parsed.preset, ...buildRelativeWeekRange(TREND_PRESET_WEEKS[parsed.preset]) };
+    }
+    const startUtc = parseIsoDateToUtcDay(parsed.startDate);
+    const endUtc = parseIsoDateToUtcDay(parsed.endDate);
+    const todayUtc = parseIsoDateToUtcDay(formatLocalIsoDate(new Date()));
+    if (startUtc === null || endUtc === null || todayUtc === null || startUtc > endUtc || endUtc > todayUtc) return fallback;
+    if (Math.floor((endUtc - startUtc) / DAY_MS) + 1 > 366) return fallback;
+    return { preset: "custom", startDate: parsed.startDate!, endDate: parsed.endDate! };
+  } catch {
+    return fallback;
+  }
 }
 
 function formatCount(value: number): string {
@@ -186,6 +276,7 @@ function sameSelection<T extends number | string>(left: T[], right: T[]): boolea
 
 export function InitiativeDeepDiveScreen() {
   const [initialPersistedScope] = useState<PersistedDeepDiveScope>(readPersistedScope);
+  const [trendSelection, setTrendSelection] = useState<TrendSelection>(readPersistedTrendSelection);
   const [groups, setGroups] = useState<EpicLookupItem[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
   const [selectedEpicKeys, setSelectedEpicKeys] = useState<string[]>([]);
@@ -206,12 +297,18 @@ export function InitiativeDeepDiveScreen() {
   const [epicSearch, setEpicSearch] = useState("");
   const [isDraftEpicLoading, setIsDraftEpicLoading] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [isTrendConfigOpen, setIsTrendConfigOpen] = useState(false);
+  const [trendPresetDraft, setTrendPresetDraft] = useState<TrendPreset>(trendSelection.preset);
+  const [trendStartDraft, setTrendStartDraft] = useState(trendSelection.startDate);
+  const [trendEndDraft, setTrendEndDraft] = useState(trendSelection.endDate);
+  const [trendValidationError, setTrendValidationError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const groupSearchRef = useRef<HTMLInputElement | null>(null);
   const persistedGroupIdsRef = useRef(initialPersistedScope.groupIds);
   const pendingPersistedEpicKeysRef = useRef(initialPersistedScope.epicKeys);
   const hasHydratedPersistedScopeRef = useRef(false);
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
+  const todayIso = useMemo(() => formatLocalIsoDate(new Date()), []);
 
   useEffect(() => {
     let active = true;
@@ -257,7 +354,9 @@ export function InitiativeDeepDiveScreen() {
     fetchInitiativeDeepDive({
       groupIds: effectiveGroupIds,
       epicKeys: selectedEpicKeys,
-      chartWeeks: 12,
+      ...(trendSelection.preset === "custom"
+        ? { chartStart: trendSelection.startDate, chartEnd: trendSelection.endDate }
+        : { chartWeeks: TREND_PRESET_WEEKS[trendSelection.preset] }),
       tableWindowWeeks,
       activity,
       timezone,
@@ -288,7 +387,18 @@ export function InitiativeDeepDiveScreen() {
     return () => {
       activeRequest = false;
     };
-  }, [activity, effectiveGroupIds, isLookupLoading, refreshVersion, selectedEpicKeys, tableWindowWeeks, timezone]);
+  }, [
+    activity,
+    effectiveGroupIds,
+    isLookupLoading,
+    refreshVersion,
+    selectedEpicKeys,
+    tableWindowWeeks,
+    timezone,
+    trendSelection.endDate,
+    trendSelection.preset,
+    trendSelection.startDate,
+  ]);
 
   useEffect(() => {
     if (!hasHydratedPersistedScope || isLookupLoading) return;
@@ -299,18 +409,23 @@ export function InitiativeDeepDiveScreen() {
   }, [hasHydratedPersistedScope, isLookupLoading, selectedEpicKeys, selectedGroupIds]);
 
   useEffect(() => {
-    if (!isScopePickerOpen) return undefined;
+    void setPreference(INITIATIVE_DEEP_DIVE_TREND_KEY, JSON.stringify(trendSelection));
+  }, [trendSelection]);
+
+  useEffect(() => {
+    if (!isScopePickerOpen && !isTrendConfigOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsScopePickerOpen(false);
+        setIsTrendConfigOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    window.requestAnimationFrame(() => groupSearchRef.current?.focus());
+    if (isScopePickerOpen) window.requestAnimationFrame(() => groupSearchRef.current?.focus());
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isScopePickerOpen]);
+  }, [isScopePickerOpen, isTrendConfigOpen]);
 
   useEffect(() => {
     if (!isScopePickerOpen || draftEffectiveGroupIds.length === 0) return undefined;
@@ -327,7 +442,9 @@ export function InitiativeDeepDiveScreen() {
     fetchInitiativeDeepDive({
       groupIds: draftEffectiveGroupIds,
       epicKeys: [],
-      chartWeeks: 12,
+      ...(trendSelection.preset === "custom"
+        ? { chartStart: trendSelection.startDate, chartEnd: trendSelection.endDate }
+        : { chartWeeks: TREND_PRESET_WEEKS[trendSelection.preset] }),
       tableWindowWeeks,
       activity: "all",
       timezone,
@@ -352,7 +469,17 @@ export function InitiativeDeepDiveScreen() {
     return () => {
       activeRequest = false;
     };
-  }, [draftEffectiveGroupIds, effectiveGroupIds, isScopePickerOpen, payload, tableWindowWeeks, timezone]);
+  }, [
+    draftEffectiveGroupIds,
+    effectiveGroupIds,
+    isScopePickerOpen,
+    payload,
+    tableWindowWeeks,
+    timezone,
+    trendSelection.endDate,
+    trendSelection.preset,
+    trendSelection.startDate,
+  ]);
 
   const allGroupsSelected = selectedGroupIds.length === 0;
   const epicOptions = payload?.epicOptions ?? [];
@@ -375,6 +502,21 @@ export function InitiativeDeepDiveScreen() {
   ));
   const scopeHasChanges = !sameSelection(selectedGroupIds, draftGroupIds)
     || !sameSelection(selectedEpicKeys, draftEpicKeys);
+  const activeTrendRange = payload?.chartRange ?? {
+    startDate: trendSelection.startDate,
+    endDate: trendSelection.endDate,
+    days: Math.max(1, Math.floor(
+      ((parseIsoDateToUtcDay(trendSelection.endDate) ?? 0) - (parseIsoDateToUtcDay(trendSelection.startDate) ?? 0)) / DAY_MS,
+    ) + 1),
+  };
+  const trendEyebrow = trendSelection.preset === "custom"
+    ? "Custom trend"
+    : `${TREND_PRESET_WEEKS[trendSelection.preset]}-week trend`;
+  const draftTrendStartUtc = parseIsoDateToUtcDay(trendStartDraft);
+  const draftTrendEndUtc = parseIsoDateToUtcDay(trendEndDraft);
+  const draftTrendDays = draftTrendStartUtc !== null && draftTrendEndUtc !== null && draftTrendEndUtc >= draftTrendStartUtc
+    ? Math.floor((draftTrendEndUtc - draftTrendStartUtc) / DAY_MS) + 1
+    : null;
   const sortedCards = useMemo(() => {
     const cards = [...(payload?.cards ?? [])];
     cards.sort((left, right) => compareCards(left, right, sortField, sortDirection));
@@ -443,6 +585,57 @@ export function InitiativeDeepDiveScreen() {
 
   const removeAppliedEpic = (epicKey: string) => {
     setSelectedEpicKeys((current) => current.filter((key) => key !== epicKey));
+  };
+
+  const openTrendConfig = () => {
+    setTrendPresetDraft(trendSelection.preset);
+    setTrendStartDraft(trendSelection.startDate);
+    setTrendEndDraft(trendSelection.endDate);
+    setTrendValidationError(null);
+    setIsTrendConfigOpen(true);
+  };
+
+  const changeTrendPresetDraft = (preset: TrendPreset) => {
+    setTrendPresetDraft(preset);
+    setTrendValidationError(null);
+    if (preset === "custom") return;
+    const nextRange = buildRelativeWeekRange(TREND_PRESET_WEEKS[preset]);
+    setTrendStartDraft(nextRange.startDate);
+    setTrendEndDraft(nextRange.endDate);
+  };
+
+  const saveTrendConfig = () => {
+    if (trendPresetDraft !== "custom") {
+      const nextRange = buildRelativeWeekRange(TREND_PRESET_WEEKS[trendPresetDraft]);
+      setTrendSelection({ preset: trendPresetDraft, ...nextRange });
+      setTrendValidationError(null);
+      setIsTrendConfigOpen(false);
+      return;
+    }
+    if (!trendStartDraft || !trendEndDraft) {
+      setTrendValidationError("Start and end date are required.");
+      return;
+    }
+    if (draftTrendStartUtc === null || draftTrendEndUtc === null) {
+      setTrendValidationError("Invalid trend range date format.");
+      return;
+    }
+    if (draftTrendStartUtc > draftTrendEndUtc) {
+      setTrendValidationError("Start date cannot be after end date.");
+      return;
+    }
+    const todayUtc = parseIsoDateToUtcDay(todayIso);
+    if (todayUtc !== null && draftTrendEndUtc > todayUtc) {
+      setTrendValidationError("End date cannot be after today.");
+      return;
+    }
+    if ((draftTrendDays ?? 0) > 366) {
+      setTrendValidationError("Trend range cannot exceed 366 days.");
+      return;
+    }
+    setTrendSelection({ preset: "custom", startDate: trendStartDraft, endDate: trendEndDraft });
+    setTrendValidationError(null);
+    setIsTrendConfigOpen(false);
   };
 
   const handleWindowSelection = (weeks: TableWindowWeeks) => {
@@ -729,6 +922,85 @@ export function InitiativeDeepDiveScreen() {
         </div>
       ) : null}
 
+      {isTrendConfigOpen ? (
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Trend Range">
+          <div className="tb-modal-backdrop" onClick={() => setIsTrendConfigOpen(false)} />
+          <div className="tb-modal tb-modal-reporting tb-deep-dive-trend-dialog">
+            <header className="tb-modal-head">
+              <div>
+                <h3>Configure Trend Range</h3>
+                <p className="tb-muted-note">
+                  Set the reporting window for created and completed card trends. Table-period tiles remain independent.
+                </p>
+              </div>
+              <div className="tb-action-row">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={() => setIsTrendConfigOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveTrendConfig}>
+                  Save
+                </button>
+              </div>
+            </header>
+
+            <div className="tb-exec-period-toolbar">
+              <div className={`tb-exec-period-row${trendPresetDraft === "custom" ? " is-custom" : ""}`}>
+                <label className="tb-exec-period-field">
+                  <span>Trend Range</span>
+                  <select
+                    value={trendPresetDraft}
+                    onChange={(event) => changeTrendPresetDraft(event.currentTarget.value as TrendPreset)}
+                  >
+                    <option value="last_4_weeks">Last 4 Weeks</option>
+                    <option value="last_8_weeks">Last 8 Weeks</option>
+                    <option value="last_12_weeks">Last 12 Weeks</option>
+                    <option value="last_26_weeks">Last 26 Weeks</option>
+                    <option value="last_52_weeks">Last 52 Weeks</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+
+                {trendPresetDraft === "custom" ? (
+                  <>
+                    <label className="tb-exec-period-field">
+                      <span>Start</span>
+                      <input
+                        type="date"
+                        value={trendStartDraft}
+                        max={todayIso}
+                        onInput={(event) => {
+                          setTrendStartDraft(event.currentTarget.value);
+                          setTrendValidationError(null);
+                        }}
+                      />
+                    </label>
+                    <label className="tb-exec-period-field">
+                      <span>End</span>
+                      <input
+                        type="date"
+                        value={trendEndDraft}
+                        max={todayIso}
+                        onInput={(event) => {
+                          setTrendEndDraft(event.currentTarget.value);
+                          setTrendValidationError(null);
+                        }}
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <p className="tb-muted-note">
+              Selected period: {draftTrendDays === null
+                ? "Choose valid dates"
+                : `${formatDateRange(trendStartDraft, trendEndDraft)} (${draftTrendDays} day${draftTrendDays === 1 ? "" : "s"}, ${timezone})`}
+            </p>
+            {trendValidationError ? <p className="tb-error-note">{trendValidationError}</p> : null}
+          </div>
+        </div>
+      ) : null}
+
       {error ? (
         <section className="tb-panel tb-deep-dive-error" role="alert">
           <div>
@@ -753,20 +1025,29 @@ export function InitiativeDeepDiveScreen() {
           <section className="tb-panel tb-deep-dive-chart-panel" aria-labelledby="initiative-flow-heading">
             <div className="tb-deep-dive-section-heading">
               <div>
-                <p className="tb-eyebrow">12-week trend</p>
+                <p className="tb-eyebrow">{trendEyebrow}</p>
                 <h3 id="initiative-flow-heading">New and completed cards by week</h3>
                 <p>Cards can contribute to both series when they are created and completed in the same week.</p>
+                <p className="tb-deep-dive-trend-range">
+                  {formatDateRange(activeTrendRange.startDate, activeTrendRange.endDate)} · {formatCount(activeTrendRange.days)} days
+                </p>
               </div>
-              <button
-                type="button"
-                className={`tb-deep-dive-wip-summary${activity === "current_wip" ? " is-active" : ""}`}
-                aria-pressed={activity === "current_wip"}
-                onClick={() => setActivity("current_wip")}
-              >
-                <span>Current WIP</span>
-                <strong>{formatCount(payload.currentWipCount)}</strong>
-                <small>View all active cards</small>
-              </button>
+              <div className="tb-deep-dive-chart-actions">
+                <button type="button" className="tb-btn tb-btn-sm" onClick={openTrendConfig}>
+                  <CalendarRange size={15} aria-hidden="true" />
+                  {TREND_PRESET_LABELS[trendSelection.preset]}
+                </button>
+                <button
+                  type="button"
+                  className={`tb-deep-dive-wip-summary${activity === "current_wip" ? " is-active" : ""}`}
+                  aria-pressed={activity === "current_wip"}
+                  onClick={() => setActivity("current_wip")}
+                >
+                  <span>Current WIP</span>
+                  <strong>{formatCount(payload.currentWipCount)}</strong>
+                  <small>View all active cards</small>
+                </button>
+              </div>
             </div>
             <InitiativeFlowChart buckets={payload.weekly} />
           </section>

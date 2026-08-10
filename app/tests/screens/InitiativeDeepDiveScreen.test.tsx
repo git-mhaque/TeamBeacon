@@ -36,6 +36,7 @@ const deepDivePayload = {
   selectedEpicKeys: [],
   selectionMode: "all",
   chartWeeks: 12,
+  chartRange: { startDate: "2026-05-25", endDate: "2026-08-10", days: 78 },
   weekly: [
     { weekStart: "2026-07-27", weekEnd: "2026-08-02", newCount: 3, completedCount: 2, netFlow: 1 },
     { weekStart: "2026-08-03", weekEnd: "2026-08-09", newCount: 4, completedCount: 5, netFlow: -1 },
@@ -187,7 +188,7 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(tooltipCallbacks.afterBody([{ dataIndex: 99 }])).toBe("");
     expect(tooltipCallbacks.afterBody([])).toBe("Net flow: +1");
 
-    const twelveWeekTile = screen.getByRole("button", { name: /Last 12 weeks/ });
+    const twelveWeekTile = screen.getByRole("button", { name: /Last 12 weeks New/ });
     expect(twelveWeekTile).toHaveAttribute("aria-pressed", "true");
     const fourWeekTile = screen.getByRole("button", { name: /Last 4 weeks/ });
     fireEvent.click(fourWeekTile);
@@ -381,6 +382,137 @@ describe("InitiativeDeepDiveScreen", () => {
         }),
       ).toBe(true);
     });
+  });
+
+  it("configures preset and custom trend ranges without changing table tiles", async () => {
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
+    });
+    render(<InitiativeDeepDiveScreen />);
+
+    await screen.findByRole("heading", { name: "New and completed cards by week" });
+    expect(screen.getByText("12-week trend")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Last 12 weeks" }));
+    let dialog = screen.getByRole("dialog", { name: "Configure Trend Range" });
+    const rangeSelect = within(dialog).getByRole("combobox", { name: "Trend Range" });
+    fireEvent.change(rangeSelect, { target: { value: "last_4_weeks" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("chartWeeks=4"))).toBe(true);
+    });
+    expect(screen.getByRole("button", { name: "Last 4 weeks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Last 12 weeks New/ })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Last 4 weeks" }));
+    dialog = screen.getByRole("dialog", { name: "Configure Trend Range" });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Trend Range" }), {
+      target: { value: "custom" },
+    });
+    fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByText("Start and end date are required.")).toBeInTheDocument();
+
+    fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2026-08-01" } });
+    fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-08-11" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByText("End date cannot be after today.")).toBeInTheDocument();
+
+    fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2025-07-01" } });
+    fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-07-30" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByText("Trend range cannot exceed 366 days.")).toBeInTheDocument();
+
+    fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2026-08-09" } });
+    fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-08-01" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByText("Start date cannot be after end date.")).toBeInTheDocument();
+
+    fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2026-07-24" } });
+    fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-07-30" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const customUrl = fetchSpy.mock.calls
+        .map(([input]) => new URL(String(input)))
+        .find((url) => url.searchParams.get("chartStart") === "2026-07-24");
+      expect(customUrl?.searchParams.get("chartEnd")).toBe("2026-07-30");
+      expect(customUrl?.searchParams.has("chartWeeks")).toBe(false);
+    });
+    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+    await waitFor(() => expect(persistence.setPreference).toHaveBeenCalledWith(
+      "teambeacon.initiativeDeepDive.trend.period",
+      JSON.stringify({ preset: "custom", startDate: "2026-07-24", endDate: "2026-07-30" }),
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Configure Trend Range" })).not.toBeInTheDocument();
+  });
+
+  it("restores a persisted custom trend range", async () => {
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => (
+      key === "teambeacon.initiativeDeepDive.trend.period"
+        ? JSON.stringify({ preset: "custom", startDate: "2026-07-01", endDate: "2026-07-31" })
+        : null
+    ));
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
+    });
+
+    render(<InitiativeDeepDiveScreen />);
+
+    expect(await screen.findByRole("button", { name: "Custom" })).toBeInTheDocument();
+    const initialDeepDiveUrl = fetchSpy.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+    expect(initialDeepDiveUrl?.searchParams.get("chartStart")).toBe("2026-07-01");
+    expect(initialDeepDiveUrl?.searchParams.get("chartEnd")).toBe("2026-07-31");
+  });
+
+  it("restores a persisted trend preset", async () => {
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => (
+      key === "teambeacon.initiativeDeepDive.trend.period"
+        ? JSON.stringify({ preset: "last_8_weeks", startDate: "", endDate: "" })
+        : null
+    ));
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
+    });
+
+    render(<InitiativeDeepDiveScreen />);
+
+    expect(await screen.findByRole("button", { name: "Last 8 weeks" })).toBeInTheDocument();
+    const initialDeepDiveUrl = fetchSpy.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+    expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("8");
+    expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
+  });
+
+  it.each([
+    JSON.stringify({ preset: "custom", startDate: "not-a-date", endDate: "2026-07-31" }),
+    JSON.stringify({ preset: "custom", startDate: "2025-01-01", endDate: "2026-07-31" }),
+  ])("falls back from an invalid persisted custom trend range", async (persistedTrend) => {
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => (
+      key === "teambeacon.initiativeDeepDive.trend.period" ? persistedTrend : null
+    ));
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
+    });
+
+    render(<InitiativeDeepDiveScreen />);
+
+    expect(await screen.findByRole("button", { name: "Last 12 weeks" })).toBeInTheDocument();
+    const initialDeepDiveUrl = fetchSpy.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+    expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("12");
+    expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
   });
 
   it("renders empty and truncated table states with resilient card formatting", async () => {
