@@ -88,7 +88,7 @@ The current application source is approximately 17,800 lines:
 
 - `app/src/styles/app.css`: approximately 4,500 lines.
 - `InitiativesScreen.tsx`: approximately 2,950 lines.
-- `TeamDashboardScreen.tsx`: approximately 3,150 lines.
+- `TeamReportScreen.tsx`: approximately 3,150 lines.
 - `TeamInsightsScreen.tsx`: approximately 1,500 lines.
 - `IntegrationsScreen.tsx`: approximately 1,400 lines.
 - `app/src/lib/api.ts`: approximately 1,175 lines.
@@ -519,7 +519,7 @@ Suggested implementation backlog:
 7. `team-insights`: trend controls, data cards, charts, and details.
 8. `release-insights`: readiness, cycle time, and risk.
 9. `initiative-insights`: saved views, KPI strip, filters, matrix, dialogs, and existing row actions.
-10. `team-dashboard`: leadership summary, drill-down, print, and export.
+10. `team-report`: leadership summary, drill-down, print, and export.
 11. `legacy-cutover`: remove OJET/Preact/RequireJS and swap build artifacts.
 12. `frontend-hardening`: accessibility, visual regression, performance, and container smoke tests.
 

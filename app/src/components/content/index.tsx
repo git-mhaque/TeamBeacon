@@ -30,11 +30,11 @@ import {
   InitiativesScreen,
 } from "./screens/InitiativesScreen";
 import {
-  EXPORT_TEAM_DASHBOARD_HTML_EVENT,
-  OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
-  OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
-  TeamDashboardScreen,
-} from "./screens/TeamDashboardScreen";
+  EXPORT_TEAM_REPORT_HTML_EVENT,
+  OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT,
+  OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT,
+  TeamReportScreen,
+} from "./screens/TeamReportScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { SystemStatusControl } from "./screens/SystemStatusControl";
@@ -60,7 +60,7 @@ type ScreenId =
   | "security"
   | "incidents"
   | "releases"
-  | "executive";
+  | "team-report";
 
 type NavItem = {
   id: ScreenId;
@@ -99,7 +99,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
   { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
-  { id: "executive", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
+  { id: "team-report", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
   { id: "integrations", label: "Settings", blurb: "Work Streams / Work Types / Metadata", showConstruction: false, icon: Settings },
 ];
 
@@ -113,7 +113,7 @@ function screenTitle(id: ScreenId): string {
     security: "Security Insights",
     incidents: "Operations Insights",
     releases: "Release Insights",
-    executive: "Team Report",
+    "team-report": "Team Report",
   };
   return mapping[id];
 }
@@ -136,8 +136,8 @@ function renderScreen(id: ScreenId) {
       return <IncidentResponseScreen />;
     case "releases":
       return <ReleasesScreen />;
-    case "executive":
-      return <TeamDashboardScreen />;
+    case "team-report":
+      return <TeamReportScreen />;
     default:
       return <IntegrationsScreen />;
   }
@@ -690,26 +690,26 @@ export function Content({ appName }: Props) {
               </button>
             </div>
           ) : null}
-          {active === "executive" ? (
+          {active === "team-report" ? (
             <div className="tb-topbar-actions">
               <button
                 type="button"
                 className="tb-btn tb-btn-sm tb-no-print"
-                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT))}
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT))}
               >
                 Reporting Period
               </button>
               <button
                 type="button"
                 className="tb-btn tb-btn-sm tb-no-print"
-                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT))}
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT))}
               >
                 Configure Initiatives
               </button>
               <button
                 type="button"
                 className="tb-btn tb-btn-sm tb-no-print"
-                onClick={() => window.dispatchEvent(new CustomEvent(EXPORT_TEAM_DASHBOARD_HTML_EVENT))}
+                onClick={() => window.dispatchEvent(new CustomEvent(EXPORT_TEAM_REPORT_HTML_EVENT))}
               >
                 Export Report
               </button>

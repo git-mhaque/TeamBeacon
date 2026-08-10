@@ -48,9 +48,9 @@ type PersistedReportingSelection = {
 
 const INITIATIVE_SECTION_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
 const REPORTING_PERIOD_SELECTION_KEY = "teambeacon.executive.reporting.period";
-export const OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT = "teambeacon:team-dashboard-open-initiative-config";
-export const OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT = "teambeacon:team-dashboard-open-reporting-period";
-export const EXPORT_TEAM_DASHBOARD_HTML_EVENT = "teambeacon:team-dashboard-export-html";
+export const OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT = "teambeacon:team-report-open-initiative-config";
+export const OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT = "teambeacon:team-report-open-reporting-period";
+export const EXPORT_TEAM_REPORT_HTML_EVENT = "teambeacon:team-report-export-html";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -264,7 +264,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-type DashboardExportMode = "interactive" | "print";
+type TeamReportExportMode = "interactive" | "print";
 
 type SaveFilePickerHandle = {
   createWritable: () => Promise<{
@@ -325,8 +325,8 @@ async function saveHtmlWithDialogOrDownload(html: string, fileName: string): Pro
   }, 0);
 }
 
-function buildTeamDashboardExportHtml(params: {
-  mode: DashboardExportMode;
+function buildTeamReportExportHtml(params: {
+  mode: TeamReportExportMode;
   generatedAt: string;
   reportingPeriodLabel: string;
   reportingPeriodDays: number;
@@ -1413,7 +1413,7 @@ function formatAiProviderName(value: string | null | undefined): string {
   return "AI";
 }
 
-export function TeamDashboardScreen() {
+export function TeamReportScreen() {
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(() => readPersistedReportingSelection(initialRange), [initialRange]);
 
@@ -1720,9 +1720,9 @@ export function TeamDashboardScreen() {
     const handleOpen = () => {
       openReportingConfig();
     };
-    window.addEventListener(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT, handleOpen);
+    window.addEventListener(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT, handleOpen);
     return () => {
-      window.removeEventListener(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT, handleOpen);
+      window.removeEventListener(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT, handleOpen);
     };
   }, [openReportingConfig]);
 
@@ -2005,7 +2005,7 @@ export function TeamDashboardScreen() {
     setCompletedWorkRefreshNonce((previous) => previous + 1);
   }, []);
 
-  const exportDashboardHtml = useCallback(async () => {
+  const exportTeamReportHtml = useCallback(async () => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
     const generatedAt = new Date().toISOString();
@@ -2019,7 +2019,7 @@ export function TeamDashboardScreen() {
       rag: row.rag,
     }));
 
-    const html = buildTeamDashboardExportHtml({
+    const html = buildTeamReportExportHtml({
       mode: "interactive",
       generatedAt,
       reportingPeriodLabel,
@@ -2065,13 +2065,13 @@ export function TeamDashboardScreen() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handleExport = () => {
-      void exportDashboardHtml();
+      void exportTeamReportHtml();
     };
-    window.addEventListener(EXPORT_TEAM_DASHBOARD_HTML_EVENT, handleExport);
+    window.addEventListener(EXPORT_TEAM_REPORT_HTML_EVENT, handleExport);
     return () => {
-      window.removeEventListener(EXPORT_TEAM_DASHBOARD_HTML_EVENT, handleExport);
+      window.removeEventListener(EXPORT_TEAM_REPORT_HTML_EVENT, handleExport);
     };
-  }, [exportDashboardHtml]);
+  }, [exportTeamReportHtml]);
 
   useEffect(() => {
     if (loading) {
@@ -2573,9 +2573,9 @@ export function TeamDashboardScreen() {
     const handleOpen = () => {
       openInitiativeConfig();
     };
-    window.addEventListener(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT, handleOpen);
+    window.addEventListener(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT, handleOpen);
     return () => {
-      window.removeEventListener(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT, handleOpen);
+      window.removeEventListener(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT, handleOpen);
     };
   }, [openInitiativeConfig]);
 

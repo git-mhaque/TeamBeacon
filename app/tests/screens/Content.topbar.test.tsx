@@ -14,9 +14,9 @@ const mockedContentState = vi.hoisted(() => {
     openTeamInsightsSettingsEvent: "teambeacon:team-insights-open-settings",
     teamInsightsTrendWindowChangeEvent: "teambeacon:team-insights-trend-window-change",
     teamInsightsTrendWindowSyncEvent: "teambeacon:team-insights-trend-window-sync",
-    openTeamDashboardReportingPeriodEvent: "teambeacon:team-dashboard-open-reporting-period",
-    openTeamDashboardInitiativeConfigEvent: "teambeacon:team-dashboard-open-initiative-config",
-    exportTeamDashboardHtmlEvent: "teambeacon:team-dashboard-export-html",
+    openTeamReportReportingPeriodEvent: "teambeacon:team-report-open-reporting-period",
+    openTeamReportInitiativeConfigEvent: "teambeacon:team-report-open-initiative-config",
+    exportTeamReportHtmlEvent: "teambeacon:team-report-export-html",
     formatTrendWindowLabel(value: number): string {
       if (value === 1) return "1 sprint";
       return `Last ${value} sprints`;
@@ -76,14 +76,14 @@ vi.mock("../../src/components/content/screens/TeamInsightsScreen", async () => {
   };
 });
 
-vi.mock("../../src/components/content/screens/TeamDashboardScreen", async () => {
+vi.mock("../../src/components/content/screens/TeamReportScreen", async () => {
   const { useEffect, useState } = await import("react");
 
   return {
-    OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT: mockedContentState.openTeamDashboardReportingPeriodEvent,
-    OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT: mockedContentState.openTeamDashboardInitiativeConfigEvent,
-    EXPORT_TEAM_DASHBOARD_HTML_EVENT: mockedContentState.exportTeamDashboardHtmlEvent,
-    TeamDashboardScreen: function TeamDashboardScreen() {
+    OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT: mockedContentState.openTeamReportReportingPeriodEvent,
+    OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT: mockedContentState.openTeamReportInitiativeConfigEvent,
+    EXPORT_TEAM_REPORT_HTML_EVENT: mockedContentState.exportTeamReportHtmlEvent,
+    TeamReportScreen: function TeamReportScreen() {
       const [isReportingOpen, setIsReportingOpen] = useState(false);
       const [isInitiativesOpen, setIsInitiativesOpen] = useState(false);
       const [exportCount, setExportCount] = useState(0);
@@ -99,13 +99,13 @@ vi.mock("../../src/components/content/screens/TeamDashboardScreen", async () => 
           setExportCount((current) => current + 1);
         };
 
-        window.addEventListener(mockedContentState.openTeamDashboardReportingPeriodEvent, handleReportingOpen);
-        window.addEventListener(mockedContentState.openTeamDashboardInitiativeConfigEvent, handleInitiativesOpen);
-        window.addEventListener(mockedContentState.exportTeamDashboardHtmlEvent, handleExport);
+        window.addEventListener(mockedContentState.openTeamReportReportingPeriodEvent, handleReportingOpen);
+        window.addEventListener(mockedContentState.openTeamReportInitiativeConfigEvent, handleInitiativesOpen);
+        window.addEventListener(mockedContentState.exportTeamReportHtmlEvent, handleExport);
         return () => {
-          window.removeEventListener(mockedContentState.openTeamDashboardReportingPeriodEvent, handleReportingOpen);
-          window.removeEventListener(mockedContentState.openTeamDashboardInitiativeConfigEvent, handleInitiativesOpen);
-          window.removeEventListener(mockedContentState.exportTeamDashboardHtmlEvent, handleExport);
+          window.removeEventListener(mockedContentState.openTeamReportReportingPeriodEvent, handleReportingOpen);
+          window.removeEventListener(mockedContentState.openTeamReportInitiativeConfigEvent, handleInitiativesOpen);
+          window.removeEventListener(mockedContentState.exportTeamReportHtmlEvent, handleExport);
         };
       }, []);
 
@@ -290,7 +290,7 @@ describe("Content topbar controls", () => {
     expect(screen.queryByRole("dialog", { name: "Team Insights Settings" })).not.toBeInTheDocument();
   });
 
-  it("renders each screen and wires executive topbar actions", () => {
+  it("renders each screen and wires Team Report topbar actions", () => {
     render(<Content appName="TeamBeacon" />);
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));

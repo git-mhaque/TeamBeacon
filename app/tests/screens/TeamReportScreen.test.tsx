@@ -2,10 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { vi } from "vitest";
 import {
-  OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT,
-  OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT,
-  TeamDashboardScreen,
-} from "../../src/components/content/screens/TeamDashboardScreen";
+  OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT,
+  OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT,
+  TeamReportScreen,
+} from "../../src/components/content/screens/TeamReportScreen";
 
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
@@ -16,7 +16,7 @@ function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   );
 }
 
-describe("TeamDashboardScreen", () => {
+describe("TeamReportScreen", () => {
   it("loads executive data, drafts summary/wins-risks, and supports initiative selection", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url =
@@ -220,7 +220,7 @@ describe("TeamDashboardScreen", () => {
       return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
     });
 
-    render(<TeamDashboardScreen />);
+    render(<TeamReportScreen />);
 
     expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
     expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
@@ -260,7 +260,7 @@ describe("TeamDashboardScreen", () => {
     expect(scopedWinsRisks.getByText(/Updated:/i)).toBeInTheDocument();
     expect(scopedWinsRisks.getByText(/words/i)).toBeInTheDocument();
 
-    window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_INITIATIVE_CONFIG_EVENT));
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT));
     const dialog = await screen.findByRole("dialog", { name: "Configure Initiative Epics" });
     expect(dialog).toBeInTheDocument();
 
@@ -275,7 +275,7 @@ describe("TeamDashboardScreen", () => {
       expect(screen.queryByText("Executive reporting automation")).not.toBeInTheDocument();
     });
 
-    window.dispatchEvent(new CustomEvent(OPEN_TEAM_DASHBOARD_REPORTING_PERIOD_EVENT));
+    window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT));
     expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
 
     expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
