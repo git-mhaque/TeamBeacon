@@ -6595,7 +6595,7 @@ body {
 
 .tb-deep-dive-table {
   width: 100%;
-  min-width: 72.5rem;
+  min-width: 82rem;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -6603,13 +6603,13 @@ body {
   font-size: 0.74rem;
 }
 
-.tb-deep-dive-table th:nth-child(1) { width: 8%; }
+.tb-deep-dive-table th:nth-child(1) { width: 11.5%; }
 .tb-deep-dive-table th:nth-child(2) { width: 13%; }
 .tb-deep-dive-table th:nth-child(3) { width: 8.5%; }
-.tb-deep-dive-table th:nth-child(4) { width: 35.5%; }
+.tb-deep-dive-table th:nth-child(4) { width: 33%; }
 .tb-deep-dive-table th:nth-child(5) { width: 8%; }
 .tb-deep-dive-table th:nth-child(6),
-.tb-deep-dive-table th:nth-child(8) { width: 8.5%; }
+.tb-deep-dive-table th:nth-child(8) { width: 8%; }
 .tb-deep-dive-table th:nth-child(7) { width: 10%; }
 
 .tb-deep-dive-table th {
@@ -6679,6 +6679,8 @@ body {
 
 .tb-deep-dive-activity-badges {
   display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
 }
