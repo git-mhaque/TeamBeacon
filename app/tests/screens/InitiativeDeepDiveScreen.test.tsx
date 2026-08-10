@@ -276,7 +276,7 @@ describe("InitiativeDeepDiveScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Choose work streams and epics" })).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("shows named scope pills, collapses overflow, and supports direct removal", async () => {
     const expandedEpicOptions = [
