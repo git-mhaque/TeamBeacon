@@ -223,7 +223,7 @@ describe("Content", () => {
     expect(screen.getByText("Incidents / DR / Observability")).toBeInTheDocument();
     expect(screen.getByText("Cycle Time / Readiness / Risk")).toBeInTheDocument();
     expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
-    expect(screen.getByText("Connections / Metadata Configuration")).toBeInTheDocument();
+    expect(screen.getByText("Groups / Work Types / Metadata")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Team Insights is under construction")).not.toBeInTheDocument();

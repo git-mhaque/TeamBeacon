@@ -37,6 +37,7 @@ import {
 } from "./screens/TeamDashboardScreen";
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
+import { SystemStatusControl } from "./screens/SystemStatusControl";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
@@ -99,7 +100,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
   { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
   { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
-  { id: "integrations", label: "Settings", blurb: "Connections / Metadata Configuration", showConstruction: false, icon: Settings },
+  { id: "integrations", label: "Settings", blurb: "Groups / Work Types / Metadata", showConstruction: false, icon: Settings },
 ];
 
 function screenTitle(id: ScreenId): string {
@@ -604,6 +605,9 @@ export function Content({ appName }: Props) {
             </div>
             <h1>Manager Console</h1>
           </div>
+        </div>
+        <div className="tb-app-header-end">
+          <SystemStatusControl />
         </div>
       </header>
 

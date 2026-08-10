@@ -103,6 +103,8 @@ const deepDivePayload = {
 
 describe("InitiativeDeepDiveScreen", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-10T12:00:00+10:00"));
     chartCalls.length = 0;
     vi.spyOn(persistence, "getPreferenceSync").mockReturnValue(null);
     vi.spyOn(persistence, "setPreference").mockResolvedValue();
@@ -110,6 +112,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("cascades group and epic scope into weekly flow and work-item activity", async () => {

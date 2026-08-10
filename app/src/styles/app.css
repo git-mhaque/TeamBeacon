@@ -60,11 +60,561 @@ body {
   height: var(--tb-app-header-height);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: #292725;
   box-shadow: 0 0.28rem 1rem rgba(40, 32, 27, 0.2);
   padding: 0 0.8rem 0 0.5rem;
+}
+
+.tb-app-header-end {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.tb-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tb-system-status-control {
+  display: flex;
+  align-items: center;
+}
+
+.tb-system-status-trigger {
+  min-height: 2.35rem;
+  max-width: min(22rem, 42vw);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8f6f3;
+  font: inherit;
+  font-size: 0.69rem;
+  font-weight: 700;
+  padding: 0.3rem 0.68rem;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.tb-system-status-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.tb-system-status-trigger:focus-visible {
+  outline: 2px solid #f2c47b;
+  outline-offset: 2px;
+}
+
+.tb-system-status-trigger > svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.tb-system-status-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-system-status-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #9f9892;
+  box-shadow: 0 0 0 0.12rem rgba(255, 255, 255, 0.08);
+}
+
+.tb-system-status-trigger.is-good .tb-system-status-dot {
+  background: #59c694;
+}
+
+.tb-system-status-trigger.is-risk .tb-system-status-dot {
+  background: #f1786c;
+}
+
+.tb-system-status-trigger.is-syncing .tb-system-status-dot {
+  background: #7dc8e6;
+}
+
+.tb-system-status-trigger.is-checking .tb-system-status-dot {
+  background: #f2c47b;
+}
+
+.tb-system-status-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.tb-system-status-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 18, 16, 0.44);
+  backdrop-filter: blur(1.5px);
+}
+
+.tb-system-status-sheet {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(100%, 32rem);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid #d8d0c9;
+  background: #f8f6f3;
+  color: var(--tb-ink);
+  box-shadow: -1.2rem 0 2.8rem rgba(34, 28, 23, 0.24);
+  animation: tb-system-sheet-in 180ms ease-out;
+}
+
+@keyframes tb-system-sheet-in {
+  from { transform: translateX(1.5rem); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.tb-system-status-sheet-head {
+  min-height: 4.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid #ded7d0;
+  background: #ffffff;
+  padding: 0.78rem 0.9rem;
+}
+
+.tb-system-status-sheet-title,
+.tb-system-status-sheet-title > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.tb-system-status-sheet-title > div:last-child {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tb-system-status-sheet-title p,
+.tb-system-status-sheet-title h2 {
+  margin: 0;
+}
+
+.tb-system-status-sheet-title p {
+  color: #8b554c;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tb-system-status-sheet-title h2 {
+  color: #302c28;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.tb-system-status-sheet-title h2:focus {
+  outline: none;
+}
+
+.tb-icon-btn {
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #d9d1ca;
+  border-radius: 0.62rem;
+  background: #fff;
+  color: #504942;
+  cursor: pointer;
+}
+
+.tb-icon-btn:hover,
+.tb-icon-btn:focus-visible {
+  border-color: #b68b82;
+  background: #fbf7f5;
+  outline: none;
+  box-shadow: 0 0 0 0.16rem rgba(150, 56, 43, 0.1);
+}
+
+.tb-icon-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.tb-system-status-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 0.72rem;
+  padding: 0.8rem;
+}
+
+.tb-system-status-summary,
+.tb-system-status-summary-copy,
+.tb-system-connection-head,
+.tb-system-connection-head > div,
+.tb-system-sync-head,
+.tb-system-status-subview-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.tb-system-status-summary,
+.tb-system-connection-head,
+.tb-system-sync-head,
+.tb-system-status-subview-toolbar {
+  justify-content: space-between;
+  gap: 0.72rem;
+}
+
+.tb-system-status-summary {
+  border: 1px solid #d8d0c9;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.68rem;
+}
+
+.tb-system-status-summary-copy {
+  min-width: 0;
+  gap: 0.52rem;
+}
+
+.tb-system-status-summary-copy > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  color: #2c7653;
+}
+
+.tb-system-status-summary-copy.is-risk > svg {
+  color: var(--tb-risk);
+}
+
+.tb-system-status-summary-copy > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tb-system-status-summary-copy strong {
+  color: #35302c;
+  font-size: 0.79rem;
+}
+
+.tb-system-status-summary-copy span {
+  color: #746c65;
+  font-size: 0.68rem;
+}
+
+.tb-system-status-summary .tb-btn,
+.tb-system-status-subview-toolbar .tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.tb-system-status-summary .tb-btn svg,
+.tb-system-status-subview-toolbar .tb-btn svg {
+  width: 0.86rem;
+  height: 0.86rem;
+}
+
+.tb-system-connection-card {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid #ddd6cf;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.72rem;
+}
+
+.tb-system-connection-head > div {
+  min-width: 0;
+  gap: 0.42rem;
+}
+
+.tb-system-connection-head h3,
+.tb-system-connection-card p,
+.tb-system-sync-head h4,
+.tb-system-sync-head span {
+  margin: 0;
+}
+
+.tb-system-connection-head h3 {
+  color: #3b3631;
+  font-size: 0.82rem;
+}
+
+.tb-system-connection-card > p {
+  color: #5f5851;
+  font-size: 0.72rem;
+}
+
+.tb-system-connection-card > small {
+  color: #817970;
+  font-size: 0.65rem;
+}
+
+.tb-system-connection-indicator {
+  width: 0.56rem;
+  height: 0.56rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #aaa39c;
+}
+
+.tb-system-connection-indicator.is-good { background: #3ba577; }
+.tb-system-connection-indicator.is-risk { background: #d95549; }
+.tb-system-connection-indicator.is-checking { background: #c88b23; }
+
+.tb-system-sync-card {
+  display: grid;
+  gap: 0.56rem;
+  border-top: 1px solid #e7e1db;
+  margin-top: 0.45rem;
+  padding-top: 0.62rem;
+}
+
+.tb-system-sync-head > div {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tb-system-sync-head > div > span {
+  color: #8c5c53;
+  font-size: 0.59rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tb-system-sync-head h4 {
+  color: #3d3833;
+  font-size: 0.78rem;
+}
+
+.tb-system-sync-facts,
+.tb-system-inline-facts,
+.tb-system-field-mapping dl {
+  margin: 0;
+}
+
+.tb-system-sync-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.tb-system-sync-facts > div,
+.tb-system-inline-facts > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tb-system-sync-facts dt,
+.tb-system-inline-facts dt,
+.tb-system-field-mapping dt {
+  color: #817970;
+  font-size: 0.59rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tb-system-sync-facts dd,
+.tb-system-inline-facts dd,
+.tb-system-field-mapping dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #48423c;
+  font-size: 0.69rem;
+  font-weight: 650;
+  margin: 0;
+}
+
+.tb-system-sync-progress {
+  display: grid;
+  gap: 0.36rem;
+}
+
+.tb-system-sync-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #514943;
+  font-size: 0.68rem;
+}
+
+.tb-system-sync-progress .tb-sync-progress-track {
+  width: 100%;
+}
+
+.tb-system-sync-detail-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.65rem;
+  color: #6e665f;
+  font-size: 0.64rem;
+}
+
+.tb-system-sync-message,
+.tb-system-sync-warning {
+  margin: 0;
+  font-size: 0.67rem;
+}
+
+.tb-system-sync-message { color: #5f5851; }
+.tb-system-sync-warning { color: #8b5e0e; }
+
+.tb-system-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+}
+
+.tb-system-inline-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
+  gap: 0.5rem;
+  border-top: 1px solid #eee8e2;
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+}
+
+.tb-system-status-subview {
+  display: grid;
+  align-content: start;
+  gap: 0.72rem;
+}
+
+.tb-system-status-subview > .tb-muted-note,
+.tb-system-status-subview-toolbar > .tb-muted-note {
+  margin: 0;
+}
+
+.tb-system-status-subview-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #ddd6cf;
+  padding-top: 0.72rem;
+}
+
+.tb-system-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.tb-system-diagnostics-grid article,
+.tb-system-field-mapping {
+  border: 1px solid #ddd6cf;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0.68rem;
+}
+
+.tb-system-diagnostics-grid h3,
+.tb-system-field-mapping h3 {
+  margin: 0;
+  color: #675f58;
+  font-size: 0.64rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.tb-system-diagnostics-grid strong,
+.tb-system-diagnostics-grid a {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #245d91;
+  font-size: 0.72rem;
+  margin-top: 0.3rem;
+}
+
+.tb-system-field-mapping > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tb-system-field-mapping dl {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.tb-system-field-mapping dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-system-status-sheet {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .tb-system-status-trigger {
+    width: 2.45rem;
+    min-height: 2.45rem;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .tb-system-status-trigger-label,
+  .tb-system-status-trigger > svg {
+    display: none;
+  }
+
+  .tb-system-status-dot {
+    width: 0.62rem;
+    height: 0.62rem;
+  }
+
+  .tb-system-status-sheet {
+    width: 100%;
+  }
+
+  .tb-system-status-summary,
+  .tb-system-status-subview-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tb-system-status-summary .tb-btn {
+    width: 100%;
+  }
+
+  .tb-system-sync-facts,
+  .tb-system-diagnostics-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .tb-app-header-start {

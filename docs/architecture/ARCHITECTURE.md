@@ -10,6 +10,7 @@ TeamBeacon is a self-hosted web analytics system:
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
 - Screens: Settings, Initiative Insights, Initiative Deep Dive, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
+- The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
 
@@ -44,8 +45,8 @@ TeamBeacon is a self-hosted web analytics system:
 - `report_runs`: generated outputs and baseline references.
 
 ## 5. Data Flow
-1. User configures integrations, field mappings, epic metadata taxonomy, and active AI provider/model.
-2. API sync logic pulls incremental issue/sprint/content changes.
+1. The deployment supplies integration credentials and provider configuration; users maintain epic metadata in Settings and inspect live integration health from the global header.
+2. Users can start or inspect JIRA syncs from the global system-status sheet, and API sync logic pulls incremental issue/sprint/content changes.
 3. API normalizes and stores data.
 4. Metrics engine computes initiative/team/release KPIs (including initiative creation/completion flow, current WIP, sprint trend, release cycle-time, and readiness metrics).
 5. UI reads snapshots and renders dashboards.

@@ -40,7 +40,7 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 - React 19, Vite 8, strict TypeScript, Tailwind CSS 4, Lucide icons, Vitest, React Testing Library, and ESLint are active.
 - The existing eight-screen component-state navigation remains in place behind a compact, hamburger-expandable application rail.
 - Initiative Insights uses browser-page vertical scrolling so the Progress Matrix no longer introduces a nested vertical scrollbar.
-- Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Dashboard, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell.
+- Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Dashboard, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell, including a persistent header control for connection health and JIRA sync operations.
 - Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
 - Existing metrics, filters, actions, dialogs, exports, preference keys, and API calls remain unchanged.
 
@@ -203,7 +203,8 @@ Use this structure:
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
 - **Release Insights:** separate release readiness from historical cycle-time analysis.
-- **Settings:** use tabs for Connections, Metadata, AI, and Diagnostics. Connection cards should prioritize status, last success, next action, and expandable technical detail.
+- **Global system status:** expose connection health, JIRA sync actions/history, and diagnostics from a compact header control. Use one accessible side sheet with internal views, keyboard focus containment, Escape dismissal, and trigger-focus restoration.
+- **Settings:** keep the screen focused on editable epic groups and work types; operational integration state belongs to the global system-status sheet.
 - **Security and Operations:** use one reusable coming-soon state until real workflows exist.
 
 ### 4.7 Visual System
@@ -380,7 +381,7 @@ Exit criteria:
 Port in this order:
 
 1. Security and Operations shared coming-soon route.
-2. Settings and integration status.
+2. Global system status and metadata settings.
 3. Sprint Insights.
 4. Team Insights and shared chart components.
 5. Release Insights.
@@ -513,7 +514,7 @@ Suggested implementation backlog:
 2. `frontend-contracts`: add OpenAPI type generation and typed client.
 3. `design-system`: tokens and accessible UI primitives.
 4. `app-shell`: navigation, header, context, and responsive behavior.
-5. `settings`: connections, sync, metadata, AI, and diagnostics.
+5. `settings`: epic-group and work-type metadata; the application shell owns connections, sync, AI health, and diagnostics.
 6. `sprint-insights`: current sprint, work mix, scope, and blocker views.
 7. `team-insights`: trend controls, data cards, charts, and details.
 8. `release-insights`: readiness, cycle time, and risk.

@@ -179,7 +179,8 @@ TeamBeacon/
 - Historical UX references: `docs/design/teambeacon-ojet-mockups.html` and `docs/design/redwood-ojet-dashboard.html`
 - Supporting notes: `docs/design/README.md`
 - Mockups must reflect:
-  - Settings (connections, field mapping, epic metadata)
+  - Global system status (source connections, JIRA sync, history, and diagnostics)
+  - Settings (epic metadata)
   - Initiative insights
   - Initiative Deep Dive
   - Team insights
