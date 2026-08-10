@@ -15,7 +15,7 @@ import { InitiativeFlowChart } from "./InitiativeFlowChart";
 type TableWindowWeeks = 1 | 2 | 4 | 12;
 type TableSortField = "activity" | "issueKey" | "summary" | "epic" | "status" | "created" | "inProgress" | "completed";
 type SortDirection = "asc" | "desc";
-type TrendPreset = "last_4_weeks" | "last_8_weeks" | "last_12_weeks" | "last_26_weeks" | "last_52_weeks" | "custom";
+type TrendPreset = "last_1_week" | "last_2_weeks" | "last_4_weeks" | "last_8_weeks" | "last_12_weeks" | "last_26_weeks" | "last_52_weeks" | "custom";
 
 type TrendSelection = {
   preset: TrendPreset;
@@ -29,6 +29,8 @@ const INITIATIVE_DEEP_DIVE_TREND_KEY = "teambeacon.initiativeDeepDive.trend.peri
 const VISIBLE_SCOPE_PILLS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TREND_PRESET_WEEKS: Record<Exclude<TrendPreset, "custom">, number> = {
+  last_1_week: 1,
+  last_2_weeks: 2,
   last_4_weeks: 4,
   last_8_weeks: 8,
   last_12_weeks: 12,
@@ -37,6 +39,8 @@ const TREND_PRESET_WEEKS: Record<Exclude<TrendPreset, "custom">, number> = {
 };
 
 const TREND_PRESET_LABELS: Record<TrendPreset, string> = {
+  last_1_week: "Last 1 week",
+  last_2_weeks: "Last 2 weeks",
   last_4_weeks: "Last 4 weeks",
   last_8_weeks: "Last 8 weeks",
   last_12_weeks: "Last 12 weeks",
@@ -95,12 +99,19 @@ function readPersistedScope(): PersistedDeepDiveScope {
 }
 
 function isTrendPreset(value: unknown): value is TrendPreset {
-  return value === "last_4_weeks"
+  return value === "last_1_week"
+    || value === "last_2_weeks"
+    || value === "last_4_weeks"
     || value === "last_8_weeks"
     || value === "last_12_weeks"
     || value === "last_26_weeks"
     || value === "last_52_weeks"
     || value === "custom";
+}
+
+function trendPresetForWeeks(weeks: TableWindowWeeks): Exclude<TrendPreset, "custom"> {
+  if (weeks === 1) return "last_1_week";
+  return `last_${weeks}_weeks` as Exclude<TrendPreset, "custom">;
 }
 
 function formatLocalIsoDate(value: Date): string {
@@ -168,9 +179,13 @@ function parseLocalDate(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" })
+    .format(parseLocalDate(value));
+}
+
 function formatDateRange(startDate: string, endDate: string): string {
-  const formatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
-  return `${formatter.format(parseLocalDate(startDate))} – ${formatter.format(parseLocalDate(endDate))}`;
+  return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -280,7 +295,6 @@ export function InitiativeDeepDiveScreen() {
   const [groups, setGroups] = useState<EpicLookupItem[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
   const [selectedEpicKeys, setSelectedEpicKeys] = useState<string[]>([]);
-  const [tableWindowWeeks, setTableWindowWeeks] = useState<TableWindowWeeks>(12);
   const [activity, setActivity] = useState<InitiativeDeepDiveActivity>("all");
   const [sortField, setSortField] = useState<TableSortField>("activity");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -357,7 +371,6 @@ export function InitiativeDeepDiveScreen() {
       ...(trendSelection.preset === "custom"
         ? { chartStart: trendSelection.startDate, chartEnd: trendSelection.endDate }
         : { chartWeeks: TREND_PRESET_WEEKS[trendSelection.preset] }),
-      tableWindowWeeks,
       activity,
       timezone,
       limit: 500,
@@ -393,7 +406,6 @@ export function InitiativeDeepDiveScreen() {
     isLookupLoading,
     refreshVersion,
     selectedEpicKeys,
-    tableWindowWeeks,
     timezone,
     trendSelection.endDate,
     trendSelection.preset,
@@ -445,7 +457,6 @@ export function InitiativeDeepDiveScreen() {
       ...(trendSelection.preset === "custom"
         ? { chartStart: trendSelection.startDate, chartEnd: trendSelection.endDate }
         : { chartWeeks: TREND_PRESET_WEEKS[trendSelection.preset] }),
-      tableWindowWeeks,
       activity: "all",
       timezone,
       limit: 1,
@@ -474,7 +485,6 @@ export function InitiativeDeepDiveScreen() {
     effectiveGroupIds,
     isScopePickerOpen,
     payload,
-    tableWindowWeeks,
     timezone,
     trendSelection.endDate,
     trendSelection.preset,
@@ -502,16 +512,18 @@ export function InitiativeDeepDiveScreen() {
   ));
   const scopeHasChanges = !sameSelection(selectedGroupIds, draftGroupIds)
     || !sameSelection(selectedEpicKeys, draftEpicKeys);
-  const activeTrendRange = payload?.chartRange ?? {
+  const selectedTrendRange = {
     startDate: trendSelection.startDate,
     endDate: trendSelection.endDate,
     days: Math.max(1, Math.floor(
       ((parseIsoDateToUtcDay(trendSelection.endDate) ?? 0) - (parseIsoDateToUtcDay(trendSelection.startDate) ?? 0)) / DAY_MS,
     ) + 1),
   };
-  const trendEyebrow = trendSelection.preset === "custom"
-    ? "Custom trend"
-    : `${TREND_PRESET_WEEKS[trendSelection.preset]}-week trend`;
+  const responseReportingPeriod = payload?.reportingPeriod ?? payload?.chartRange;
+  const activeTrendRange = responseReportingPeriod?.startDate === trendSelection.startDate
+    && responseReportingPeriod.endDate === trendSelection.endDate
+    ? responseReportingPeriod
+    : selectedTrendRange;
   const draftTrendStartUtc = parseIsoDateToUtcDay(trendStartDraft);
   const draftTrendEndUtc = parseIsoDateToUtcDay(trendEndDraft);
   const draftTrendDays = draftTrendStartUtc !== null && draftTrendEndUtc !== null && draftTrendEndUtc >= draftTrendStartUtc
@@ -525,7 +537,6 @@ export function InitiativeDeepDiveScreen() {
 
   const resetDependentScope = () => {
     setSelectedEpicKeys([]);
-    setTableWindowWeeks(12);
     setActivity("all");
     setPayload(null);
     setError(null);
@@ -571,7 +582,6 @@ export function InitiativeDeepDiveScreen() {
     setSelectedEpicKeys(nextEpicKeys);
     setIsScopePickerOpen(false);
     if (changed) {
-      setTableWindowWeeks(12);
       setActivity("all");
       setPayload(null);
       setError(null);
@@ -608,6 +618,7 @@ export function InitiativeDeepDiveScreen() {
     if (trendPresetDraft !== "custom") {
       const nextRange = buildRelativeWeekRange(TREND_PRESET_WEEKS[trendPresetDraft]);
       setTrendSelection({ preset: trendPresetDraft, ...nextRange });
+      if (activity === "current_wip") setActivity("all");
       setTrendValidationError(null);
       setIsTrendConfigOpen(false);
       return;
@@ -617,7 +628,7 @@ export function InitiativeDeepDiveScreen() {
       return;
     }
     if (draftTrendStartUtc === null || draftTrendEndUtc === null) {
-      setTrendValidationError("Invalid trend range date format.");
+      setTrendValidationError("Invalid reporting-period date format.");
       return;
     }
     if (draftTrendStartUtc > draftTrendEndUtc) {
@@ -630,16 +641,18 @@ export function InitiativeDeepDiveScreen() {
       return;
     }
     if ((draftTrendDays ?? 0) > 366) {
-      setTrendValidationError("Trend range cannot exceed 366 days.");
+      setTrendValidationError("Reporting period cannot exceed 366 days.");
       return;
     }
     setTrendSelection({ preset: "custom", startDate: trendStartDraft, endDate: trendEndDraft });
+    if (activity === "current_wip") setActivity("all");
     setTrendValidationError(null);
     setIsTrendConfigOpen(false);
   };
 
   const handleWindowSelection = (weeks: TableWindowWeeks) => {
-    setTableWindowWeeks(weeks);
+    const preset = trendPresetForWeeks(weeks);
+    setTrendSelection({ preset, ...buildRelativeWeekRange(weeks) });
     if (activity === "current_wip") setActivity("all");
   };
 
@@ -671,7 +684,19 @@ export function InitiativeDeepDiveScreen() {
             <p className="tb-eyebrow">Scope</p>
             <h3 id="initiative-deep-dive-filters">Choose groups and epics</h3>
           </div>
-          {payload ? <p className="tb-deep-dive-timezone">Weeks start Monday · {payload.timezone}</p> : null}
+          <div className="tb-deep-dive-reporting-control">
+            {payload ? <p className="tb-deep-dive-timezone">Weeks start Monday · {payload.timezone}</p> : null}
+            <span>Reporting period</span>
+            <button
+              type="button"
+              className="tb-btn tb-btn-sm"
+              onClick={openTrendConfig}
+              aria-label={`Configure reporting period: ${TREND_PRESET_LABELS[trendSelection.preset]}`}
+            >
+              <CalendarRange size={15} aria-hidden="true" />
+              {TREND_PRESET_LABELS[trendSelection.preset]}
+            </button>
+          </div>
         </div>
 
         <div className="tb-deep-dive-scope-summary">
@@ -923,14 +948,14 @@ export function InitiativeDeepDiveScreen() {
       ) : null}
 
       {isTrendConfigOpen ? (
-        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Trend Range">
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Reporting Period">
           <div className="tb-modal-backdrop" onClick={() => setIsTrendConfigOpen(false)} />
           <div className="tb-modal tb-modal-reporting tb-deep-dive-trend-dialog">
             <header className="tb-modal-head">
               <div>
-                <h3>Configure Trend Range</h3>
+                <h3>Configure Reporting Period</h3>
                 <p className="tb-muted-note">
-                  Set the reporting window for created and completed card trends. Table-period tiles remain independent.
+                  Set one reporting window for the card-flow chart and work-item activity. Current WIP remains a point-in-time snapshot.
                 </p>
               </div>
               <div className="tb-action-row">
@@ -946,11 +971,13 @@ export function InitiativeDeepDiveScreen() {
             <div className="tb-exec-period-toolbar">
               <div className={`tb-exec-period-row${trendPresetDraft === "custom" ? " is-custom" : ""}`}>
                 <label className="tb-exec-period-field">
-                  <span>Trend Range</span>
+                  <span>Reporting Period</span>
                   <select
                     value={trendPresetDraft}
                     onChange={(event) => changeTrendPresetDraft(event.currentTarget.value as TrendPreset)}
                   >
+                    <option value="last_1_week">Last 1 Week</option>
+                    <option value="last_2_weeks">Last 2 Weeks</option>
                     <option value="last_4_weeks">Last 4 Weeks</option>
                     <option value="last_8_weeks">Last 8 Weeks</option>
                     <option value="last_12_weeks">Last 12 Weeks</option>
@@ -1025,7 +1052,7 @@ export function InitiativeDeepDiveScreen() {
           <section className="tb-panel tb-deep-dive-chart-panel" aria-labelledby="initiative-flow-heading">
             <div className="tb-deep-dive-section-heading">
               <div>
-                <p className="tb-eyebrow">{trendEyebrow}</p>
+                <p className="tb-eyebrow">Card flow</p>
                 <h3 id="initiative-flow-heading">New and completed cards by week</h3>
                 <p>Cards can contribute to both series when they are created and completed in the same week.</p>
                 <p className="tb-deep-dive-trend-range">
@@ -1033,10 +1060,6 @@ export function InitiativeDeepDiveScreen() {
                 </p>
               </div>
               <div className="tb-deep-dive-chart-actions">
-                <button type="button" className="tb-btn tb-btn-sm" onClick={openTrendConfig}>
-                  <CalendarRange size={15} aria-hidden="true" />
-                  {TREND_PRESET_LABELS[trendSelection.preset]}
-                </button>
                 <button
                   type="button"
                   className={`tb-deep-dive-wip-summary${activity === "current_wip" ? " is-active" : ""}`}
@@ -1055,15 +1078,16 @@ export function InitiativeDeepDiveScreen() {
           <section aria-labelledby="initiative-period-heading">
             <div className="tb-deep-dive-period-heading">
               <div>
-                <p className="tb-eyebrow">Table period</p>
-                <h3 id="initiative-period-heading">Select a weekly window</h3>
+                <p className="tb-eyebrow">Reporting period shortcuts</p>
+                <h3 id="initiative-period-heading">Compare and select a weekly range</h3>
+                <p>Choosing a shortcut updates both the chart and the activity table.</p>
               </div>
-              <p>{formatDateRange(payload.selectedPeriod.startDate, payload.selectedPeriod.endDate)}</p>
+              <p>Active · {formatDateRange(activeTrendRange.startDate, activeTrendRange.endDate)}</p>
             </div>
             <div className="tb-deep-dive-period-grid">
               {WINDOW_OPTIONS.map((weeks) => {
                 const period = payload.periods.find((entry) => entry.weeks === weeks);
-                const selected = tableWindowWeeks === weeks && activity !== "current_wip";
+                const selected = trendSelection.preset === trendPresetForWeeks(weeks);
                 const netFlow = period?.netFlow ?? 0;
                 return (
                   <button
@@ -1090,10 +1114,15 @@ export function InitiativeDeepDiveScreen() {
               <div>
                 <p className="tb-eyebrow">Work item activity</p>
                 <h3 id="initiative-activity-heading">
-                  {activity === "current_wip" ? "Current work in progress" : `Activity in the last ${tableWindowWeeks} week${tableWindowWeeks === 1 ? "" : "s"}`}
+                  {activity === "current_wip"
+                    ? "Current work in progress"
+                    : `Activity · ${formatDateRange(activeTrendRange.startDate, activeTrendRange.endDate)}`}
                 </h3>
+                <p>{activity === "current_wip"
+                  ? `Point-in-time snapshot as of ${formatDate(todayIso)}.`
+                  : "Created, started, or completed during the shared reporting period."}</p>
               </div>
-              <span>{formatCount(payload.count)} card{payload.count === 1 ? "" : "s"}</span>
+              <span>{formatCount(payload.count)} {activity === "current_wip" ? "active" : "matching"} card{payload.count === 1 ? "" : "s"}</span>
             </div>
 
             <div className="tb-deep-dive-activity-filters" role="toolbar" aria-label="Work item activity filter">

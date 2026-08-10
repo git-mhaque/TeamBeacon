@@ -15,7 +15,7 @@ from services.api.issues.current_sprint_work import is_subtask_issue_type
 
 _ALLOWED_ACTIVITY_FILTERS = {"all", "new", "in_progress", "completed", "current_wip"}
 _ALLOWED_TABLE_WINDOWS = {1, 2, 4, 12}
-_MAX_CHART_RANGE_DAYS = 366
+_MAX_REPORTING_PERIOD_DAYS = 366
 _DONE_STATUS_NAMES = {"closed", "complete", "completed", "done", "resolved"}
 _IN_PROGRESS_STATUS_NAMES = {
     "analysis",
@@ -110,7 +110,9 @@ def _normalize_activity_filter(activity: str | None) -> str:
     return normalized
 
 
-def _normalize_table_window(table_window_weeks: int | str) -> int:
+def _normalize_table_window(table_window_weeks: int | str | None) -> int | None:
+    if table_window_weeks is None or str(table_window_weeks).strip() == "":
+        return None
     try:
         normalized = int(table_window_weeks)
     except (TypeError, ValueError) as exc:
@@ -159,8 +161,8 @@ def _resolve_chart_range(
     if normalized_end > local_today:
         raise ValueError("chartEnd cannot be after today in the selected timezone.")
     range_days = (normalized_end - normalized_start).days + 1
-    if range_days > _MAX_CHART_RANGE_DAYS:
-        raise ValueError(f"chart range cannot exceed {_MAX_CHART_RANGE_DAYS} days.")
+    if range_days > _MAX_REPORTING_PERIOD_DAYS:
+        raise ValueError(f"reporting period cannot exceed {_MAX_REPORTING_PERIOD_DAYS} days.")
     return normalized_start, normalized_end
 
 
@@ -469,7 +471,9 @@ def _build_empty_response(
     selected_epic_keys: list[str],
     chart_start_date: date,
     chart_end_date: date,
-    table_window_weeks: int,
+    table_start_date: date,
+    table_end_date: date,
+    table_window_weeks: int | None,
     activity: str,
     timezone_name: str,
     local_today: date,
@@ -507,12 +511,18 @@ def _build_empty_response(
             "endDate": chart_end_date.isoformat(),
             "days": (chart_end_date - chart_start_date).days + 1,
         },
+        "reportingPeriod": {
+            "startDate": chart_start_date.isoformat(),
+            "endDate": chart_end_date.isoformat(),
+            "days": (chart_end_date - chart_start_date).days + 1,
+        },
         "weekly": weekly,
         "periods": periods,
         "selectedPeriod": {
             "weeks": table_window_weeks,
-            "startDate": (current_week_start - timedelta(weeks=table_window_weeks - 1)).isoformat(),
-            "endDate": local_today.isoformat(),
+            "startDate": table_start_date.isoformat(),
+            "endDate": table_end_date.isoformat(),
+            "days": (table_end_date - table_start_date).days + 1,
         },
         "currentWipCount": 0,
         "tableCounts": {"all": 0, "new": 0, "inProgress": 0, "completed": 0},
@@ -533,7 +543,7 @@ def get_initiative_deep_dive(
     chart_weeks: int | str = 12,
     chart_start: str | None = None,
     chart_end: str | None = None,
-    table_window_weeks: int | str = 12,
+    table_window_weeks: int | str | None = None,
     activity: str | None = "all",
     timezone_name: str | None = None,
     limit: int | str = 500,
@@ -562,7 +572,12 @@ def get_initiative_deep_dive(
         chart_end=chart_end,
         local_today=local_today,
     )
-    table_start_date = current_week_start - timedelta(weeks=normalized_table_window - 1)
+    if normalized_table_window is None:
+        table_start_date = chart_start_date
+        table_end_date = chart_end_date
+    else:
+        table_start_date = current_week_start - timedelta(weeks=normalized_table_window - 1)
+        table_end_date = local_today
 
     resolved_db_path = db_path or _resolve_db_path()
     conn = _connect(resolved_db_path)
@@ -591,6 +606,8 @@ def get_initiative_deep_dive(
                 selected_epic_keys=requested_epic_keys,
                 chart_start_date=chart_start_date,
                 chart_end_date=chart_end_date,
+                table_start_date=table_start_date,
+                table_end_date=table_end_date,
                 table_window_weeks=normalized_table_window,
                 activity=normalized_activity,
                 timezone_name=resolved_timezone_name,
@@ -726,11 +743,11 @@ def get_initiative_deep_dive(
     table_counts: Counter[str] = Counter()
     matching_cards: list[dict[str, Any]] = []
     for card in card_events:
-        is_new = _is_date_in_window(card["createdDate"], table_start_date, local_today)
+        is_new = _is_date_in_window(card["createdDate"], table_start_date, table_end_date)
         is_in_progress = card["statusBucket"] == "in_progress" and _is_date_in_window(
-            card["inProgressStartedDate"], table_start_date, local_today
+            card["inProgressStartedDate"], table_start_date, table_end_date
         )
-        is_completed = _is_date_in_window(card["completedDate"], table_start_date, local_today)
+        is_completed = _is_date_in_window(card["completedDate"], table_start_date, table_end_date)
         is_current_wip = card["statusBucket"] == "in_progress"
         if is_new:
             table_counts["new"] += 1
@@ -823,12 +840,18 @@ def get_initiative_deep_dive(
             "endDate": chart_end_date.isoformat(),
             "days": (chart_end_date - chart_start_date).days + 1,
         },
+        "reportingPeriod": {
+            "startDate": chart_start_date.isoformat(),
+            "endDate": chart_end_date.isoformat(),
+            "days": (chart_end_date - chart_start_date).days + 1,
+        },
         "weekly": weekly_counts,
         "periods": periods,
         "selectedPeriod": {
             "weeks": normalized_table_window,
             "startDate": table_start_date.isoformat(),
-            "endDate": local_today.isoformat(),
+            "endDate": table_end_date.isoformat(),
+            "days": (table_end_date - table_start_date).days + 1,
         },
         "currentWipCount": len(current_wip_rows),
         "tableCounts": {

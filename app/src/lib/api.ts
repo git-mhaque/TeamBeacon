@@ -229,12 +229,18 @@ export type InitiativeDeepDiveResponse = {
     endDate: string;
     days: number;
   };
+  reportingPeriod: {
+    startDate: string;
+    endDate: string;
+    days: number;
+  };
   weekly: InitiativeDeepDiveWeeklyBucket[];
   periods: InitiativeDeepDivePeriod[];
   selectedPeriod: {
-    weeks: 1 | 2 | 4 | 12;
+    weeks: 1 | 2 | 4 | 12 | null;
     startDate: string;
     endDate: string;
+    days: number;
   };
   currentWipCount: number;
   tableCounts: {
@@ -1037,7 +1043,9 @@ export async function fetchInitiativeDeepDive(options: {
   } else {
     params.set("chartWeeks", String(options.chartWeeks ?? 12));
   }
-  params.set("tableWindowWeeks", String(options.tableWindowWeeks ?? 12));
+  if (options.tableWindowWeeks !== undefined) {
+    params.set("tableWindowWeeks", String(options.tableWindowWeeks));
+  }
   params.set("activity", options.activity ?? "all");
   params.set("timezone", options.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   params.set("limit", String(options.limit ?? 500));

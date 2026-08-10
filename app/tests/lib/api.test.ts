@@ -219,7 +219,7 @@ describe("api initiative deep dive", () => {
     await expect(fetchInitiativeDeepDive({ groupIds: [99], timezone: "UTC" })).rejects.toThrow("Unknown groupId: 99");
   });
 
-  it("uses explicit chart dates instead of chart weeks for custom trend ranges", async () => {
+  it("uses explicit dates as the shared custom reporting period", async () => {
     (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({ weekly: [] }));
     const { fetchInitiativeDeepDive } = await import("../../src/lib/api");
@@ -235,5 +235,6 @@ describe("api initiative deep dive", () => {
     expect(requestUrl.searchParams.get("chartStart")).toBe("2026-07-24");
     expect(requestUrl.searchParams.get("chartEnd")).toBe("2026-07-30");
     expect(requestUrl.searchParams.has("chartWeeks")).toBe(false);
+    expect(requestUrl.searchParams.has("tableWindowWeeks")).toBe(false);
   });
 });

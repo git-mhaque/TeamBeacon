@@ -115,17 +115,17 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - Tracked cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
     - Sub-tasks are excluded from Team Insights calculations
-- `GET /api/initiative-deep-dive?groupId=5&groupId=8&tableWindowWeeks=12`
+- `GET /api/initiative-deep-dive?groupId=5&groupId=8&chartWeeks=12`
   - Returns group/epic-scoped initiative flow and work-item activity.
   - Optional query:
     - repeated `epicKey=<key>` values; omit for all configured epics in the group
-    - `chartWeeks=12` (1-52)
-    - `chartStart=2026-07-24&chartEnd=2026-07-30` for an explicit inclusive trend range (both required, no future end date, maximum 366 days); explicit dates take precedence over `chartWeeks`
-    - `tableWindowWeeks=1|2|4|12`
+    - `chartWeeks=12` (1-52) sets the shared Monday-based reporting period for the chart and activity table
+    - `chartStart=2026-07-24&chartEnd=2026-07-30` sets an explicit inclusive reporting period (both required, no future end date, maximum 366 days); explicit dates take precedence over `chartWeeks`
+    - deprecated `tableWindowWeeks=1|2|4|12` overrides only the activity table for legacy clients; omit it to use the shared reporting period
     - `activity=all|new|in_progress|completed|current_wip`
     - `timezone=Australia/Melbourne` (IANA timezone; defaults to `UTC`)
     - `limit=500` (1-1000)
-  - `chartRange` returns the applied inclusive `startDate`, `endDate`, and day count.
+  - `reportingPeriod` returns the applied shared inclusive `startDate`, `endDate`, and day count; `chartRange` is retained as a compatibility alias.
   - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`; explicit custom boundaries can produce partial first or last buckets.
   - `periods` returns the 1/2/4/12-week tile totals; `currentWipCount` remains an all-age snapshot.
   - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first.

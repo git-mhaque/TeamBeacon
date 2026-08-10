@@ -318,6 +318,13 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
                 "endDate": "2026-08-09",
                 "days": 9,
             })
+            self.assertEqual(payload["reportingPeriod"], payload["chartRange"])
+            self.assertEqual(payload["selectedPeriod"], {
+                "weeks": None,
+                "startDate": "2026-08-01",
+                "endDate": "2026-08-09",
+                "days": 9,
+            })
             self.assertEqual(payload["chartWeeks"], 2)
             self.assertEqual(
                 [(bucket["weekStart"], bucket["weekEnd"]) for bucket in payload["weekly"]],
@@ -326,6 +333,8 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["weekly"][0]["newCount"], 0)
             self.assertEqual(payload["weekly"][1]["newCount"], 1)
             self.assertEqual(payload["weekly"][1]["completedCount"], 2)
+            self.assertEqual(payload["tableCounts"], {"all": 3, "new": 1, "inProgress": 1, "completed": 2})
+            self.assertEqual({card["issueKey"] for card in payload["cards"]}, {"TB-1", "TB-2", "TB-7"})
 
     def test_filters_selected_epics_activity_and_current_wip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -448,7 +457,6 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
                 group_id=empty_group["id"],
                 epic_keys=["", "  "],
                 chart_weeks=2,
-                table_window_weeks=1,
                 timezone_name=None,
                 limit=5_000,
                 db_path=db_path,
@@ -463,7 +471,17 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(len(payload["weekly"]), 2)
             self.assertTrue(all(bucket["newCount"] == 0 for bucket in payload["weekly"]))
             self.assertEqual([period["weeks"] for period in payload["periods"]], [1, 2, 4, 12])
-            self.assertEqual(payload["selectedPeriod"]["weeks"], 1)
+            self.assertEqual(payload["reportingPeriod"], {
+                "startDate": "2026-08-03",
+                "endDate": "2026-08-10",
+                "days": 8,
+            })
+            self.assertEqual(payload["selectedPeriod"], {
+                "weeks": None,
+                "startDate": "2026-08-03",
+                "endDate": "2026-08-10",
+                "days": 8,
+            })
             self.assertEqual(payload["limit"], 1_000)
             self.assertEqual(payload["cards"], [])
 

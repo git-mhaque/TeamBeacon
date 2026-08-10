@@ -6189,6 +6189,8 @@ body {
 }
 
 .tb-deep-dive-section-heading > div > p:last-child,
+.tb-deep-dive-period-heading > div > p:last-child,
+.tb-deep-dive-table-heading > div > p:last-child,
 .tb-deep-dive-state p {
   margin: 0.25rem 0 0;
   color: #697387;
@@ -6205,6 +6207,36 @@ body {
   color: #697387;
   font-size: 0.73rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.tb-deep-dive-reporting-control {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-items: end;
+  gap: 0.28rem 0.5rem;
+}
+
+.tb-deep-dive-reporting-control .tb-deep-dive-timezone {
+  grid-column: 1 / -1;
+}
+
+.tb-deep-dive-reporting-control > span {
+  color: #697387;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.tb-deep-dive-reporting-control .tb-btn {
+  min-height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  background: #fff;
   white-space: nowrap;
 }
 
@@ -7091,6 +7123,20 @@ body {
   .tb-deep-dive-timezone,
   .tb-deep-dive-period-heading > p {
     white-space: normal;
+  }
+
+  .tb-deep-dive-reporting-control {
+    width: 100%;
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .tb-deep-dive-reporting-control .tb-deep-dive-timezone {
+    grid-column: auto;
+  }
+
+  .tb-deep-dive-reporting-control .tb-btn {
+    justify-content: center;
   }
 
   .tb-initiative-flow-chart {

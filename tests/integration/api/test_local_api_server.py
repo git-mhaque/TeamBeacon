@@ -963,6 +963,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         def fake_initiative_deep_dive(**kwargs):  # noqa: ANN003
             self.initiative_deep_dive_calls.append(kwargs)
             group_ids = [int(group_id) for group_id in kwargs["group_ids"]]
+            table_window_weeks = kwargs.get("table_window_weeks")
+            reporting_start = kwargs.get("chart_start") or "2026-05-25"
+            reporting_end = kwargs.get("chart_end") or "2026-08-10"
             groups = [
                 {"id": group_id, "name": f"Group {group_id}", "epicCount": 2}
                 for group_id in group_ids
@@ -982,16 +985,22 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "selectionMode": "selected" if kwargs.get("epic_keys") else "all",
                 "chartWeeks": int(kwargs.get("chart_weeks", 12)),
                 "chartRange": {
-                    "startDate": kwargs.get("chart_start") or "2026-05-25",
-                    "endDate": kwargs.get("chart_end") or "2026-08-10",
+                    "startDate": reporting_start,
+                    "endDate": reporting_end,
+                    "days": 78,
+                },
+                "reportingPeriod": {
+                    "startDate": reporting_start,
+                    "endDate": reporting_end,
                     "days": 78,
                 },
                 "weekly": [],
                 "periods": [],
                 "selectedPeriod": {
-                    "weeks": int(kwargs.get("table_window_weeks", 12)),
-                    "startDate": "2026-05-25",
-                    "endDate": "2026-08-10",
+                    "weeks": int(table_window_weeks) if table_window_weeks is not None else None,
+                    "startDate": reporting_start,
+                    "endDate": reporting_end,
+                    "days": 78,
                 },
                 "currentWipCount": 3,
                 "tableCounts": {"all": 5, "new": 2, "inProgress": 1, "completed": 3},
@@ -1482,7 +1491,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         url = (
             f"{self.base_url}/api/initiative-deep-dive?groupId=5&groupId=8"
             "&epicKey=CEGBUPOL-4482&epicKey=CEGBUPOL-3553"
-            "&chartWeeks=12&tableWindowWeeks=4&activity=completed"
+            "&chartWeeks=12&activity=completed"
             "&chartStart=2026-06-01&chartEnd=2026-08-09"
             "&timezone=Australia%2FMelbourne&limit=250"
         )
@@ -1494,7 +1503,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIsNone(body["group"])
         self.assertEqual(body["selectedGroupIds"], [5, 8])
         self.assertEqual(body["selectedEpicKeys"], ["CEGBUPOL-4482", "CEGBUPOL-3553"])
-        self.assertEqual(body["selectedPeriod"]["weeks"], 4)
+        self.assertIsNone(body["selectedPeriod"]["weeks"])
         self.assertEqual(body["activity"], "completed")
         self.assertEqual(
             self.initiative_deep_dive_calls[-1],
@@ -1504,7 +1513,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "chart_weeks": "12",
                 "chart_start": "2026-06-01",
                 "chart_end": "2026-08-09",
-                "table_window_weeks": "4",
+                "table_window_weeks": None,
                 "activity": "completed",
                 "timezone_name": "Australia/Melbourne",
                 "limit": "250",

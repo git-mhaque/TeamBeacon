@@ -37,6 +37,7 @@ const deepDivePayload = {
   selectionMode: "all",
   chartWeeks: 12,
   chartRange: { startDate: "2026-05-25", endDate: "2026-08-10", days: 78 },
+  reportingPeriod: { startDate: "2026-05-25", endDate: "2026-08-10", days: 78 },
   weekly: [
     { weekStart: "2026-07-27", weekEnd: "2026-08-02", newCount: 3, completedCount: 2, netFlow: 1 },
     { weekStart: "2026-08-03", weekEnd: "2026-08-09", newCount: 4, completedCount: 5, netFlow: -1 },
@@ -48,7 +49,7 @@ const deepDivePayload = {
     { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-10", newCount: 8, completedCount: 7, netFlow: 1 },
     { weeks: 12, startDate: "2026-05-25", endDate: "2026-08-10", newCount: 24, completedCount: 21, netFlow: 3 },
   ],
-  selectedPeriod: { weeks: 12, startDate: "2026-05-25", endDate: "2026-08-10" },
+  selectedPeriod: { weeks: null, startDate: "2026-05-25", endDate: "2026-08-10", days: 78 },
   currentWipCount: 2,
   tableCounts: { all: 3, new: 2, inProgress: 1, completed: 1 },
   activity: "all",
@@ -194,7 +195,10 @@ describe("InitiativeDeepDiveScreen", () => {
     fireEvent.click(fourWeekTile);
     expect(fourWeekTile).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => {
-      expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("tableWindowWeeks=4"))).toBe(true);
+      expect(fetchSpy.mock.calls.some(([input]) => {
+        const url = new URL(String(input));
+        return url.searchParams.get("chartWeeks") === "4" && !url.searchParams.has("tableWindowWeeks");
+      })).toBe(true);
     });
 
     const selectedGroups = screen.getByLabelText("Selected groups");
@@ -373,18 +377,18 @@ describe("InitiativeDeepDiveScreen", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: /Last 2 weeks/ }));
-    expect(screen.getByRole("heading", { name: "Activity in the last 2 weeks" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Activity · .*Aug 10, 2026/ })).toBeInTheDocument();
     await waitFor(() => {
       expect(
         fetchSpy.mock.calls.some(([input]) => {
           const url = String(input);
-          return url.includes("tableWindowWeeks=2") && url.includes("activity=all");
+          return url.includes("chartWeeks=2") && !url.includes("tableWindowWeeks") && url.includes("activity=all");
         }),
       ).toBe(true);
     });
   });
 
-  it("configures preset and custom trend ranges without changing table tiles", async () => {
+  it("configures one reporting period for the chart, shortcuts, and activity table", async () => {
     const fetchSpy = setupFetchMock({
       "/api/initiative-deep-dive": deepDivePayload,
       "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
@@ -392,22 +396,28 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     await screen.findByRole("heading", { name: "New and completed cards by week" });
-    expect(screen.getByText("12-week trend")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Last 12 weeks" }));
-    let dialog = screen.getByRole("dialog", { name: "Configure Trend Range" });
-    const rangeSelect = within(dialog).getByRole("combobox", { name: "Trend Range" });
+    expect(screen.getByText("Card flow")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Configure reporting period: Last 12 weeks" }));
+    let dialog = screen.getByRole("dialog", { name: "Configure Reporting Period" });
+    const rangeSelect = within(dialog).getByRole("combobox", { name: "Reporting Period" });
     fireEvent.change(rangeSelect, { target: { value: "last_4_weeks" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("chartWeeks=4"))).toBe(true);
     });
-    expect(screen.getByRole("button", { name: "Last 4 weeks" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Last 12 weeks New/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Configure reporting period: Last 4 weeks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Last 4 weeks New/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Last 12 weeks New/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("heading", { name: /Activity · .*Aug 10, 2026/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Last 4 weeks" }));
-    dialog = screen.getByRole("dialog", { name: "Configure Trend Range" });
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "Trend Range" }), {
+    const activityToolbar = screen.getByRole("toolbar", { name: "Work item activity filter" });
+    fireEvent.click(within(activityToolbar).getByRole("button", { name: "Current WIP, 2 cards" }));
+    expect(screen.getByRole("heading", { name: "Current work in progress" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure reporting period: Last 4 weeks" }));
+    dialog = screen.getByRole("dialog", { name: "Configure Reporting Period" });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Reporting Period" }), {
       target: { value: "custom" },
     });
     fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "" } });
@@ -422,7 +432,7 @@ describe("InitiativeDeepDiveScreen", () => {
     fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2025-07-01" } });
     fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-07-30" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(within(dialog).getByText("Trend range cannot exceed 366 days.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Reporting period cannot exceed 366 days.")).toBeInTheDocument();
 
     fireEvent.input(within(dialog).getByLabelText("Start"), { target: { value: "2026-08-09" } });
     fireEvent.input(within(dialog).getByLabelText("End"), { target: { value: "2026-08-01" } });
@@ -440,15 +450,17 @@ describe("InitiativeDeepDiveScreen", () => {
       expect(customUrl?.searchParams.get("chartEnd")).toBe("2026-07-30");
       expect(customUrl?.searchParams.has("chartWeeks")).toBe(false);
     });
-    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Configure reporting period: Custom" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Activity · Jul 24, 2026 – Jul 30, 2026/ })).toBeInTheDocument();
+    expect(within(activityToolbar).getByRole("button", { name: "All activity, 3 cards" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(persistence.setPreference).toHaveBeenCalledWith(
       "teambeacon.initiativeDeepDive.trend.period",
       JSON.stringify({ preset: "custom", startDate: "2026-07-24", endDate: "2026-07-30" }),
     ));
 
-    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure reporting period: Custom" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog", { name: "Configure Trend Range" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Configure Reporting Period" })).not.toBeInTheDocument();
   });
 
   it("restores a persisted custom trend range", async () => {
@@ -464,7 +476,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("button", { name: "Custom" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Configure reporting period: Custom" })).toBeInTheDocument();
     const initialDeepDiveUrl = fetchSpy.mock.calls
       .map(([input]) => new URL(String(input)))
       .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
@@ -485,7 +497,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("button", { name: "Last 8 weeks" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Configure reporting period: Last 8 weeks" })).toBeInTheDocument();
     const initialDeepDiveUrl = fetchSpy.mock.calls
       .map(([input]) => new URL(String(input)))
       .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
@@ -507,7 +519,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("button", { name: "Last 12 weeks" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Configure reporting period: Last 12 weeks" })).toBeInTheDocument();
     const initialDeepDiveUrl = fetchSpy.mock.calls
       .map(([input]) => new URL(String(input)))
       .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
@@ -554,13 +566,13 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     expect(await screen.findByText("TB-EDGE")).toBeInTheDocument();
-    expect(screen.getByText("1 card")).toBeInTheDocument();
+    expect(screen.getByText("1 matching card")).toBeInTheDocument();
     expect(screen.getByText("not-a-date")).toBeInTheDocument();
     expect(screen.getByText("Showing the first 1 cards, newest activity first.")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /Last 1 week/ }));
-    expect(screen.getByRole("heading", { name: "Activity in the last 1 week" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Activity · Aug 10, 2026 – Aug 10, 2026/ })).toBeInTheDocument();
   });
 
   it("shows an empty result and recovers from a failed deep-dive request", async () => {
