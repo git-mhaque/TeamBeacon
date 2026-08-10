@@ -98,13 +98,42 @@ describe("TeamDashboardScreen", () => {
     vi.spyOn(persistence, "setPreference").mockResolvedValue();
   });
 
+  it("uses layout-preserving skeletons during the initial load", () => {
+    vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => undefined));
+
+    render(<TeamDashboardScreen />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading work-stream insights");
+    expect(document.querySelectorAll(".tb-dashboard-skeleton-row")).toHaveLength(6);
+    expect(document.querySelectorAll(".tb-dashboard-kpi .tb-dashboard-skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Loading work-stream flow…")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Flow period/ })).toBeDisabled();
+  });
+
+  it("keeps the current dashboard visible while refreshing", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboardPayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockReturnValueOnce(new Promise(() => undefined));
+
+    render(<TeamDashboardScreen />);
+
+    expect(await screen.findByText("TeamBeacon 2.4")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument();
+    expect(screen.getByText("TeamBeacon 2.4")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Platform Delivery delivery progress" })).toBeInTheDocument();
+  });
+
   it("summarizes delivery health and supports dashboard drill-downs", async () => {
     const callbacks = {
       onOpenWorkStream: vi.fn(),
       onOpenReleaseInsights: vi.fn(),
       onOpenTeamInsights: vi.fn(),
       onOpenSprintInsights: vi.fn(),
-      onOpenDeepDive: vi.fn(),
       onOpenSettings: vi.fn(),
     };
     const fetchSpy = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
@@ -115,8 +144,15 @@ describe("TeamDashboardScreen", () => {
     expect(screen.getByText("3.4 days")).toBeInTheDocument();
     expect(screen.getByText("0.8 days faster")).toBeInTheDocument();
     expect(screen.getByText("Sprint 43 · 5 SP")).toBeInTheDocument();
-    expect(screen.getByTitle("Unblock release automation")).toBeInTheDocument();
-    expect(screen.getByTitle("Publish delivery dashboard")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Blocked items" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recently completed" })).not.toBeInTheDocument();
+
+    const highlights = screen.getByRole("region", { name: "Team delivery highlights" });
+    expect(Array.from(highlights.querySelectorAll(".tb-dashboard-kpi-heading span")).map((title) => title.textContent)).toEqual([
+      "Latest completed release",
+      "Latest sprint cycle time",
+      "Current sprint blockers",
+    ]);
 
     const progress = screen.getByRole("progressbar", { name: "Platform Delivery delivery progress" });
     expect(progress).toHaveAttribute("aria-valuenow", "65");
@@ -130,7 +166,8 @@ describe("TeamDashboardScreen", () => {
       "aria-sort",
       "descending",
     );
-    expect(within(comparisonTable).getByRole("columnheader", { name: "Recent flow · Last 4 weeks" })).toBeInTheDocument();
+    expect(within(comparisonTable).getAllByRole("columnheader")).toHaveLength(7);
+    expect(within(comparisonTable).queryByRole("columnheader", { name: "Recent flow · Last 4 weeks" })).not.toBeInTheDocument();
 
     const platformRow = screen.getByRole("button", { name: "Platform Delivery" }).closest("tr");
     expect(platformRow).not.toBeNull();
@@ -148,7 +185,7 @@ describe("TeamDashboardScreen", () => {
     expect(within(totalsRow as HTMLElement).getByText("Balanced")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("17/30 completed")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("57%")).toBeInTheDocument();
-    for (const label of ["Work stream", "Epics", "Created", "Flow gap", "Current WIP", "Overall delivery"]) {
+    for (const label of ["Work stream", "Epics", "Created", "Flow gap", "Current WIP", "Delivery progress"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
@@ -157,18 +194,13 @@ describe("TeamDashboardScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "View Release Insights" }));
     fireEvent.click(screen.getByRole("button", { name: "View Team Insights" }));
     fireEvent.click(screen.getAllByRole("button", { name: /View.*Sprint Insights/ })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "View completion flow" }));
     expect(callbacks.onOpenReleaseInsights).toHaveBeenCalledOnce();
     expect(callbacks.onOpenTeamInsights).toHaveBeenCalledOnce();
     expect(callbacks.onOpenSprintInsights).toHaveBeenCalledOnce();
-    expect(callbacks.onOpenDeepDive).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
 
-    const issueLink = screen.getByRole("link", { name: "TB-421" });
-    expect(issueLink).toHaveAttribute("target", "_blank");
-    expect(issueLink).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("persists and refreshes the selected work-stream flow period", async () => {
@@ -223,12 +255,10 @@ describe("TeamDashboardScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Team dashboard request failed (503)");
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Some dashboard sections could not be refreshed");
+    expect(await screen.findByText("Some dashboard sections could not be refreshed.")).toBeInTheDocument();
     expect(screen.getByText("No work streams configured")).toBeInTheDocument();
     expect(screen.getByText("No completed release")).toBeInTheDocument();
     expect(screen.getByText("No completed sprint data")).toBeInTheDocument();
-    expect(screen.getByText("No blocked cards in the current sprint.")).toBeInTheDocument();
-    expect(screen.getByText("No cards completed in the last seven days.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledTimes(2);

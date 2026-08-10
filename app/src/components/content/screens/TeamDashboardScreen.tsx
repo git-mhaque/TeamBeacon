@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -171,20 +172,58 @@ function CycleDelta({ cycleTime }: { cycleTime: TeamDashboardSprintCycleTime }) 
   return <span className="tb-dashboard-delta is-neutral"><Minus size={15} aria-hidden="true" />No change</span>;
 }
 
+function WorkStreamTableSkeleton() {
+  return (
+    <div className="tb-dashboard-work-stream-table-wrap tb-dashboard-loading-table" role="status" aria-live="polite">
+      <span className="tb-visually-hidden">Loading work-stream insights…</span>
+      <table className="tb-data-table tb-dashboard-work-stream-table" aria-hidden="true">
+        <thead>
+          <tr>
+            <th scope="col">Work stream</th>
+            <th scope="col" className="is-number">Epics</th>
+            <th scope="col" className="is-number">Created</th>
+            <th scope="col" className="is-number">Completed</th>
+            <th scope="col" className="is-flow-gap">Flow gap</th>
+            <th scope="col" className="is-number">Current WIP</th>
+            <th scope="col" className="is-progress">Delivery progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 6 }, (_, index) => (
+            <tr key={index} className="tb-dashboard-skeleton-row">
+              <td data-label="Work stream"><span className="tb-dashboard-skeleton is-table-name" /></td>
+              <td data-label="Epics" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Flow gap"><span className="tb-dashboard-skeleton is-table-pill" /></td>
+              <td data-label="Current WIP" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Delivery progress" className="tb-dashboard-delivery-cell">
+                <span className="tb-dashboard-skeleton is-table-progress-copy" />
+                <span className="tb-dashboard-skeleton is-table-progress" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function TeamDashboardScreen({
   onOpenWorkStream,
   onOpenReleaseInsights,
   onOpenTeamInsights,
   onOpenSprintInsights,
-  onOpenDeepDive,
   onOpenSettings,
 }: Props) {
   const [flowWeeks, setFlowWeeks] = useState<TeamDashboardFlowWeeks>(readFlowWeeks);
   const [payload, setPayload] = useState<TeamDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLElement | null>(null);
   const [workStreamSortField, setWorkStreamSortField] = useState<WorkStreamSortField>("netFlow");
   const [workStreamSortDirection, setWorkStreamSortDirection] = useState<SortDirection>("desc");
+  const initialLoading = loading && payload == null;
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -203,6 +242,10 @@ export function TeamDashboardScreen({
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useLayoutEffect(() => {
+    setTopbarActionsTarget(document.querySelector<HTMLElement>(".tb-main-dashboard > .tb-topbar"));
+  }, []);
 
   const sectionErrorCount = useMemo(() => Object.keys(payload?.errors ?? {}).length, [payload?.errors]);
   const flowPeriodText = payload?.flowPeriod.startDate && payload.flowPeriod.endDate
@@ -256,22 +299,23 @@ export function TeamDashboardScreen({
     setWorkStreamSortDirection(defaultSortDirection(field));
   };
 
+  const freshnessActions = (
+    <div className="tb-dashboard-freshness">
+      <span className="tb-dashboard-freshness-copy">
+        <span>Data as of</span>
+        <strong>{loading ? payload ? "Refreshing…" : "Loading…" : formatTimestamp(payload?.generatedAt)}</strong>
+      </span>
+      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void loadDashboard()} disabled={loading}>
+        <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh
+      </button>
+    </div>
+  );
+
   return (
     <div className="tb-dashboard" aria-busy={loading}>
-      <section className="tb-panel tb-dashboard-intro">
-        <div>
-          <p className="tb-eyebrow">Operational snapshot</p>
-          <h3>What needs attention today</h3>
-          <p>Delivery flow, release movement, sprint speed, blockers, and recent outcomes in one place.</p>
-        </div>
-        <div className="tb-dashboard-freshness">
-          <span>Data as of</span>
-          <strong>{loading ? "Refreshing…" : formatTimestamp(payload?.generatedAt)}</strong>
-          <button type="button" className="tb-btn tb-btn-sm" onClick={() => void loadDashboard()} disabled={loading}>
-            <RefreshCw size={15} aria-hidden="true" /> Refresh
-          </button>
-        </div>
-      </section>
+      {topbarActionsTarget
+        ? createPortal(freshnessActions, topbarActionsTarget)
+        : <div className="tb-dashboard-inline-actions">{freshnessActions}</div>}
 
       {error ? (
         <section className="tb-panel tb-dashboard-error" role="alert">
@@ -288,34 +332,64 @@ export function TeamDashboardScreen({
       ) : null}
 
       <section className="tb-dashboard-kpi-grid" aria-label="Team delivery highlights">
-        <article className={`tb-dashboard-kpi${(payload?.blockedItems.count ?? 0) > 0 ? " is-attention" : " is-positive"}`}>
-          <div className="tb-dashboard-kpi-heading">
-            <span>Current sprint blockers</span>
-            {(payload?.blockedItems.count ?? 0) > 0
-              ? <CircleAlert size={19} aria-hidden="true" />
-              : <CircleCheckBig size={19} aria-hidden="true" />}
-          </div>
-          <strong>{loading ? "—" : payload?.blockedItems.count ?? 0}</strong>
-          <p>
-            {payload?.blockedItems.sprintName ?? "No active sprint"}
-            {payload?.blockedItems.storyPointsTotal ? ` · ${payload.blockedItems.storyPointsTotal} SP` : ""}
-          </p>
-          <button type="button" onClick={onOpenSprintInsights}>View Sprint Insights</button>
-        </article>
-
         <article className="tb-dashboard-kpi">
           <div className="tb-dashboard-kpi-heading"><span>Latest completed release</span></div>
-          <strong className="tb-dashboard-kpi-name">{loading ? "—" : payload?.latestRelease?.name ?? "No completed release"}</strong>
-          <p>{payload?.latestRelease ? `${formatDate(payload.latestRelease.releaseDate)} · ${formatDays(payload.latestRelease.cycleTimeDays)}` : "Release data is not available."}</p>
+          <strong className="tb-dashboard-kpi-name">
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-value is-wide" aria-hidden="true" />
+              : payload?.latestRelease?.name ?? "No completed release"}
+          </strong>
+          <p>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
+              : payload?.latestRelease
+                ? `${formatDate(payload.latestRelease.releaseDate)} · ${formatDays(payload.latestRelease.cycleTimeDays)}`
+                : "Release data is not available."}
+          </p>
           <button type="button" onClick={onOpenReleaseInsights}>View Release Insights</button>
         </article>
 
         <article className="tb-dashboard-kpi">
           <div className="tb-dashboard-kpi-heading"><span>Latest sprint cycle time</span></div>
-          <strong>{loading ? "—" : formatDays(payload?.sprintCycleTime?.latestAverageDays)}</strong>
-          <p>{payload?.sprintCycleTime?.latestSprintName ?? "No completed sprint data"}</p>
+          <strong>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-value" aria-hidden="true" />
+              : formatDays(payload?.sprintCycleTime?.latestAverageDays)}
+          </strong>
+          <p>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
+              : payload?.sprintCycleTime?.latestSprintName ?? "No completed sprint data"}
+          </p>
           {payload?.sprintCycleTime ? <CycleDelta cycleTime={payload.sprintCycleTime} /> : null}
           <button type="button" onClick={onOpenTeamInsights}>View Team Insights</button>
+        </article>
+
+        <article className={`tb-dashboard-kpi${initialLoading ? "" : (payload?.blockedItems.count ?? 0) > 0 ? " is-attention" : " is-positive"}`}>
+          <div className="tb-dashboard-kpi-heading">
+            <span>Current sprint blockers</span>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-icon" aria-hidden="true" />
+              : (payload?.blockedItems.count ?? 0) > 0
+                ? <CircleAlert size={19} aria-hidden="true" />
+                : <CircleCheckBig size={19} aria-hidden="true" />}
+          </div>
+          <strong>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-value is-compact" aria-hidden="true" />
+              : payload?.blockedItems.count ?? 0}
+          </strong>
+          <p>
+            {initialLoading
+              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
+              : (
+                <>
+                  {payload?.blockedItems.sprintName ?? "No active sprint"}
+                  {payload?.blockedItems.storyPointsTotal ? ` · ${payload.blockedItems.storyPointsTotal} SP` : ""}
+                </>
+              )}
+          </p>
+          <button type="button" onClick={onOpenSprintInsights}>View Sprint Insights</button>
         </article>
       </section>
 
@@ -332,6 +406,7 @@ export function TeamDashboardScreen({
             <span>Flow period</span>
             <select
               value={flowWeeks}
+              disabled={loading}
               onChange={(event) => updateFlowWeeks(Number(event.currentTarget.value) as TeamDashboardFlowWeeks)}
             >
               {FLOW_WEEK_OPTIONS.map((weeks) => <option key={weeks} value={weeks}>{flowRangeLabel(weeks)}</option>)}
@@ -340,8 +415,8 @@ export function TeamDashboardScreen({
           </label>
         </header>
 
-        {loading && !payload ? <p className="tb-muted-note">Loading work-stream flow…</p> : null}
-        {!loading && payload?.workStreams.length === 0 ? (
+        {initialLoading ? <WorkStreamTableSkeleton /> : null}
+        {!initialLoading && payload?.workStreams.length === 0 ? (
           <div className="tb-dashboard-empty">
             <strong>No work streams configured</strong>
             <p>Add work streams and assign configured epics before using this overview.</p>
@@ -356,13 +431,12 @@ export function TeamDashboardScreen({
                 Work streams compared by recent card flow, current work in progress, and overall delivery progress.
               </caption>
               <thead>
-                <tr className="tb-dashboard-table-groups">
+                <tr>
                   <SortableHeader
                     field="name"
                     label="Work stream"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
-                    rowSpan={2}
                     onSort={updateWorkStreamSort}
                   />
                   <SortableHeader
@@ -370,31 +444,9 @@ export function TeamDashboardScreen({
                     label="Epics"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
-                    rowSpan={2}
                     className="is-number"
                     onSort={updateWorkStreamSort}
                   />
-                  <th scope="colgroup" colSpan={3}>Recent flow · {flowRangeLabel(flowWeeks)}</th>
-                  <SortableHeader
-                    field="currentWipCount"
-                    label="Current WIP"
-                    activeField={workStreamSortField}
-                    direction={workStreamSortDirection}
-                    rowSpan={2}
-                    className="is-number"
-                    onSort={updateWorkStreamSort}
-                  />
-                  <SortableHeader
-                    field="completionPercent"
-                    label="Overall delivery"
-                    activeField={workStreamSortField}
-                    direction={workStreamSortDirection}
-                    rowSpan={2}
-                    className="is-progress"
-                    onSort={updateWorkStreamSort}
-                  />
-                </tr>
-                <tr>
                   <SortableHeader
                     field="newCount"
                     label="Created"
@@ -417,6 +469,22 @@ export function TeamDashboardScreen({
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-flow-gap"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="currentWipCount"
+                    label="Current WIP"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-number"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="completionPercent"
+                    label="Delivery progress"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-progress"
                     onSort={updateWorkStreamSort}
                   />
                 </tr>
@@ -484,47 +552,6 @@ export function TeamDashboardScreen({
         ) : null}
       </section>
 
-      <section className="tb-dashboard-activity-grid">
-        <article className="tb-panel">
-          <header className="tb-panel-header">
-            <div><p className="tb-eyebrow">Attention</p><h3>Blocked items</h3></div>
-            <span className="tb-dashboard-count">{payload?.blockedItems.count ?? 0}</span>
-          </header>
-          <div className="tb-dashboard-item-list">
-            {payload?.blockedItems.items.map((item) => (
-              <div key={item.issueKey} className="tb-dashboard-item">
-                <div>
-                  {item.issueUrl ? <a href={item.issueUrl} target="_blank" rel="noopener noreferrer">{item.issueKey}</a> : <strong>{item.issueKey}</strong>}
-                  <p title={item.summary}>{item.summary}</p>
-                </div>
-                <span>{item.status ?? "Blocked"}{item.storyPoints != null ? ` · ${item.storyPoints} SP` : ""}</span>
-              </div>
-            ))}
-            {!loading && (payload?.blockedItems.items.length ?? 0) === 0 ? <p className="tb-dashboard-list-empty">No blocked cards in the current sprint.</p> : null}
-          </div>
-          <button type="button" className="tb-dashboard-view-all" onClick={onOpenSprintInsights}>View all in Sprint Insights</button>
-        </article>
-
-        <article className="tb-panel">
-          <header className="tb-panel-header">
-            <div><p className="tb-eyebrow">Outcomes</p><h3>Recently completed</h3></div>
-            <span className="tb-dashboard-count">{payload?.recentlyCompleted.count ?? 0}</span>
-          </header>
-          <div className="tb-dashboard-item-list">
-            {payload?.recentlyCompleted.items.map((item) => (
-              <div key={item.issueKey} className="tb-dashboard-item">
-                <div>
-                  {item.issueUrl ? <a href={item.issueUrl} target="_blank" rel="noopener noreferrer">{item.issueKey}</a> : <strong>{item.issueKey}</strong>}
-                  <p title={item.summary}>{item.summary}</p>
-                </div>
-                <span>{item.workStreamName} · {formatDate(item.completedAt)}</span>
-              </div>
-            ))}
-            {!loading && (payload?.recentlyCompleted.items.length ?? 0) === 0 ? <p className="tb-dashboard-list-empty">No cards completed in the last seven days.</p> : null}
-          </div>
-          <button type="button" className="tb-dashboard-view-all" onClick={onOpenDeepDive}>View completion flow</button>
-        </article>
-      </section>
     </div>
   );
 }
