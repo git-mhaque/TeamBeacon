@@ -41,7 +41,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Show ongoing release readiness, overdue/due-soon counts, delivered scope, completion quality, and risk signals.
 - Completed/In-progress work:
   - Sprint Insights board-style snapshot (`Done`, `In Progress`, `Planned`) with state breakdown and work mix breakdown.
-- Team Dashboard:
+- Team Report:
   - Summary since last report.
   - Initiative-level progress and risks.
   - AI draft generation using selected provider/model from Settings.
@@ -186,4 +186,4 @@ TeamBeacon/
   - Team insights
   - Sprint Insights
   - Security / Incident response / Releases
-  - Team Dashboard
+  - Team Report

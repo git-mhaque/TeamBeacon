@@ -40,7 +40,7 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 - React 19, Vite 8, strict TypeScript, Tailwind CSS 4, Lucide icons, Vitest, React Testing Library, and ESLint are active.
 - The existing eight-screen component-state navigation remains in place behind a compact, hamburger-expandable application rail.
 - Initiative Insights uses browser-page vertical scrolling so the Progress Matrix no longer introduces a nested vertical scrollbar.
-- Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Dashboard, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell, including a persistent header control for connection health and JIRA sync operations.
+- Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Report, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell, including a persistent header control for connection health and JIRA sync operations.
 - Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
 - Existing metrics, filters, actions, dialogs, exports, preference keys, and API calls remain unchanged.
 
@@ -136,7 +136,7 @@ Preserve the current navigation destinations and order, including the approved p
 5. Security Insights.
 6. Operations Insights.
 7. Release Insights.
-8. Team Dashboard.
+8. Team Report.
 9. Settings.
 
 Preserve the existing initial-screen and in-session navigation behavior. URL-based routing is deferred because it would be an observable functional change.
@@ -199,7 +199,7 @@ Use this structure:
 ### 4.6 Other Screen Patterns
 
 - **Initiative Deep Dive:** default to all groups with checkbox-based multi-group selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
-- **Team Dashboard:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
+- **Team Report:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
 - **Release Insights:** separate release readiness from historical cycle-time analysis.
@@ -386,7 +386,7 @@ Port in this order:
 4. Team Insights and shared chart components.
 5. Release Insights.
 6. Initiative Insights and Progress Matrix.
-7. Team Dashboard and print/export behavior.
+7. Team Report and print/export behavior.
 
 For each route:
 
@@ -530,7 +530,7 @@ Indicative effort after design approval:
 - One engineer: approximately five to seven weeks.
 - Two engineers with coordinated feature ownership: approximately three to four weeks.
 
-The Initiative and Team Dashboard screens are the largest uncertainty because they combine the most UI code, state, and reporting behavior. Estimate these only after the foundation and one representative dashboard route are complete.
+The Initiative and Team Report screens are the largest uncertainty because they combine the most UI code, state, and reporting behavior. Estimate these only after the foundation and one representative reporting route are complete.
 
 ## 12. Decision Checkpoints
 

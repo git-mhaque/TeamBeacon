@@ -15,7 +15,7 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Release Insights: release overview, selectable cycle-time trend, overdue readiness, and completed-release quality signals.
-- Team Dashboard: AI-generated summary, wins/risks, initiative progress, and work-mix visibility for leadership updates.
+- Team Report: AI-generated summary, wins/risks, initiative progress, and work-mix visibility for leadership updates.
 
 ## 📣 Communication One-Pager
 For product messaging, capability narrative, and value framing, see:
@@ -41,8 +41,8 @@ The following live-app captures use a synthetic demo workspace so project, sprin
       <sub>Sprint Insights</sub>
     </td>
     <td align="center">
-      <img src="docs/communication/images/executive-report-ready.png" alt="Team dashboard" width="360" /><br />
-      <sub>Team Dashboard</sub>
+      <img src="docs/communication/images/executive-report-ready.png" alt="Team report" width="360" /><br />
+      <sub>Team Report</sub>
     </td>
   </tr>
 </table>

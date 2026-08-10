@@ -1,7 +1,7 @@
 # TeamBeacon for Engineering Managers
 
 ## Executive Snapshot (TL;DR)
-TeamBeacon is a local-first intelligence layer for Engineering Managers (EM) that sits on top of existing delivery data, without changing source records. It combines convenient sync, manager-configured metadata, initiative and sprint-level visibility, and an AI-augmented team dashboard to reduce cognitive load and surface risks earlier. This helps EMs think more systemically, lead higher-quality conversations, and drive better delivery outcomes.
+TeamBeacon is a local-first intelligence layer for Engineering Managers (EM) that sits on top of existing delivery data, without changing source records. It combines convenient sync, manager-configured metadata, initiative and sprint-level visibility, and an AI-augmented team report to reduce cognitive load and surface risks earlier. This helps EMs think more systemically, lead higher-quality conversations, and drive better delivery outcomes.
 
 ## Purpose
 The purpose of this page is to highlight TeamBeacon capabilities and practical value for Engineering Managers (EMs).
@@ -9,7 +9,7 @@ The purpose of this page is to highlight TeamBeacon capabilities and practical v
 ## What is TeamBeacon? 
 TeamBeacon is a lightweight, intelligent layer on top of existing engineering data sources.
 
-It helps Engineering Managers move from fragmented status gathering to focused delivery leadership by combining synced data, metadata-driven insight, and an AI-augmented team dashboard in a local-first workflow.
+It helps Engineering Managers move from fragmented status gathering to focused delivery leadership by combining synced data, metadata-driven insight, and an AI-augmented team report in a local-first workflow.
 
 Key characteristics:
 - Local-first: runs on the Engineering Manager's laptop.
@@ -104,7 +104,7 @@ Manager value:
 - Earlier attention to overdue or due-soon release readiness risks.
 - Manager-facing language that avoids source-system terminology in the product experience.
 
-### 6 Team Dashboard (Killer Feature)
+### 6 Team Report (Killer Feature)
 What is implemented today:
 - AI-generated Executive Summary using the configured AI provider (OCI, Ollama, or OpenAI).
 - AI-generated Wins and Risks using current configured initiative data.

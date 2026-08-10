@@ -9,7 +9,7 @@ TeamBeacon is a self-hosted web analytics system:
 ## 2. High-Level Components
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
-- Screens: Settings, Initiative Insights, Initiative Deep Dive, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
+- Screens: Settings, Initiative Insights, Initiative Deep Dive, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Report.
 - The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
@@ -84,7 +84,7 @@ Default thresholds:
   - Security
   - Incident Response
   - Releases
-  - Team Dashboard
+  - Team Report
   - Settings
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.

@@ -195,7 +195,7 @@ describe("Content", () => {
       "Security Insights",
       "Operations Insights",
       "Release Insights",
-      "Team Dashboard",
+      "Team Report",
       "Settings",
     ]);
     expect(within(nav).getAllByRole("button")).toHaveLength(9);
@@ -225,7 +225,7 @@ describe("Content", () => {
     expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
     expect(screen.getByText("Groups / Work Types / Metadata")).toBeInTheDocument();
 
-    expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Team Report is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Team Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();

@@ -316,13 +316,13 @@ describe("Content topbar controls", () => {
     fireEvent.click(screen.getByRole("button", { name: /Release Insights/ }));
     expect(screen.getByText("Releases stub")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Team Dashboard/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Team Report/ }));
     expect(screen.getByText("Executive Summary")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reporting Period" }));
     expect(screen.getByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Configure Initiatives" }));
     expect(screen.getByRole("dialog", { name: "Configure Initiative Epics" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Export Dashboard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export Report" }));
     expect(screen.getByText("Exports: 1")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Security Insights/ }));

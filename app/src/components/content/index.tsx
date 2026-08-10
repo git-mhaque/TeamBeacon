@@ -99,7 +99,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
   { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
-  { id: "executive", label: "Team Dashboard", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
+  { id: "executive", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
   { id: "integrations", label: "Settings", blurb: "Groups / Work Types / Metadata", showConstruction: false, icon: Settings },
 ];
 
@@ -113,7 +113,7 @@ function screenTitle(id: ScreenId): string {
     security: "Security Insights",
     incidents: "Operations Insights",
     releases: "Release Insights",
-    executive: "Team Dashboard",
+    executive: "Team Report",
   };
   return mapping[id];
 }
@@ -711,7 +711,7 @@ export function Content({ appName }: Props) {
                 className="tb-btn tb-btn-sm tb-no-print"
                 onClick={() => window.dispatchEvent(new CustomEvent(EXPORT_TEAM_DASHBOARD_HTML_EVENT))}
               >
-                Export Dashboard
+                Export Report
               </button>
             </div>
           ) : null}
