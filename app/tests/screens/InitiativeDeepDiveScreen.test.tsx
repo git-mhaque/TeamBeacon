@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { vi } from "vitest";
+import * as persistence from "../../src/lib/persistence";
 import { setupFetchMock } from "../utils/fetchMock";
 
 const { chartCalls } = vi.hoisted(() => ({
@@ -99,6 +100,8 @@ const deepDivePayload = {
 describe("InitiativeDeepDiveScreen", () => {
   beforeEach(() => {
     chartCalls.length = 0;
+    vi.spyOn(persistence, "getPreferenceSync").mockReturnValue(null);
+    vi.spyOn(persistence, "setPreference").mockResolvedValue();
   });
 
   afterEach(() => {
@@ -358,5 +361,41 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(screen.getByRole("button", { name: "Group" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Epic" })).toBeDisabled();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores and validates persisted group and epic scope", async () => {
+    vi.mocked(persistence.getPreferenceSync).mockReturnValue(JSON.stringify({
+      groupIds: [8, 99, 8],
+      epicKeys: ["tb-200", "MISSING", "TB-200"],
+    }));
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": {
+        groups: [
+          { id: 5, name: "Platform" },
+          { id: 8, name: "Operations" },
+        ],
+        workTypes: [],
+      },
+    });
+
+    render(<InitiativeDeepDiveScreen />);
+
+    expect(await screen.findByRole("button", { name: "Group" })).toHaveTextContent("1 of 2 groups");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Epic" })).toHaveTextContent("1 of 2 epics"));
+
+    const deepDiveUrls = fetchSpy.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.includes("/api/initiative-deep-dive"))
+      .map((url) => new URL(url));
+    expect(deepDiveUrls).toHaveLength(2);
+    expect(deepDiveUrls[0].searchParams.getAll("groupId")).toEqual(["8"]);
+    expect(deepDiveUrls[0].searchParams.getAll("epicKey")).toEqual([]);
+    expect(deepDiveUrls[1].searchParams.getAll("groupId")).toEqual(["8"]);
+    expect(deepDiveUrls[1].searchParams.getAll("epicKey")).toEqual(["TB-200"]);
+    await waitFor(() => expect(persistence.setPreference).toHaveBeenCalledWith(
+      "teambeacon.initiativeDeepDive.scope",
+      JSON.stringify({ groupIds: [8], epicKeys: ["TB-200"] }),
+    ));
   });
 });

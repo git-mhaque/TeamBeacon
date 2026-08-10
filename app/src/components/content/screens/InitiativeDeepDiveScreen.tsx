@@ -8,6 +8,7 @@ import {
   type InitiativeDeepDiveCard,
   type InitiativeDeepDiveResponse,
 } from "../../../lib/api";
+import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { InitiativeFlowChart } from "./InitiativeFlowChart";
 
 type TableWindowWeeks = 1 | 2 | 4 | 12;
@@ -15,6 +16,12 @@ type TableSortField = "activity" | "issueKey" | "summary" | "epic" | "status" | 
 type SortDirection = "asc" | "desc";
 
 const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12];
+const INITIATIVE_DEEP_DIVE_SCOPE_KEY = "teambeacon.initiativeDeepDive.scope";
+
+type PersistedDeepDiveScope = {
+  groupIds: number[];
+  epicKeys: string[];
+};
 
 const TABLE_COLUMNS: Array<{ id: TableSortField; label: string }> = [
   { id: "activity", label: "Activity" },
@@ -34,6 +41,31 @@ const ACTIVITY_FILTERS: Array<{ id: InitiativeDeepDiveActivity; label: string }>
   { id: "completed", label: "Completed" },
   { id: "current_wip", label: "Current WIP" },
 ];
+
+function parsePersistedScope(raw: string | null): PersistedDeepDiveScope {
+  if (!raw) return { groupIds: [], epicKeys: [] };
+  try {
+    const parsed = JSON.parse(raw) as { groupIds?: unknown; epicKeys?: unknown };
+    const groupIds = Array.isArray(parsed.groupIds)
+      ? [...new Set(parsed.groupIds.filter(
+        (value): value is number => typeof value === "number" && Number.isInteger(value) && value > 0,
+      ))]
+      : [];
+    const epicKeys = Array.isArray(parsed.epicKeys)
+      ? [...new Set(parsed.epicKeys
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean))]
+      : [];
+    return { groupIds, epicKeys };
+  } catch {
+    return { groupIds: [], epicKeys: [] };
+  }
+}
+
+function readPersistedScope(): PersistedDeepDiveScope {
+  return parsePersistedScope(getPreferenceSync(INITIATIVE_DEEP_DIVE_SCOPE_KEY));
+}
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat().format(value);
@@ -145,6 +177,7 @@ function countForActivity(payload: InitiativeDeepDiveResponse, activity: Initiat
 }
 
 export function InitiativeDeepDiveScreen() {
+  const [initialPersistedScope] = useState<PersistedDeepDiveScope>(readPersistedScope);
   const [groups, setGroups] = useState<EpicLookupItem[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
   const [selectedEpicKeys, setSelectedEpicKeys] = useState<string[]>([]);
@@ -155,12 +188,16 @@ export function InitiativeDeepDiveScreen() {
   const [payload, setPayload] = useState<InitiativeDeepDiveResponse | null>(null);
   const [isLookupLoading, setIsLookupLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasHydratedPersistedScope, setHasHydratedPersistedScope] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
   const [isEpicMenuOpen, setIsEpicMenuOpen] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const epicMenuRef = useRef<HTMLDivElement | null>(null);
+  const persistedGroupIdsRef = useRef(initialPersistedScope.groupIds);
+  const pendingPersistedEpicKeysRef = useRef(initialPersistedScope.epicKeys);
+  const hasHydratedPersistedScopeRef = useRef(false);
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
 
   useEffect(() => {
@@ -170,6 +207,13 @@ export function InitiativeDeepDiveScreen() {
       .then((lookup) => {
         if (!active) return;
         setGroups(lookup.groups);
+        const availableGroupIds = new Set(lookup.groups.map((group) => group.id));
+        const restoredGroupIds = persistedGroupIdsRef.current.filter((groupId) => availableGroupIds.has(groupId));
+        setSelectedGroupIds(
+          restoredGroupIds.length === 0 || restoredGroupIds.length === lookup.groups.length
+            ? []
+            : lookup.groups.map((group) => group.id).filter((groupId) => restoredGroupIds.includes(groupId)),
+        );
       })
       .catch((requestError: unknown) => {
         if (!active) return;
@@ -189,7 +233,7 @@ export function InitiativeDeepDiveScreen() {
   );
 
   useEffect(() => {
-    if (effectiveGroupIds.length === 0) return undefined;
+    if (isLookupLoading || effectiveGroupIds.length === 0) return undefined;
     let activeRequest = true;
     setIsLoading(true);
     setError(null);
@@ -204,6 +248,17 @@ export function InitiativeDeepDiveScreen() {
     })
       .then((nextPayload) => {
         if (!activeRequest) return;
+        if (!hasHydratedPersistedScopeRef.current) {
+          const availableEpicKeys = new Set(nextPayload.epicOptions.map((epic) => epic.epicKey));
+          const restoredEpicKeys = pendingPersistedEpicKeysRef.current.filter((epicKey) => availableEpicKeys.has(epicKey));
+          hasHydratedPersistedScopeRef.current = true;
+          setHasHydratedPersistedScope(true);
+          pendingPersistedEpicKeysRef.current = [];
+          if (restoredEpicKeys.length > 0 && restoredEpicKeys.length < nextPayload.epicOptions.length) {
+            setSelectedEpicKeys(restoredEpicKeys);
+            return;
+          }
+        }
         setPayload(nextPayload);
       })
       .catch((requestError: unknown) => {
@@ -216,7 +271,15 @@ export function InitiativeDeepDiveScreen() {
     return () => {
       activeRequest = false;
     };
-  }, [activity, effectiveGroupIds, refreshVersion, selectedEpicKeys, tableWindowWeeks, timezone]);
+  }, [activity, effectiveGroupIds, isLookupLoading, refreshVersion, selectedEpicKeys, tableWindowWeeks, timezone]);
+
+  useEffect(() => {
+    if (!hasHydratedPersistedScope || isLookupLoading) return;
+    void setPreference(INITIATIVE_DEEP_DIVE_SCOPE_KEY, JSON.stringify({
+      groupIds: selectedGroupIds,
+      epicKeys: selectedEpicKeys,
+    } satisfies PersistedDeepDiveScope));
+  }, [hasHydratedPersistedScope, isLookupLoading, selectedEpicKeys, selectedGroupIds]);
 
   useEffect(() => {
     if (!isGroupMenuOpen && !isEpicMenuOpen) return undefined;
