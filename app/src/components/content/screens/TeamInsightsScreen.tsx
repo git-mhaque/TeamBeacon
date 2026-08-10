@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TeamInsightAvailableStatus, TeamInsightsResponse, fetchTeamInsights } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
+import {
+  TEAM_INSIGHTS_SETTINGS_KEY,
+  normalizePersistedCycleTimeStatusKeys,
+} from "../../../lib/teamInsightsSettings";
 import { TrendBarChart, type TrendBarChartPoint } from "./TrendBarChart";
 
 export const TREND_WINDOW_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
@@ -9,7 +13,6 @@ export const TEAM_INSIGHTS_TREND_WINDOW_CHANGE_EVENT = "teambeacon:team-insights
 export const TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT = "teambeacon:team-insights-trend-window-sync";
 const DEFAULT_TARGET_CYCLE_TIME_DAYS = 5;
 const DEFAULT_TREND_WINDOW = 12;
-const TEAM_INSIGHTS_SETTINGS_KEY = "teambeacon.teamInsights.settings";
 
 const EMPTY_INSIGHTS: TeamInsightsResponse = {
   source: "local",
@@ -287,19 +290,6 @@ function resolveCardCycleTimeDays(row: CardsInWindowRow): number | null {
   if (!isMissingNumber(row.cycleTimeDays)) return row.cycleTimeDays as number;
   if (!isMissingNumber(row.cycleTimeToDateDays)) return row.cycleTimeToDateDays as number;
   return null;
-}
-
-function normalizePersistedCycleTimeStatusKeys(
-  value: unknown,
-  fallback: string[] | null,
-): string[] | null {
-  if (value === null) return null;
-  if (!Array.isArray(value)) return fallback;
-  return Array.from(new Set(
-    value
-      .map((entry) => normalizeStatusKey(typeof entry === "string" ? entry : null))
-      .filter((entry): entry is string => entry !== null),
-  ));
 }
 
 function nullableSelectionsMatch(left: string[] | null, right: string[] | null): boolean {

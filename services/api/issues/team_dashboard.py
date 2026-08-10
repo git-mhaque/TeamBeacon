@@ -118,6 +118,7 @@ def get_team_dashboard(
     flow_weeks: int | str = 4,
     recent_limit: int | str = 5,
     timezone_name: str | None = None,
+    cycle_time_status_keys: list[str] | None = None,
     db_path: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -268,6 +269,7 @@ def get_team_dashboard(
         errors,
         get_team_insights,
         sprint_limit=12,
+        cycle_time_status_keys=cycle_time_status_keys,
         db_path=db_path,
     )
     sprint_cycle_time = _cycle_time_comparison(team_insights)

@@ -123,6 +123,7 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
             flow_weeks=4,
             recent_limit=1,
             timezone_name="Australia/Melbourne",
+            cycle_time_status_keys=["in progress", "code review"],
             db_path="/tmp/test.db",
             now=datetime(2026, 8, 11, 0, 0, tzinfo=timezone.utc),
         )
@@ -137,6 +138,11 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
         self.assertEqual(payload["sprintCycleTime"]["latestSprintName"], "Sprint 11")
         self.assertEqual(payload["sprintCycleTime"]["deltaDays"], -1.5)
         self.assertEqual(payload["sprintCycleTime"]["direction"], "down")
+        team_mock.assert_called_once_with(
+            sprint_limit=12,
+            cycle_time_status_keys=["in progress", "code review"],
+            db_path="/tmp/test.db",
+        )
         self.assertEqual(payload["blockedItems"]["count"], 2)
         self.assertEqual(len(payload["blockedItems"]["items"]), 1)
         self.assertEqual(payload["recentlyCompleted"]["count"], 2)

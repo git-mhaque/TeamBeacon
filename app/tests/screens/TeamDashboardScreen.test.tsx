@@ -216,6 +216,24 @@ describe("TeamDashboardScreen", () => {
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowWeeks", "12");
   });
 
+  it("uses the saved Team Insights statuses for sprint cycle time", async () => {
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => (
+      key === "teambeacon.teamInsights.settings"
+        ? JSON.stringify({
+          selectedCycleTimeStatusKeys: ["In Progress", " Code Review ", "in progress"],
+        })
+        : null
+    ));
+    const fetchSpy = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+
+    render(<TeamDashboardScreen />);
+
+    await screen.findByText("3.4 days");
+    const requestUrl = new URL(String(fetchSpy.mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("cycleTimeStatusMode")).toBe("custom");
+    expect(requestUrl.searchParams.getAll("cycleTimeStatus")).toEqual(["in progress", "code review"]);
+  });
+
   it("calls out a slower sprint cycle-time trend", async () => {
     setupFetchMock({
       "/api/team/dashboard": {

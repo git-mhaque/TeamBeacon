@@ -116,6 +116,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - Epics are excluded from cycle-time calculations
     - Sub-tasks are excluded from Team Insights calculations
 - `GET /api/team/dashboard?flowWeeks=4&recentLimit=5&timezone=Australia%2FMelbourne`
+  - Add `cycleTimeStatusMode=custom` with repeated `cycleTimeStatus=<normalized-status-key>` parameters to keep the sprint cycle-time summary aligned with the saved Team Insights workflow-status selection.
   - Composite operational snapshot for the startup Team Dashboard.
   - `flowWeeks` accepts `1`, `4`, or `12`; `recentLimit` is capped at `20`.
   - Reuses existing local work-stream, Initiative Deep Dive, Release Insights, Team Insights, and current-sprint metrics.

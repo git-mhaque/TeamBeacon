@@ -464,6 +464,28 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "description": "Maximum blocker and recently completed items returned.",
                         },
                         {"name": "timezone", "in": "query", "schema": {"type": "string", "default": "UTC"}},
+                        {
+                            "name": "cycleTimeStatusMode",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["default", "custom"], "default": "default"},
+                            "description": (
+                                "When set to custom, use the Team Insights workflow-status selection for the "
+                                "sprint cycle-time summary."
+                            ),
+                        },
+                        {
+                            "name": "cycleTimeStatus",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "array", "items": {"type": "string"}},
+                            "style": "form",
+                            "explode": True,
+                            "description": (
+                                "Normalized workflow status keys used for the sprint cycle-time summary when "
+                                "cycleTimeStatusMode=custom."
+                            ),
+                        },
                     ],
                     "responses": {
                         "200": {"description": "Team dashboard payload", "content": json_payload},
@@ -1100,11 +1122,14 @@ def build_handler(
 
             if path == "/api/team/dashboard":
                 query = parse_qs(parsed.query)
+                cycle_time_status_mode = query.get("cycleTimeStatusMode", ["default"])[0]
+                cycle_time_status_keys = query.get("cycleTimeStatus", []) if cycle_time_status_mode == "custom" else None
                 try:
                     payload = team_dashboard_provider(
                         flow_weeks=query.get("flowWeeks", ["4"])[0],
                         recent_limit=query.get("recentLimit", ["5"])[0],
                         timezone_name=query.get("timezone", [None])[0],
+                        cycle_time_status_keys=cycle_time_status_keys,
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)

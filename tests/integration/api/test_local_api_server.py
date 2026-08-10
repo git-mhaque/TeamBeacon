@@ -1144,6 +1144,13 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/metadata/initiative-views/delete", body["paths"])
         self.assertEqual(body["servers"][0]["url"], self.base_url)
 
+        team_dashboard_get = body["paths"]["/api/team/dashboard"]["get"]
+        team_dashboard_parameter_names = {
+            parameter.get("name") for parameter in team_dashboard_get.get("parameters", [])
+        }
+        self.assertIn("cycleTimeStatusMode", team_dashboard_parameter_names)
+        self.assertIn("cycleTimeStatus", team_dashboard_parameter_names)
+
         team_insights_get = body["paths"]["/api/team/insights"]["get"]
         sprint_limit_param = next(
             (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "sprintLimit"),
@@ -1533,7 +1540,10 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.team_insights_calls[-1], (6, None))
 
     def test_team_dashboard_endpoint_supports_snapshot_controls(self) -> None:
-        url = f"{self.base_url}/api/team/dashboard?flowWeeks=12&recentLimit=8&timezone=Australia%2FMelbourne"
+        url = (
+            f"{self.base_url}/api/team/dashboard?flowWeeks=12&recentLimit=8&timezone=Australia%2FMelbourne"
+            "&cycleTimeStatusMode=custom&cycleTimeStatus=in%20progress&cycleTimeStatus=code%20review"
+        )
         with urlopen(url, timeout=5) as response:  # noqa: S310
             self.assertEqual(response.status, 200)
             body = json.loads(response.read().decode("utf-8"))
@@ -1545,7 +1555,12 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["sprintCycleTime"]["direction"], "down")
         self.assertEqual(
             self.team_dashboard_calls[-1],
-            {"flow_weeks": "12", "recent_limit": "8", "timezone_name": "Australia/Melbourne"},
+            {
+                "flow_weeks": "12",
+                "recent_limit": "8",
+                "timezone_name": "Australia/Melbourne",
+                "cycle_time_status_keys": ["in progress", "code review"],
+            },
         )
 
         with self.assertRaises(HTTPError) as invalid_context:

@@ -16,6 +16,7 @@ import {
   type TeamDashboardWorkStream,
 } from "../../../lib/api";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
+import { readTeamInsightsCycleTimeStatusKeys } from "../../../lib/teamInsightsSettings";
 
 const TEAM_DASHBOARD_FLOW_WEEKS_KEY = "teambeacon.teamDashboard.flowWeeks";
 const FLOW_WEEK_OPTIONS: TeamDashboardFlowWeeks[] = [1, 4, 12];
@@ -217,6 +218,7 @@ export function TeamDashboardScreen({
   onOpenSettings,
 }: Props) {
   const [flowWeeks, setFlowWeeks] = useState<TeamDashboardFlowWeeks>(readFlowWeeks);
+  const [cycleTimeStatusKeys] = useState(readTeamInsightsCycleTimeStatusKeys);
   const [payload, setPayload] = useState<TeamDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,7 +231,12 @@ export function TeamDashboardScreen({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchTeamDashboard(flowWeeks, 5);
+      const response = await fetchTeamDashboard(
+        flowWeeks,
+        5,
+        Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+        cycleTimeStatusKeys,
+      );
       setPayload(response);
     } catch (loadError) {
       setPayload(null);
@@ -237,7 +244,7 @@ export function TeamDashboardScreen({
     } finally {
       setLoading(false);
     }
-  }, [flowWeeks]);
+  }, [cycleTimeStatusKeys, flowWeeks]);
 
   useEffect(() => {
     void loadDashboard();

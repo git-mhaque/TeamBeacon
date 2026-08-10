@@ -1304,11 +1304,18 @@ export async function fetchTeamDashboard(
   flowWeeks: TeamDashboardFlowWeeks = 4,
   recentLimit = 5,
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  cycleTimeStatusKeys?: string[] | null,
 ): Promise<TeamDashboardResponse> {
   const params = new URLSearchParams();
   params.set("flowWeeks", String(flowWeeks));
   params.set("recentLimit", String(recentLimit));
   params.set("timezone", timezone);
+  if (cycleTimeStatusKeys !== undefined && cycleTimeStatusKeys !== null) {
+    params.set("cycleTimeStatusMode", "custom");
+    for (const statusKey of cycleTimeStatusKeys) {
+      params.append("cycleTimeStatus", statusKey);
+    }
+  }
   const response = await fetch(`${API_BASE}/api/team/dashboard?${params.toString()}`, {
     method: "GET",
     headers: { Accept: "application/json" },
