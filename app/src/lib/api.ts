@@ -184,7 +184,7 @@ export type InitiativeDeepDiveWeeklyBucket = {
 };
 
 export type InitiativeDeepDivePeriod = {
-  weeks: 1 | 2 | 4 | 12;
+  weeks: 1 | 2 | 4 | 12 | 26 | 52;
   startDate: string;
   endDate: string;
   newCount: number;

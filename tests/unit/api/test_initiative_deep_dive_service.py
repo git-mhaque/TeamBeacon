@@ -284,6 +284,7 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(period_two["newCount"], 1)
             self.assertEqual(period_two["completedCount"], 2)
             self.assertEqual(period_two["netFlow"], -1)
+            self.assertEqual([period["weeks"] for period in payload["periods"]], [1, 2, 4, 12, 26, 52])
             self.assertEqual(payload["currentWipCount"], 2)
             self.assertEqual(payload["tableCounts"], {"all": 3, "new": 1, "inProgress": 1, "completed": 2})
 
@@ -470,7 +471,7 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["chartWeeks"], 2)
             self.assertEqual(len(payload["weekly"]), 2)
             self.assertTrue(all(bucket["newCount"] == 0 for bucket in payload["weekly"]))
-            self.assertEqual([period["weeks"] for period in payload["periods"]], [1, 2, 4, 12])
+            self.assertEqual([period["weeks"] for period in payload["periods"]], [1, 2, 4, 12, 26, 52])
             self.assertEqual(payload["reportingPeriod"], {
                 "startDate": "2026-08-03",
                 "endDate": "2026-08-10",

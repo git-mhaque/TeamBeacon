@@ -482,7 +482,7 @@ def _build_empty_response(
     current_week_start = _week_start(local_today)
     weekly = _build_weekly_buckets(chart_start_date, chart_end_date)
     periods = []
-    for weeks in (1, 2, 4, 12):
+    for weeks in (1, 2, 4, 12, 26, 52):
         start = current_week_start - timedelta(weeks=weeks - 1)
         periods.append(
             {
@@ -721,7 +721,7 @@ def get_initiative_deep_dive(
         bucket["netFlow"] = int(bucket["newCount"]) - int(bucket["completedCount"])
 
     periods: list[dict[str, Any]] = []
-    for weeks in (1, 2, 4, 12):
+    for weeks in (1, 2, 4, 12, 26, 52):
         start_date = current_week_start - timedelta(weeks=weeks - 1)
         new_count = sum(
             1 for card in card_events if _is_date_in_window(card["createdDate"], start_date, local_today)

@@ -48,6 +48,8 @@ const deepDivePayload = {
     { weeks: 2, startDate: "2026-08-03", endDate: "2026-08-10", newCount: 5, completedCount: 6, netFlow: -1 },
     { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-10", newCount: 8, completedCount: 7, netFlow: 1 },
     { weeks: 12, startDate: "2026-05-25", endDate: "2026-08-10", newCount: 24, completedCount: 21, netFlow: 3 },
+    { weeks: 26, startDate: "2026-02-16", endDate: "2026-08-10", newCount: 40, completedCount: 35, netFlow: 5 },
+    { weeks: 52, startDate: "2025-08-18", endDate: "2026-08-10", newCount: 70, completedCount: 60, netFlow: 10 },
   ],
   selectedPeriod: { weeks: null, startDate: "2026-05-25", endDate: "2026-08-10", days: 78 },
   currentWipCount: 2,
@@ -386,6 +388,29 @@ describe("InitiativeDeepDiveScreen", () => {
         }),
       ).toBe(true);
     });
+  });
+
+  it("offers 26- and 52-week reporting-period shortcuts", async () => {
+    const fetchSpy = setupFetchMock({
+      "/api/initiative-deep-dive": deepDivePayload,
+      "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
+    });
+    render(<InitiativeDeepDiveScreen />);
+    await screen.findByRole("heading", { name: "Compare and select a weekly range" });
+
+    const twentySixWeekTile = screen.getByRole("button", { name: /Last 26 weeks New 40/ });
+    const fiftyTwoWeekTile = screen.getByRole("button", { name: /Last 52 weeks New 70/ });
+    fireEvent.click(twentySixWeekTile);
+    expect(twentySixWeekTile).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([input]) => (
+      new URL(String(input)).searchParams.get("chartWeeks") === "26"
+    ))).toBe(true));
+
+    fireEvent.click(fiftyTwoWeekTile);
+    expect(fiftyTwoWeekTile).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([input]) => (
+      new URL(String(input)).searchParams.get("chartWeeks") === "52"
+    ))).toBe(true));
   });
 
   it("configures one reporting period for the chart, shortcuts, and activity table", async () => {

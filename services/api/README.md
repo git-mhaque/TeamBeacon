@@ -127,7 +127,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `limit=500` (1-1000)
   - `reportingPeriod` returns the applied shared inclusive `startDate`, `endDate`, and day count; `chartRange` is retained as a compatibility alias.
   - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`; explicit custom boundaries can produce partial first or last buckets.
-  - `periods` returns the 1/2/4/12-week tile totals; `currentWipCount` remains an all-age snapshot.
+  - `periods` returns the 1/2/4/12/26/52-week shortcut totals; `currentWipCount` remains an all-age snapshot.
   - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first.
   - Epics and subtasks are excluded.
 - `GET /api/metadata/lookup`

@@ -6700,7 +6700,7 @@ body {
 
 .tb-deep-dive-period-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
@@ -7042,6 +7042,12 @@ body {
 .tb-deep-dive-truncated {
   border-top: 1px solid #edf0f3;
   padding: 0.55rem 0.95rem;
+}
+
+@media (max-width: 1400px) {
+  .tb-deep-dive-period-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 980px) {

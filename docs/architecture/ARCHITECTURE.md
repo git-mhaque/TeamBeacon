@@ -88,7 +88,7 @@ Default thresholds:
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
-  - Initiative Deep Dive defaults to all groups, supports checkbox-based multi-group selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12-week cards act as shared-period shortcuts.
+  - Initiative Deep Dive defaults to all groups, supports checkbox-based multi-group selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 

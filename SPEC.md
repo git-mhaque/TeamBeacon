@@ -26,7 +26,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Initiative Deep Dive:
   - Start with all epic groups selected, or select one-or-more groups, then choose all or one-or-more configured epics across those groups.
   - Compare new and completed card counts in weekly buckets over one persisted preset or custom reporting period, defaulting to 12 weeks.
-  - Select a 1/2/4/12-week shortcut to apply that reporting period to both the chart and work-item activity table.
+  - Select a 1/2/4/12/26/52-week shortcut to apply that reporting period to both the chart and work-item activity table.
   - Inspect new, currently in-progress, and completed cards with newest qualifying activity first.
 - Team insights:
   - Sprint trend window controls (`Last 4/6/8/10/12 sprints`).
@@ -143,7 +143,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Reopened cards that remain open are not counted as completed; re-completed cards use their latest completion.
 - Reporting period, shortcuts, and activity table:
   - One persisted reporting period drives both the chart and activity table. It offers 1/2/4/8/12/26/52-week presets plus an inclusive custom date range; 12 weeks is the default. Custom boundaries can create partial first or last buckets.
-  - The 1/2/4/12-week cards remain visible as comparative summaries and quick shortcuts. Selecting one changes the shared reporting period.
+  - The 1/2/4/12/26/52-week cards remain visible as comparative summaries and quick shortcuts. Selecting one changes the shared reporting period.
   - `New` matches cards created in the period.
   - `In Progress` matches cards currently in the Jira `In Progress` category whose current in-progress run began in the period.
   - `Completed` matches cards completed in the period.

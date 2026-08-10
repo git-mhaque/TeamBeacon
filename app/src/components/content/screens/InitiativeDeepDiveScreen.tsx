@@ -12,7 +12,7 @@ import {
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { InitiativeFlowChart } from "./InitiativeFlowChart";
 
-type TableWindowWeeks = 1 | 2 | 4 | 12;
+type TableWindowWeeks = 1 | 2 | 4 | 12 | 26 | 52;
 type TableSortField = "activity" | "issueKey" | "summary" | "epic" | "status" | "created" | "inProgress" | "completed";
 type SortDirection = "asc" | "desc";
 type TrendPreset = "last_1_week" | "last_2_weeks" | "last_4_weeks" | "last_8_weeks" | "last_12_weeks" | "last_26_weeks" | "last_52_weeks" | "custom";
@@ -23,7 +23,7 @@ type TrendSelection = {
   endDate: string;
 };
 
-const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12];
+const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12, 26, 52];
 const INITIATIVE_DEEP_DIVE_SCOPE_KEY = "teambeacon.initiativeDeepDive.scope";
 const INITIATIVE_DEEP_DIVE_TREND_KEY = "teambeacon.initiativeDeepDive.trend.period";
 const VISIBLE_SCOPE_PILLS = 3;
