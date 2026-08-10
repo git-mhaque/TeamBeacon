@@ -20,11 +20,11 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Configure initiative success criteria (target completion, due date, blockers, scope change thresholds).
   - Configure epic metadata:
     - success criteria checklist
-    - one or more epic groups
-    - one or more work types
+    - one work stream
+    - one work type
   - Generate RAG status and explanation.
 - Initiative Deep Dive:
-  - Start with all epic groups selected, or select one-or-more groups, then choose all or one-or-more configured epics across those groups.
+  - Start with all work streams selected, or select one or more work streams, then choose all or one or more configured epics across those work streams.
   - Compare new and completed card counts in weekly buckets over one persisted preset or custom reporting period, defaulting to 12 weeks.
   - Select a 1/2/4/12/26/52-week shortcut to apply that reporting period to both the chart and work-item activity table.
   - Inspect new, currently in-progress, and completed cards with newest qualifying activity first.
@@ -60,9 +60,9 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 4. Persist normalized local analytics data.
 5. Compute configurable metrics and RAG statuses.
 6. Generate exportable executive report (Markdown/PDF-ready format).
-7. Configure and persist epic metadata lookups (`epic groups`, `work types`) and per-epic assignments.
+7. Configure and persist initiative metadata lookups (`work streams`, `work types`) and per-epic assignments.
 8. Support runtime AI provider selection via `INTELLIGENCE_PROVIDER` with provider-specific configuration.
-9. Provide group- and epic-scoped initiative flow analytics for created, in-progress, and completed Jira cards.
+9. Provide work-stream- and epic-scoped initiative flow analytics for created, in-progress, and completed Jira cards.
 
 ## 6.1 JIRA Sync Semantics (Current Behavior)
 - Sync modes:
@@ -93,10 +93,10 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - User-level attribution rule:
   - “Worked by user X” matches issue assignee, reporter, or any changelog author on that issue.
 
-## 6.2 Epic Metadata Configuration (Current Behavior)
+## 6.2 Initiative Metadata Configuration (Current Behavior)
 - Epic metadata is managed from Initiative Insights (Configure/Edit Epic flow).
 - Lookup/reference data:
-  - `epic groups` can be added and reused.
+  - `work streams` can be added and reused.
   - `work types` can be added and reused.
 - Per-epic configuration payload:
   - `epicKey`
@@ -132,7 +132,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 ## 6.4 Initiative Deep Dive Semantics
 - Scope:
   - At least one `groupId` is required; repeated `groupId` values combine groups and shared epics are de-duplicated.
-  - Omitting `epicKey` means all configured epics across the selected groups; repeated `epicKey` values select a subset.
+  - Omitting `epicKey` means all configured epics across the selected work streams; repeated `epicKey` values select a subset.
   - Epics and subtasks are excluded from card metrics.
   - Direct epic children and one-level nested children are included using current Jira lineage.
 - Weekly flow:

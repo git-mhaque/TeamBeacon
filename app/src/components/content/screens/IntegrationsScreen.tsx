@@ -55,7 +55,7 @@ export function IntegrationsScreen() {
   const handleAddEpicGroup = useCallback(async () => {
     const candidate = groupDraft.trim();
     if (!candidate) {
-      setMetaError("Epic group name is required.");
+      setMetaError("Work stream name is required.");
       return;
     }
     setMetaError(null);
@@ -64,9 +64,9 @@ export function IntegrationsScreen() {
       await addEpicGroup(candidate);
       setGroupDraft("");
       await loadEpicMetadataConfig();
-      setMetaSuccess(`Epic group "${candidate}" saved.`);
+      setMetaSuccess(`Work stream "${candidate}" saved.`);
     } catch (err) {
-      setMetaError(err instanceof Error ? err.message : "Failed to save epic group.");
+      setMetaError(err instanceof Error ? err.message : "Failed to save work stream.");
     }
   }, [groupDraft, loadEpicMetadataConfig]);
 
@@ -92,7 +92,7 @@ export function IntegrationsScreen() {
     if (editingGroupId === null) return;
     const candidate = editingGroupName.trim();
     if (!candidate) {
-      setMetaError("Epic group name is required.");
+      setMetaError("Work stream name is required.");
       return;
     }
     setMetaError(null);
@@ -102,9 +102,9 @@ export function IntegrationsScreen() {
       await loadEpicMetadataConfig();
       setEditingGroupId(null);
       setEditingGroupName("");
-      setMetaSuccess("Epic group updated.");
+      setMetaSuccess("Work stream updated.");
     } catch (err) {
-      setMetaError(err instanceof Error ? err.message : "Failed to update epic group.");
+      setMetaError(err instanceof Error ? err.message : "Failed to update work stream.");
     }
   }, [editingGroupId, editingGroupName, loadEpicMetadataConfig]);
 
@@ -140,7 +140,7 @@ export function IntegrationsScreen() {
           setEditingGroupId(null);
           setEditingGroupName("");
         }
-        setMetaSuccess(`Epic group "${pendingLookupDelete.name}" deleted.`);
+        setMetaSuccess(`Work stream "${pendingLookupDelete.name}" deleted.`);
       } else {
         await deleteWorkType(pendingLookupDelete.id);
         if (editingWorkTypeId === pendingLookupDelete.id) {
@@ -163,8 +163,8 @@ export function IntegrationsScreen() {
       <section className="tb-panel">
         <header className="tb-panel-header">
           <div>
-            <h3>Epic Metadata Configuration</h3>
-            <p className="tb-muted-note">Manage reusable epic groups and work types used by initiative configuration.</p>
+            <h3>Initiative Metadata</h3>
+            <p className="tb-muted-note">Manage reusable work streams and work types used by initiative configuration.</p>
           </div>
         </header>
 
@@ -172,21 +172,21 @@ export function IntegrationsScreen() {
 
         <div className="tb-lookup-grid">
           <article className="tb-lookup-card">
-            <h4>Epic Groups</h4>
+            <h4>Work Streams</h4>
             <div className="tb-lookup-add-row">
               <input
                 type="text"
                 value={groupDraft}
-                aria-label="Add epic group"
+                aria-label="Add work stream"
                 onInput={(event) => setGroupDraft((event.currentTarget as HTMLInputElement).value)}
-                placeholder="Add epic group"
+                placeholder="Add work stream"
               />
               <button type="button" className="tb-btn tb-btn-sm" onClick={() => handleAddEpicGroup()}>
                 Add
               </button>
             </div>
             <div className="tb-lookup-item-list">
-              {epicLookup.groups.length === 0 ? <span className="tb-chip">No groups</span> : null}
+              {epicLookup.groups.length === 0 ? <span className="tb-chip">No work streams</span> : null}
               {epicLookup.groups.map((group) => (
                 <div key={group.id} className="tb-lookup-item-row">
                   {editingGroupId === group.id ? (
@@ -284,7 +284,7 @@ export function IntegrationsScreen() {
           }} />
           <div className="tb-modal">
             <header className="tb-modal-head">
-              <h3>{pendingLookupDelete.type === "group" ? "Delete Epic Group" : "Delete Work Type"}</h3>
+              <h3>{pendingLookupDelete.type === "group" ? "Delete Work Stream" : "Delete Work Type"}</h3>
               <button
                 type="button"
                 className="tb-btn tb-btn-sm"

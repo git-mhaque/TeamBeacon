@@ -341,7 +341,7 @@ export function InitiativeDeepDiveScreen() {
       })
       .catch((requestError: unknown) => {
         if (!active) return;
-        setError(requestError instanceof Error ? requestError.message : "Unable to load initiative groups.");
+        setError(requestError instanceof Error ? requestError.message : "Unable to load work streams.");
       })
       .finally(() => {
         if (active) setIsLookupLoading(false);
@@ -472,7 +472,7 @@ export function InitiativeDeepDiveScreen() {
       })
       .catch((requestError: unknown) => {
         if (!activeRequest) return;
-        setDraftError(requestError instanceof Error ? requestError.message : "Unable to load epics for this group selection.");
+        setDraftError(requestError instanceof Error ? requestError.message : "Unable to load epics for this work stream selection.");
       })
       .finally(() => {
         if (activeRequest) setIsDraftEpicLoading(false);
@@ -673,7 +673,7 @@ export function InitiativeDeepDiveScreen() {
   };
 
   if (isLookupLoading) {
-    return <section className="tb-panel tb-deep-dive-state">Loading initiative groups…</section>;
+    return <section className="tb-panel tb-deep-dive-state">Loading work streams…</section>;
   }
 
   return (
@@ -682,7 +682,7 @@ export function InitiativeDeepDiveScreen() {
         <div className="tb-deep-dive-section-heading">
           <div>
             <p className="tb-eyebrow">Scope</p>
-            <h3 id="initiative-deep-dive-filters">Choose groups and epics</h3>
+            <h3 id="initiative-deep-dive-filters">Choose work streams and epics</h3>
           </div>
           <div className="tb-deep-dive-reporting-control">
             {payload ? <p className="tb-deep-dive-timezone">Weeks start Monday · {payload.timezone}</p> : null}
@@ -701,16 +701,16 @@ export function InitiativeDeepDiveScreen() {
 
         <div className="tb-deep-dive-scope-summary">
           <div className="tb-deep-dive-scope-rows">
-            <div className="tb-deep-dive-scope-row" aria-label="Selected groups">
+            <div className="tb-deep-dive-scope-row" aria-label="Selected work streams">
               <div className="tb-deep-dive-scope-label">
-                <span>Groups</span>
+                <span>Work Streams</span>
                 <small>{allGroupsSelected ? `${groups.length} available` : `${selectedGroupIds.length} selected`}</small>
               </div>
               <div className="tb-deep-dive-scope-pills">
                 {allGroupsSelected ? (
                   <span className="tb-deep-dive-scope-pill is-all">
                     <Check size={13} aria-hidden="true" />
-                    <span className="tb-deep-dive-scope-pill-label">All groups</span>
+                    <span className="tb-deep-dive-scope-pill-label">All work streams</span>
                   </span>
                 ) : (
                   <>
@@ -719,7 +719,7 @@ export function InitiativeDeepDiveScreen() {
                         <span className="tb-deep-dive-scope-pill-label">{group.name}</span>
                         <button
                           type="button"
-                          aria-label={`Remove group ${group.name}`}
+                          aria-label={`Remove work stream ${group.name}`}
                           onClick={() => removeAppliedGroup(group.id)}
                         >
                           <X size={13} aria-hidden="true" />
@@ -746,7 +746,7 @@ export function InitiativeDeepDiveScreen() {
                   <span className="tb-deep-dive-scope-pill is-all">
                     <Check size={13} aria-hidden="true" />
                     <span className="tb-deep-dive-scope-pill-label">
-                      All epics in selected groups{epicOptions.length > 0 ? ` (${epicOptions.length})` : ""}
+                      All epics in selected work streams{epicOptions.length > 0 ? ` (${epicOptions.length})` : ""}
                     </span>
                   </span>
                 ) : (
@@ -801,8 +801,8 @@ export function InitiativeDeepDiveScreen() {
             <header className="tb-modal-head tb-deep-dive-scope-dialog-head">
               <div>
                 <p className="tb-eyebrow">Initiative scope</p>
-                <h3 id="initiative-scope-picker-heading">Choose groups and epics</h3>
-                <p>Epics are filtered by the groups selected on the left.</p>
+                <h3 id="initiative-scope-picker-heading">Choose work streams and epics</h3>
+                <p>Epics are filtered by the work streams selected on the left.</p>
               </div>
               <button
                 type="button"
@@ -817,7 +817,7 @@ export function InitiativeDeepDiveScreen() {
             <div className="tb-deep-dive-scope-picker">
               <section className="tb-deep-dive-scope-pane" aria-labelledby="initiative-scope-groups-heading">
                 <div className="tb-deep-dive-scope-pane-heading">
-                  <h4 id="initiative-scope-groups-heading">Groups</h4>
+                  <h4 id="initiative-scope-groups-heading">Work Streams</h4>
                   <span>{allDraftGroupsSelected ? "All selected" : `${draftGroupIds.length} selected`}</span>
                 </div>
                 <label className="tb-deep-dive-scope-search">
@@ -826,12 +826,12 @@ export function InitiativeDeepDiveScreen() {
                     ref={groupSearchRef}
                     type="search"
                     value={groupSearch}
-                    aria-label="Search groups"
-                    placeholder="Search groups…"
+                    aria-label="Search work streams"
+                    placeholder="Search work streams…"
                     onChange={(event) => setGroupSearch(event.target.value)}
                   />
                 </label>
-                <div className="tb-deep-dive-scope-options" role="group" aria-label="Group options">
+                <div className="tb-deep-dive-scope-options" role="group" aria-label="Work stream options">
                   <label className="tb-deep-dive-check-option is-all">
                     <input
                       type="checkbox"
@@ -846,8 +846,8 @@ export function InitiativeDeepDiveScreen() {
                       {allDraftGroupsSelected ? <Check size={13} /> : null}
                     </span>
                     <span>
-                      <strong>All groups</strong>
-                      <small>Keep every configured group in scope</small>
+                      <strong>All work streams</strong>
+                      <small>Keep every configured work stream in scope</small>
                     </span>
                   </label>
                   {filteredGroups.map((group) => {
@@ -862,7 +862,7 @@ export function InitiativeDeepDiveScreen() {
                       </label>
                     );
                   })}
-                  {filteredGroups.length === 0 ? <p className="tb-deep-dive-option-empty">No matching groups.</p> : null}
+                  {filteredGroups.length === 0 ? <p className="tb-deep-dive-option-empty">No matching work streams.</p> : null}
                 </div>
               </section>
 
@@ -899,7 +899,7 @@ export function InitiativeDeepDiveScreen() {
                           {allDraftEpicsSelected ? <Check size={13} /> : null}
                         </span>
                         <span>
-                          <strong>All epics in selected groups</strong>
+                          <strong>All epics in selected work streams</strong>
                           <small>{draftEpicOptions.length} eligible epics</small>
                         </span>
                       </label>
@@ -927,7 +927,7 @@ export function InitiativeDeepDiveScreen() {
 
             <footer className="tb-deep-dive-scope-footer">
               <p>
-                <strong>{allDraftGroupsSelected ? `All ${groups.length}` : draftGroupIds.length}</strong> groups
+                <strong>{allDraftGroupsSelected ? `All ${groups.length}` : draftGroupIds.length}</strong> work streams
                 <span aria-hidden="true">·</span>
                 <strong>{allDraftEpicsSelected ? `All ${draftEpicOptions.length}` : draftEpicKeys.length}</strong> epics
               </p>
@@ -1042,8 +1042,8 @@ export function InitiativeDeepDiveScreen() {
 
       {groups.length === 0 ? (
         <section className="tb-panel tb-deep-dive-state">
-          <h3>No initiative groups configured</h3>
-          <p>Add an epic group in Settings before using Initiative Deep Dive.</p>
+          <h3>No work streams configured</h3>
+          <p>Add a work stream in Settings before using Initiative Deep Dive.</p>
         </section>
       ) : null}
 

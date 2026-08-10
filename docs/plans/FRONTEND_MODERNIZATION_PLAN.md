@@ -198,13 +198,13 @@ Use this structure:
 
 ### 4.6 Other Screen Patterns
 
-- **Initiative Deep Dive:** default to all groups with checkbox-based multi-group selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
+- **Initiative Deep Dive:** default to all work streams with checkbox-based multi-work-stream selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
 - **Team Report:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
 - **Release Insights:** separate release readiness from historical cycle-time analysis.
 - **Global system status:** expose connection health, JIRA sync actions/history, and diagnostics from a compact header control. Use one accessible side sheet with internal views, keyboard focus containment, Escape dismissal, and trigger-focus restoration.
-- **Settings:** keep the screen focused on editable epic groups and work types; operational integration state belongs to the global system-status sheet.
+- **Settings:** keep the screen focused on editable work streams and work types; operational integration state belongs to the global system-status sheet.
 - **Security and Operations:** use one reusable coming-soon state until real workflows exist.
 
 ### 4.7 Visual System

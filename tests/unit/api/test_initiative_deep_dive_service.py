@@ -418,7 +418,7 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
                 ({"group_id": 0}, "groupId"),
                 ({"group_id": 999}, "Unknown groupId"),
                 ({"group_id": platform_id, "epic_keys": [7]}, "epicKey"),
-                ({"group_id": platform_id, "epic_keys": ["TB-300"]}, "selected group"),
+                ({"group_id": platform_id, "epic_keys": ["TB-300"]}, "selected work stream"),
                 ({"group_id": platform_id, "table_window_weeks": "invalid"}, "tableWindowWeeks"),
                 ({"group_id": platform_id, "table_window_weeks": 3}, "tableWindowWeeks"),
                 ({"group_id": platform_id, "chart_weeks": "invalid"}, "chartWeeks"),

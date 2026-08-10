@@ -1066,7 +1066,7 @@ export async function addEpicGroup(name: string): Promise<EpicLookupItem> {
     body: JSON.stringify({ name }),
   });
   if (!response.ok) {
-    throw await parseError(response, `Epic group create failed (${response.status})`);
+    throw await parseError(response, `Work stream create failed (${response.status})`);
   }
   return (await response.json()) as EpicLookupItem;
 }
@@ -1078,7 +1078,7 @@ export async function updateEpicGroup(id: number, name: string): Promise<EpicLoo
     body: JSON.stringify({ id, name }),
   });
   if (!response.ok) {
-    throw await parseError(response, `Epic group update failed (${response.status})`);
+    throw await parseError(response, `Work stream update failed (${response.status})`);
   }
   return (await response.json()) as EpicLookupItem;
 }
@@ -1090,7 +1090,7 @@ export async function deleteEpicGroup(id: number): Promise<{ id: number; deleted
     body: JSON.stringify({ id }),
   });
   if (!response.ok) {
-    throw await parseError(response, `Epic group delete failed (${response.status})`);
+    throw await parseError(response, `Work stream delete failed (${response.status})`);
   }
   return (await response.json()) as { id: number; deleted: boolean };
 }

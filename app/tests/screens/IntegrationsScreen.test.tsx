@@ -24,16 +24,16 @@ describe("IntegrationsScreen metadata settings", () => {
 
     render(<IntegrationsScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Epic Metadata Configuration" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Initiative Metadata" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Source Connections" })).not.toBeInTheDocument();
     expect(screen.queryByText("JIRA Connection")).not.toBeInTheDocument();
 
-    const groupsCard = screen.getByRole("heading", { name: "Epic Groups" }).closest("article") as HTMLElement;
+    const groupsCard = screen.getByRole("heading", { name: "Work Streams" }).closest("article") as HTMLElement;
     const workTypesCard = screen.getByRole("heading", { name: "Work Types" }).closest("article") as HTMLElement;
 
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Add" }));
-    expect(screen.getByText(/Epic group name is required/)).toBeInTheDocument();
-    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add epic group" }), { target: { value: "Operations" } });
+    expect(screen.getByText(/Work stream name is required/)).toBeInTheDocument();
+    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add work stream" }), { target: { value: "Operations" } });
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Add" }));
     await waitFor(() => expect(fetchSpy.mock.calls.some(([input, init]) => (
       String(input).endsWith("/api/metadata/lookup/groups") && init?.method === "POST"
@@ -85,7 +85,7 @@ describe("IntegrationsScreen metadata settings", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Metadata service unavailable"));
     render(<IntegrationsScreen />);
     expect(await screen.findByText(/Metadata service unavailable/)).toBeInTheDocument();
-    expect(screen.getByText("No groups")).toBeInTheDocument();
+    expect(screen.getByText("No work streams")).toBeInTheDocument();
     expect(screen.getByText("No work types")).toBeInTheDocument();
   });
 
@@ -94,7 +94,7 @@ describe("IntegrationsScreen metadata settings", () => {
     render(<IntegrationsScreen />);
     expect(await screen.findByText("Core Platform")).toBeInTheDocument();
 
-    const groupsCard = screen.getByRole("heading", { name: "Epic Groups" }).closest("article") as HTMLElement;
+    const groupsCard = screen.getByRole("heading", { name: "Work Streams" }).closest("article") as HTMLElement;
     const workTypesCard = screen.getByRole("heading", { name: "Work Types" }).closest("article") as HTMLElement;
     fireEvent.click(within(workTypesCard).getByRole("button", { name: "Add" }));
     expect(screen.getByText(/Work type name is required/)).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe("IntegrationsScreen metadata settings", () => {
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Edit" }));
     fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Edit Core Platform" }), { target: { value: " " } });
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Save" }));
-    expect(screen.getByText(/Epic group name is required/)).toBeInTheDocument();
+    expect(screen.getByText(/Work stream name is required/)).toBeInTheDocument();
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Cancel" }));
 
     fireEvent.click(within(workTypesCard).getByRole("button", { name: "Edit" }));
@@ -124,10 +124,10 @@ describe("IntegrationsScreen metadata settings", () => {
 
     render(<IntegrationsScreen />);
     expect(await screen.findByText("Core Platform")).toBeInTheDocument();
-    const groupsCard = screen.getByRole("heading", { name: "Epic Groups" }).closest("article") as HTMLElement;
+    const groupsCard = screen.getByRole("heading", { name: "Work Streams" }).closest("article") as HTMLElement;
     const workTypesCard = screen.getByRole("heading", { name: "Work Types" }).closest("article") as HTMLElement;
 
-    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add epic group" }), { target: { value: "Operations" } });
+    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add work stream" }), { target: { value: "Operations" } });
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Add" }));
     expect(await screen.findByText(/Metadata mutation failed/)).toBeInTheDocument();
 
@@ -172,12 +172,12 @@ describe("IntegrationsScreen metadata settings", () => {
 
     const { unmount } = render(<IntegrationsScreen />);
     expect(await screen.findByText("Core Platform")).toBeInTheDocument();
-    const groupsCard = screen.getByRole("heading", { name: "Epic Groups" }).closest("article") as HTMLElement;
+    const groupsCard = screen.getByRole("heading", { name: "Work Streams" }).closest("article") as HTMLElement;
     const workTypesCard = screen.getByRole("heading", { name: "Work Types" }).closest("article") as HTMLElement;
 
-    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add epic group" }), { target: { value: "Operations" } });
+    fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Add work stream" }), { target: { value: "Operations" } });
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Add" }));
-    expect(await screen.findByText(/Failed to save epic group/)).toBeInTheDocument();
+    expect(await screen.findByText(/Failed to save work stream/)).toBeInTheDocument();
     fireEvent.input(within(workTypesCard).getByRole("textbox", { name: "Add work type" }), { target: { value: "Security" } });
     fireEvent.click(within(workTypesCard).getByRole("button", { name: "Add" }));
     expect(await screen.findByText(/Failed to save work type/)).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe("IntegrationsScreen metadata settings", () => {
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Edit" }));
     fireEvent.input(within(groupsCard).getByRole("textbox", { name: "Edit Core Platform" }), { target: { value: "Platform" } });
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Save" }));
-    expect(await screen.findByText(/Failed to update epic group/)).toBeInTheDocument();
+    expect(await screen.findByText(/Failed to update work stream/)).toBeInTheDocument();
     fireEvent.click(within(groupsCard).getByRole("button", { name: "Cancel" }));
 
     fireEvent.click(within(workTypesCard).getByRole("button", { name: "Edit" }));
@@ -214,7 +214,7 @@ describe("IntegrationsScreen metadata settings", () => {
     });
     render(<IntegrationsScreen />);
     expect(await screen.findByText("Core Platform")).toBeInTheDocument();
-    const groupsCard = screen.getByRole("heading", { name: "Epic Groups" }).closest("article") as HTMLElement;
+    const groupsCard = screen.getByRole("heading", { name: "Work Streams" }).closest("article") as HTMLElement;
     const workTypesCard = screen.getByRole("heading", { name: "Work Types" }).closest("article") as HTMLElement;
 
     const groupEdit = within(groupsCard).getByRole("button", { name: "Edit" });

@@ -595,7 +595,7 @@ def get_initiative_deep_dive(
         unknown_epic_keys = [key for key in requested_epic_keys if key not in available_epic_set]
         if unknown_epic_keys:
             raise ValueError(
-                "epicKey values must belong to the selected groups: " + ", ".join(unknown_epic_keys)
+                "epicKey values must belong to the selected work streams: " + ", ".join(unknown_epic_keys)
             )
         selected_epic_keys = requested_epic_keys or available_epic_keys
         if not selected_epic_keys:

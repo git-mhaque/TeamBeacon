@@ -5,13 +5,13 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 ## 🎯 Overview
 - Containerized workflow that can run locally on the manager's machine.
 - Non-destructive integration model (does not modify upstream source data).
-- Metadata-driven insight layer (Group/Type/Epic configuration).
+- Metadata-driven insight layer (Work Stream/Work Type/Epic configuration).
 - AI-powered insights with pluggable provider support (OCI, Ollama, OpenAI).
 
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, metadata configuration, and AI Model Connection status (provider + model).
 - Initiative Insights: progress matrix, filters, and RAG visibility.
-- Initiative Deep Dive: default-all and multi-group/epic-scoped weekly intake and completion flow with one persisted preset/custom reporting period shared by the chart and activity table, quick-range shortcuts, and a distinct current-WIP snapshot.
+- Initiative Deep Dive: default-all and multi-work-stream/epic-scoped weekly intake and completion flow with one persisted preset/custom reporting period shared by the chart and activity table, quick-range shortcuts, and a distinct current-WIP snapshot.
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Release Insights: release overview, selectable cycle-time trend, overdue readiness, and completed-release quality signals.

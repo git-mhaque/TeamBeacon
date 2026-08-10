@@ -155,7 +155,7 @@ describe("TeamDashboardScreen", () => {
 
       if (url.includes("/api/ai/chat")) {
         const bodyText = typeof init?.body === "string" ? init.body : "";
-        if (bodyText.includes("Draft a completed-work summary grouped by initiative group for engineering leaders.")) {
+        if (bodyText.includes("Draft a completed-work summary grouped by work stream for engineering leaders.")) {
           return jsonResponse({
             source: "ollama",
             provider: "ollama",
@@ -246,7 +246,7 @@ describe("TeamDashboardScreen", () => {
 
     expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
     expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();
-    expect(screen.getByLabelText("Group effort distribution chart")).toBeInTheDocument();
+    expect(screen.getByLabelText("Work stream effort distribution chart")).toBeInTheDocument();
     expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();
 
     const winsRisksPanel = screen.getByRole("heading", { name: "Wins and Risks" }).closest("section");

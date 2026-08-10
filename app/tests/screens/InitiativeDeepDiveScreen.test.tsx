@@ -115,7 +115,7 @@ describe("InitiativeDeepDiveScreen", () => {
     vi.useRealTimers();
   });
 
-  it("cascades group and epic scope into weekly flow and work-item activity", async () => {
+  it("cascades work stream and epic scope into weekly flow and work-item activity", async () => {
     const fetchSpy = setupFetchMock({
       "/api/initiative-deep-dive": deepDivePayload,
       "/api/metadata/lookup": {
@@ -208,21 +208,21 @@ describe("InitiativeDeepDiveScreen", () => {
       })).toBe(true);
     });
 
-    const selectedGroups = screen.getByLabelText("Selected groups");
+    const selectedGroups = screen.getByLabelText("Selected work streams");
     const selectedEpics = screen.getByLabelText("Selected epics");
-    expect(within(selectedGroups).getByText("All groups")).toBeInTheDocument();
-    expect(within(selectedEpics).getByText("All epics in selected groups (2)")).toBeInTheDocument();
+    expect(within(selectedGroups).getByText("All work streams")).toBeInTheDocument();
+    expect(within(selectedEpics).getByText("All epics in selected work streams (2)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
-    const scopeDialog = screen.getByRole("dialog", { name: "Choose groups and epics" });
-    const groupOptions = within(scopeDialog).getByRole("group", { name: "Group options" });
-    expect(within(groupOptions).getByRole("checkbox", { name: /All groups/ })).toBeChecked();
+    const scopeDialog = screen.getByRole("dialog", { name: "Choose work streams and epics" });
+    const groupOptions = within(scopeDialog).getByRole("group", { name: "Work stream options" });
+    expect(within(groupOptions).getByRole("checkbox", { name: /All work streams/ })).toBeChecked();
     expect(within(scopeDialog).getByRole("button", { name: "Apply scope" })).toBeDisabled();
-    fireEvent.click(within(groupOptions).getByRole("checkbox", { name: /All groups/ }));
+    fireEvent.click(within(groupOptions).getByRole("checkbox", { name: /All work streams/ }));
 
-    const groupSearch = within(scopeDialog).getByRole("searchbox", { name: "Search groups" });
+    const groupSearch = within(scopeDialog).getByRole("searchbox", { name: "Search work streams" });
     fireEvent.change(groupSearch, { target: { value: "no matching group" } });
-    expect(within(groupOptions).getByText("No matching groups.")).toBeInTheDocument();
+    expect(within(groupOptions).getByText("No matching work streams.")).toBeInTheDocument();
     fireEvent.change(groupSearch, { target: { value: "oper" } });
     expect(within(groupOptions).queryByRole("checkbox", { name: "Platform" })).not.toBeInTheDocument();
     expect(within(groupOptions).getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
@@ -231,7 +231,7 @@ describe("InitiativeDeepDiveScreen", () => {
     fireEvent.click(within(groupOptions).getByRole("checkbox", { name: "Platform" }));
     fireEvent.click(within(groupOptions).getByRole("checkbox", { name: "Platform" }));
 
-    expect(within(selectedGroups).getByText("All groups")).toBeInTheDocument();
+    expect(within(selectedGroups).getByText("All work streams")).toBeInTheDocument();
     await waitFor(() => {
       const previewUrls = fetchSpy.mock.calls
         .map(([input]) => new URL(String(input)))
@@ -241,7 +241,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     const epicOptions = within(scopeDialog).getByRole("group", { name: "Epic options" });
     await waitFor(() => expect(within(epicOptions).getByRole("checkbox", { name: /Platform foundations/ })).toBeInTheDocument());
-    expect(within(epicOptions).getByRole("checkbox", { name: /All epics in selected groups/ })).toBeChecked();
+    expect(within(epicOptions).getByRole("checkbox", { name: /All epics in selected work streams/ })).toBeChecked();
     const epicSearch = within(scopeDialog).getByRole("searchbox", { name: "Search epics" });
     fireEvent.change(epicSearch, { target: { value: "experience" } });
     expect(within(epicOptions).queryByRole("checkbox", { name: /Platform foundations/ })).not.toBeInTheDocument();
@@ -264,18 +264,18 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(within(selectedEpics).getByText("Platform foundations")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
-    const reopenedDialog = screen.getByRole("dialog", { name: "Choose groups and epics" });
-    fireEvent.click(within(reopenedDialog).getByRole("checkbox", { name: /All groups/ }));
-    await waitFor(() => expect(within(reopenedDialog).getByRole("checkbox", { name: /All epics in selected groups/ })).toBeInTheDocument());
-    fireEvent.click(within(reopenedDialog).getByRole("checkbox", { name: /All epics in selected groups/ }));
+    const reopenedDialog = screen.getByRole("dialog", { name: "Choose work streams and epics" });
+    fireEvent.click(within(reopenedDialog).getByRole("checkbox", { name: /All work streams/ }));
+    await waitFor(() => expect(within(reopenedDialog).getByRole("checkbox", { name: /All epics in selected work streams/ })).toBeInTheDocument());
+    fireEvent.click(within(reopenedDialog).getByRole("checkbox", { name: /All epics in selected work streams/ }));
     fireEvent.click(within(reopenedDialog).getByRole("button", { name: "Close scope picker" }));
-    expect(screen.queryByRole("dialog", { name: "Choose groups and epics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Choose work streams and epics" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
     fireEvent.click(document.querySelector(".tb-modal-backdrop") as HTMLElement);
-    expect(screen.queryByRole("dialog", { name: "Choose groups and epics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Choose work streams and epics" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Choose groups and epics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Choose work streams and epics" })).not.toBeInTheDocument();
   });
 
   it("shows named scope pills, collapses overflow, and supports direct removal", async () => {
@@ -307,11 +307,11 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     expect(await screen.findByRole("button", { name: "Remove epic Platform foundations" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove group Platform" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove work stream Platform" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "+1 more" })).toHaveLength(2);
 
     fireEvent.click(screen.getAllByRole("button", { name: "+1 more" })[0]);
-    expect(screen.getByRole("dialog", { name: "Choose groups and epics" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Choose work streams and epics" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Remove epic Platform foundations" }));
@@ -321,13 +321,13 @@ describe("InitiativeDeepDiveScreen", () => {
     });
     expect(screen.queryByRole("button", { name: "Remove epic Platform foundations" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove group Platform" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove work stream Platform" }));
     await waitFor(() => {
       const latestUrl = new URL(String(fetchSpy.mock.calls.at(-1)?.[0]));
       expect(latestUrl.searchParams.getAll("groupId")).toEqual(["2", "3", "4"]);
       expect(latestUrl.searchParams.getAll("epicKey")).toEqual([]);
     });
-    expect(screen.queryByRole("button", { name: "Remove group Platform" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove work stream Platform" })).not.toBeInTheDocument();
   });
 
   it("keeps the applied scope when eligible epics cannot be previewed", async () => {
@@ -355,12 +355,12 @@ describe("InitiativeDeepDiveScreen", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Edit scope" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Edit scope" }));
-    const dialog = screen.getByRole("dialog", { name: "Choose groups and epics" });
+    const dialog = screen.getByRole("dialog", { name: "Choose work streams and epics" });
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Platform" }));
 
     expect(await within(dialog).findByText("Preview unavailable")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Apply scope" })).toBeDisabled();
-    expect(within(screen.getByLabelText("Selected groups")).getByText("All groups")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Selected work streams")).getByText("All work streams")).toBeInTheDocument();
   });
 
   it("filters activity and resets current WIP when a weekly tile is selected", async () => {
@@ -631,14 +631,14 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
-  it("shows setup guidance when no initiative groups are configured", async () => {
+  it("shows setup guidance when no work streams are configured", async () => {
     const fetchSpy = setupFetchMock({
       "/api/metadata/lookup": { groups: [], workTypes: [] },
     });
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("heading", { name: "No initiative groups configured" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No work streams configured" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit scope" })).toBeDisabled();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -661,7 +661,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("button", { name: "Remove group Operations" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Remove work stream Operations" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Remove epic Platform experience" })).toBeInTheDocument());
 
     const deepDiveUrls = fetchSpy.mock.calls
@@ -694,8 +694,8 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    const selectedGroups = await screen.findByLabelText("Selected groups");
-    expect(within(selectedGroups).getByText("All groups")).toBeInTheDocument();
-    expect(await within(screen.getByLabelText("Selected epics")).findByText("All epics in selected groups (2)")).toBeInTheDocument();
+    const selectedGroups = await screen.findByLabelText("Selected work streams");
+    expect(within(selectedGroups).getByText("All work streams")).toBeInTheDocument();
+    expect(await within(screen.getByLabelText("Selected epics")).findByText("All epics in selected work streams (2)")).toBeInTheDocument();
   });
 });

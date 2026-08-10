@@ -63,7 +63,7 @@ type PersistedReportingSelection = {
 type ViewEditorMode = "create" | "edit";
 
 const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }> = [
-  { id: "group", label: "Group" },
+  { id: "group", label: "Work Stream" },
   { id: "type", label: "Type" },
   { id: "progress", label: "Progress" },
   { id: "completed", label: "Completed" },
@@ -1970,7 +1970,7 @@ export function InitiativesScreen() {
             <span>Search</span>
             <input
               type="text"
-              placeholder="Epic key, name, group, type..."
+              placeholder="Epic key, name, work stream, type..."
               value={searchQuery}
               onInput={(event) => setSearchQuery((event.currentTarget as HTMLInputElement).value)}
             />
@@ -1978,8 +1978,8 @@ export function InitiativesScreen() {
 
           <MultiSelectFilter
             id="initiative-group-filter"
-            label="Group"
-            allLabel="All groups"
+            label="Work Stream"
+            allLabel="All work streams"
             options={groupOptions.map((option) => ({ value: option, label: option }))}
             selectedValues={groupFilters}
             onChange={setGroupFilters}
@@ -2049,9 +2049,9 @@ export function InitiativesScreen() {
                       type="button"
                       className={`tb-table-sort${sortField === "group" ? " is-active" : ""}`}
                       onClick={() => handleSortHeaderClick("group")}
-                      aria-label={`Sort by Group (${sortField === "group" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                      aria-label={`Sort by Work Stream (${sortField === "group" && sortDirection === "asc" ? "ascending" : "descending"})`}
                     >
-                      <span>Group</span>
+                      <span>Work Stream</span>
                       <span className="tb-table-sort-indicator" aria-hidden="true">
                         {sortField === "group" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
                       </span>
@@ -2417,7 +2417,7 @@ export function InitiativesScreen() {
                     type="text"
                     value={viewEpicQuery}
                     onInput={(event) => setViewEpicQuery((event.currentTarget as HTMLInputElement).value)}
-                    placeholder="Epic key, name, group, or type"
+                    placeholder="Epic key, name, work stream, or type"
                   />
                 </label>
                 <div className="tb-initiative-view-list" role="group" aria-label="Available configured epics">
@@ -2569,7 +2569,7 @@ export function InitiativesScreen() {
               {pendingDeleteEpic.epicName ? ` (${pendingDeleteEpic.epicName})` : ""}?
             </p>
             <p className="tb-muted-note">
-              This removes success criteria, group mapping, and work type mapping for this epic.
+              This removes success criteria, work stream mapping, and work type mapping for this epic.
             </p>
             <footer className="tb-modal-actions">
               <button
@@ -2737,7 +2737,7 @@ export function InitiativesScreen() {
 
             <div className="tb-modal-two-up">
               <label className="tb-modal-field">
-                <span>Epic Group (one)</span>
+                <span>Work Stream</span>
                 <select
                   value={configureSelectedGroupId}
                   onChange={(event) => setConfigureSelectedGroupId((event.currentTarget as HTMLSelectElement).value)}
@@ -2853,7 +2853,7 @@ export function InitiativesScreen() {
 
             <div className="tb-modal-two-up">
               <label className="tb-modal-field">
-                <span>Epic Group (one)</span>
+                <span>Work Stream</span>
                 <select
                   value={editSelectedGroupId}
                   onChange={(event) => setEditSelectedGroupId((event.currentTarget as HTMLSelectElement).value)}

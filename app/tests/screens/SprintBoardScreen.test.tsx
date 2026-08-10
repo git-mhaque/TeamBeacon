@@ -178,9 +178,9 @@ describe("SprintBoardScreen", () => {
     expect(screen.getByRole("heading", { name: "State Breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Card breakdown:/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Story point breakdown:/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Work Mix by Group" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Work Mix by Work Stream" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Work Mix by Type" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Work mix by group chart" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Work mix by work stream chart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Work mix by type chart" })).toBeInTheDocument();
     const allocationPanel = screen.getByRole("heading", { name: "Team Allocation" }).closest("article");
     expect(allocationPanel).not.toBeNull();
@@ -229,7 +229,7 @@ describe("SprintBoardScreen", () => {
     expect(plannedHeading.compareDocumentPosition(inProgressHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inProgressHeading.compareDocumentPosition(doneHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    const groupFilter = scopedWork.getByLabelText("Group") as HTMLSelectElement;
+    const groupFilter = scopedWork.getByLabelText("Work Stream") as HTMLSelectElement;
     const typeFilter = scopedWork.getByLabelText("Type") as HTMLSelectElement;
     const epicFilter = scopedWork.getByLabelText("Epic") as HTMLSelectElement;
     const assigneeFilter = scopedWork.getByLabelText("Assignee") as HTMLSelectElement;

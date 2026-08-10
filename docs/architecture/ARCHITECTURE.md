@@ -89,15 +89,15 @@ Default thresholds:
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
-  - Initiative Deep Dive defaults to all groups, supports checkbox-based multi-group selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
+  - Initiative Deep Dive defaults to all work streams, supports checkbox-based multi-work-stream selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 
 ## 10. Initiative Deep Dive Query Model
 - `GET /api/initiative-deep-dive` owns the complete aggregation contract so weekly bars, period tiles, WIP counts, and table rows share one scope and timezone.
-- Repeated `groupId` query parameters form a union of configured group epics; shared epics and their cards are de-duplicated before metrics are calculated.
+- Repeated `groupId` query parameters form a union of configured work-stream epics; shared epics and their cards are de-duplicated before metrics are calculated.
 - The shared reporting period accepts either `chartWeeks` or an inclusive `chartStart`/`chartEnd` pair and drives both weekly buckets and activity rows. Custom boundaries remain exact and may yield partial first/last weekly buckets. The deprecated `tableWindowWeeks` parameter remains only as a compatibility override.
-- Group/epic membership and issue lineage are evaluated from the current local model; no historical group-membership snapshots are implied.
+- Work-stream/epic membership and issue lineage are evaluated from the current local model; no historical work-stream-membership snapshots are implied.
 - Creation and completion are dated events. In-progress is a current-state classification with the current run start derived from status changelog transitions.
 - The query excludes epics/subtasks, reuses the current full-sync scope guard, and returns no more than 1,000 newest activity rows.
 - Design source:

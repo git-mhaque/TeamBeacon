@@ -398,7 +398,7 @@ function buildTeamDashboardExportHtml(params: {
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="3" class="empty">No group mix data available.</td></tr>`;
+    : `<tr><td colspan="3" class="empty">No work stream mix data available.</td></tr>`;
 
   const typeRows = params.typeMixRows.length > 0
     ? params.typeMixRows.map((row, index) => `
@@ -879,7 +879,7 @@ function buildTeamDashboardExportHtml(params: {
         <table>
           <thead>
             <tr>
-              <th>Group</th>
+              <th>Work Stream</th>
               <th>Initiative</th>
               <th>Period Progress</th>
               <th>Overall Progress</th>
@@ -891,13 +891,13 @@ function buildTeamDashboardExportHtml(params: {
       </section>
 
       <section class="panel">
-        <h2>Work Mix by Group and Type</h2>
+        <h2>Work Mix by Work Stream and Type</h2>
         <div class="section-stack">
           <section>
-            <h3>By Group</h3>
+            <h3>By Work Stream</h3>
             <table>
               <thead>
-                <tr><th>Group</th><th>Completed</th><th>%</th></tr>
+                <tr><th>Work Stream</th><th>Completed</th><th>%</th></tr>
               </thead>
               <tbody>${groupRows}</tbody>
             </table>
@@ -1079,7 +1079,7 @@ function buildExecutiveSummaryPrompt(params: {
 
     return (
       `${index + 1}. ${simpleName}` +
-      ` | Group: ${row.groupText}` +
+      ` | Work stream: ${row.groupText}` +
       ` | Type: ${row.typeText}` +
       ` | Period Progress: ${row.completedInPeriodValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})` +
       ` | Overall Progress: ${formatPercent(row.completionPercent)}` +
@@ -1101,7 +1101,7 @@ function buildExecutiveSummaryPrompt(params: {
     "Do not reference JIRA issue keys.",
     "Do not use full initiative names literally.",
     "Do not use numbered placeholders like 'Initiative 4'.",
-    "Refer to simplified initiative names, groups, and delivery themes.",
+    "Refer to simplified initiative names, work streams, and delivery themes.",
     "",
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     `Selected initiatives: ${params.totalEpics}`,
@@ -1226,11 +1226,11 @@ function buildWinsRisksPrompt(params: {
     "- wins must contain 3-4 concise bullets grounded in completed-card outcomes from this reporting period.",
     "- risks must contain 3-4 concise bullets grounded in the provided progress signals and completed-card patterns.",
     "- Each risk bullet must mention a simplified initiative name from the provided data.",
-    "- Do not use initiative group names or numbered initiative aliases.",
+    "- Do not use work stream names or numbered initiative aliases.",
     "- Each bullet must be <= 24 words.",
     "- Use only the provided data. No invented metrics.",
     "- Do not reference JIRA issue keys.",
-    "- Do not use full initiative names literally; use initiative aliases or group descriptions.",
+    "- Do not use full initiative names literally; use initiative aliases or work stream descriptions.",
     "",
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     truncationNote,
@@ -1260,7 +1260,7 @@ function buildCompletedWorkSummaryPrompt(params: {
 }): string {
   const promptCards = params.cards.slice(0, params.maxCards ?? 220);
   const cardLines = promptCards.map((card, index) => (
-    `${index + 1}. Group: ${card.group}` +
+    `${index + 1}. Work stream: ${card.group}` +
     ` | Initiative: ${card.initiativeAlias}` +
     ` | Status: ${card.status}` +
     ` | Completed: ${formatCompletedDateForPrompt(card.completedAt)}` +
@@ -1274,7 +1274,7 @@ function buildCompletedWorkSummaryPrompt(params: {
     : "";
 
   return [
-    "Draft a completed-work summary grouped by initiative group for engineering leaders.",
+    "Draft a completed-work summary grouped by work stream for engineering leaders.",
     "Return JSON only with this schema:",
     "{\"items\":[{\"group\":\"...\",\"bullet\":\"...\"}]}",
     "Rules:",
@@ -1291,10 +1291,10 @@ function buildCompletedWorkSummaryPrompt(params: {
     `Completed cards in scope: ${params.completedCardsCount}`,
     truncationNote,
     "",
-    "Completed-card distribution by group:",
+    "Completed-card distribution by work stream:",
     ...groupLines,
     "",
-    "Completed card outcomes by initiative group:",
+    "Completed card outcomes by work stream:",
     ...cardLines,
   ]
     .filter((line) => line.trim().length > 0)
@@ -2757,7 +2757,7 @@ export function TeamDashboardScreen() {
           <table className="tb-sync-history-table">
             <thead>
               <tr>
-                <th>Group</th>
+                <th>Work Stream</th>
                 <th>Epic</th>
                 <th>Period Progress</th>
                 <th>Overall Progress</th>
@@ -2815,7 +2815,7 @@ export function TeamDashboardScreen() {
       <section className="tb-panel">
         <header className="tb-panel-header">
           <div>
-            <h3>Work Mix by Group and Type</h3>
+            <h3>Work Mix by Work Stream and Type</h3>
             <p className="tb-muted-note">Share of completed cards in the selected reporting period.</p>
           </div>
         </header>
@@ -2823,12 +2823,12 @@ export function TeamDashboardScreen() {
         <div className="tb-exec-workmix-stack">
           <section className="tb-exec-workmix-row">
             <div>
-              <h4 className="tb-exec-list-title">Groups</h4>
+              <h4 className="tb-exec-list-title">Work Streams</h4>
               <div className="tb-sync-history-wrap">
                 <table className="tb-sync-history-table">
                   <thead>
                     <tr>
-                      <th>Group</th>
+                      <th>Work Stream</th>
                       <th>Completed in Period</th>
                       <th>%</th>
                     </tr>
@@ -2843,7 +2843,7 @@ export function TeamDashboardScreen() {
                     ))}
                     {!loading && groupDistributionRows.length === 0 ? (
                       <tr>
-                        <td colSpan={3}>No group-tagged epics yet.</td>
+                        <td colSpan={3}>No work-stream-tagged epics yet.</td>
                       </tr>
                     ) : null}
                   </tbody>
@@ -2851,13 +2851,13 @@ export function TeamDashboardScreen() {
               </div>
             </div>
             <div>
-              <h4 className="tb-exec-list-title">Group Mix</h4>
+              <h4 className="tb-exec-list-title">Work Stream Mix</h4>
               <div className="tb-exec-donut-wrap">
                 <div
                   className="tb-exec-donut"
                   style={{ background: buildDonutBackground(groupDistributionSlices) }}
                   role="img"
-                  aria-label="Group effort distribution chart"
+                  aria-label="Work stream effort distribution chart"
                 >
                   {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
                 </div>
@@ -3063,7 +3063,7 @@ export function TeamDashboardScreen() {
                 type="text"
                 value={initiativeConfigQuery}
                 onInput={(event) => setInitiativeConfigQuery((event.currentTarget as HTMLInputElement).value)}
-                placeholder="Search by epic key, title, group, or type"
+                placeholder="Search by epic key, title, work stream, or type"
               />
             </label>
 

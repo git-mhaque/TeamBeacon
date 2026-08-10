@@ -100,7 +100,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
   { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
   { id: "executive", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
-  { id: "integrations", label: "Settings", blurb: "Groups / Work Types / Metadata", showConstruction: false, icon: Settings },
+  { id: "integrations", label: "Settings", blurb: "Work Streams / Work Types / Metadata", showConstruction: false, icon: Settings },
 ];
 
 function screenTitle(id: ScreenId): string {

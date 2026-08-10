@@ -15,7 +15,7 @@ Key characteristics:
 - Local-first: runs on the Engineering Manager's laptop.
 - Non-destructive: does not modify source system data.
 - Reads from existing sources and synced local data.
-- Insight augmentation: allows EM-configured metadata (Group/Type/Epic metadata) to unlock richer system-level visibility.
+- Insight augmentation: allows EM-configured metadata (Work Stream/Work Type/Epic metadata) to unlock richer system-level visibility.
 
 ## Problem Context and Why It Matters
 In large enterprises, Engineering Managers typically oversee:
@@ -46,13 +46,13 @@ TeamBeacon helps Engineering Managers:
 ### 1 Settings: Connections, Sync, and Metadata Taxonomy
 What is implemented today:
 - JIRA sync modes: incremental/since last, custom date, and full sync.
-- Epic Group and Work Type configuration for local metadata enrichment.
+- Work Stream and Work Type configuration for local metadata enrichment.
 - AI Model Connection with active provider/model status and health check.
 
 Manager value:
 - Fast refresh of relevant data without heavy manual steps.
 - Faster refresh cycles and better work-mix analysis.
-- Better system-level understanding of work mix once group/type metadata is configured.
+- Better system-level understanding of work mix once work-stream/work-type metadata is configured.
 
 ### 2 Initiative Insights
 What is implemented today:
@@ -63,13 +63,13 @@ What is implemented today:
 
 Manager value:
 - A clear view of all active initiative work.
-- Lower cognitive overhead through group/type/progress slicing.
+- Lower cognitive overhead through work-stream/work-type/progress slicing.
 - Earlier intervention opportunities when trends turn Amber or Red.
 
 ### 3 Sprint Insights
 What is implemented today:
 - Sprint overview (dates and state breakdown).
-- Work mix views by group and type.
+- Work mix views by work stream and type.
 - Scope change and blocker visibility.
 - Sprint work filtering for targeted drill-down.
 
@@ -109,7 +109,7 @@ What is implemented today:
 - AI-generated Executive Summary using the configured AI provider (OCI, Ollama, or OpenAI).
 - AI-generated Wins and Risks using current configured initiative data.
 - Progress for key initiatives with RAG indicators and reporting-period progress.
-- Work mix by group and type for selected reporting-period output.
+- Work mix by work stream and type for selected reporting-period output.
 - Reporting period control and print-ready output.
 
 Manager value:

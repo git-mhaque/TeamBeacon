@@ -568,9 +568,9 @@ describe("InitiativesScreen", () => {
         .map((node) => node.textContent?.trim() ?? "")
         .filter((value) => value.length > 0);
 
-    const groupFilter = screen.getByRole("combobox", { name: "Group" });
+    const groupFilter = screen.getByRole("combobox", { name: "Work Stream" });
     fireEvent.click(groupFilter);
-    const groupListbox = screen.getByRole("listbox", { name: "Group options" });
+    const groupListbox = screen.getByRole("listbox", { name: "Work Stream options" });
     fireEvent.click(within(groupListbox).getByLabelText("Core Platform"));
 
     await waitFor(() => {

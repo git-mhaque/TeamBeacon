@@ -497,7 +497,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "schema": {"type": "array", "items": {"type": "integer", "minimum": 1}},
                             "style": "form",
                             "explode": True,
-                            "description": "Selected group IDs. Repeat to combine multiple groups.",
+                            "description": "Selected work stream IDs. Repeat to combine multiple work streams.",
                         },
                         {
                             "name": "epicKey",
@@ -506,7 +506,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "schema": {"type": "array", "items": {"type": "string"}},
                             "style": "form",
                             "explode": True,
-                            "description": "Selected epic keys. Omit to include all configured epics in the group.",
+                            "description": "Selected epic keys. Omit to include all configured epics in the work stream.",
                         },
                         {
                             "name": "chartWeeks",
@@ -558,14 +558,14 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
             "/api/metadata/lookup": {
                 "get": {
                     "tags": ["metadata"],
-                    "summary": "Lookup data (groups/work types)",
+                    "summary": "Lookup data (work streams/work types)",
                     "responses": {"200": {"description": "Lookup data", "content": json_payload}},
                 }
             },
             "/api/metadata/lookup/groups": {
                 "post": {
                     "tags": ["metadata"],
-                    "summary": "Create epic group",
+                    "summary": "Create work stream",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -574,13 +574,13 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             }
                         },
                     },
-                    "responses": {"200": {"description": "Group created", "content": json_payload}, "400": error_payload},
+                    "responses": {"200": {"description": "Work stream created", "content": json_payload}, "400": error_payload},
                 }
             },
             "/api/metadata/lookup/groups/update": {
                 "post": {
                     "tags": ["metadata"],
-                    "summary": "Update epic group",
+                    "summary": "Update work stream",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -593,13 +593,13 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             }
                         },
                     },
-                    "responses": {"200": {"description": "Group updated", "content": json_payload}, "400": error_payload},
+                    "responses": {"200": {"description": "Work stream updated", "content": json_payload}, "400": error_payload},
                 }
             },
             "/api/metadata/lookup/groups/delete": {
                 "post": {
                     "tags": ["metadata"],
-                    "summary": "Delete epic group",
+                    "summary": "Delete work stream",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -608,7 +608,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             }
                         },
                     },
-                    "responses": {"200": {"description": "Group deleted", "content": json_payload}, "400": error_payload},
+                    "responses": {"200": {"description": "Work stream deleted", "content": json_payload}, "400": error_payload},
                 }
             },
             "/api/metadata/lookup/work-types": {

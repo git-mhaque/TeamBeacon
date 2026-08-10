@@ -116,7 +116,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - Epics are excluded from cycle-time calculations
     - Sub-tasks are excluded from Team Insights calculations
 - `GET /api/initiative-deep-dive?groupId=5&groupId=8&chartWeeks=12`
-  - Returns group/epic-scoped initiative flow and work-item activity.
+  - Returns work-stream/epic-scoped initiative flow and work-item activity.
   - Optional query:
     - repeated `epicKey=<key>` values; omit for all configured epics in the group
     - `chartWeeks=12` (1-52) sets the shared Monday-based reporting period for the chart and activity table
@@ -132,7 +132,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
   - Epics and subtasks are excluded.
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:
-    - `groups` (epic groups)
+    - `groups` (work streams; field name retained for compatibility)
     - `workTypes` (work-type taxonomy)
 - `POST /api/metadata/lookup/groups`
   - Body: `{"name":"Platform"}`

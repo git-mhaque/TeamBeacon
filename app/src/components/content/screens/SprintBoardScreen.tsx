@@ -567,7 +567,7 @@ export function SprintBoardScreen() {
   );
 
   const groupFilterOptions = useMemo(
-    () => buildFilterOptions(allWorkItems, "All groups", (issue) => normalizeFilterValue(issue.groupName)),
+    () => buildFilterOptions(allWorkItems, "All work streams", (issue) => normalizeFilterValue(issue.groupName)),
     [allWorkItems],
   );
   const typeFilterOptions = useMemo(
@@ -860,7 +860,7 @@ export function SprintBoardScreen() {
           </article>
 
           <article className="tb-sprint-summary-card tb-sprint-mix-card">
-            <h4>Work Mix by Group</h4>
+            <h4>Work Mix by Work Stream</h4>
             {workLoading ? <p className="tb-muted-note">Loading work mix...</p> : null}
             {!workLoading ? (
               <div className="tb-exec-donut-wrap">
@@ -868,7 +868,7 @@ export function SprintBoardScreen() {
                   className="tb-exec-donut"
                   style={{ background: buildDonutBackground(groupMixSlices) }}
                   role="img"
-                  aria-label="Work mix by group chart"
+                  aria-label="Work mix by work stream chart"
                 >
                   {groupMixSlices.length === 0 ? <span>No data</span> : null}
                 </div>
@@ -1069,7 +1069,7 @@ export function SprintBoardScreen() {
         </header>
         <div className="tb-initiative-toolbar tb-initiative-toolbar-sprint">
           <label className="tb-initiative-filter">
-            <span>Group</span>
+            <span>Work Stream</span>
             <select
               value={groupFilter}
               onChange={(event) => setGroupFilter((event.currentTarget as HTMLSelectElement).value)}
