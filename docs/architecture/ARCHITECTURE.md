@@ -9,7 +9,7 @@ TeamBeacon is a self-hosted web analytics system:
 ## 2. High-Level Components
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
-- Screens: Settings, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
+- Screens: Settings, Initiative Insights, Initiative Deep Dive, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Dashboard.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
 
@@ -47,7 +47,7 @@ TeamBeacon is a self-hosted web analytics system:
 1. User configures integrations, field mappings, epic metadata taxonomy, and active AI provider/model.
 2. API sync logic pulls incremental issue/sprint/content changes.
 3. API normalizes and stores data.
-4. Metrics engine computes initiative/team/release KPIs (including sprint trend, release cycle-time, and readiness metrics).
+4. Metrics engine computes initiative/team/release KPIs (including initiative creation/completion flow, current WIP, sprint trend, release cycle-time, and readiness metrics).
 5. UI reads snapshots and renders dashboards.
 6. Reporting module compares current state with last report baseline and can generate AI-assisted narrative drafts.
 
@@ -77,6 +77,7 @@ Default thresholds:
 ## 9. UI Information Architecture
 - Primary navigation:
   - Initiative Insights
+  - Initiative Deep Dive
   - Sprint Insights
   - Team Insights
   - Security
@@ -87,8 +88,15 @@ Default thresholds:
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
+  - Initiative Deep Dive cascades group selection into an all-or-multi-epic selector, renders a 12-week created/completed chart, and drives table filtering from 1/2/4/12-week tiles.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
+
+## 10. Initiative Deep Dive Query Model
+- `GET /api/initiative-deep-dive` owns the complete aggregation contract so weekly bars, period tiles, WIP counts, and table rows share one scope and timezone.
+- Group/epic membership and issue lineage are evaluated from the current local model; no historical group-membership snapshots are implied.
+- Creation and completion are dated events. In-progress is a current-state classification with the current run start derived from status changelog transitions.
+- The query excludes epics/subtasks, reuses the current full-sync scope guard, and returns no more than 1,000 newest activity rows.
 - Design source:
   - `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` defines the active frontend direction and parity constraints.
   - Existing files under `docs/design/` remain historical references for screen inventory and prior visual exploration.

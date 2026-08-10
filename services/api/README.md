@@ -115,6 +115,19 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - Tracked cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
     - Sub-tasks are excluded from Team Insights calculations
+- `GET /api/initiative-deep-dive?groupId=5&tableWindowWeeks=12`
+  - Returns group/epic-scoped initiative flow and work-item activity.
+  - Optional query:
+    - repeated `epicKey=<key>` values; omit for all configured epics in the group
+    - `chartWeeks=12` (1-52)
+    - `tableWindowWeeks=1|2|4|12`
+    - `activity=all|new|in_progress|completed|current_wip`
+    - `timezone=Australia/Melbourne` (IANA timezone; defaults to `UTC`)
+    - `limit=500` (1-1000)
+  - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`.
+  - `periods` returns the 1/2/4/12-week tile totals; `currentWipCount` remains an all-age snapshot.
+  - Table cards include activity badges and created/in-progress/completed timestamps, newest qualifying activity first.
+  - Epics and subtasks are excluded.
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:
     - `groups` (epic groups)

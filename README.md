@@ -11,6 +11,7 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 ## ✨ Core Capabilities
 - Settings: source connectivity checks, sync controls, metadata configuration, and AI Model Connection status (provider + model).
 - Initiative Insights: progress matrix, filters, and RAG visibility.
+- Initiative Deep Dive: group/epic-scoped weekly intake and completion flow, current WIP, and selectable work-item activity windows.
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Release Insights: release overview, selectable cycle-time trend, overdue readiness, and completed-release quality signals.

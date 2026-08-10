@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from services.api.issues.current_sprint import get_current_sprint
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
 from services.api.issues.current_sprint_work import get_current_sprint_work
+from services.api.issues.initiative_deep_dive import get_initiative_deep_dive
 from services.api.issues.query import search_synced_issues
 from services.api.issues.release_insights import get_release_insights
 from services.api.issues.team_insights import get_team_insights
@@ -60,6 +61,7 @@ CurrentSprintWorkProvider = Callable[..., dict[str, Any]]
 CurrentSprintChangesProvider = Callable[..., dict[str, Any]]
 TeamInsightsProvider = Callable[..., dict[str, Any]]
 ReleaseInsightsProvider = Callable[..., dict[str, Any]]
+InitiativeDeepDiveProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
 MetadataCreateProvider = Callable[[str], dict[str, Any]]
 MetadataUpdateProvider = Callable[[int, str], dict[str, Any]]
@@ -188,6 +190,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
             {"name": "health", "description": "Service health checks."},
             {"name": "integrations", "description": "Integration status and sync controls."},
             {"name": "issues", "description": "Issue and sprint-level views."},
+            {"name": "initiatives", "description": "Initiative analytics and work-flow views."},
             {"name": "metadata", "description": "Epic metadata and lookup configuration."},
             {"name": "ai", "description": "Provider-agnostic AI status and chat utilities."},
             {"name": "docs", "description": "OpenAPI and Swagger UI docs endpoints."},
@@ -480,6 +483,58 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         },
                     ],
                     "responses": {"200": {"description": "Team insights payload", "content": json_payload}},
+                }
+            },
+            "/api/initiative-deep-dive": {
+                "get": {
+                    "tags": ["initiatives"],
+                    "summary": "Initiative creation, completion, and in-progress flow",
+                    "parameters": [
+                        {
+                            "name": "groupId",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 1},
+                        },
+                        {
+                            "name": "epicKey",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "array", "items": {"type": "string"}},
+                            "style": "form",
+                            "explode": True,
+                            "description": "Selected epic keys. Omit to include all configured epics in the group.",
+                        },
+                        {
+                            "name": "chartWeeks",
+                            "in": "query",
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 52, "default": 12},
+                        },
+                        {
+                            "name": "tableWindowWeeks",
+                            "in": "query",
+                            "schema": {"type": "integer", "enum": [1, 2, 4, 12], "default": 12},
+                        },
+                        {
+                            "name": "activity",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": ["all", "new", "in_progress", "completed", "current_wip"],
+                                "default": "all",
+                            },
+                        },
+                        {"name": "timezone", "in": "query", "schema": {"type": "string", "default": "UTC"}},
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 500},
+                        },
+                    ],
+                    "responses": {
+                        "200": {"description": "Initiative deep-dive payload", "content": json_payload},
+                        "400": error_payload,
+                    },
                 }
             },
             "/api/metadata/lookup": {
@@ -783,6 +838,7 @@ def build_handler(
     current_sprint_changes_provider: CurrentSprintChangesProvider = get_current_sprint_changes,
     team_insights_provider: TeamInsightsProvider = get_team_insights,
     release_insights_provider: ReleaseInsightsProvider = get_release_insights,
+    initiative_deep_dive_provider: InitiativeDeepDiveProvider = get_initiative_deep_dive,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
@@ -1009,6 +1065,31 @@ def build_handler(
                     sprint_limit=sprint_limit,
                     cycle_time_status_keys=cycle_time_status_keys,
                 )
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/initiative-deep-dive":
+                query = parse_qs(parsed.query)
+                group_id = query.get("groupId", [None])[0]
+                if group_id is None:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": "groupId is required."}))
+                    return
+                try:
+                    payload = initiative_deep_dive_provider(
+                        group_id=group_id,
+                        epic_keys=query.get("epicKey", []),
+                        chart_weeks=query.get("chartWeeks", ["12"])[0],
+                        table_window_weeks=query.get("tableWindowWeeks", ["12"])[0],
+                        activity=query.get("activity", ["all"])[0],
+                        timezone_name=query.get("timezone", [None])[0],
+                        limit=query.get("limit", ["500"])[0],
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

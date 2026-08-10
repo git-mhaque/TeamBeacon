@@ -20,6 +20,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.current_sprint_changes_calls: list[bool] = []
         self.current_sprint_work_calls: list[bool] = []
         self.team_insights_calls: list[tuple[int, list[str] | None]] = []
+        self.initiative_deep_dive_calls: list[dict[str, object]] = []
         self.group_create_calls: list[str] = []
         self.work_type_create_calls: list[str] = []
         self.group_update_calls: list[tuple[int, str]] = []
@@ -959,6 +960,37 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             self.initiative_view_delete_calls.append(view_id)
             return {"id": view_id, "deleted": True, "removedMappings": 2, "removedRows": 1}
 
+        def fake_initiative_deep_dive(**kwargs):  # noqa: ANN003
+            self.initiative_deep_dive_calls.append(kwargs)
+            return {
+                "source": "local",
+                "scope": "initiative-deep-dive",
+                "timezone": kwargs.get("timezone_name") or "UTC",
+                "group": {"id": int(kwargs["group_id"]), "name": "Platform", "epicCount": 2},
+                "epicOptions": [
+                    {"epicKey": "CEGBUPOL-4482", "epicName": "Enable offline initiative scoring"},
+                    {"epicKey": "CEGBUPOL-3553", "epicName": "Domain Support Q4"},
+                ],
+                "selectedEpicKeys": kwargs.get("epic_keys") or [],
+                "selectionMode": "selected" if kwargs.get("epic_keys") else "all",
+                "chartWeeks": int(kwargs.get("chart_weeks", 12)),
+                "weekly": [],
+                "periods": [],
+                "selectedPeriod": {
+                    "weeks": int(kwargs.get("table_window_weeks", 12)),
+                    "startDate": "2026-05-25",
+                    "endDate": "2026-08-10",
+                },
+                "currentWipCount": 3,
+                "tableCounts": {"all": 5, "new": 2, "inProgress": 1, "completed": 3},
+                "activity": kwargs.get("activity", "all"),
+                "count": 5,
+                "limit": int(kwargs.get("limit", 500)),
+                "truncated": False,
+                "cards": [],
+                "error": None,
+            }
+
         handler_cls = build_handler(
             jira_status_provider=fake_status,
             jira_sync_status_provider=fake_sync_status,
@@ -970,6 +1002,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             current_sprint_work_provider=fake_current_sprint_work,
             team_insights_provider=fake_team_insights,
             release_insights_provider=fake_release_insights,
+            initiative_deep_dive_provider=fake_initiative_deep_dive,
             metadata_lookup_provider=fake_metadata_lookup,
             metadata_add_group_provider=fake_add_group,
             metadata_add_work_type_provider=fake_add_work_type,
@@ -1028,6 +1061,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/releases/refresh/status", body["paths"])
         self.assertIn("/api/releases/refresh/result", body["paths"])
         self.assertIn("/api/team/insights", body["paths"])
+        self.assertIn("/api/initiative-deep-dive", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards", body["paths"])
         self.assertIn("/api/metadata/epics/completed-cards/configured", body["paths"])
@@ -1431,6 +1465,42 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
 
         self.assertEqual(body["windowSize"], 4)
         self.assertEqual(self.team_insights_calls[-1], (4, None))
+
+    def test_initiative_deep_dive_endpoint_supports_scope_and_filters(self) -> None:
+        url = (
+            f"{self.base_url}/api/initiative-deep-dive?groupId=5"
+            "&epicKey=CEGBUPOL-4482&epicKey=CEGBUPOL-3553"
+            "&chartWeeks=12&tableWindowWeeks=4&activity=completed"
+            "&timezone=Australia%2FMelbourne&limit=250"
+        )
+        with urlopen(url, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["scope"], "initiative-deep-dive")
+        self.assertEqual(body["group"]["id"], 5)
+        self.assertEqual(body["selectedEpicKeys"], ["CEGBUPOL-4482", "CEGBUPOL-3553"])
+        self.assertEqual(body["selectedPeriod"]["weeks"], 4)
+        self.assertEqual(body["activity"], "completed")
+        self.assertEqual(
+            self.initiative_deep_dive_calls[-1],
+            {
+                "group_id": "5",
+                "epic_keys": ["CEGBUPOL-4482", "CEGBUPOL-3553"],
+                "chart_weeks": "12",
+                "table_window_weeks": "4",
+                "activity": "completed",
+                "timezone_name": "Australia/Melbourne",
+                "limit": "250",
+            },
+        )
+
+    def test_initiative_deep_dive_endpoint_requires_group(self) -> None:
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(f"{self.base_url}/api/initiative-deep-dive", timeout=5)  # noqa: S310
+        self.assertEqual(raised.exception.code, 400)
+        body = json.loads(raised.exception.read().decode("utf-8"))
+        self.assertEqual(body["detail"], "groupId is required.")
 
     def test_metadata_lookup_endpoint(self) -> None:
         with urlopen(f"{self.base_url}/api/metadata/lookup", timeout=5) as response:  # noqa: S310

@@ -189,6 +189,7 @@ describe("Content", () => {
       .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
     expect(orderedTitles).toEqual([
       "Initiative Insights",
+      "Initiative Deep Dive",
       "Sprint Insights",
       "Team Insights",
       "Security Insights",
@@ -197,8 +198,8 @@ describe("Content", () => {
       "Team Dashboard",
       "Settings",
     ]);
-    expect(within(nav).getAllByRole("button")).toHaveLength(8);
-    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(8);
+    expect(within(nav).getAllByRole("button")).toHaveLength(9);
+    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(9);
     const navigationToggle = screen.getByRole("button", { name: "Expand navigation" });
     expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(navigationToggle);

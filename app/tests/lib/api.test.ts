@@ -171,3 +171,51 @@ describe("api initiative views", () => {
     });
   });
 });
+
+describe("api initiative deep dive", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    delete (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE;
+  });
+
+  it("fetches initiative flow with repeated epic scope parameters", async () => {
+    (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
+    const payload = {
+      source: "local",
+      scope: "initiative-deep-dive",
+      weekly: [],
+      periods: [],
+      cards: [],
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse(payload));
+    const { fetchInitiativeDeepDive } = await import("../../src/lib/api");
+
+    const result = await fetchInitiativeDeepDive({
+      groupId: 5,
+      epicKeys: ["TB-100", "TB-200"],
+      chartWeeks: 12,
+      tableWindowWeeks: 4,
+      activity: "completed",
+      timezone: "Australia/Melbourne",
+      limit: 250,
+    });
+
+    expect(result).toEqual(payload);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://teambeacon.test/api/initiative-deep-dive?groupId=5&epicKey=TB-100&epicKey=TB-200&chartWeeks=12&tableWindowWeeks=4&activity=completed&timezone=Australia%2FMelbourne&limit=250",
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+    );
+  });
+
+  it("surfaces initiative deep-dive backend errors", async () => {
+    (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({ detail: "Unknown groupId: 99" }, 400));
+    const { fetchInitiativeDeepDive } = await import("../../src/lib/api");
+
+    await expect(fetchInitiativeDeepDive({ groupId: 99, timezone: "UTC" })).rejects.toThrow("Unknown groupId: 99");
+  });
+});

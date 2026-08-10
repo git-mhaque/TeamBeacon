@@ -43,6 +43,10 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 - Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Dashboard, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell.
 - Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
 - Existing metrics, filters, actions, dialogs, exports, preference keys, and API calls remain unchanged.
+
+### 1.3 Approved Post-Parity Feature
+
+Initiative Deep Dive is an explicitly approved product addition after the parity migration. It adds a ninth navigation destination after Initiative Insights, backed by `/api/initiative-deep-dive`, without changing existing Initiative Insights behavior.
 - The Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
 - Additional target libraries in this plan should still be introduced only when a component needs them and parity tests justify the change.
 
@@ -123,16 +127,17 @@ The current visual hierarchy is clear enough to operate, but navigation descript
 
 ### 4.2 Information Architecture
 
-Preserve the current navigation destinations and order:
+Preserve the current navigation destinations and order, including the approved post-parity destination:
 
 1. Initiative Insights.
-2. Sprint Insights.
-3. Team Insights.
-4. Security Insights.
-5. Operations Insights.
-6. Release Insights.
-7. Team Dashboard.
-8. Settings.
+2. Initiative Deep Dive.
+3. Sprint Insights.
+4. Team Insights.
+5. Security Insights.
+6. Operations Insights.
+7. Release Insights.
+8. Team Dashboard.
+9. Settings.
 
 Preserve the existing initial-screen and in-session navigation behavior. URL-based routing is deferred because it would be an observable functional change.
 
@@ -193,6 +198,7 @@ Use this structure:
 
 ### 4.6 Other Screen Patterns
 
+- **Initiative Deep Dive:** cascade group into an all-or-multi-epic selector; compare new and completed cards over 12 Monday-based weeks; use 1/2/4/12-week tiles to drive a horizontally contained activity table; expose Current WIP as a distinct all-age snapshot.
 - **Team Dashboard:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  ChartColumn,
   Gauge,
   LayoutDashboard,
   ListTodo,
@@ -20,6 +21,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { InitiativeDeepDiveScreen } from "./screens/InitiativeDeepDiveScreen";
 import {
   INITIATIVES_VIEW_STATE_EVENT,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
@@ -51,6 +53,7 @@ import {
 type ScreenId =
   | "integrations"
   | "initiatives"
+  | "initiative-deep-dive"
   | "team"
   | "sprint"
   | "security"
@@ -89,6 +92,7 @@ const DEFAULT_INITIATIVE_TOPBAR_STATE: InitiativeTopbarState = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false, icon: Gauge },
+  { id: "initiative-deep-dive", label: "Initiative Deep Dive", blurb: "New / WIP / Completed Flow", showConstruction: false, icon: ChartColumn },
   { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false, icon: ListTodo },
   { id: "team", label: "Team Insights", blurb: "Sprint Trend / Cycle Time", showConstruction: false, icon: UsersRound },
   { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
@@ -102,6 +106,7 @@ function screenTitle(id: ScreenId): string {
   const mapping: Record<ScreenId, string> = {
     integrations: "Settings",
     initiatives: "Initiative Insights",
+    "initiative-deep-dive": "Initiative Deep Dive",
     team: "Team Insights",
     sprint: "Sprint Insights",
     security: "Security Insights",
@@ -118,6 +123,8 @@ function renderScreen(id: ScreenId) {
       return <IntegrationsScreen />;
     case "initiatives":
       return <InitiativesScreen />;
+    case "initiative-deep-dive":
+      return <InitiativeDeepDiveScreen />;
     case "team":
       return <TeamInsightsScreen />;
     case "sprint":

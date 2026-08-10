@@ -168,6 +168,80 @@ export type EpicLookupConfig = {
   workTypes: EpicLookupItem[];
 };
 
+export type InitiativeDeepDiveActivity = "all" | "new" | "in_progress" | "completed" | "current_wip";
+
+export type InitiativeDeepDiveEpicOption = {
+  epicKey: string;
+  epicName: string;
+};
+
+export type InitiativeDeepDiveWeeklyBucket = {
+  weekStart: string;
+  weekEnd: string;
+  newCount: number;
+  completedCount: number;
+  netFlow: number;
+};
+
+export type InitiativeDeepDivePeriod = {
+  weeks: 1 | 2 | 4 | 12;
+  startDate: string;
+  endDate: string;
+  newCount: number;
+  completedCount: number;
+  netFlow: number;
+};
+
+export type InitiativeDeepDiveCard = {
+  issueKey: string;
+  summary: string;
+  issueType: string;
+  epicKey: string;
+  epicName: string;
+  status: string;
+  statusCategory: string;
+  storyPoints?: number | null;
+  assigneeAccountId?: string | null;
+  assigneeDisplayName?: string | null;
+  activityTypes: Array<"new" | "in_progress" | "completed">;
+  latestActivityAt?: string | null;
+  createdAt?: string | null;
+  inProgressStartedAt?: string | null;
+  completedAt?: string | null;
+};
+
+export type InitiativeDeepDiveResponse = {
+  source: "local";
+  scope: "initiative-deep-dive";
+  generatedAt: string;
+  timezone: string;
+  group: EpicLookupItem & { epicCount: number };
+  epicOptions: InitiativeDeepDiveEpicOption[];
+  selectedEpicKeys: string[];
+  selectionMode: "all" | "selected";
+  chartWeeks: number;
+  weekly: InitiativeDeepDiveWeeklyBucket[];
+  periods: InitiativeDeepDivePeriod[];
+  selectedPeriod: {
+    weeks: 1 | 2 | 4 | 12;
+    startDate: string;
+    endDate: string;
+  };
+  currentWipCount: number;
+  tableCounts: {
+    all: number;
+    new: number;
+    inProgress: number;
+    completed: number;
+  };
+  activity: InitiativeDeepDiveActivity;
+  count: number;
+  limit: number;
+  truncated: boolean;
+  cards: InitiativeDeepDiveCard[];
+  error?: string | null;
+};
+
 export type EpicCandidate = {
   epicKey: string;
   epicName: string;
@@ -928,6 +1002,35 @@ export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
     throw await parseError(response, `Epic lookup request failed (${response.status})`);
   }
   return (await response.json()) as EpicLookupConfig;
+}
+
+export async function fetchInitiativeDeepDive(options: {
+  groupId: number;
+  epicKeys?: string[];
+  chartWeeks?: number;
+  tableWindowWeeks?: 1 | 2 | 4 | 12;
+  activity?: InitiativeDeepDiveActivity;
+  timezone?: string;
+  limit?: number;
+}): Promise<InitiativeDeepDiveResponse> {
+  const params = new URLSearchParams();
+  params.set("groupId", String(options.groupId));
+  for (const epicKey of options.epicKeys ?? []) {
+    params.append("epicKey", epicKey);
+  }
+  params.set("chartWeeks", String(options.chartWeeks ?? 12));
+  params.set("tableWindowWeeks", String(options.tableWindowWeeks ?? 12));
+  params.set("activity", options.activity ?? "all");
+  params.set("timezone", options.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
+  params.set("limit", String(options.limit ?? 500));
+  const response = await fetch(`${API_BASE}/api/initiative-deep-dive?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Initiative deep-dive request failed (${response.status})`);
+  }
+  return (await response.json()) as InitiativeDeepDiveResponse;
 }
 
 export async function addEpicGroup(name: string): Promise<EpicLookupItem> {

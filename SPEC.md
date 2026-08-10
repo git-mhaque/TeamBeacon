@@ -23,6 +23,11 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
     - one or more epic groups
     - one or more work types
   - Generate RAG status and explanation.
+- Initiative Deep Dive:
+  - Select one epic group, then all or one-or-more configured epics in that group.
+  - Compare new and completed card counts in Monday-based weekly buckets, defaulting to 12 weeks.
+  - Select a 1/2/4/12-week tile to filter work-item activity.
+  - Inspect new, currently in-progress, and completed cards with newest qualifying activity first.
 - Team insights:
   - Sprint trend window controls (`Last 4/6/8/10/12 sprints`).
   - Completed story points by sprint.
@@ -57,6 +62,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 6. Generate exportable executive report (Markdown/PDF-ready format).
 7. Configure and persist epic metadata lookups (`epic groups`, `work types`) and per-epic assignments.
 8. Support runtime AI provider selection via `INTELLIGENCE_PROVIDER` with provider-specific configuration.
+9. Provide group- and epic-scoped initiative flow analytics for created, in-progress, and completed Jira cards.
 
 ## 6.1 JIRA Sync Semantics (Current Behavior)
 - Sync modes:
@@ -123,6 +129,27 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Track per-status dwell time across completed cards in the selected sprint window.
   - Surface per-status aggregate metrics (`avg`, `median`, `p85`, `max`, total share).
 
+## 6.4 Initiative Deep Dive Semantics
+- Scope:
+  - A group is required.
+  - Omitting `epicKey` means all configured epics in that group; repeated `epicKey` values select a subset.
+  - Epics and subtasks are excluded from card metrics.
+  - Direct epic children and one-level nested children are included using current Jira lineage.
+- Weekly flow:
+  - Weeks start Monday in the requested IANA timezone and include the current partial week.
+  - `New` counts distinct cards by Jira creation timestamp.
+  - `Completed` counts currently done cards once, using their latest resolution timestamp.
+  - A card created and completed in the same week contributes once to both series.
+  - Reopened cards that remain open are not counted as completed; re-completed cards use their latest completion.
+- Period tiles and activity table:
+  - UI periods are 1, 2, 4, and 12 Monday-based weekly buckets; 12 weeks is the default.
+  - Selecting a tile changes the table period.
+  - `New` matches cards created in the period.
+  - `In Progress` matches cards currently in the Jira `In Progress` category whose current in-progress run began in the period.
+  - `Completed` matches cards completed in the period.
+  - `Current WIP` is a separate all-age snapshot so ageing active work is not hidden by the selected period.
+  - The combined activity table deduplicates cards that match multiple event types and sorts by latest qualifying activity.
+
 ## 7. Non-Functional Requirements
 - Local-first privacy model with least-privilege access.
 - Resilient sync with retry/backoff and clear error states.
@@ -154,6 +181,7 @@ TeamBeacon/
 - Mockups must reflect:
   - Settings (connections, field mapping, epic metadata)
   - Initiative insights
+  - Initiative Deep Dive
   - Team insights
   - Sprint Insights
   - Security / Incident response / Releases
