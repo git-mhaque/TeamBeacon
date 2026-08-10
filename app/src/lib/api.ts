@@ -217,7 +217,9 @@ export type InitiativeDeepDiveResponse = {
   scope: "initiative-deep-dive";
   generatedAt: string;
   timezone: string;
-  group: EpicLookupItem & { epicCount: number };
+  group: (EpicLookupItem & { epicCount: number }) | null;
+  groups: Array<EpicLookupItem & { epicCount: number }>;
+  selectedGroupIds: number[];
   epicOptions: InitiativeDeepDiveEpicOption[];
   selectedEpicKeys: string[];
   selectionMode: "all" | "selected";
@@ -1007,7 +1009,7 @@ export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
 }
 
 export async function fetchInitiativeDeepDive(options: {
-  groupId: number;
+  groupIds: number[];
   epicKeys?: string[];
   chartWeeks?: number;
   tableWindowWeeks?: 1 | 2 | 4 | 12;
@@ -1016,7 +1018,9 @@ export async function fetchInitiativeDeepDive(options: {
   limit?: number;
 }): Promise<InitiativeDeepDiveResponse> {
   const params = new URLSearchParams();
-  params.set("groupId", String(options.groupId));
+  for (const groupId of options.groupIds) {
+    params.append("groupId", String(groupId));
+  }
   for (const epicKey of options.epicKeys ?? []) {
     params.append("epicKey", epicKey);
   }

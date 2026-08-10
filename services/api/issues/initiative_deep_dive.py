@@ -51,6 +51,32 @@ def _normalize_group_id(group_id: int | str) -> int:
     return normalized
 
 
+def _normalize_group_ids(
+    group_ids: Iterable[int | str] | int | str | None,
+    group_id: int | str | None,
+) -> list[int]:
+    if group_ids is None:
+        raw_values: list[int | str] = []
+    elif isinstance(group_ids, (int, str)):
+        raw_values = [group_ids]
+    else:
+        raw_values = list(group_ids)
+    if group_id is not None:
+        raw_values.insert(0, group_id)
+    if not raw_values:
+        raise ValueError("groupId is required.")
+
+    normalized: list[int] = []
+    seen: set[int] = set()
+    for raw_value in raw_values:
+        value = _normalize_group_id(raw_value)
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return normalized
+
+
 def _normalize_epic_keys(epic_keys: Iterable[str] | None) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
@@ -210,7 +236,7 @@ def _jira_issue_url(jira_base_url: str | None, issue_key: str | None) -> str | N
     return f"{jira_base_url}/browse/{quote(issue_key, safe='')}"
 
 
-def _load_group_epics(
+def _load_single_group_epics(
     conn: sqlite3.Connection,
     group_id: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -244,6 +270,24 @@ def _load_group_epics(
         "epicCount": len(epics),
     }
     return group, epics
+
+
+def _load_group_epics(
+    conn: sqlite3.Connection,
+    group_ids: Iterable[int],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    groups: list[dict[str, Any]] = []
+    epics_by_key: dict[str, dict[str, Any]] = {}
+    for group_id in group_ids:
+        group, epics = _load_single_group_epics(conn, group_id)
+        groups.append(group)
+        for epic in epics:
+            epics_by_key.setdefault(str(epic["epicKey"]), epic)
+    epic_options = sorted(
+        epics_by_key.values(),
+        key=lambda epic: (str(epic["epicName"]).casefold(), str(epic["epicKey"])),
+    )
+    return groups, epic_options
 
 
 def _status_category_key(status_category: Any, status_name: Any) -> str:
@@ -365,7 +409,8 @@ def _resolve_owning_epic(row: sqlite3.Row, selected_epic_set: set[str]) -> str |
 
 def _build_empty_response(
     *,
-    group: dict[str, Any],
+    groups: list[dict[str, Any]],
+    selected_group_ids: list[int],
     epic_options: list[dict[str, Any]],
     selected_epic_keys: list[str],
     chart_weeks: int,
@@ -408,7 +453,9 @@ def _build_empty_response(
         "scope": "initiative-deep-dive",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "timezone": timezone_name,
-        "group": group,
+        "group": groups[0] if len(groups) == 1 else None,
+        "groups": groups,
+        "selectedGroupIds": selected_group_ids,
         "epicOptions": epic_options,
         "selectedEpicKeys": selected_epic_keys,
         "selectionMode": "selected" if selected_epic_keys else "all",
@@ -433,7 +480,8 @@ def _build_empty_response(
 
 def get_initiative_deep_dive(
     *,
-    group_id: int | str,
+    group_id: int | str | None = None,
+    group_ids: Iterable[int | str] | int | str | None = None,
     epic_keys: Iterable[str] | None = None,
     chart_weeks: int | str = 12,
     table_window_weeks: int | str = 12,
@@ -444,7 +492,7 @@ def get_initiative_deep_dive(
     now: datetime | None = None,
     jira_base_url: str | None = None,
 ) -> dict[str, Any]:
-    normalized_group_id = _normalize_group_id(group_id)
+    normalized_group_ids = _normalize_group_ids(group_ids, group_id)
     requested_epic_keys = _normalize_epic_keys(epic_keys)
     normalized_chart_weeks = _normalize_chart_window(chart_weeks)
     normalized_table_window = _normalize_table_window(table_window_weeks)
@@ -473,18 +521,19 @@ def get_initiative_deep_dive(
             or _resolve_jira_base_url()
             or _resolve_jira_base_url_from_db(conn)
         )
-        group, epic_options = _load_group_epics(conn, normalized_group_id)
+        groups, epic_options = _load_group_epics(conn, normalized_group_ids)
         available_epic_keys = [str(epic["epicKey"]) for epic in epic_options]
         available_epic_set = set(available_epic_keys)
         unknown_epic_keys = [key for key in requested_epic_keys if key not in available_epic_set]
         if unknown_epic_keys:
             raise ValueError(
-                "epicKey values must belong to the selected group: " + ", ".join(unknown_epic_keys)
+                "epicKey values must belong to the selected groups: " + ", ".join(unknown_epic_keys)
             )
         selected_epic_keys = requested_epic_keys or available_epic_keys
         if not selected_epic_keys:
             return _build_empty_response(
-                group=group,
+                groups=groups,
+                selected_group_ids=normalized_group_ids,
                 epic_options=epic_options,
                 selected_epic_keys=requested_epic_keys,
                 chart_weeks=normalized_chart_weeks,
@@ -716,7 +765,9 @@ def get_initiative_deep_dive(
         "scope": "initiative-deep-dive",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "timezone": resolved_timezone_name,
-        "group": group,
+        "group": groups[0] if len(groups) == 1 else None,
+        "groups": groups,
+        "selectedGroupIds": normalized_group_ids,
         "epicOptions": epic_options,
         "selectedEpicKeys": requested_epic_keys,
         "selectionMode": "selected" if requested_epic_keys else "all",

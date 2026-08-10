@@ -146,7 +146,7 @@ function countForActivity(payload: InitiativeDeepDiveResponse, activity: Initiat
 
 export function InitiativeDeepDiveScreen() {
   const [groups, setGroups] = useState<EpicLookupItem[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
   const [selectedEpicKeys, setSelectedEpicKeys] = useState<string[]>([]);
   const [tableWindowWeeks, setTableWindowWeeks] = useState<TableWindowWeeks>(12);
   const [activity, setActivity] = useState<InitiativeDeepDiveActivity>("all");
@@ -156,8 +156,10 @@ export function InitiativeDeepDiveScreen() {
   const [isLookupLoading, setIsLookupLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
   const [isEpicMenuOpen, setIsEpicMenuOpen] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const epicMenuRef = useRef<HTMLDivElement | null>(null);
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
 
@@ -181,13 +183,18 @@ export function InitiativeDeepDiveScreen() {
     };
   }, []);
 
+  const effectiveGroupIds = useMemo(
+    () => selectedGroupIds.length === 0 ? groups.map((group) => group.id) : selectedGroupIds,
+    [groups, selectedGroupIds],
+  );
+
   useEffect(() => {
-    if (selectedGroupId === null) return undefined;
+    if (effectiveGroupIds.length === 0) return undefined;
     let activeRequest = true;
     setIsLoading(true);
     setError(null);
     fetchInitiativeDeepDive({
-      groupId: selectedGroupId,
+      groupIds: effectiveGroupIds,
       epicKeys: selectedEpicKeys,
       chartWeeks: 12,
       tableWindowWeeks,
@@ -209,17 +216,24 @@ export function InitiativeDeepDiveScreen() {
     return () => {
       activeRequest = false;
     };
-  }, [activity, refreshVersion, selectedEpicKeys, selectedGroupId, tableWindowWeeks, timezone]);
+  }, [activity, effectiveGroupIds, refreshVersion, selectedEpicKeys, tableWindowWeeks, timezone]);
 
   useEffect(() => {
-    if (!isEpicMenuOpen) return undefined;
+    if (!isGroupMenuOpen && !isEpicMenuOpen) return undefined;
     const handlePointerDown = (event: MouseEvent) => {
-      if (!epicMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!groupMenuRef.current?.contains(target)) {
+        setIsGroupMenuOpen(false);
+      }
+      if (!epicMenuRef.current?.contains(target)) {
         setIsEpicMenuOpen(false);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsEpicMenuOpen(false);
+      if (event.key === "Escape") {
+        setIsGroupMenuOpen(false);
+        setIsEpicMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
@@ -227,8 +241,12 @@ export function InitiativeDeepDiveScreen() {
       document.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isEpicMenuOpen]);
+  }, [isEpicMenuOpen, isGroupMenuOpen]);
 
+  const allGroupsSelected = selectedGroupIds.length === 0;
+  const groupSelectionLabel = allGroupsSelected
+    ? `All groups${groups.length > 0 ? ` (${groups.length})` : ""}`
+    : `${selectedGroupIds.length} of ${groups.length} groups`;
   const epicOptions = payload?.epicOptions ?? [];
   const allEpicsSelected = selectedEpicKeys.length === 0;
   const epicSelectionLabel = allEpicsSelected
@@ -240,15 +258,29 @@ export function InitiativeDeepDiveScreen() {
     return cards;
   }, [payload?.cards, sortDirection, sortField]);
 
-  const handleGroupChange = (value: string) => {
-    const nextGroupId = value ? Number.parseInt(value, 10) : null;
-    setSelectedGroupId(Number.isFinite(nextGroupId) ? nextGroupId : null);
+  const resetDependentScope = () => {
     setSelectedEpicKeys([]);
     setTableWindowWeeks(12);
     setActivity("all");
     setPayload(null);
     setIsEpicMenuOpen(false);
     setError(null);
+  };
+
+  const selectAllGroups = () => {
+    setSelectedGroupIds([]);
+    resetDependentScope();
+  };
+
+  const toggleGroup = (groupId: number) => {
+    setSelectedGroupIds((current) => {
+      const next = current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId];
+      if (next.length === 0 || next.length === groups.length) return [];
+      return next;
+    });
+    resetDependentScope();
   };
 
   const toggleEpic = (epicKey: string) => {
@@ -292,25 +324,59 @@ export function InitiativeDeepDiveScreen() {
         <div className="tb-deep-dive-section-heading">
           <div>
             <p className="tb-eyebrow">Scope</p>
-            <h3 id="initiative-deep-dive-filters">Choose a group and its epics</h3>
+            <h3 id="initiative-deep-dive-filters">Choose groups and epics</h3>
           </div>
           {payload ? <p className="tb-deep-dive-timezone">Weeks start Monday · {payload.timezone}</p> : null}
         </div>
 
         <div className="tb-deep-dive-filters">
-          <label className="tb-field">
-            <span>Group</span>
-            <select
-              value={selectedGroupId ?? ""}
-              onChange={(event) => handleGroupChange(event.target.value)}
-              aria-label="Initiative group"
+          <div className="tb-field tb-deep-dive-epic-field" ref={groupMenuRef}>
+            <span id="initiative-group-filter-label">Group</span>
+            <button
+              type="button"
+              className="tb-deep-dive-epic-trigger"
+              aria-labelledby="initiative-group-filter-label"
+              aria-haspopup="true"
+              aria-expanded={isGroupMenuOpen}
+              disabled={groups.length === 0}
+              onClick={() => {
+                setIsEpicMenuOpen(false);
+                setIsGroupMenuOpen((current) => !current);
+              }}
             >
-              <option value="">Select a group</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-            </select>
-          </label>
+              <span>{groups.length === 0 ? "No groups configured" : groupSelectionLabel}</span>
+              <ChevronDown aria-hidden="true" size={16} />
+            </button>
+            {isGroupMenuOpen ? (
+              <div className="tb-deep-dive-epic-menu" role="group" aria-label="Group options">
+                <label className="tb-deep-dive-check-option is-all">
+                  <input
+                    type="checkbox"
+                    checked={allGroupsSelected}
+                    onChange={selectAllGroups}
+                  />
+                  <span className="tb-deep-dive-checkbox" aria-hidden="true">
+                    {allGroupsSelected ? <Check size={13} /> : null}
+                  </span>
+                  <span>All groups</span>
+                </label>
+                <div className="tb-deep-dive-epic-options">
+                  {groups.map((group) => {
+                    const checked = selectedGroupIds.includes(group.id);
+                    return (
+                      <label className="tb-deep-dive-check-option" key={group.id}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleGroup(group.id)} />
+                        <span className="tb-deep-dive-checkbox" aria-hidden="true">
+                          {checked ? <Check size={13} /> : null}
+                        </span>
+                        <span>{group.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           <div className="tb-field tb-deep-dive-epic-field" ref={epicMenuRef}>
             <span id="initiative-epic-filter-label">Epic</span>
@@ -320,10 +386,13 @@ export function InitiativeDeepDiveScreen() {
               aria-labelledby="initiative-epic-filter-label"
               aria-haspopup="true"
               aria-expanded={isEpicMenuOpen}
-              disabled={selectedGroupId === null || !payload || epicOptions.length === 0}
-              onClick={() => setIsEpicMenuOpen((current) => !current)}
+              disabled={effectiveGroupIds.length === 0 || !payload || epicOptions.length === 0}
+              onClick={() => {
+                setIsGroupMenuOpen(false);
+                setIsEpicMenuOpen((current) => !current);
+              }}
             >
-              <span>{selectedGroupId === null ? "Select a group first" : epicSelectionLabel}</span>
+              <span>{effectiveGroupIds.length === 0 ? "Select a group first" : epicSelectionLabel}</span>
               <ChevronDown aria-hidden="true" size={16} />
             </button>
             {isEpicMenuOpen ? (
@@ -374,10 +443,10 @@ export function InitiativeDeepDiveScreen() {
         </section>
       ) : null}
 
-      {selectedGroupId === null ? (
+      {groups.length === 0 ? (
         <section className="tb-panel tb-deep-dive-state">
-          <h3>Select an initiative group to begin</h3>
-          <p>The epic selector, weekly flow, period tiles, and work-item activity will follow that group.</p>
+          <h3>No initiative groups configured</h3>
+          <p>Add an epic group in Settings before using Initiative Deep Dive.</p>
         </section>
       ) : null}
 

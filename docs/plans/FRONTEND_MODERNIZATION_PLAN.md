@@ -198,7 +198,7 @@ Use this structure:
 
 ### 4.6 Other Screen Patterns
 
-- **Initiative Deep Dive:** cascade group into an all-or-multi-epic selector; compare new and completed cards over 12 Monday-based weeks; use 1/2/4/12-week tiles to drive a horizontally contained activity table; expose Current WIP as a distinct all-age snapshot.
+- **Initiative Deep Dive:** default to all groups with checkbox-based multi-group selection, cascade their combined scope into an all-or-multi-epic selector, compare new and completed cards over 12 Monday-based weeks, use 1/2/4/12-week tiles to drive a horizontally contained activity table, and expose Current WIP as a distinct all-age snapshot.
 - **Team Dashboard:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.

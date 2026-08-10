@@ -115,7 +115,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - Tracked cards with no time in the selected statuses are excluded from cycle-time metrics
     - Epics are excluded from cycle-time calculations
     - Sub-tasks are excluded from Team Insights calculations
-- `GET /api/initiative-deep-dive?groupId=5&tableWindowWeeks=12`
+- `GET /api/initiative-deep-dive?groupId=5&groupId=8&tableWindowWeeks=12`
   - Returns group/epic-scoped initiative flow and work-item activity.
   - Optional query:
     - repeated `epicKey=<key>` values; omit for all configured epics in the group

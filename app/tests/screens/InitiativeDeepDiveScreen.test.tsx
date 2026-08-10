@@ -22,7 +22,12 @@ const deepDivePayload = {
   scope: "initiative-deep-dive",
   generatedAt: "2026-08-10T02:00:00+00:00",
   timezone: "Australia/Melbourne",
-  group: { id: 5, name: "Platform", epicCount: 2 },
+  group: null,
+  groups: [
+    { id: 5, name: "Platform", epicCount: 2 },
+    { id: 8, name: "Operations", epicCount: 0 },
+  ],
+  selectedGroupIds: [5, 8],
   epicOptions: [
     { epicKey: "TB-100", epicName: "Platform foundations" },
     { epicKey: "TB-200", epicName: "Platform experience" },
@@ -114,12 +119,9 @@ describe("InitiativeDeepDiveScreen", () => {
 
     render(<InitiativeDeepDiveScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Select an initiative group to begin" })).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Initiative group" }), { target: { value: "5" } });
-
     expect(await screen.findByRole("heading", { name: "New and completed cards by week" })).toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(new URL(String(fetchSpy.mock.calls[1][0])).searchParams.getAll("groupId")).toEqual(["5", "8"]);
     expect(screen.getByRole("img", { name: "New and completed cards by week" })).toBeInTheDocument();
     expect(screen.getByText("Ship initiative deep dive")).toHaveAttribute(
       "title",
@@ -191,7 +193,29 @@ describe("InitiativeDeepDiveScreen", () => {
       expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("tableWindowWeeks=4"))).toBe(true);
     });
 
+    const groupTrigger = screen.getByRole("button", { name: "Group" });
+    expect(groupTrigger).toHaveTextContent("All groups (2)");
+    fireEvent.click(groupTrigger);
+    const groupOptions = screen.getByRole("group", { name: "Group options" });
+    expect(within(groupOptions).getByRole("checkbox", { name: "All groups" })).toBeChecked();
+    fireEvent.click(within(groupOptions).getByRole("checkbox", { name: "Platform" }));
+    await waitFor(() => {
+      const latestUrl = new URL(String(fetchSpy.mock.calls.at(-1)?.[0]));
+      expect(latestUrl.searchParams.getAll("groupId")).toEqual(["5"]);
+    });
+    expect(groupTrigger).toHaveTextContent("1 of 2 groups");
+    fireEvent.click(within(groupOptions).getByRole("checkbox", { name: "Operations" }));
+    await waitFor(() => {
+      const latestUrl = new URL(String(fetchSpy.mock.calls.at(-1)?.[0]));
+      expect(latestUrl.searchParams.getAll("groupId")).toEqual(["5", "8"]);
+    });
+    expect(within(groupOptions).getByRole("checkbox", { name: "All groups" })).toBeChecked();
+    fireEvent.click(within(groupOptions).getByRole("checkbox", { name: "All groups" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("group", { name: "Group options" })).not.toBeInTheDocument();
+
     const epicTrigger = screen.getByRole("button", { name: "Epic" });
+    await waitFor(() => expect(epicTrigger).toBeEnabled());
     fireEvent.click(epicTrigger);
     const epicOptions = screen.getByRole("group", { name: "Epic options" });
     fireEvent.mouseDown(epicOptions);
@@ -215,8 +239,6 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(screen.getByRole("group", { name: "Epic options" })).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole("group", { name: "Epic options" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Initiative group" }), { target: { value: "" } });
-    expect(screen.getByRole("heading", { name: "Select an initiative group to begin" })).toBeInTheDocument();
   });
 
   it("filters activity and resets current WIP when a weekly tile is selected", async () => {
@@ -225,7 +247,6 @@ describe("InitiativeDeepDiveScreen", () => {
       "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
     });
     render(<InitiativeDeepDiveScreen />);
-    fireEvent.change(await screen.findByRole("combobox", { name: "Initiative group" }), { target: { value: "5" } });
     await screen.findByRole("heading", { name: "New and completed cards by week" });
 
     const activityToolbar = screen.getByRole("toolbar", { name: "Work item activity filter" });
@@ -289,7 +310,6 @@ describe("InitiativeDeepDiveScreen", () => {
       "/api/metadata/lookup": { groups: [{ id: 5, name: "Platform" }], workTypes: [] },
     });
     render(<InitiativeDeepDiveScreen />);
-    fireEvent.change(await screen.findByRole("combobox", { name: "Initiative group" }), { target: { value: "5" } });
 
     expect(await screen.findByText("TB-EDGE")).toBeInTheDocument();
     expect(screen.getByText("1 card")).toBeInTheDocument();
@@ -320,11 +340,23 @@ describe("InitiativeDeepDiveScreen", () => {
     });
 
     render(<InitiativeDeepDiveScreen />);
-    fireEvent.change(await screen.findByRole("combobox", { name: "Initiative group" }), { target: { value: "5" } });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load initiative deep dive.");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("No cards match this scope, period, and activity filter.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("shows setup guidance when no initiative groups are configured", async () => {
+    const fetchSpy = setupFetchMock({
+      "/api/metadata/lookup": { groups: [], workTypes: [] },
+    });
+
+    render(<InitiativeDeepDiveScreen />);
+
+    expect(await screen.findByRole("heading", { name: "No initiative groups configured" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Group" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Epic" })).toBeDisabled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

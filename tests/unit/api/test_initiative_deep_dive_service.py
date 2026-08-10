@@ -328,12 +328,50 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(old_wip["activityTypes"], ["in_progress"])
             self.assertEqual(old_wip["inProgressStartedAt"], "2026-04-01T01:00:00+00:00")
 
+    def test_combines_multiple_groups_and_deduplicates_shared_epics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform_id, operations_id = self._seed_database(db_path)
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO epic_metadata_groups (epic_metadata_id, group_id)
+                    SELECT id, ? FROM epic_metadata WHERE epic_key = 'TB-100'
+                    """,
+                    (operations_id,),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            payload = get_initiative_deep_dive(
+                group_ids=[platform_id, operations_id, platform_id],
+                table_window_weeks=2,
+                timezone_name="Australia/Melbourne",
+                db_path=db_path,
+                now=datetime(2026, 8, 10, 12, 0, tzinfo=ZoneInfo("Australia/Melbourne")),
+            )
+
+            self.assertIsNone(payload["group"])
+            self.assertEqual(payload["selectedGroupIds"], [platform_id, operations_id])
+            self.assertEqual([group["name"] for group in payload["groups"]], ["Platform", "Operations"])
+            self.assertEqual(
+                [epic["epicKey"] for epic in payload["epicOptions"]],
+                ["TB-300", "TB-200", "TB-100"],
+            )
+            self.assertEqual(len(payload["epicOptions"]), len({epic["epicKey"] for epic in payload["epicOptions"]}))
+            issue_keys = [card["issueKey"] for card in payload["cards"]]
+            self.assertEqual(set(issue_keys), {"TB-1", "TB-2", "TB-7", "TB-9"})
+            self.assertEqual(len(issue_keys), len(set(issue_keys)))
+
     def test_rejects_invalid_scope_and_query_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = str(Path(tmp_dir) / "teambeacon.db")
             platform_id, _ = self._seed_database(db_path)
 
             invalid_calls = (
+                ({"group_ids": []}, "groupId"),
                 ({"group_id": "not-a-number"}, "groupId"),
                 ({"group_id": 0}, "groupId"),
                 ({"group_id": 999}, "Unknown groupId"),
@@ -371,6 +409,8 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             )
 
             self.assertEqual(payload["selectionMode"], "all")
+            self.assertEqual(payload["selectedGroupIds"], [empty_group["id"]])
+            self.assertEqual([group["name"] for group in payload["groups"]], ["No configured epics"])
             self.assertEqual(payload["epicOptions"], [])
             self.assertEqual(payload["chartWeeks"], 2)
             self.assertEqual(len(payload["weekly"]), 2)

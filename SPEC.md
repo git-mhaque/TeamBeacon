@@ -24,7 +24,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
     - one or more work types
   - Generate RAG status and explanation.
 - Initiative Deep Dive:
-  - Select one epic group, then all or one-or-more configured epics in that group.
+  - Start with all epic groups selected, or select one-or-more groups, then choose all or one-or-more configured epics across those groups.
   - Compare new and completed card counts in Monday-based weekly buckets, defaulting to 12 weeks.
   - Select a 1/2/4/12-week tile to filter work-item activity.
   - Inspect new, currently in-progress, and completed cards with newest qualifying activity first.
@@ -131,8 +131,8 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 
 ## 6.4 Initiative Deep Dive Semantics
 - Scope:
-  - A group is required.
-  - Omitting `epicKey` means all configured epics in that group; repeated `epicKey` values select a subset.
+  - At least one `groupId` is required; repeated `groupId` values combine groups and shared epics are de-duplicated.
+  - Omitting `epicKey` means all configured epics across the selected groups; repeated `epicKey` values select a subset.
   - Epics and subtasks are excluded from card metrics.
   - Direct epic children and one-level nested children are included using current Jira lineage.
 - Weekly flow:

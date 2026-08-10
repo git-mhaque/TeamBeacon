@@ -179,7 +179,7 @@ describe("api initiative deep dive", () => {
     delete (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE;
   });
 
-  it("fetches initiative flow with repeated epic scope parameters", async () => {
+  it("fetches initiative flow with repeated group and epic scope parameters", async () => {
     (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
     const payload = {
       source: "local",
@@ -192,7 +192,7 @@ describe("api initiative deep dive", () => {
     const { fetchInitiativeDeepDive } = await import("../../src/lib/api");
 
     const result = await fetchInitiativeDeepDive({
-      groupId: 5,
+      groupIds: [5, 8],
       epicKeys: ["TB-100", "TB-200"],
       chartWeeks: 12,
       tableWindowWeeks: 4,
@@ -203,7 +203,7 @@ describe("api initiative deep dive", () => {
 
     expect(result).toEqual(payload);
     expect(fetchSpy).toHaveBeenCalledWith(
-      "https://teambeacon.test/api/initiative-deep-dive?groupId=5&epicKey=TB-100&epicKey=TB-200&chartWeeks=12&tableWindowWeeks=4&activity=completed&timezone=Australia%2FMelbourne&limit=250",
+      "https://teambeacon.test/api/initiative-deep-dive?groupId=5&groupId=8&epicKey=TB-100&epicKey=TB-200&chartWeeks=12&tableWindowWeeks=4&activity=completed&timezone=Australia%2FMelbourne&limit=250",
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -216,6 +216,6 @@ describe("api initiative deep dive", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({ detail: "Unknown groupId: 99" }, 400));
     const { fetchInitiativeDeepDive } = await import("../../src/lib/api");
 
-    await expect(fetchInitiativeDeepDive({ groupId: 99, timezone: "UTC" })).rejects.toThrow("Unknown groupId: 99");
+    await expect(fetchInitiativeDeepDive({ groupIds: [99], timezone: "UTC" })).rejects.toThrow("Unknown groupId: 99");
   });
 });

@@ -30,7 +30,7 @@ Exit criteria:
 
 ## Phase 2 (Weeks 4-5): Insights MVP
 - Initiative insights with configurable success criteria.
-- Initiative Deep Dive with group/epic cascading scope, weekly created/completed flow, selectable periods, current WIP, and card activity detail.
+- Initiative Deep Dive with default-all and multi-group/epic cascading scope, weekly created/completed flow, selectable periods, current WIP, and card activity detail.
 - Team metrics: committed/completed points, cycle time trends.
 - Release metrics: release cycle time, selectable completed-release trend, ongoing release readiness, and linked scope risk.
 - Individual insights by alias and date range.

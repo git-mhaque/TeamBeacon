@@ -962,11 +962,18 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
 
         def fake_initiative_deep_dive(**kwargs):  # noqa: ANN003
             self.initiative_deep_dive_calls.append(kwargs)
+            group_ids = [int(group_id) for group_id in kwargs["group_ids"]]
+            groups = [
+                {"id": group_id, "name": f"Group {group_id}", "epicCount": 2}
+                for group_id in group_ids
+            ]
             return {
                 "source": "local",
                 "scope": "initiative-deep-dive",
                 "timezone": kwargs.get("timezone_name") or "UTC",
-                "group": {"id": int(kwargs["group_id"]), "name": "Platform", "epicCount": 2},
+                "group": groups[0] if len(groups) == 1 else None,
+                "groups": groups,
+                "selectedGroupIds": group_ids,
                 "epicOptions": [
                     {"epicKey": "CEGBUPOL-4482", "epicName": "Enable offline initiative scoring"},
                     {"epicKey": "CEGBUPOL-3553", "epicName": "Domain Support Q4"},
@@ -1468,7 +1475,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
 
     def test_initiative_deep_dive_endpoint_supports_scope_and_filters(self) -> None:
         url = (
-            f"{self.base_url}/api/initiative-deep-dive?groupId=5"
+            f"{self.base_url}/api/initiative-deep-dive?groupId=5&groupId=8"
             "&epicKey=CEGBUPOL-4482&epicKey=CEGBUPOL-3553"
             "&chartWeeks=12&tableWindowWeeks=4&activity=completed"
             "&timezone=Australia%2FMelbourne&limit=250"
@@ -1478,14 +1485,15 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             body = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(body["scope"], "initiative-deep-dive")
-        self.assertEqual(body["group"]["id"], 5)
+        self.assertIsNone(body["group"])
+        self.assertEqual(body["selectedGroupIds"], [5, 8])
         self.assertEqual(body["selectedEpicKeys"], ["CEGBUPOL-4482", "CEGBUPOL-3553"])
         self.assertEqual(body["selectedPeriod"]["weeks"], 4)
         self.assertEqual(body["activity"], "completed")
         self.assertEqual(
             self.initiative_deep_dive_calls[-1],
             {
-                "group_id": "5",
+                "group_ids": ["5", "8"],
                 "epic_keys": ["CEGBUPOL-4482", "CEGBUPOL-3553"],
                 "chart_weeks": "12",
                 "table_window_weeks": "4",

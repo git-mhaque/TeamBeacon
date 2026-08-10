@@ -494,7 +494,10 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "name": "groupId",
                             "in": "query",
                             "required": True,
-                            "schema": {"type": "integer", "minimum": 1},
+                            "schema": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+                            "style": "form",
+                            "explode": True,
+                            "description": "Selected group IDs. Repeat to combine multiple groups.",
                         },
                         {
                             "name": "epicKey",
@@ -1071,14 +1074,14 @@ def build_handler(
 
             if path == "/api/initiative-deep-dive":
                 query = parse_qs(parsed.query)
-                group_id = query.get("groupId", [None])[0]
-                if group_id is None:
+                group_ids = query.get("groupId", [])
+                if not group_ids:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": "groupId is required."}))
                     return
                 try:
                     payload = initiative_deep_dive_provider(
-                        group_id=group_id,
+                        group_ids=group_ids,
                         epic_keys=query.get("epicKey", []),
                         chart_weeks=query.get("chartWeeks", ["12"])[0],
                         table_window_weeks=query.get("tableWindowWeeks", ["12"])[0],
