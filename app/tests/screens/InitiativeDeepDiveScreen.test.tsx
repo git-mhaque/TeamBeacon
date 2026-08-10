@@ -51,10 +51,12 @@ const deepDivePayload = {
   cards: [
     {
       issueKey: "TB-1",
+      issueUrl: "https://jira.example.test/browse/TB-1",
       summary: "Ship initiative deep dive",
       issueType: "Story",
       epicKey: "TB-100",
       epicName: "Platform foundations",
+      epicUrl: "https://jira.example.test/browse/TB-100",
       status: "Done",
       statusCategory: "Done",
       storyPoints: 5,
@@ -68,10 +70,12 @@ const deepDivePayload = {
     },
     {
       issueKey: "TB-2",
+      issueUrl: "https://jira.example.test/browse/TB-2",
       summary: "Review flow metrics",
       issueType: "Task",
       epicKey: "TB-200",
       epicName: "Platform experience",
+      epicUrl: "https://jira.example.test/browse/TB-200",
       status: "In Progress",
       statusCategory: "In Progress",
       storyPoints: 3,
@@ -119,8 +123,46 @@ describe("InitiativeDeepDiveScreen", () => {
     expect(screen.getByRole("img", { name: "New and completed cards by week" })).toBeInTheDocument();
     expect(screen.getByText("Ship initiative deep dive")).toBeInTheDocument();
     expect(screen.getByText("Review flow metrics")).toBeInTheDocument();
-    expect(screen.getByText("Asha Dev")).toBeInTheDocument();
-    expect(screen.getByText("dev-2")).toBeInTheDocument();
+    const activityTable = screen.getByRole("table");
+    const columnHeaders = within(activityTable).getAllByRole("columnheader");
+    expect(columnHeaders).toHaveLength(8);
+    expect(columnHeaders.map((header) => header.querySelector("button span")?.textContent)).toEqual([
+      "Activity",
+      "Epic",
+      "Key",
+      "Title",
+      "Current status",
+      "Created",
+      "In progress since",
+      "Completed",
+    ]);
+    expect(within(activityTable).queryByRole("columnheader", { name: "Type" })).not.toBeInTheDocument();
+    expect(within(activityTable).queryByRole("columnheader", { name: "Assignee" })).not.toBeInTheDocument();
+    expect(within(activityTable).queryByRole("columnheader", { name: "SP" })).not.toBeInTheDocument();
+
+    const issueLink = within(activityTable).getByRole("link", { name: "TB-1" });
+    expect(issueLink).toHaveAttribute("href", "https://jira.example.test/browse/TB-1");
+    expect(issueLink).toHaveAttribute("target", "_blank");
+    expect(issueLink).toHaveAttribute("rel", "noopener noreferrer");
+    const epicLink = within(activityTable).getByRole("link", { name: "Platform foundations" });
+    expect(epicLink).toHaveAttribute("href", "https://jira.example.test/browse/TB-100");
+    expect(epicLink).toHaveAttribute("target", "_blank");
+
+    const issueOrder = () => within(activityTable).getAllByRole("row").slice(1).map((row) => (
+      within(row).getByRole("link", { name: /^TB-/ }).textContent
+    ));
+    expect(issueOrder()).toEqual(["TB-1", "TB-2"]);
+    const titleSort = within(activityTable).getByRole("button", { name: "Sort by Title (ascending)" });
+    fireEvent.click(titleSort);
+    expect(issueOrder()).toEqual(["TB-2", "TB-1"]);
+    fireEvent.click(titleSort);
+    expect(issueOrder()).toEqual(["TB-1", "TB-2"]);
+
+    for (const label of ["Key", "Epic", "Current status", "Created", "In progress since", "Completed"]) {
+      fireEvent.click(within(activityTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
+    }
+    fireEvent.click(within(activityTable).getByRole("button", { name: /Sort by Activity/ }));
+    expect(within(activityTable).getByRole("columnheader", { name: /Activity/ })).toHaveAttribute("aria-sort", "descending");
 
     await waitFor(() => expect(chartCalls.length).toBeGreaterThan(0));
     const chart = chartCalls[chartCalls.length - 1];
@@ -218,6 +260,8 @@ describe("InitiativeDeepDiveScreen", () => {
         {
           ...deepDivePayload.cards[0],
           issueKey: "TB-EDGE",
+          issueUrl: null,
+          epicUrl: null,
           issueType: "",
           status: "Selected for development",
           statusCategory: "To Do",
@@ -231,6 +275,8 @@ describe("InitiativeDeepDiveScreen", () => {
         {
           ...deepDivePayload.cards[1],
           issueKey: "TB-NO-SP",
+          issueUrl: null,
+          epicUrl: null,
           storyPoints: Number.NaN,
         },
       ],
@@ -244,9 +290,7 @@ describe("InitiativeDeepDiveScreen", () => {
 
     expect(await screen.findByText("TB-EDGE")).toBeInTheDocument();
     expect(screen.getByText("1 card")).toBeInTheDocument();
-    expect(screen.getByText("1.3")).toBeInTheDocument();
     expect(screen.getByText("not-a-date")).toBeInTheDocument();
-    expect(screen.getByText("Unassigned")).toBeInTheDocument();
     expect(screen.getByText("Showing the first 1 cards, newest activity first.")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
 

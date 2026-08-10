@@ -6589,12 +6589,22 @@ body {
 
 .tb-deep-dive-table {
   width: 100%;
-  min-width: 82rem;
+  min-width: 72.5rem;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   color: #344156;
   font-size: 0.74rem;
 }
+
+.tb-deep-dive-table th:nth-child(1) { width: 7.2rem; }
+.tb-deep-dive-table th:nth-child(2) { width: 11.6rem; }
+.tb-deep-dive-table th:nth-child(3) { width: 7rem; }
+.tb-deep-dive-table th:nth-child(4) { width: 19rem; }
+.tb-deep-dive-table th:nth-child(5) { width: 7rem; }
+.tb-deep-dive-table th:nth-child(6),
+.tb-deep-dive-table th:nth-child(8) { width: 6.5rem; }
+.tb-deep-dive-table th:nth-child(7) { width: 7.7rem; }
 
 .tb-deep-dive-table th {
   position: sticky;
@@ -6636,6 +6646,24 @@ body {
   max-width: 22rem;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tb-deep-dive-epic-cell {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-deep-dive-jira-link {
+  color: #245b9b;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tb-deep-dive-jira-link:hover,
+.tb-deep-dive-jira-link:focus-visible {
+  color: #173f75;
+  text-decoration: underline;
 }
 
 .tb-deep-dive-activity-badges {

@@ -263,6 +263,7 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
                 timezone_name="Australia/Melbourne",
                 db_path=db_path,
                 now=datetime(2026, 8, 10, 12, 0, tzinfo=ZoneInfo("Australia/Melbourne")),
+                jira_base_url="https://jira.example.test/",
             )
 
             self.assertEqual(payload["scope"], "initiative-deep-dive")
@@ -285,6 +286,8 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             cards_by_key = {card["issueKey"]: card for card in payload["cards"]}
             self.assertEqual(set(cards_by_key), {"TB-1", "TB-2", "TB-7"})
             self.assertEqual(cards_by_key["TB-1"]["activityTypes"], ["new", "completed"])
+            self.assertEqual(cards_by_key["TB-1"]["issueUrl"], "https://jira.example.test/browse/TB-1")
+            self.assertEqual(cards_by_key["TB-1"]["epicUrl"], "https://jira.example.test/browse/TB-100")
             self.assertEqual(cards_by_key["TB-2"]["activityTypes"], ["in_progress"])
             self.assertEqual(cards_by_key["TB-2"]["inProgressStartedAt"], "2026-08-05T01:00:00+00:00")
             self.assertEqual(cards_by_key["TB-7"]["completedAt"], "2026-08-08T01:00:00+00:00")

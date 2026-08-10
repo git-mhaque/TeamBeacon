@@ -126,7 +126,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `limit=500` (1-1000)
   - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`.
   - `periods` returns the 1/2/4/12-week tile totals; `currentWipCount` remains an all-age snapshot.
-  - Table cards include activity badges and created/in-progress/completed timestamps, newest qualifying activity first.
+  - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first.
   - Epics and subtasks are excluded.
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:

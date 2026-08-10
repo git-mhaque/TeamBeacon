@@ -194,10 +194,12 @@ export type InitiativeDeepDivePeriod = {
 
 export type InitiativeDeepDiveCard = {
   issueKey: string;
+  issueUrl?: string | null;
   summary: string;
   issueType: string;
   epicKey: string;
   epicName: string;
+  epicUrl?: string | null;
   status: string;
   statusCategory: string;
   storyPoints?: number | null;

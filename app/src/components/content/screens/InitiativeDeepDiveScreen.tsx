@@ -11,8 +11,21 @@ import {
 import { InitiativeFlowChart } from "./InitiativeFlowChart";
 
 type TableWindowWeeks = 1 | 2 | 4 | 12;
+type TableSortField = "activity" | "issueKey" | "summary" | "epic" | "status" | "created" | "inProgress" | "completed";
+type SortDirection = "asc" | "desc";
 
 const WINDOW_OPTIONS: TableWindowWeeks[] = [1, 2, 4, 12];
+
+const TABLE_COLUMNS: Array<{ id: TableSortField; label: string }> = [
+  { id: "activity", label: "Activity" },
+  { id: "epic", label: "Epic" },
+  { id: "issueKey", label: "Key" },
+  { id: "summary", label: "Title" },
+  { id: "status", label: "Current status" },
+  { id: "created", label: "Created" },
+  { id: "inProgress", label: "In progress since" },
+  { id: "completed", label: "Completed" },
+];
 
 const ACTIVITY_FILTERS: Array<{ id: InitiativeDeepDiveActivity; label: string }> = [
   { id: "all", label: "All activity" },
@@ -47,9 +60,67 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(parsed);
 }
 
-function formatStoryPoints(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+function compareText(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { sensitivity: "base", numeric: true });
+}
+
+function compareTimestamp(
+  left: string | null | undefined,
+  right: string | null | undefined,
+  direction: SortDirection,
+): number {
+  const leftTimestamp = left ? new Date(left).getTime() : Number.NaN;
+  const rightTimestamp = right ? new Date(right).getTime() : Number.NaN;
+  const leftMissing = Number.isNaN(leftTimestamp);
+  const rightMissing = Number.isNaN(rightTimestamp);
+  if (leftMissing || rightMissing) {
+    if (leftMissing && rightMissing) return 0;
+    return leftMissing ? 1 : -1;
+  }
+  const comparison = leftTimestamp === rightTimestamp ? 0 : leftTimestamp < rightTimestamp ? -1 : 1;
+  return direction === "asc" ? comparison : -comparison;
+}
+
+function defaultSortDirection(field: TableSortField): SortDirection {
+  return ["activity", "created", "inProgress", "completed"].includes(field) ? "desc" : "asc";
+}
+
+function compareCards(
+  left: InitiativeDeepDiveCard,
+  right: InitiativeDeepDiveCard,
+  field: TableSortField,
+  direction: SortDirection,
+): number {
+  let comparison = 0;
+  switch (field) {
+    case "activity":
+      comparison = compareTimestamp(left.latestActivityAt, right.latestActivityAt, direction);
+      break;
+    case "issueKey":
+      comparison = compareText(left.issueKey, right.issueKey);
+      break;
+    case "summary":
+      comparison = compareText(left.summary, right.summary);
+      break;
+    case "epic":
+      comparison = compareText(left.epicName || left.epicKey, right.epicName || right.epicKey);
+      break;
+    case "status":
+      comparison = compareText(left.status, right.status);
+      break;
+    case "created":
+      comparison = compareTimestamp(left.createdAt, right.createdAt, direction);
+      break;
+    case "inProgress":
+      comparison = compareTimestamp(left.inProgressStartedAt, right.inProgressStartedAt, direction);
+      break;
+    case "completed":
+      comparison = compareTimestamp(left.completedAt, right.completedAt, direction);
+      break;
+  }
+  if (comparison === 0) return compareText(left.issueKey, right.issueKey);
+  if (["activity", "created", "inProgress", "completed"].includes(field)) return comparison;
+  return direction === "asc" ? comparison : -comparison;
 }
 
 function statusTone(statusCategory: string): string {
@@ -79,6 +150,8 @@ export function InitiativeDeepDiveScreen() {
   const [selectedEpicKeys, setSelectedEpicKeys] = useState<string[]>([]);
   const [tableWindowWeeks, setTableWindowWeeks] = useState<TableWindowWeeks>(12);
   const [activity, setActivity] = useState<InitiativeDeepDiveActivity>("all");
+  const [sortField, setSortField] = useState<TableSortField>("activity");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [payload, setPayload] = useState<InitiativeDeepDiveResponse | null>(null);
   const [isLookupLoading, setIsLookupLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -161,6 +234,11 @@ export function InitiativeDeepDiveScreen() {
   const epicSelectionLabel = allEpicsSelected
     ? `All epics${epicOptions.length > 0 ? ` (${epicOptions.length})` : ""}`
     : `${selectedEpicKeys.length} of ${epicOptions.length} epics`;
+  const sortedCards = useMemo(() => {
+    const cards = [...(payload?.cards ?? [])];
+    cards.sort((left, right) => compareCards(left, right, sortField, sortDirection));
+    return cards;
+  }, [payload?.cards, sortDirection, sortField]);
 
   const handleGroupChange = (value: string) => {
     const nextGroupId = value ? Number.parseInt(value, 10) : null;
@@ -186,6 +264,22 @@ export function InitiativeDeepDiveScreen() {
   const handleWindowSelection = (weeks: TableWindowWeeks) => {
     setTableWindowWeeks(weeks);
     if (activity === "current_wip") setActivity("all");
+  };
+
+  const handleSortHeaderClick = (field: TableSortField) => {
+    setSortField((current) => {
+      if (current === field) {
+        setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+        return current;
+      }
+      setSortDirection(defaultSortDirection(field));
+      return field;
+    });
+  };
+
+  const resolveSortIndicator = (field: TableSortField): string => {
+    if (sortField !== field) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
   };
 
   if (isLookupLoading) {
@@ -374,21 +468,29 @@ export function InitiativeDeepDiveScreen() {
               <table className="tb-data-table tb-deep-dive-table">
                 <thead>
                   <tr>
-                    <th scope="col">Activity</th>
-                    <th scope="col">Key</th>
-                    <th scope="col">Title</th>
-                    <th scope="col">Epic</th>
-                    <th scope="col">Current status</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Assignee</th>
-                    <th scope="col" className="is-numeric">SP</th>
-                    <th scope="col">Created</th>
-                    <th scope="col">In progress since</th>
-                    <th scope="col">Completed</th>
+                    {TABLE_COLUMNS.map((column) => (
+                      <th
+                        key={column.id}
+                        scope="col"
+                        aria-sort={sortField === column.id ? (sortDirection === "asc" ? "ascending" : "descending") : undefined}
+                      >
+                        <button
+                          type="button"
+                          className={`tb-table-sort${sortField === column.id ? " is-active" : ""}`}
+                          onClick={() => handleSortHeaderClick(column.id)}
+                          aria-label={`Sort by ${column.label} (${sortField === column.id ? sortDirection === "asc" ? "ascending" : "descending" : defaultSortDirection(column.id) === "asc" ? "ascending" : "descending"})`}
+                        >
+                          <span>{column.label}</span>
+                          <span className="tb-table-sort-indicator" aria-hidden="true">{resolveSortIndicator(column.id)}</span>
+                        </button>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {payload.cards.map((card) => (
+                  {sortedCards.map((card) => {
+                    const epicTitle = card.epicName.trim() || card.epicKey;
+                    return (
                     <tr key={card.issueKey}>
                       <td>
                         <div className="tb-deep-dive-activity-badges">
@@ -397,18 +499,34 @@ export function InitiativeDeepDiveScreen() {
                           ))}
                         </div>
                       </td>
-                      <td><strong>{card.issueKey}</strong></td>
+                      <td className="tb-deep-dive-epic-cell">
+                        {card.epicUrl ? (
+                          <a
+                            className="tb-deep-dive-jira-link"
+                            href={card.epicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Jira epic ${card.epicKey}`}
+                          >
+                            {epicTitle}
+                          </a>
+                        ) : <span title={card.epicKey}>{epicTitle}</span>}
+                      </td>
+                      <td>
+                        {card.issueUrl ? (
+                          <a className="tb-deep-dive-jira-link" href={card.issueUrl} target="_blank" rel="noopener noreferrer">
+                            {card.issueKey}
+                          </a>
+                        ) : <strong>{card.issueKey}</strong>}
+                      </td>
                       <td className="tb-deep-dive-title-cell">{card.summary}</td>
-                      <td><span title={card.epicName}>{card.epicKey}</span></td>
                       <td><span className={`tb-deep-dive-status ${statusTone(card.statusCategory)}`}>{card.status}</span></td>
-                      <td>{card.issueType || "—"}</td>
-                      <td>{card.assigneeDisplayName || card.assigneeAccountId || "Unassigned"}</td>
-                      <td className="is-numeric">{formatStoryPoints(card.storyPoints)}</td>
                       <td>{formatDateTime(card.createdAt)}</td>
                       <td>{formatDateTime(card.inProgressStartedAt)}</td>
                       <td>{formatDateTime(card.completedAt)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {payload.cards.length === 0 ? (

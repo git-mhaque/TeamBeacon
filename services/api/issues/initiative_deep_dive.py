@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from packages.connectors.jira_config import load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 from services.api.issues.current_sprint_work import is_subtask_issue_type
 
@@ -170,6 +173,41 @@ def _current_full_sync_issue_clause(conn: sqlite3.Connection) -> tuple[str, list
     if latest_full_sync_started_at is None:
         return "", []
     return "AND datetime(i.synced_at) >= datetime(?)", [latest_full_sync_started_at]
+
+
+def _resolve_jira_base_url() -> str | None:
+    try:
+        load_env_files()
+    except Exception:  # noqa: BLE001
+        return None
+    base_url = str(os.environ.get("JIRA_BASE_URL", "")).strip()
+    return base_url.rstrip("/") if base_url else None
+
+
+def _resolve_jira_base_url_from_db(conn: sqlite3.Connection) -> str | None:
+    try:
+        row = conn.execute(
+            """
+            SELECT base_url
+            FROM integration_configs
+            WHERE source_type = 'jira'
+              AND is_enabled = 1
+            ORDER BY datetime(updated_at) DESC, id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    base_url = str(row["base_url"] or "").strip()
+    return base_url.rstrip("/") if base_url else None
+
+
+def _jira_issue_url(jira_base_url: str | None, issue_key: str | None) -> str | None:
+    if not jira_base_url or not issue_key:
+        return None
+    return f"{jira_base_url}/browse/{quote(issue_key, safe='')}"
 
 
 def _load_group_epics(
@@ -404,6 +442,7 @@ def get_initiative_deep_dive(
     limit: int | str = 500,
     db_path: str | None = None,
     now: datetime | None = None,
+    jira_base_url: str | None = None,
 ) -> dict[str, Any]:
     normalized_group_id = _normalize_group_id(group_id)
     requested_epic_keys = _normalize_epic_keys(epic_keys)
@@ -428,6 +467,12 @@ def get_initiative_deep_dive(
     conn = _connect(resolved_db_path)
     try:
         _ensure_schema(conn)
+        requested_jira_base_url = str(jira_base_url or "").strip().rstrip("/")
+        resolved_jira_base_url = (
+            requested_jira_base_url
+            or _resolve_jira_base_url()
+            or _resolve_jira_base_url_from_db(conn)
+        )
         group, epic_options = _load_group_epics(conn, normalized_group_id)
         available_epic_keys = [str(epic["epicKey"]) for epic in epic_options]
         available_epic_set = set(available_epic_keys)
@@ -637,10 +682,12 @@ def get_initiative_deep_dive(
         matching_cards.append(
             {
                 "issueKey": card["issueKey"],
+                "issueUrl": _jira_issue_url(resolved_jira_base_url, card["issueKey"]),
                 "summary": str(row["summary"] or ""),
                 "issueType": str(row["issue_type"] or ""),
                 "epicKey": owning_epic_key,
                 "epicName": epic_name_by_key.get(owning_epic_key, owning_epic_key),
+                "epicUrl": _jira_issue_url(resolved_jira_base_url, owning_epic_key),
                 "status": str(row["status_name"] or ""),
                 "statusCategory": str(row["status_category"] or ""),
                 "storyPoints": row["story_points"],
