@@ -507,11 +507,13 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     expect(await screen.findByRole("button", { name: "Configure reporting period: Custom" })).toBeInTheDocument();
-    const initialDeepDiveUrl = fetchSpy.mock.calls
-      .map(([input]) => new URL(String(input)))
-      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
-    expect(initialDeepDiveUrl?.searchParams.get("chartStart")).toBe("2026-07-01");
-    expect(initialDeepDiveUrl?.searchParams.get("chartEnd")).toBe("2026-07-31");
+    await waitFor(() => {
+      const initialDeepDiveUrl = fetchSpy.mock.calls
+        .map(([input]) => new URL(String(input)))
+        .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+      expect(initialDeepDiveUrl?.searchParams.get("chartStart")).toBe("2026-07-01");
+      expect(initialDeepDiveUrl?.searchParams.get("chartEnd")).toBe("2026-07-31");
+    });
   });
 
   it("restores a persisted trend preset", async () => {
@@ -528,11 +530,13 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     expect(await screen.findByRole("button", { name: "Configure reporting period: Last 8 weeks" })).toBeInTheDocument();
-    const initialDeepDiveUrl = fetchSpy.mock.calls
-      .map(([input]) => new URL(String(input)))
-      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
-    expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("8");
-    expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
+    await waitFor(() => {
+      const initialDeepDiveUrl = fetchSpy.mock.calls
+        .map(([input]) => new URL(String(input)))
+        .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+      expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("8");
+      expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
+    });
   });
 
   it.each([
@@ -550,11 +554,13 @@ describe("InitiativeDeepDiveScreen", () => {
     render(<InitiativeDeepDiveScreen />);
 
     expect(await screen.findByRole("button", { name: "Configure reporting period: Last 12 weeks" })).toBeInTheDocument();
-    const initialDeepDiveUrl = fetchSpy.mock.calls
-      .map(([input]) => new URL(String(input)))
-      .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
-    expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("12");
-    expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
+    await waitFor(() => {
+      const initialDeepDiveUrl = fetchSpy.mock.calls
+        .map(([input]) => new URL(String(input)))
+        .find((url) => url.pathname.endsWith("/api/initiative-deep-dive"));
+      expect(initialDeepDiveUrl?.searchParams.get("chartWeeks")).toBe("12");
+      expect(initialDeepDiveUrl?.searchParams.has("chartStart")).toBe(false);
+    });
   });
 
   it("renders empty and truncated table states with resilient card formatting", async () => {
