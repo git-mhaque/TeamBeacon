@@ -180,6 +180,8 @@ describe("InitiativeDeepDiveScreen", () => {
     const chart = chartCalls[chartCalls.length - 1];
     expect(chart.config.data.datasets[0].label).toBe("New cards");
     expect(chart.config.data.datasets[0].data).toEqual([3, 4, 1]);
+    expect(chart.config.data.datasets[0].backgroundColor).toBe("#d97706");
+    expect(chart.config.data.datasets[0].borderColor).toBe("#9a4d00");
     expect(chart.config.data.datasets[1].label).toBe("Completed cards");
     expect(chart.config.data.datasets[1].data).toEqual([2, 5, 0]);
     const tooltipCallbacks = chart.config.options.plugins.tooltip.callbacks;

@@ -43,8 +43,8 @@ export function InitiativeFlowChart({ buckets }: Props) {
           {
             label: "New cards",
             data: buckets.map((bucket) => bucket.newCount),
-            backgroundColor: "#3a84dc",
-            borderColor: "#1f67c1",
+            backgroundColor: "#d97706",
+            borderColor: "#9a4d00",
             borderWidth: 1,
             borderRadius: 3,
             categoryPercentage: 0.72,
