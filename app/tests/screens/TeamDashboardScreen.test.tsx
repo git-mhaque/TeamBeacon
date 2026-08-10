@@ -120,11 +120,37 @@ describe("TeamDashboardScreen", () => {
 
     const progress = screen.getByRole("progressbar", { name: "Platform Delivery delivery progress" });
     expect(progress).toHaveAttribute("aria-valuenow", "65");
-    const streamCard = screen.getByRole("button", { name: "Platform Delivery" }).closest("article");
-    expect(streamCard).not.toBeNull();
-    expect(within(streamCard as HTMLElement).getByText("-3 net")).toHaveClass("is-good");
-    expect(within(streamCard as HTMLElement).getByText("13 of 20 scoped cards completed")).toBeInTheDocument();
-    expect(screen.getByText("Flow data unavailable.")).toBeInTheDocument();
+    const comparisonRegion = screen.getByRole("region", { name: "Work stream comparison" });
+    const comparisonTable = within(comparisonRegion).getByRole("table");
+    const streamOrder = () => Array.from(comparisonTable.querySelectorAll("tbody tr")).map((row) => (
+      within(row as HTMLElement).getByRole("button").textContent
+    ));
+    expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
+    expect(within(comparisonTable).getByRole("columnheader", { name: /Flow gap/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    expect(within(comparisonTable).getByRole("columnheader", { name: "Recent flow · Last 4 weeks" })).toBeInTheDocument();
+
+    const platformRow = screen.getByRole("button", { name: "Platform Delivery" }).closest("tr");
+    expect(platformRow).not.toBeNull();
+    expect(within(platformRow as HTMLElement).getByText("3 reduced")).toHaveClass("is-good");
+    expect(within(platformRow as HTMLElement).getByText("13/20 completed")).toBeInTheDocument();
+    expect(screen.getByText("Flow data unavailable")).toBeInTheDocument();
+
+    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Completed (descending)" }));
+    expect(streamOrder()).toEqual(["Platform Delivery", "Customer Operations"]);
+    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Completed (descending)" }));
+    expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
+
+    const totalsRow = within(comparisonTable).getByRole("rowheader", { name: "All work streams" }).closest("tr");
+    expect(totalsRow).not.toBeNull();
+    expect(within(totalsRow as HTMLElement).getByText("Balanced")).toBeInTheDocument();
+    expect(within(totalsRow as HTMLElement).getByText("17/30 completed")).toBeInTheDocument();
+    expect(within(totalsRow as HTMLElement).getByText("57%")).toBeInTheDocument();
+    for (const label of ["Work stream", "Epics", "Created", "Flow gap", "Current WIP", "Overall delivery"]) {
+      fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
+    }
 
     fireEvent.click(screen.getByRole("button", { name: "Platform Delivery" }));
     expect(callbacks.onOpenWorkStream).toHaveBeenCalledWith(5);

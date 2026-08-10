@@ -12,6 +12,7 @@ import {
   type TeamDashboardFlowWeeks,
   type TeamDashboardResponse,
   type TeamDashboardSprintCycleTime,
+  type TeamDashboardWorkStream,
 } from "../../../lib/api";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 
@@ -26,6 +27,94 @@ type Props = {
   onOpenDeepDive?: () => void;
   onOpenSettings?: () => void;
 };
+
+type WorkStreamSortField =
+  | "name"
+  | "epicCount"
+  | "newCount"
+  | "completedCount"
+  | "netFlow"
+  | "currentWipCount"
+  | "completionPercent";
+
+type SortDirection = "asc" | "desc";
+
+type SortableHeaderProps = {
+  field: WorkStreamSortField;
+  label: string;
+  activeField: WorkStreamSortField;
+  direction: SortDirection;
+  rowSpan?: number;
+  className?: string;
+  onSort: (field: WorkStreamSortField) => void;
+};
+
+function defaultSortDirection(field: WorkStreamSortField): SortDirection {
+  return field === "name" ? "asc" : "desc";
+}
+
+function compareWorkStreams(
+  left: TeamDashboardWorkStream,
+  right: TeamDashboardWorkStream,
+  field: WorkStreamSortField,
+  direction: SortDirection,
+): number {
+  const comparison = field === "name"
+    ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" })
+    : left[field] - right[field];
+  if (comparison === 0 && field !== "name") {
+    return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+  }
+  return direction === "asc" ? comparison : -comparison;
+}
+
+function SortableHeader({
+  field,
+  label,
+  activeField,
+  direction,
+  rowSpan,
+  className,
+  onSort,
+}: SortableHeaderProps) {
+  const isActive = field === activeField;
+  const announcedDirection = isActive ? direction : defaultSortDirection(field);
+  const indicator = isActive ? direction === "asc" ? "↑" : "↓" : "↕";
+  return (
+    <th
+      scope="col"
+      rowSpan={rowSpan}
+      className={className}
+      aria-sort={isActive ? direction === "asc" ? "ascending" : "descending" : undefined}
+    >
+      <button
+        type="button"
+        className={`tb-table-sort${isActive ? " is-active" : ""}`}
+        aria-label={`Sort by ${label} (${announcedDirection === "asc" ? "ascending" : "descending"})`}
+        onClick={() => onSort(field)}
+      >
+        <span>{label}</span>
+        <span className="tb-table-sort-indicator" aria-hidden="true">{indicator}</span>
+      </button>
+    </th>
+  );
+}
+
+function clampPercentage(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function flowGapLabel(value: number): string {
+  if (value > 0) return `+${value} growing`;
+  if (value < 0) return `${Math.abs(value)} reduced`;
+  return "Balanced";
+}
+
+function flowGapTone(value: number): string {
+  if (value > 0) return "is-warning";
+  if (value < 0) return "is-good";
+  return "is-neutral";
+}
 
 function readFlowWeeks(): TeamDashboardFlowWeeks {
   const value = Number.parseInt(getPreferenceSync(TEAM_DASHBOARD_FLOW_WEEKS_KEY) ?? "", 10);
@@ -94,6 +183,8 @@ export function TeamDashboardScreen({
   const [payload, setPayload] = useState<TeamDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workStreamSortField, setWorkStreamSortField] = useState<WorkStreamSortField>("netFlow");
+  const [workStreamSortDirection, setWorkStreamSortDirection] = useState<SortDirection>("desc");
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -117,10 +208,52 @@ export function TeamDashboardScreen({
   const flowPeriodText = payload?.flowPeriod.startDate && payload.flowPeriod.endDate
     ? `${formatDate(payload.flowPeriod.startDate)} – ${formatDate(payload.flowPeriod.endDate)}`
     : flowRangeLabel(flowWeeks);
+  const sortedWorkStreams = useMemo(() => (
+    [...(payload?.workStreams ?? [])].sort((left, right) => compareWorkStreams(
+      left,
+      right,
+      workStreamSortField,
+      workStreamSortDirection,
+    ))
+  ), [payload?.workStreams, workStreamSortDirection, workStreamSortField]);
+  const workStreamTotals = useMemo(() => {
+    const totals = (payload?.workStreams ?? []).reduce((current, workStream) => ({
+      epicCount: current.epicCount + workStream.epicCount,
+      newCount: current.newCount + workStream.newCount,
+      completedCount: current.completedCount + workStream.completedCount,
+      netFlow: current.netFlow + workStream.netFlow,
+      currentWipCount: current.currentWipCount + workStream.currentWipCount,
+      totalCards: current.totalCards + workStream.totalCards,
+      totalCompletedCards: current.totalCompletedCards + workStream.totalCompletedCards,
+    }), {
+      epicCount: 0,
+      newCount: 0,
+      completedCount: 0,
+      netFlow: 0,
+      currentWipCount: 0,
+      totalCards: 0,
+      totalCompletedCards: 0,
+    });
+    return {
+      ...totals,
+      completionPercent: totals.totalCards > 0
+        ? (totals.totalCompletedCards / totals.totalCards) * 100
+        : 0,
+    };
+  }, [payload?.workStreams]);
 
   const updateFlowWeeks = (value: TeamDashboardFlowWeeks) => {
     setFlowWeeks(value);
     void setPreference(TEAM_DASHBOARD_FLOW_WEEKS_KEY, String(value));
+  };
+
+  const updateWorkStreamSort = (field: WorkStreamSortField) => {
+    if (field === workStreamSortField) {
+      setWorkStreamSortDirection((current) => current === "asc" ? "desc" : "asc");
+      return;
+    }
+    setWorkStreamSortField(field);
+    setWorkStreamSortDirection(defaultSortDirection(field));
   };
 
   return (
@@ -191,7 +324,9 @@ export function TeamDashboardScreen({
           <div>
             <p className="tb-eyebrow">Work stream insights</p>
             <h3>Intake, completion, and delivery progress</h3>
-            <p className="tb-muted-note">Created and completed cards use {flowRangeLabel(flowWeeks).toLowerCase()}; progress covers all scoped cards.</p>
+            <p className="tb-muted-note">
+              Created and completed cards use {flowRangeLabel(flowWeeks).toLowerCase()}. Flow gap is created minus completed; progress covers all scoped cards.
+            </p>
           </div>
           <label className="tb-dashboard-range">
             <span>Flow period</span>
@@ -214,43 +349,139 @@ export function TeamDashboardScreen({
           </div>
         ) : null}
 
-        <div className="tb-dashboard-work-stream-grid">
-          {payload?.workStreams.map((workStream) => {
-            const netTone = workStream.netFlow > 0 ? "is-warning" : workStream.netFlow < 0 ? "is-good" : "is-neutral";
-            return (
-              <article key={workStream.id} className="tb-dashboard-work-stream-card">
-                <header>
-                  <div>
-                    <button type="button" onClick={() => onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
-                    <span>{workStream.epicCount} {workStream.epicCount === 1 ? "epic" : "epics"}</span>
-                  </div>
-                  <span className={`tb-dashboard-net ${netTone}`}>{workStream.netFlow > 0 ? "+" : ""}{workStream.netFlow} net</span>
-                </header>
-                <div className="tb-dashboard-flow-values">
-                  <div className="is-new"><span>Created</span><strong>{workStream.newCount}</strong></div>
-                  <div className="is-completed"><span>Completed</span><strong>{workStream.completedCount}</strong></div>
-                  <div><span>Current WIP</span><strong>{workStream.currentWipCount}</strong></div>
-                </div>
-                <div className="tb-dashboard-progress-copy">
-                  <span>Delivery progress</span>
-                  <strong>{workStream.completionPercent.toFixed(0)}%</strong>
-                </div>
-                <div
-                  className="tb-dashboard-progress"
-                  role="progressbar"
-                  aria-label={`${workStream.name} delivery progress`}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.max(0, Math.min(100, workStream.completionPercent))}
-                >
-                  <span style={{ width: `${Math.max(0, Math.min(100, workStream.completionPercent))}%` }} />
-                </div>
-                <p>{workStream.totalCompletedCards} of {workStream.totalCards} scoped cards completed</p>
-                {workStream.error ? <small className="tb-error-note">Flow data unavailable.</small> : null}
-              </article>
-            );
-          })}
-        </div>
+        {sortedWorkStreams.length > 0 ? (
+          <div className="tb-dashboard-work-stream-table-wrap" role="region" aria-label="Work stream comparison" tabIndex={0}>
+            <table className="tb-data-table tb-dashboard-work-stream-table">
+              <caption className="tb-visually-hidden">
+                Work streams compared by recent card flow, current work in progress, and overall delivery progress.
+              </caption>
+              <thead>
+                <tr className="tb-dashboard-table-groups">
+                  <SortableHeader
+                    field="name"
+                    label="Work stream"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    rowSpan={2}
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="epicCount"
+                    label="Epics"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    rowSpan={2}
+                    className="is-number"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <th scope="colgroup" colSpan={3}>Recent flow · {flowRangeLabel(flowWeeks)}</th>
+                  <SortableHeader
+                    field="currentWipCount"
+                    label="Current WIP"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    rowSpan={2}
+                    className="is-number"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="completionPercent"
+                    label="Overall delivery"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    rowSpan={2}
+                    className="is-progress"
+                    onSort={updateWorkStreamSort}
+                  />
+                </tr>
+                <tr>
+                  <SortableHeader
+                    field="newCount"
+                    label="Created"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-number is-new"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="completedCount"
+                    label="Completed"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-number is-completed"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
+                    field="netFlow"
+                    label="Flow gap"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-flow-gap"
+                    onSort={updateWorkStreamSort}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedWorkStreams.map((workStream) => {
+                  const progress = clampPercentage(workStream.completionPercent);
+                  return (
+                    <tr key={workStream.id}>
+                      <td data-label="Work stream" className="tb-dashboard-work-stream-name">
+                        <button type="button" onClick={() => onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
+                        {workStream.error ? <small className="tb-error-note">Flow data unavailable</small> : null}
+                      </td>
+                      <td data-label="Epics" className="is-number">{workStream.epicCount}</td>
+                      <td data-label="Created" className="is-number is-new">{workStream.newCount}</td>
+                      <td data-label="Completed" className="is-number is-completed">{workStream.completedCount}</td>
+                      <td data-label="Flow gap">
+                        <span className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}>
+                          {flowGapLabel(workStream.netFlow)}
+                        </span>
+                      </td>
+                      <td data-label="Current WIP" className="is-number">{workStream.currentWipCount}</td>
+                      <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
+                        <div className="tb-dashboard-progress-copy">
+                          <strong>{workStream.completionPercent.toFixed(0)}%</strong>
+                          <span>{workStream.totalCompletedCards}/{workStream.totalCards} completed</span>
+                        </div>
+                        <div
+                          className="tb-dashboard-progress"
+                          role="progressbar"
+                          aria-label={`${workStream.name} delivery progress`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={progress}
+                        >
+                          <span style={{ width: `${progress}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" data-label="Work stream">All work streams</th>
+                  <td data-label="Epics" className="is-number">{workStreamTotals.epicCount}</td>
+                  <td data-label="Created" className="is-number is-new">{workStreamTotals.newCount}</td>
+                  <td data-label="Completed" className="is-number is-completed">{workStreamTotals.completedCount}</td>
+                  <td data-label="Flow gap">
+                    <span className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}>
+                      {flowGapLabel(workStreamTotals.netFlow)}
+                    </span>
+                  </td>
+                  <td data-label="Current WIP" className="is-number">{workStreamTotals.currentWipCount}</td>
+                  <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
+                    <div className="tb-dashboard-progress-copy">
+                      <strong>{workStreamTotals.completionPercent.toFixed(0)}%</strong>
+                      <span>{workStreamTotals.totalCompletedCards}/{workStreamTotals.totalCards} completed</span>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : null}
       </section>
 
       <section className="tb-dashboard-activity-grid">
