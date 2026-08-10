@@ -15,6 +15,11 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Support pluggable AI providers for intelligence workflows (`oci`, `ollama`, `openai`).
 
 ## 4. In Scope (MVP)
+- Team Dashboard:
+  - Open as the default startup screen and summarize the most actionable delivery signals.
+  - Show one card per work stream with selectable 1/4/12-week created-versus-completed flow, current WIP, and all-scope completion progress.
+  - Show the latest completed release and cycle time, latest completed-sprint average cycle time compared with the previous completed sprint, current-sprint blockers, and cards completed in the last seven days.
+  - Link summary cards to the relevant detailed insight screen.
 - Initiative insights (epic-centric):
   - Search/select epics via JQL.
   - Configure initiative success criteria (target completion, due date, blockers, scope change thresholds).
@@ -180,6 +185,7 @@ TeamBeacon/
 - Supporting notes: `docs/design/README.md`
 - Mockups must reflect:
   - Global system status (source connections, JIRA sync, history, and diagnostics)
+  - Team Dashboard
   - Settings (epic metadata)
   - Initiative insights
   - Initiative Deep Dive

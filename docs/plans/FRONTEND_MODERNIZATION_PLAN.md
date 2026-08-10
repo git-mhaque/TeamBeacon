@@ -38,7 +38,7 @@ The modernization is an implementation and visual-design change only. It must no
 The functional-parity screen migration is complete on `codex/frontend-shell-initiative`:
 
 - React 19, Vite 8, strict TypeScript, Tailwind CSS 4, Lucide icons, Vitest, React Testing Library, and ESLint are active.
-- The existing eight-screen component-state navigation remains in place behind a compact, hamburger-expandable application rail.
+- The component-state navigation remains in place behind a compact, hamburger-expandable application rail.
 - Initiative Insights uses browser-page vertical scrolling so the Progress Matrix no longer introduces a nested vertical scrollbar.
 - Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Report, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell, including a persistent header control for connection health and JIRA sync operations.
 - Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
@@ -46,7 +46,7 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 
 ### 1.3 Approved Post-Parity Feature
 
-Initiative Deep Dive is an explicitly approved product addition after the parity migration. It adds a ninth navigation destination after Initiative Insights, backed by `/api/initiative-deep-dive`, without changing existing Initiative Insights behavior.
+Initiative Deep Dive and Team Dashboard are explicitly approved product additions after the parity migration. Team Dashboard is the first navigation destination and startup screen, backed by `/api/team/dashboard`; Initiative Deep Dive remains backed by `/api/initiative-deep-dive` without changing Initiative Insights behavior.
 - The Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
 - Additional target libraries in this plan should still be introduced only when a component needs them and parity tests justify the change.
 
@@ -127,19 +127,20 @@ The current visual hierarchy is clear enough to operate, but navigation descript
 
 ### 4.2 Information Architecture
 
-Preserve the current navigation destinations and order, including the approved post-parity destination:
+The current navigation order, including approved post-parity additions, is:
 
-1. Initiative Insights.
-2. Initiative Deep Dive.
-3. Sprint Insights.
-4. Team Insights.
-5. Security Insights.
-6. Operations Insights.
-7. Release Insights.
-8. Team Report.
-9. Settings.
+1. Team Dashboard.
+2. Initiative Insights.
+3. Initiative Deep Dive.
+4. Sprint Insights.
+5. Team Insights.
+6. Security Insights.
+7. Operations Insights.
+8. Release Insights.
+9. Team Report.
+10. Settings.
 
-Preserve the existing initial-screen and in-session navigation behavior. URL-based routing is deferred because it would be an observable functional change.
+Team Dashboard is the initial screen. In-session navigation remains component-state based; URL routing is deferred.
 
 ### 4.3 Application Shell
 
@@ -198,6 +199,7 @@ Use this structure:
 
 ### 4.6 Other Screen Patterns
 
+- **Team Dashboard:** provide an operational startup snapshot with one work-stream flow/progress card per configured work stream, latest completed-release health, completed-sprint cycle-time comparison, current blockers, recent completions, and clear drill-downs to detailed screens. Persist the 1/4/12-week work-stream flow window locally.
 - **Initiative Deep Dive:** default to all work streams with checkbox-based multi-work-stream selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
 - **Team Report:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.

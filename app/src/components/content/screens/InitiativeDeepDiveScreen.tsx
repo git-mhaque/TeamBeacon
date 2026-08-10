@@ -98,6 +98,10 @@ function readPersistedScope(): PersistedDeepDiveScope {
   return parsePersistedScope(getPreferenceSync(INITIATIVE_DEEP_DIVE_SCOPE_KEY));
 }
 
+export function persistInitiativeDeepDiveScope(groupIds: number[], epicKeys: string[] = []): Promise<void> {
+  return setPreference(INITIATIVE_DEEP_DIVE_SCOPE_KEY, JSON.stringify({ groupIds, epicKeys }));
+}
+
 function isTrendPreset(value: unknown): value is TrendPreset {
   return value === "last_1_week"
     || value === "last_2_weeks"

@@ -29,6 +29,7 @@ Exit criteria:
 - Last-sync watermark works for incremental updates.
 
 ## Phase 2 (Weeks 4-5): Insights MVP
+- Team Dashboard startup snapshot with work-stream flow/progress, release and sprint-cycle highlights, current blockers, recent completions, and detail-screen drill-downs.
 - Initiative insights with configurable success criteria.
 - Initiative Deep Dive with default-all and multi-group/epic cascading scope, weekly created/completed flow, selectable periods, current WIP, and card activity detail.
 - Team metrics: committed/completed points, cycle time trends.

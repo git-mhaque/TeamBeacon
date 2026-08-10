@@ -19,6 +19,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.current_sprint_calls: list[bool] = []
         self.current_sprint_changes_calls: list[bool] = []
         self.current_sprint_work_calls: list[bool] = []
+        self.team_dashboard_calls: list[dict[str, object]] = []
         self.team_insights_calls: list[tuple[int, list[str] | None]] = []
         self.initiative_deep_dive_calls: list[dict[str, object]] = []
         self.group_create_calls: list[str] = []
@@ -667,6 +668,56 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
+        def fake_team_dashboard(**kwargs):  # noqa: ANN003
+            if int(kwargs.get("flow_weeks", 4)) not in {1, 4, 12}:
+                raise ValueError("flowWeeks must be one of 1, 4, or 12.")
+            self.team_dashboard_calls.append(kwargs)
+            return {
+                "source": "local",
+                "generatedAt": "2026-08-11T00:00:00+00:00",
+                "timezone": kwargs.get("timezone_name") or "UTC",
+                "flowPeriod": {
+                    "weeks": int(kwargs.get("flow_weeks", 4)),
+                    "startDate": "2026-07-20",
+                    "endDate": "2026-08-11",
+                },
+                "workStreams": [
+                    {
+                        "id": 1,
+                        "name": "Platform",
+                        "epicCount": 2,
+                        "newCount": 8,
+                        "completedCount": 6,
+                        "netFlow": 2,
+                        "currentWipCount": 3,
+                        "totalCards": 20,
+                        "totalCompletedCards": 12,
+                        "completionPercent": 60.0,
+                        "error": None,
+                    }
+                ],
+                "latestRelease": {
+                    "versionId": "26001",
+                    "name": "Search 26.4",
+                    "releaseDate": "2026-08-08T00:00:00+00:00",
+                    "cycleTimeDays": 18.0,
+                },
+                "sprintCycleTime": {
+                    "latestSprintId": 55420,
+                    "latestSprintName": "Sprint 44",
+                    "latestAverageDays": 4.0,
+                    "previousSprintId": 55419,
+                    "previousSprintName": "Sprint 43",
+                    "previousAverageDays": 5.0,
+                    "deltaDays": -1.0,
+                    "deltaPercent": -20.0,
+                    "direction": "down",
+                },
+                "blockedItems": {"sprintId": 55421, "sprintName": "Sprint 45", "count": 2, "storyPointsTotal": 8, "items": []},
+                "recentlyCompleted": {"windowDays": 7, "count": 1, "items": []},
+                "errors": {},
+            }
+
         def fake_metadata_lookup():
             return {
                 "groups": [{"id": 1, "name": "Platform"}],
@@ -1021,6 +1072,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             current_sprint_provider=fake_current_sprint,
             current_sprint_changes_provider=fake_current_sprint_changes,
             current_sprint_work_provider=fake_current_sprint_work,
+            team_dashboard_provider=fake_team_dashboard,
             team_insights_provider=fake_team_insights,
             release_insights_provider=fake_release_insights,
             initiative_deep_dive_provider=fake_initiative_deep_dive,
@@ -1081,6 +1133,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("/api/releases/refresh/start", body["paths"])
         self.assertIn("/api/releases/refresh/status", body["paths"])
         self.assertIn("/api/releases/refresh/result", body["paths"])
+        self.assertIn("/api/team/dashboard", body["paths"])
         self.assertIn("/api/team/insights", body["paths"])
         self.assertIn("/api/initiative-deep-dive", body["paths"])
         self.assertIn("/api/metadata/epics/summary", body["paths"])
@@ -1478,6 +1531,29 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["trend"][0]["sprintName"], "CEGBU Polaris Sprint 43")
         self.assertEqual(body["trend"][0]["avgCycleTimeDays"], 3.6)
         self.assertEqual(self.team_insights_calls[-1], (6, None))
+
+    def test_team_dashboard_endpoint_supports_snapshot_controls(self) -> None:
+        url = f"{self.base_url}/api/team/dashboard?flowWeeks=12&recentLimit=8&timezone=Australia%2FMelbourne"
+        with urlopen(url, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(body["source"], "local")
+        self.assertEqual(body["flowPeriod"]["weeks"], 12)
+        self.assertEqual(body["workStreams"][0]["name"], "Platform")
+        self.assertEqual(body["latestRelease"]["name"], "Search 26.4")
+        self.assertEqual(body["sprintCycleTime"]["direction"], "down")
+        self.assertEqual(
+            self.team_dashboard_calls[-1],
+            {"flow_weeks": "12", "recent_limit": "8", "timezone_name": "Australia/Melbourne"},
+        )
+
+        with self.assertRaises(HTTPError) as invalid_context:
+            urlopen(f"{self.base_url}/api/team/dashboard?flowWeeks=2", timeout=5)  # noqa: S310
+        self.assertEqual(invalid_context.exception.code, 400)
+        error_body = json.loads(invalid_context.exception.read().decode("utf-8"))
+        self.assertEqual(error_body["error"], "bad_request")
+        self.assertIn("flowWeeks", error_body["detail"])
 
     def test_team_insights_endpoint_supports_sprint_limit(self) -> None:
         with urlopen(f"{self.base_url}/api/team/insights?sprintLimit=4", timeout=5) as response:  # noqa: S310

@@ -121,6 +121,12 @@ vi.mock("../../src/components/content/screens/TeamReportScreen", async () => {
   };
 });
 
+vi.mock("../../src/components/content/screens/TeamDashboardScreen", () => ({
+  TeamDashboardScreen: function TeamDashboardScreen() {
+    return <p>Team dashboard stub</p>;
+  },
+}));
+
 vi.mock("../../src/components/content/screens/InitiativesScreen", async () => {
   const { useEffect, useState } = await import("react");
 
@@ -292,6 +298,8 @@ describe("Content topbar controls", () => {
 
   it("renders each screen and wires Team Report topbar actions", () => {
     render(<Content appName="TeamBeacon" />);
+
+    expect(screen.getByText("Team dashboard stub")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
     expect(screen.getByText("Initiatives stub")).toBeInTheDocument();

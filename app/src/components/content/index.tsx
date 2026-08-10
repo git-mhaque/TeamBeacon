@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ChartColumn,
+  FileText,
   Gauge,
   LayoutDashboard,
   ListTodo,
@@ -21,7 +22,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { InitiativeDeepDiveScreen } from "./screens/InitiativeDeepDiveScreen";
+import { InitiativeDeepDiveScreen, persistInitiativeDeepDiveScope } from "./screens/InitiativeDeepDiveScreen";
 import {
   INITIATIVES_VIEW_STATE_EVENT,
   OPEN_INITIATIVES_CONFIGURE_EVENT,
@@ -38,6 +39,7 @@ import {
 import { IncidentResponseScreen } from "./screens/IncidentResponseScreen";
 import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { SystemStatusControl } from "./screens/SystemStatusControl";
+import { TeamDashboardScreen } from "./screens/TeamDashboardScreen";
 import { ReleasesScreen } from "./screens/ReleasesScreen";
 import { SecurityScreen } from "./screens/SecurityScreen";
 import { SprintBoardScreen } from "./screens/SprintBoardScreen";
@@ -52,6 +54,7 @@ import {
 } from "./screens/TeamInsightsScreen";
 
 type ScreenId =
+  | "dashboard"
   | "integrations"
   | "initiatives"
   | "initiative-deep-dive"
@@ -92,6 +95,7 @@ const DEFAULT_INITIATIVE_TOPBAR_STATE: InitiativeTopbarState = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Team Dashboard", blurb: "Flow / Releases / Blockers / Outcomes", showConstruction: false, icon: LayoutDashboard },
   { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false, icon: Gauge },
   { id: "initiative-deep-dive", label: "Initiative Deep Dive", blurb: "New / WIP / Completed Flow", showConstruction: false, icon: ChartColumn },
   { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false, icon: ListTodo },
@@ -99,12 +103,13 @@ const NAV_ITEMS: NavItem[] = [
   { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
   { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
   { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
-  { id: "team-report", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: LayoutDashboard },
+  { id: "team-report", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: FileText },
   { id: "integrations", label: "Settings", blurb: "Work Streams / Work Types / Metadata", showConstruction: false, icon: Settings },
 ];
 
 function screenTitle(id: ScreenId): string {
   const mapping: Record<ScreenId, string> = {
+    dashboard: "Team Dashboard",
     integrations: "Settings",
     initiatives: "Initiative Insights",
     "initiative-deep-dive": "Initiative Deep Dive",
@@ -118,8 +123,22 @@ function screenTitle(id: ScreenId): string {
   return mapping[id];
 }
 
-function renderScreen(id: ScreenId) {
+function renderScreen(id: ScreenId, navigate: (screen: ScreenId) => void) {
   switch (id) {
+    case "dashboard":
+      return (
+        <TeamDashboardScreen
+          onOpenWorkStream={(workStreamId) => {
+            void persistInitiativeDeepDiveScope([workStreamId]);
+            navigate("initiative-deep-dive");
+          }}
+          onOpenReleaseInsights={() => navigate("releases")}
+          onOpenTeamInsights={() => navigate("team")}
+          onOpenSprintInsights={() => navigate("sprint")}
+          onOpenDeepDive={() => navigate("initiative-deep-dive")}
+          onOpenSettings={() => navigate("integrations")}
+        />
+      );
     case "integrations":
       return <IntegrationsScreen />;
     case "initiatives":
@@ -139,7 +158,7 @@ function renderScreen(id: ScreenId) {
     case "team-report":
       return <TeamReportScreen />;
     default:
-      return <IntegrationsScreen />;
+      return <TeamDashboardScreen />;
   }
 }
 
@@ -502,7 +521,7 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
 }
 
 export function Content({ appName }: Props) {
-  const [active, setActive] = useState<ScreenId>("integrations");
+  const [active, setActive] = useState<ScreenId>("dashboard");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [teamTrendWindowSelection, setTeamTrendWindowSelection] = useState<number>(12);
   const [initiativeTopbarState, setInitiativeTopbarState] = useState<InitiativeTopbarState>(
@@ -716,7 +735,7 @@ export function Content({ appName }: Props) {
             </div>
           ) : null}
         </header>
-        <section className="tb-screen-body">{renderScreen(active)}</section>
+        <section className="tb-screen-body">{renderScreen(active, setActive)}</section>
       </main>
     </div>
   );

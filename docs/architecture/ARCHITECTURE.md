@@ -9,7 +9,7 @@ TeamBeacon is a self-hosted web analytics system:
 ## 2. High-Level Components
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
-- Screens: Settings, Initiative Insights, Initiative Deep Dive, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Report.
+- Screens: Team Dashboard, Initiative Insights, Initiative Deep Dive, Sprint Insights, Team Insights, Security, Incident Response, Releases, Team Report, Settings.
 - The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
@@ -77,6 +77,7 @@ Default thresholds:
 
 ## 9. UI Information Architecture
 - Primary navigation:
+  - Team Dashboard
   - Initiative Insights
   - Initiative Deep Dive
   - Sprint Insights
@@ -89,6 +90,7 @@ Default thresholds:
 - Interaction pattern:
   - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
   - Main pane for KPI cards, trend widgets, and narrative insights.
+  - Team Dashboard is the startup destination and composes work-stream flow/progress, latest completed-release health, completed-sprint cycle-time movement, current blockers, and recent completions through `GET /api/team/dashboard`.
   - Initiative Deep Dive defaults to all work streams, supports checkbox-based multi-work-stream selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
@@ -103,3 +105,9 @@ Default thresholds:
 - Design source:
   - `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` defines the active frontend direction and parity constraints.
   - Existing files under `docs/design/` remain historical references for screen inventory and prior visual exploration.
+
+## 11. Team Dashboard Composition
+- `GET /api/team/dashboard` is a read-only composite endpoint over existing local insight services; it does not introduce a second metric definition.
+- Work-stream flow uses the same weekly created/completed semantics as Initiative Deep Dive, while progress uses completed cards divided by all currently scoped cards.
+- Section failures are isolated and returned in an `errors` map so healthy dashboard regions remain usable.
+- The frontend persists only the selected 1/4/12-week flow window; source data remains authoritative in SQLite.

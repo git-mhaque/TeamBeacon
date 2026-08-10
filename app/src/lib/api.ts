@@ -455,6 +455,79 @@ export type CurrentSprintChangesResponse = {
   error?: string | null;
 };
 
+export type TeamDashboardFlowWeeks = 1 | 4 | 12;
+
+export type TeamDashboardWorkStream = {
+  id: number;
+  name: string;
+  epicCount: number;
+  newCount: number;
+  completedCount: number;
+  netFlow: number;
+  currentWipCount: number;
+  totalCards: number;
+  totalCompletedCards: number;
+  completionPercent: number;
+  error?: string | null;
+};
+
+export type TeamDashboardRelease = {
+  versionId?: string | null;
+  name?: string | null;
+  releaseDate?: string | null;
+  cycleTimeDays?: number | null;
+};
+
+export type TeamDashboardSprintCycleTime = {
+  latestSprintId?: number | null;
+  latestSprintName?: string | null;
+  latestAverageDays: number;
+  previousSprintId?: number | null;
+  previousSprintName?: string | null;
+  previousAverageDays?: number | null;
+  deltaDays?: number | null;
+  deltaPercent?: number | null;
+  direction: "up" | "down" | "flat";
+};
+
+export type TeamDashboardCompletedItem = {
+  issueKey: string;
+  issueUrl?: string | null;
+  summary: string;
+  epicKey?: string | null;
+  epicName?: string | null;
+  workStreamId: number;
+  workStreamName: string;
+  completedAt?: string | null;
+};
+
+export type TeamDashboardResponse = {
+  source: "local";
+  generatedAt: string;
+  timezone: string;
+  flowPeriod: {
+    weeks: TeamDashboardFlowWeeks;
+    startDate?: string | null;
+    endDate?: string | null;
+  };
+  workStreams: TeamDashboardWorkStream[];
+  latestRelease?: TeamDashboardRelease | null;
+  sprintCycleTime?: TeamDashboardSprintCycleTime | null;
+  blockedItems: {
+    sprintId?: number | null;
+    sprintName?: string | null;
+    count: number;
+    storyPointsTotal: number;
+    items: CurrentSprintChangeIssue[];
+  };
+  recentlyCompleted: {
+    windowDays: number;
+    count: number;
+    items: TeamDashboardCompletedItem[];
+  };
+  errors: Record<string, string>;
+};
+
 export type TeamInsightTrendPoint = {
   sprintId: number;
   sprintName: string;
@@ -1225,6 +1298,25 @@ export async function fetchCurrentSprintChanges(): Promise<CurrentSprintChangesR
     throw await parseError(response, `Current sprint changes request failed (${response.status})`);
   }
   return (await response.json()) as CurrentSprintChangesResponse;
+}
+
+export async function fetchTeamDashboard(
+  flowWeeks: TeamDashboardFlowWeeks = 4,
+  recentLimit = 5,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+): Promise<TeamDashboardResponse> {
+  const params = new URLSearchParams();
+  params.set("flowWeeks", String(flowWeeks));
+  params.set("recentLimit", String(recentLimit));
+  params.set("timezone", timezone);
+  const response = await fetch(`${API_BASE}/api/team/dashboard?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Team dashboard request failed (${response.status})`);
+  }
+  return (await response.json()) as TeamDashboardResponse;
 }
 
 export async function fetchTeamInsights(

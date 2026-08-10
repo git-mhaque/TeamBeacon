@@ -15,6 +15,7 @@ from services.api.issues.current_sprint_work import get_current_sprint_work
 from services.api.issues.initiative_deep_dive import get_initiative_deep_dive
 from services.api.issues.query import search_synced_issues
 from services.api.issues.release_insights import get_release_insights
+from services.api.issues.team_dashboard import get_team_dashboard
 from services.api.issues.team_insights import get_team_insights
 from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
@@ -60,6 +61,7 @@ CurrentSprintProvider = Callable[..., dict[str, Any]]
 CurrentSprintWorkProvider = Callable[..., dict[str, Any]]
 CurrentSprintChangesProvider = Callable[..., dict[str, Any]]
 TeamInsightsProvider = Callable[..., dict[str, Any]]
+TeamDashboardProvider = Callable[..., dict[str, Any]]
 ReleaseInsightsProvider = Callable[..., dict[str, Any]]
 InitiativeDeepDiveProvider = Callable[..., dict[str, Any]]
 MetadataLookupProvider = Callable[[], dict[str, Any]]
@@ -442,6 +444,31 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "tags": ["issues"],
                     "summary": "Current sprint scope/blocker changes",
                     "responses": {"200": {"description": "Current sprint changes", "content": json_payload}},
+                }
+            },
+            "/api/team/dashboard": {
+                "get": {
+                    "tags": ["issues"],
+                    "summary": "Team operational dashboard snapshot",
+                    "parameters": [
+                        {
+                            "name": "flowWeeks",
+                            "in": "query",
+                            "schema": {"type": "integer", "enum": [1, 4, 12], "default": 4},
+                            "description": "Reporting window for work-stream creation and completion flow.",
+                        },
+                        {
+                            "name": "recentLimit",
+                            "in": "query",
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+                            "description": "Maximum blocker and recently completed items returned.",
+                        },
+                        {"name": "timezone", "in": "query", "schema": {"type": "string", "default": "UTC"}},
+                    ],
+                    "responses": {
+                        "200": {"description": "Team dashboard payload", "content": json_payload},
+                        "400": error_payload,
+                    },
                 }
             },
             "/api/team/insights": {
@@ -854,6 +881,7 @@ def build_handler(
     current_sprint_provider: CurrentSprintProvider = get_current_sprint,
     current_sprint_work_provider: CurrentSprintWorkProvider = get_current_sprint_work,
     current_sprint_changes_provider: CurrentSprintChangesProvider = get_current_sprint_changes,
+    team_dashboard_provider: TeamDashboardProvider = get_team_dashboard,
     team_insights_provider: TeamInsightsProvider = get_team_insights,
     release_insights_provider: ReleaseInsightsProvider = get_release_insights,
     initiative_deep_dive_provider: InitiativeDeepDiveProvider = get_initiative_deep_dive,
@@ -1066,6 +1094,22 @@ def build_handler(
 
             if path == "/api/sprints/current/changes":
                 payload = current_sprint_changes_provider()
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/team/dashboard":
+                query = parse_qs(parsed.query)
+                try:
+                    payload = team_dashboard_provider(
+                        flow_weeks=query.get("flowWeeks", ["4"])[0],
+                        recent_limit=query.get("recentLimit", ["5"])[0],
+                        timezone_name=query.get("timezone", [None])[0],
+                    )
+                except ValueError as exc:
+                    self._set_json_headers(400)
+                    self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
                 return

@@ -6,6 +6,32 @@ import { setupFetchMock } from "../utils/fetchMock";
 describe("Content", () => {
   it("renders construction markers only for static screens in sidebar", async () => {
     setupFetchMock({
+      "/api/team/dashboard": {
+        source: "local",
+        generatedAt: "2026-04-10T09:00:00Z",
+        timezone: "Australia/Melbourne",
+        flowPeriod: {
+          weeks: 4,
+          startDate: "2026-03-16",
+          endDate: "2026-04-12",
+        },
+        workStreams: [],
+        latestRelease: null,
+        sprintCycleTime: null,
+        blockedItems: {
+          sprintId: 4102,
+          sprintName: "Sprint 42 (Q4 FY26)",
+          count: 0,
+          storyPointsTotal: 0,
+          items: [],
+        },
+        recentlyCompleted: {
+          windowDays: 7,
+          count: 0,
+          items: [],
+        },
+        errors: {},
+      },
       "/api/integrations/jira/status": {
         source: "jira",
         connected: true,
@@ -175,7 +201,8 @@ describe("Content", () => {
 
     render(<Content appName="TeamBeacon" />);
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Team Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "What needs attention today" })).toBeInTheDocument();
     const appHeader = document.querySelector(".tb-app-header");
     expect(appHeader).not.toBeNull();
     expect(within(appHeader as HTMLElement).getByText("TeamBeacon")).toBeInTheDocument();
@@ -188,6 +215,7 @@ describe("Content", () => {
       .getAllByRole("button")
       .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
     expect(orderedTitles).toEqual([
+      "Team Dashboard",
       "Initiative Insights",
       "Initiative Deep Dive",
       "Sprint Insights",
@@ -198,8 +226,8 @@ describe("Content", () => {
       "Team Report",
       "Settings",
     ]);
-    expect(within(nav).getAllByRole("button")).toHaveLength(9);
-    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(9);
+    expect(within(nav).getAllByRole("button")).toHaveLength(10);
+    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(10);
     const navigationToggle = screen.getByRole("button", { name: "Expand navigation" });
     expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(navigationToggle);
@@ -217,6 +245,7 @@ describe("Content", () => {
     expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
 
     expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
+    expect(screen.getByText("Flow / Releases / Blockers / Outcomes")).toBeInTheDocument();
     expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
     expect(screen.getByText("Sprint Trend / Cycle Time")).toBeInTheDocument();
     expect(screen.getByText("Scan / Vulnerability Posture")).toBeInTheDocument();
@@ -226,6 +255,7 @@ describe("Content", () => {
     expect(screen.getByText("Work Streams / Work Types / Metadata")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Team Report is under construction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Team Insights is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
