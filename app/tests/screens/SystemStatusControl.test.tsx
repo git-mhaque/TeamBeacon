@@ -300,7 +300,12 @@ describe("SystemStatusControl", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Sync data" }));
     expect(screen.getByRole("dialog", { name: "Start JIRA sync" })).toBeInTheDocument();
+    const deletionCheckbox = screen.getByRole("checkbox", {
+      name: /Remove cards deleted from JIRA/,
+    });
+    expect(deletionCheckbox).not.toBeChecked();
     fireEvent.click(screen.getByRole("radio", { name: /Full sync/ }));
+    fireEvent.click(deletionCheckbox);
     fireEvent.click(screen.getByRole("button", { name: "Start sync" }));
 
     await waitFor(() => {
@@ -308,6 +313,7 @@ describe("SystemStatusControl", () => {
         String(input).includes("/api/integrations/jira/sync/start")
         && init?.method === "POST"
         && JSON.parse(String(init.body)).mode === "full"
+        && JSON.parse(String(init.body)).reconcileDeletedIssues === true
       ))).toBe(true);
     });
 
@@ -584,6 +590,7 @@ describe("SystemStatusControl", () => {
         syncMode: "since_last",
         downloadedIssues: 4549,
         totalIssues: 4549,
+        deletedIssuesRemoved: 1,
         percent: 100,
         lastSyncedAt: "2026-06-02T03:15:57Z",
       },
@@ -600,7 +607,9 @@ describe("SystemStatusControl", () => {
     renderSystemStatusControl();
 
     const jiraSyncRegion = await screen.findByRole("region", { name: "JIRA data sync" });
-    expect(await within(jiraSyncRegion).findByText("4549 issues synced")).toBeInTheDocument();
+    expect(await within(jiraSyncRegion).findByText(
+      "4549 issues synced · 1 deleted issue removed",
+    )).toBeInTheDocument();
     expect(within(jiraSyncRegion).queryByText("4549 issues changed")).not.toBeInTheDocument();
   });
 

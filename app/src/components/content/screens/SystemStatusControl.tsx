@@ -143,6 +143,7 @@ export function SystemStatusControl() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedSyncMode, setSelectedSyncMode] = useState<JiraSyncMode>("since_last");
   const [selectedSinceDate, setSelectedSinceDate] = useState(todayLocalDate);
+  const [removeDeletedIssues, setRemoveDeletedIssues] = useState(false);
 
   const closeOverlay = useCallback(() => {
     setIsOpen(false);
@@ -326,8 +327,14 @@ export function SystemStatusControl() {
     ? `${jiraSyncStatus.candidateIssues} of ${jiraSyncStatus.candidateTotalIssues} candidates checked`
     : null;
   const hasStructuredSyncDetail = Boolean(issueProgressText || changelogCount !== null || candidateProgressText);
+  const deletedIssuesRemoved = jiraSyncStatus?.deletedIssuesRemoved ?? 0;
   const completedResult = jiraSyncStatus?.state === "completed"
-    ? `${downloadedIssues} issue${downloadedIssues === 1 ? "" : "s"} synced`
+    ? (
+      `${downloadedIssues} issue${downloadedIssues === 1 ? "" : "s"} synced`
+      + (deletedIssuesRemoved > 0
+        ? ` · ${deletedIssuesRemoved} deleted issue${deletedIssuesRemoved === 1 ? "" : "s"} removed`
+        : "")
+    )
     : null;
 
   const jiraBaseUrl = jiraStatus?.config.baseUrl?.replace(/\/$/, "") ?? null;
@@ -351,6 +358,7 @@ export function SystemStatusControl() {
     if (isJiraSyncRunning) return;
     setSelectedSyncMode("since_last");
     setSelectedSinceDate(todayLocalDate);
+    setRemoveDeletedIssues(false);
     setView("sync");
   };
 
@@ -369,6 +377,7 @@ export function SystemStatusControl() {
       setJiraSyncStatus(await startJiraSync(
         selectedSyncMode,
         selectedSyncMode === "since_date" ? selectedSinceDate : undefined,
+        removeDeletedIssues,
       ));
       setView("overview");
       await loadJiraSyncStatus();
@@ -557,6 +566,17 @@ export function SystemStatusControl() {
                         <span><strong>{label}</strong><small>{note}</small></span>
                       </label>
                     ))}
+                    <label className={`tb-sync-option ${removeDeletedIssues ? "is-selected" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={removeDeletedIssues}
+                        onChange={(event) => setRemoveDeletedIssues(event.currentTarget.checked)}
+                      />
+                      <span>
+                        <strong>Remove cards deleted from JIRA</strong>
+                        <small>Runs a complete project key check and can increase sync time.</small>
+                      </span>
+                    </label>
                   </div>
                   {selectedSyncMode === "since_date" ? (
                     <label className="tb-sync-date-field">

@@ -14,7 +14,7 @@ from services.api.server import build_handler
 
 class LocalApiServerIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.sync_start_calls: list[tuple[str | None, str | None]] = []
+        self.sync_start_calls: list[tuple[str | None, str | None, bool]] = []
         self.issue_search_calls: list[dict[str, object]] = []
         self.current_sprint_calls: list[bool] = []
         self.current_sprint_changes_calls: list[bool] = []
@@ -69,18 +69,23 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "error": None,
             }
 
-        def fake_sync_start(mode=None, since_date=None):  # noqa: ANN001
+        def fake_sync_start(  # noqa: ANN001
+            mode=None,
+            since_date=None,
+            reconcile_deleted_issues=False,
+        ):
             if mode not in {None, "full", "since_last", "since_date"}:
                 raise ValueError("Unsupported sync mode. Allowed values: full, since_last, since_date.")
             if mode == "since_date" and not since_date:
                 raise ValueError("sinceDate is required in YYYY-MM-DD or ISO-8601 format when mode is since_date.")
-            self.sync_start_calls.append((mode, since_date))
+            self.sync_start_calls.append((mode, since_date, reconcile_deleted_issues))
             return {
                 "source": "jira",
                 "state": "running",
                 "phase": "issues",
                 "syncMode": mode or "full",
                 "requestedSince": since_date,
+                "reconcileDeletedIssues": reconcile_deleted_issues,
                 "boardsSynced": 1,
                 "sprintsSynced": 12,
                 "downloadedIssues": 12,
@@ -1210,7 +1215,9 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             f"{self.base_url}/api/integrations/jira/sync/start",
             method="POST",
             headers={"Content-Type": "application/json"},
-            data=json.dumps({"mode": "since_last"}).encode("utf-8"),
+            data=json.dumps(
+                {"mode": "since_last", "reconcileDeletedIssues": True}
+            ).encode("utf-8"),
         )
         with urlopen(request, timeout=5) as response:  # noqa: S310
             self.assertEqual(response.status, 202)
@@ -1220,7 +1227,8 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["syncMode"], "since_last")
         self.assertEqual(body["downloadedIssues"], 12)
         self.assertEqual(body["totalIssues"], 5000)
-        self.assertEqual(self.sync_start_calls[-1], ("since_last", None))
+        self.assertTrue(body["reconcileDeletedIssues"])
+        self.assertEqual(self.sync_start_calls[-1], ("since_last", None, True))
 
     def test_jira_sync_start_endpoint_since_date_mode(self) -> None:
         request = Request(
@@ -1235,7 +1243,22 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertTrue(body["started"])
         self.assertEqual(body["syncMode"], "since_date")
         self.assertEqual(body["requestedSince"], "2026-03-01")
-        self.assertEqual(self.sync_start_calls[-1], ("since_date", "2026-03-01"))
+        self.assertEqual(self.sync_start_calls[-1], ("since_date", "2026-03-01", False))
+
+    def test_jira_sync_start_endpoint_rejects_invalid_deletion_option(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/integrations/jira/sync/start",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {"mode": "since_last", "reconcileDeletedIssues": "yes"}
+            ).encode("utf-8"),
+        )
+        with self.assertRaises(HTTPError) as exc_ctx:
+            urlopen(request, timeout=5)  # noqa: S310
+        self.assertEqual(exc_ctx.exception.code, 400)
+        detail = json.loads(exc_ctx.exception.read().decode("utf-8"))["detail"]
+        self.assertEqual(detail, "reconcileDeletedIssues must be a boolean.")
 
     def test_jira_sync_start_endpoint_rejects_invalid_mode(self) -> None:
         request = Request(

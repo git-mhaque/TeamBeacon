@@ -181,6 +181,37 @@ class JiraConnectorUnitTests(unittest.TestCase):
         self.assertIn("project = CEGBUPOL", params["jql"])
         self.assertIn("updated >=", params["jql"])
 
+    def test_get_project_issue_keys_fetches_complete_lightweight_snapshot(self) -> None:
+        page_1 = {
+            "startAt": 0,
+            "total": 3,
+            "issues": [{"key": "CEGBUPOL-1"}, {"key": "CEGBUPOL-2"}],
+        }
+        page_2 = {
+            "startAt": 2,
+            "total": 3,
+            "issues": [{"key": "CEGBUPOL-3"}],
+        }
+        with patch.object(self.connector, "_request_json", side_effect=[page_1, page_2]) as mocked:
+            issue_keys = self.connector.get_project_issue_keys(" CEGBUPOL ")
+
+        self.assertEqual(issue_keys, {"CEGBUPOL-1", "CEGBUPOL-2", "CEGBUPOL-3"})
+        self.assertEqual(mocked.call_count, 2)
+        first_params = mocked.call_args_list[0].kwargs["params"]
+        self.assertEqual(first_params["fields"], "key")
+        self.assertEqual(first_params["startAt"], 0)
+        self.assertEqual(mocked.call_args_list[1].kwargs["params"]["startAt"], 2)
+        self.assertIn("project = CEGBUPOL", first_params["jql"])
+
+    def test_get_project_issue_keys_rejects_incomplete_snapshot(self) -> None:
+        with patch.object(
+            self.connector,
+            "_request_json",
+            return_value={"startAt": 0, "total": 1, "issues": []},
+        ):
+            with self.assertRaisesRegex(JiraAPIError, "ended before all issues"):
+                self.connector.get_project_issue_keys("CEGBUPOL")
+
     def test_get_boards_handles_pagination(self) -> None:
         page_1 = {
             "isLast": False,

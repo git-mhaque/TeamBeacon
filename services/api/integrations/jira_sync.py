@@ -1178,6 +1178,51 @@ def _upsert_issues(conn: sqlite3.Connection, issues: list[IssueRecord]) -> None:
         _replace_issue_release_links(conn, issue)
 
 
+def _remove_issues_absent_from_project_snapshot(
+    conn: sqlite3.Connection,
+    project_key: str,
+    live_issue_keys: set[str],
+) -> int:
+    normalized_project_key = project_key.strip()
+    if not normalized_project_key:
+        return 0
+
+    rows = conn.execute(
+        """
+        SELECT issue_key
+        FROM issues
+        WHERE project_key = ? COLLATE NOCASE
+        """,
+        (normalized_project_key,),
+    ).fetchall()
+    local_issue_keys = {
+        str(row[0]).strip()
+        for row in rows
+        if row[0] is not None and str(row[0]).strip()
+    }
+    stale_issue_keys = sorted(local_issue_keys - live_issue_keys)
+    if not stale_issue_keys:
+        return 0
+
+    removed = 0
+    for issue_key in stale_issue_keys:
+        conn.execute("DELETE FROM issue_changelog WHERE issue_key = ?", (issue_key,))
+        conn.execute("DELETE FROM issue_release_links WHERE issue_key = ?", (issue_key,))
+        conn.execute("UPDATE issues SET epic_key = NULL WHERE epic_key = ?", (issue_key,))
+        conn.execute("UPDATE issues SET parent_issue_key = NULL WHERE parent_issue_key = ?", (issue_key,))
+        result = conn.execute(
+            """
+            DELETE FROM issues
+            WHERE issue_key = ?
+              AND project_key = ? COLLATE NOCASE
+            """,
+            (issue_key, normalized_project_key),
+        )
+        removed += int(result.rowcount or 0)
+
+    return removed
+
+
 def _active_sprint_ids(sprints: list[SprintRecord]) -> list[int]:
     active_ids: set[int] = set()
     for sprint in sprints:
@@ -1507,6 +1552,7 @@ def run_jira_sync_once(
     connector: JiraRestConnector | None = None,
     sync_mode: SyncMode | str = SYNC_MODE_FULL,
     since_date: str | None = None,
+    reconcile_deleted_issues: bool = False,
 ) -> dict[str, Any]:
     runtime = runtime or _load_runtime()
     if runtime.board_id is None:
@@ -1520,6 +1566,7 @@ def run_jira_sync_once(
     persisted_mode: str = requested_mode
     requested_since: str | None = None
     incremental_since_utc: datetime | None = None
+    prior_source_cursor = _read_since_last_cursor(resolved_db_path, scope)
 
     if requested_mode == SYNC_MODE_SINCE_DATE:
         parsed_requested_since = _parse_requested_since(since_date)
@@ -1534,9 +1581,8 @@ def run_jira_sync_once(
         # Keep persisted mode compatible with pre-existing DB CHECK constraint.
         persisted_mode = SYNC_MODE_SINCE_LAST
     elif requested_mode == SYNC_MODE_SINCE_LAST:
-        parsed_source_cursor = _read_since_last_cursor(resolved_db_path, scope)
-        if parsed_source_cursor is not None:
-            incremental_since_utc = parsed_source_cursor
+        if prior_source_cursor is not None:
+            incremental_since_utc = prior_source_cursor
         else:
             effective_mode = SYNC_MODE_FULL
 
@@ -1696,6 +1742,7 @@ def run_jira_sync_once(
         active_sprint_issues_hydrated = 0
         active_sprint_changelog_entries_synced = 0
         active_sprint_changelog_failures = 0
+        deleted_issues_removed = 0
         incremental_filter_inclusive = requested_mode == SYNC_MODE_SINCE_DATE
         if incremental_since_utc is not None:
             count_incremental = getattr(connector, "count_incremental_issues", None)
@@ -1826,6 +1873,45 @@ def run_jira_sync_once(
                 }
             )
 
+        if reconcile_deleted_issues and project_key_for_versions:
+            emit(
+                {
+                    "phase": "issues",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "candidateIssues": candidate_issues_checked,
+                    "candidateTotalIssues": candidate_total_issues,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": f"Checking {project_key_for_versions} for deleted JIRA issues.",
+                }
+            )
+            live_project_issue_keys = connector.get_project_issue_keys(project_key_for_versions)
+            deleted_issues_removed = _remove_issues_absent_from_project_snapshot(
+                conn,
+                project_key_for_versions,
+                live_project_issue_keys,
+            )
+            conn.commit()
+            emit(
+                {
+                    "phase": "issues",
+                    "boardsSynced": 1,
+                    "sprintsSynced": sprints_synced,
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "candidateIssues": candidate_issues_checked,
+                    "candidateTotalIssues": candidate_total_issues,
+                    "deletedIssuesRemoved": deleted_issues_removed,
+                    "percent": _safe_percent(downloaded, total_issues),
+                    "message": (
+                        f"JIRA deletion reconcile complete; removed {deleted_issues_removed} stale issue"
+                        f"{'s' if deleted_issues_removed != 1 else ''}."
+                    ),
+                }
+            )
+
         emit(
             {
                 "phase": "sprints",
@@ -1949,6 +2035,10 @@ def run_jira_sync_once(
 
         completed_at = _utc_iso_now()
         source_cursor = _read_latest_issue_updated_at_source(conn)
+        if prior_source_cursor is not None and (
+            source_cursor is None or prior_source_cursor > source_cursor
+        ):
+            source_cursor = prior_source_cursor
         source_cursor_at = source_cursor.isoformat() if source_cursor is not None else completed_at
         _update_sync_run(
             conn,
@@ -1992,6 +2082,8 @@ def run_jira_sync_once(
             "activeSprintChangelogEntriesSynced": active_sprint_changelog_entries_synced,
             "changelogFailures": changelog_failures,
             "activeSprintChangelogFailures": active_sprint_changelog_failures,
+            "deletedIssuesRemoved": deleted_issues_removed,
+            "reconcileDeletedIssues": reconcile_deleted_issues,
             "error": None,
             "message": (
                 (
@@ -2002,6 +2094,12 @@ def run_jira_sync_once(
                 + (
                     f" Skipped changelog for {changelog_failures} issue(s) after transient JIRA failures."
                     if changelog_failures
+                    else ""
+                )
+                + (
+                    f" Removed {deleted_issues_removed} issue"
+                    f"{'s' if deleted_issues_removed != 1 else ''} no longer present in JIRA."
+                    if deleted_issues_removed
                     else ""
                 )
             ),
@@ -2071,6 +2169,8 @@ class JiraSyncManager:
             "totalIssues": None,
             "candidateIssues": 0,
             "candidateTotalIssues": None,
+            "deletedIssuesRemoved": 0,
+            "reconcileDeletedIssues": False,
             "percent": None,
             "currentStep": 1,
             "totalSteps": SYNC_TOTAL_STEPS,
@@ -2101,6 +2201,9 @@ class JiraSyncManager:
             )
             self._state["candidateTotalIssues"] = update.get(
                 "candidateTotalIssues", self._state["candidateTotalIssues"]
+            )
+            self._state["deletedIssuesRemoved"] = update.get(
+                "deletedIssuesRemoved", self._state["deletedIssuesRemoved"]
             )
             self._state["percent"] = update.get("percent", self._state["percent"])
             self._state["currentStep"] = update.get("currentStep", self._state["currentStep"])
@@ -2216,7 +2319,12 @@ class JiraSyncManager:
             _ = self._hydrate_from_persisted(dict(state))
         return _read_sync_history(self._db_path_provider(), safe_limit)
 
-    def start(self, mode: str | None = None, since_date: str | None = None) -> dict[str, Any]:
+    def start(
+        self,
+        mode: str | None = None,
+        since_date: str | None = None,
+        reconcile_deleted_issues: bool = False,
+    ) -> dict[str, Any]:
         normalized_mode = _normalize_sync_mode(mode)
         requested_since = _parse_requested_since(since_date) if normalized_mode == SYNC_MODE_SINCE_DATE else None
         if normalized_mode == SYNC_MODE_SINCE_DATE:
@@ -2247,6 +2355,8 @@ class JiraSyncManager:
                     "totalIssues": None,
                     "candidateIssues": 0,
                     "candidateTotalIssues": None,
+                    "deletedIssuesRemoved": 0,
+                    "reconcileDeletedIssues": reconcile_deleted_issues,
                     "percent": None,
                     **_sync_step_payload("initializing"),
                     "startedAt": started_at,
@@ -2258,7 +2368,7 @@ class JiraSyncManager:
 
         thread = threading.Thread(
             target=self._run_background,
-            args=(normalized_mode, normalized_since),
+            args=(normalized_mode, normalized_since, reconcile_deleted_issues),
             daemon=True,
         )
         thread.start()
@@ -2267,13 +2377,19 @@ class JiraSyncManager:
         snapshot["started"] = True
         return snapshot
 
-    def _run_background(self, sync_mode: SyncMode, since_date: str | None = None) -> None:
+    def _run_background(
+        self,
+        sync_mode: SyncMode,
+        since_date: str | None = None,
+        reconcile_deleted_issues: bool = False,
+    ) -> None:
         try:
             result = self._sync_runner(
                 progress_callback=self._update_progress,
                 db_path=self._db_path_provider(),
                 sync_mode=sync_mode,
                 since_date=since_date,
+                reconcile_deleted_issues=reconcile_deleted_issues,
             )
         except Exception as exc:  # noqa: BLE001
             failed_at = _utc_iso_now()
@@ -2307,6 +2423,10 @@ class JiraSyncManager:
                     "totalIssues": result.get("totalIssues"),
                     "candidateIssues": result.get("candidateIssues", self._state.get("candidateIssues", 0)),
                     "candidateTotalIssues": result.get("candidateTotalIssues"),
+                    "deletedIssuesRemoved": result.get("deletedIssuesRemoved", 0),
+                    "reconcileDeletedIssues": result.get(
+                        "reconcileDeletedIssues", reconcile_deleted_issues
+                    ),
                     "percent": result.get("percent"),
                     **_sync_step_payload(str(result.get("phase", "done"))),
                     "finishedAt": result.get("finishedAt"),
@@ -2324,8 +2444,16 @@ def get_jira_sync_status() -> dict[str, Any]:
     return JIRA_SYNC_MANAGER.get_status()
 
 
-def start_jira_sync(mode: str | None = None, since_date: str | None = None) -> dict[str, Any]:
-    return JIRA_SYNC_MANAGER.start(mode=mode, since_date=since_date)
+def start_jira_sync(
+    mode: str | None = None,
+    since_date: str | None = None,
+    reconcile_deleted_issues: bool = False,
+) -> dict[str, Any]:
+    return JIRA_SYNC_MANAGER.start(
+        mode=mode,
+        since_date=since_date,
+        reconcile_deleted_issues=reconcile_deleted_issues,
+    )
 
 
 def get_jira_sync_history(limit: int = 20) -> dict[str, Any]:

@@ -213,6 +213,10 @@ class _SuccessfulConnectorStub:
             return [self.issue_2], SyncBatch(next_cursor=None, has_more=False)
         return [], SyncBatch(next_cursor=None, has_more=False)
 
+    def get_project_issue_keys(self, project_key: str) -> set[str]:
+        _ = project_key
+        return set(self.issues_by_key)
+
     def get_issue_changelog(self, issue_key: str) -> list[ChangelogItemRecord]:
         return [
             ChangelogItemRecord(
@@ -287,6 +291,19 @@ class _IncrementalMissingActiveIssueConnectorStub(_SuccessfulConnectorStub):
         if start_at == 0:
             return [self.issue_1], SyncBatch(next_cursor=None, has_more=False)
         return [], SyncBatch(next_cursor=None, has_more=False)
+
+
+class _DeletedIssueConnectorStub(_IncrementalMissingActiveIssueConnectorStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.issues_by_key.pop("CEGBUPOL-2")
+        self.live_sprint_issue_keys = {901: ["CEGBUPOL-1"]}
+
+
+class _SnapshotFailureConnectorStub(_IncrementalMissingActiveIssueConnectorStub):
+    def get_project_issue_keys(self, project_key: str) -> set[str]:
+        _ = project_key
+        raise JiraAPIError("project issue snapshot failed", status_code=503)
 
 
 class _IncrementalOverlapCandidateConnectorStub(_SuccessfulConnectorStub):
@@ -575,6 +592,110 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(issue_1[1], 901)
             self.assertEqual(issue_2[0], "CEGBUPOL-2")
             self.assertIsNone(issue_2[1])
+
+    def test_run_sync_removes_deleted_jira_issues_and_dependent_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+            progress_events: list[dict[str, object]] = []
+            summary = run_jira_sync_once(
+                progress_callback=progress_events.append,
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_DeletedIssueConnectorStub(),
+                sync_mode="since_last",
+                reconcile_deleted_issues=True,
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertEqual(summary["deletedIssuesRemoved"], 1)
+            self.assertIn("Removed 1 issue", summary["message"])
+            self.assertTrue(any(event.get("deletedIssuesRemoved") == 1 for event in progress_events))
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                remaining_issue_keys = {
+                    row[0] for row in conn.execute("SELECT issue_key FROM issues").fetchall()
+                }
+                deleted_changelog_count = conn.execute(
+                    "SELECT COUNT(*) FROM issue_changelog WHERE issue_key = 'CEGBUPOL-2'"
+                ).fetchone()[0]
+                deleted_release_link_count = conn.execute(
+                    "SELECT COUNT(*) FROM issue_release_links WHERE issue_key = 'CEGBUPOL-2'"
+                ).fetchone()[0]
+                checkpoint_cursor = conn.execute(
+                    """
+                    SELECT last_cursor
+                    FROM sync_checkpoints
+                    WHERE source_type = 'jira' AND scope_key = 'board:27193'
+                    """
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertEqual(remaining_issue_keys, {"CEGBUPOL-1"})
+            self.assertEqual(deleted_changelog_count, 0)
+            self.assertEqual(deleted_release_link_count, 0)
+            self.assertEqual(checkpoint_cursor, "2026-03-22T10:00:00+00:00")
+
+    def test_run_sync_keeps_local_issues_when_deletion_snapshot_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            with self.assertRaisesRegex(JiraAPIError, "snapshot failed"):
+                run_jira_sync_once(
+                    db_path=str(db_path),
+                    runtime=runtime,
+                    connector=_SnapshotFailureConnectorStub(),
+                    sync_mode="since_last",
+                    reconcile_deleted_issues=True,
+                )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                issue_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+            finally:
+                conn.close()
+            self.assertEqual(issue_count, 2)
+
+    def test_run_sync_skips_deletion_snapshot_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SnapshotFailureConnectorStub(),
+                sync_mode="since_last",
+            )
+
+            self.assertEqual(summary["state"], "completed")
+            self.assertFalse(summary["reconcileDeletedIssues"])
+            self.assertEqual(summary["deletedIssuesRemoved"], 0)
+            conn = sqlite3.connect(str(db_path))
+            try:
+                issue_count = conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
+            finally:
+                conn.close()
+            self.assertEqual(issue_count, 2)
 
     def test_run_sync_since_last_uses_latest_issue_source_watermark(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1006,9 +1127,16 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
 
         captured_modes: list[str] = []
 
-        def fake_sync_runner(progress_callback, db_path, sync_mode, since_date=None):  # noqa: ANN001
+        def fake_sync_runner(  # noqa: ANN001
+            progress_callback,
+            db_path,
+            sync_mode,
+            since_date=None,
+            reconcile_deleted_issues=False,
+        ):
             _ = db_path
             _ = since_date
+            self.assertFalse(reconcile_deleted_issues)
             captured_modes.append(sync_mode)
             progress_callback(
                 {
@@ -1063,12 +1191,18 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
         self.assertEqual(captured_modes, ["since_last"])
 
     def test_manager_start_since_date_sets_requested_since(self) -> None:
-        captured: list[tuple[str, str | None]] = []
+        captured: list[tuple[str, str | None, bool]] = []
 
-        def fake_sync_runner(progress_callback, db_path, sync_mode, since_date=None):  # noqa: ANN001
+        def fake_sync_runner(  # noqa: ANN001
+            progress_callback,
+            db_path,
+            sync_mode,
+            since_date=None,
+            reconcile_deleted_issues=False,
+        ):
             _ = progress_callback
             _ = db_path
-            captured.append((sync_mode, since_date))
+            captured.append((sync_mode, since_date, reconcile_deleted_issues))
             return {
                 "source": "jira",
                 "state": "completed",
@@ -1091,7 +1225,11 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             sync_runner=fake_sync_runner,
         )
 
-        start_payload = manager.start(mode="since_date", since_date="2026-03-01")
+        start_payload = manager.start(
+            mode="since_date",
+            since_date="2026-03-01",
+            reconcile_deleted_issues=True,
+        )
         self.assertTrue(start_payload["started"])
         self.assertEqual(start_payload["syncMode"], "since_date")
         self.assertTrue(str(start_payload["requestedSince"]).startswith("2026-03-01T00:00:00"))
@@ -1105,10 +1243,12 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
 
         self.assertEqual(status["state"], "completed")
         self.assertEqual(status["syncMode"], "since_date")
+        self.assertTrue(status["reconcileDeletedIssues"])
         self.assertTrue(str(status["requestedSince"]).startswith("2026-03-01T00:00:00"))
         self.assertEqual(len(captured), 1)
         self.assertEqual(captured[0][0], "since_date")
         self.assertTrue(str(captured[0][1]).startswith("2026-03-01T00:00:00"))
+        self.assertTrue(captured[0][2])
 
     def test_manager_reconciles_stale_running_sync_from_db(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

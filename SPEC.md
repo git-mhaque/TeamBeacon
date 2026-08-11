@@ -82,6 +82,11 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - For `since_date`, cursor is the provided date at `00:00:00Z` (or provided ISO-8601 timestamp) and must be in the past.
 - Incremental JQL pattern:
   - `project = <JIRA_PROJECT_KEY> AND updated >= '<UTC timestamp>' ORDER BY updated ASC`
+- Deletion reconciliation:
+  - A per-run “Remove cards deleted from JIRA” option is available and is off by default so routine incremental syncs remain fast.
+  - When selected, sync fetches a lightweight, paginated snapshot of all current issue keys in the configured JIRA project.
+  - Locally stored project issues absent from that complete snapshot are removed with their changelog and release-link rows.
+  - Snapshot failures fail the sync and preserve all local issues; partial or transient responses never trigger deletion.
 - Per-run sync order:
   1. Board metadata
   2. Project release records
@@ -95,6 +100,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - `issue_changelog` stores per-change author, field, before/after values, and change time.
   - `sync_run_history` stores run mode/status and counters.
   - `sync_checkpoints` stores latest successful cursor/timestamp.
+  - Successful deletion reconciliation never moves the incremental source cursor backwards.
 - User-level attribution rule:
   - “Worked by user X” matches issue assignee, reporter, or any changelog author on that issue.
 

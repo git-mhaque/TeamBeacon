@@ -129,6 +129,8 @@ export type JiraSyncStatus = {
   totalIssues?: number | null;
   candidateIssues?: number | null;
   candidateTotalIssues?: number | null;
+  deletedIssuesRemoved?: number;
+  reconcileDeletedIssues?: boolean;
   percent?: number | null;
   currentStep?: number | null;
   totalSteps?: number | null;
@@ -883,8 +885,15 @@ export async function fetchJiraSyncStatus(): Promise<JiraSyncStatus> {
   return (await response.json()) as JiraSyncStatus;
 }
 
-export async function startJiraSync(mode: JiraSyncMode = "full", sinceDate?: string): Promise<JiraSyncStatus> {
-  const payload: { mode: JiraSyncMode; sinceDate?: string } = { mode };
+export async function startJiraSync(
+  mode: JiraSyncMode = "full",
+  sinceDate?: string,
+  reconcileDeletedIssues = false,
+): Promise<JiraSyncStatus> {
+  const payload: { mode: JiraSyncMode; sinceDate?: string; reconcileDeletedIssues: boolean } = {
+    mode,
+    reconcileDeletedIssues,
+  };
   if (sinceDate) {
     payload.sinceDate = sinceDate;
   }

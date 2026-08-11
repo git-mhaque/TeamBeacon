@@ -434,6 +434,70 @@ class JiraRestConnector(JiraConnector):
         except (TypeError, ValueError):
             return None
 
+    def get_project_issue_keys(self, project_key: str) -> set[str]:
+        normalized_project_key = project_key.strip()
+        if not normalized_project_key:
+            return set()
+
+        issue_keys: set[str] = set()
+        start_at = 0
+        max_results = 100
+        fetched_count = 0
+        expected_total: int | None = None
+        jql = f"project = {normalized_project_key} ORDER BY key ASC"
+
+        while True:
+            payload = self._request_json(
+                "/rest/api/2/search",
+                params={
+                    "jql": jql,
+                    "fields": "key",
+                    "startAt": start_at,
+                    "maxResults": max_results,
+                },
+            )
+            raw_issues = payload.get("issues")
+            if not isinstance(raw_issues, list):
+                raise JiraAPIError("JIRA project issue-key snapshot omitted the issues list.")
+
+            total_raw = payload.get("total")
+            if isinstance(total_raw, int):
+                expected_total = total_raw
+            elif total_raw is not None:
+                try:
+                    expected_total = int(str(total_raw))
+                except (TypeError, ValueError) as exc:
+                    raise JiraAPIError("JIRA project issue-key snapshot returned an invalid total.") from exc
+            else:
+                raise JiraAPIError("JIRA project issue-key snapshot omitted the total issue count.")
+
+            for raw_issue in raw_issues:
+                if not isinstance(raw_issue, dict):
+                    raise JiraAPIError("JIRA project issue-key snapshot returned an invalid issue entry.")
+                issue_key = str(raw_issue.get("key") or "").strip()
+                if not issue_key:
+                    raise JiraAPIError("JIRA project issue-key snapshot returned an issue without a key.")
+                issue_keys.add(issue_key)
+
+            fetched_count += len(raw_issues)
+            if expected_total is not None and fetched_count >= expected_total:
+                break
+            if not raw_issues:
+                if expected_total not in {None, 0} and fetched_count < expected_total:
+                    raise JiraAPIError("JIRA project issue-key snapshot ended before all issues were returned.")
+                break
+            if expected_total is None and len(raw_issues) < max_results:
+                break
+            start_at = int(payload.get("startAt", start_at)) + len(raw_issues)
+
+        if (
+            expected_total is None
+            or fetched_count != expected_total
+            or len(issue_keys) != expected_total
+        ):
+            raise JiraAPIError("JIRA project issue-key snapshot did not return the expected issue count.")
+        return issue_keys
+
     def get_boards(self) -> list[BoardRecord]:
         boards: list[BoardRecord] = []
         start_at = 0

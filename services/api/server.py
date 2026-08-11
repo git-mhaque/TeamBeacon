@@ -54,7 +54,7 @@ from services.api.metadata.epic_config import (
 
 
 StatusProvider = Callable[[], dict[str, Any]]
-StartProvider = Callable[[Optional[str], Optional[str]], dict[str, Any]]
+StartProvider = Callable[[Optional[str], Optional[str], bool], dict[str, Any]]
 HistoryProvider = Callable[[int], dict[str, Any]]
 IssueSearchProvider = Callable[..., dict[str, Any]]
 CurrentSprintProvider = Callable[..., dict[str, Any]]
@@ -270,6 +270,14 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                                             "enum": ["full", "since_last", "since_date"],
                                         },
                                         "sinceDate": {"type": "string", "description": "ISO date or timestamp"},
+                                        "reconcileDeletedIssues": {
+                                            "type": "boolean",
+                                            "default": False,
+                                            "description": (
+                                                "Compare against a complete project key snapshot and remove "
+                                                "local issues that no longer exist in JIRA."
+                                            ),
+                                        },
                                     },
                                 }
                             }
@@ -1356,13 +1364,31 @@ def build_handler(
             if path == "/api/integrations/jira/sync/start":
                 mode = None
                 since_date = None
+                reconcile_deleted_issues = False
                 if isinstance(body_payload, dict):
                     mode_raw = body_payload.get("mode")
                     mode = mode_raw if isinstance(mode_raw, str) else None
                     since_date_raw = body_payload.get("sinceDate")
                     since_date = since_date_raw if isinstance(since_date_raw, str) else None
+                    reconcile_raw = body_payload.get("reconcileDeletedIssues", False)
+                    if not isinstance(reconcile_raw, bool):
+                        self._set_json_headers(400)
+                        self.wfile.write(
+                            _json_bytes(
+                                {
+                                    "error": "bad_request",
+                                    "detail": "reconcileDeletedIssues must be a boolean.",
+                                }
+                            )
+                        )
+                        return
+                    reconcile_deleted_issues = reconcile_raw
                 try:
-                    payload = jira_sync_start_provider(mode, since_date)
+                    payload = jira_sync_start_provider(
+                        mode,
+                        since_date,
+                        reconcile_deleted_issues,
+                    )
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))

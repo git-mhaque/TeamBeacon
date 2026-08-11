@@ -46,6 +46,10 @@ class JiraConnector(ABC):
         """Fetch issues updated since a cursor for scheduled sync."""
 
     @abstractmethod
+    def get_project_issue_keys(self, project_key: str) -> set[str]:
+        """Return the authoritative set of issue keys currently present in a project."""
+
+    @abstractmethod
     def get_boards(self) -> list[BoardRecord]:
         """List accessible agile boards."""
 

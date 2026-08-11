@@ -46,7 +46,7 @@ TeamBeacon is a self-hosted web analytics system:
 
 ## 5. Data Flow
 1. The deployment supplies integration credentials and provider configuration; users maintain epic metadata in Settings and inspect live integration health from the global header.
-2. Users can start or inspect JIRA syncs from the global system-status sheet, and API sync logic pulls incremental issue/sprint/content changes.
+2. Users can start or inspect JIRA syncs from the global system-status sheet. API sync logic pulls incremental issue/sprint/content changes. An optional, off-by-default deletion-reconciliation setting also compares local project issues with a complete key-only JIRA snapshot so deleted source cards and their dependent rows are safely removed without slowing routine syncs.
 3. API normalizes and stores data.
 4. Metrics engine computes initiative/team/release KPIs (including initiative creation/completion flow, current WIP, sprint trend, release cycle-time, and readiness metrics).
 5. UI reads snapshots and renders dashboards.
