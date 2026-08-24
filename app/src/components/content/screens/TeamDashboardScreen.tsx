@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowDownRight,
@@ -17,6 +17,11 @@ import {
 } from "../../../lib/api";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { readTeamInsightsCycleTimeStatusKeys } from "../../../lib/teamInsightsSettings";
+import {
+  TeamDashboardIssueOverlay,
+  type TeamDashboardIssueMetric,
+  type TeamDashboardIssueSelection,
+} from "./TeamDashboardIssueOverlay";
 
 const TEAM_DASHBOARD_FLOW_WEEKS_KEY = "teambeacon.teamDashboard.flowWeeks";
 const FLOW_WEEK_OPTIONS: TeamDashboardFlowWeeks[] = [1, 4, 12];
@@ -102,6 +107,29 @@ function SortableHeader({
   );
 }
 
+function MetricDrilldownButton({
+  label,
+  className,
+  children,
+  onClick,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`tb-dashboard-metric-link${className ? ` ${className}` : ""}`}
+      aria-label={label}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
 function clampPercentage(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
@@ -180,7 +208,7 @@ function WorkStreamTableSkeleton() {
       <table className="tb-data-table tb-dashboard-work-stream-table" aria-hidden="true">
         <thead>
           <tr>
-            <th scope="col">Work stream</th>
+            <th scope="col">Work Streams</th>
             <th scope="col" className="is-number">Epics</th>
             <th scope="col" className="is-number">Created</th>
             <th scope="col" className="is-number">Completed</th>
@@ -192,7 +220,7 @@ function WorkStreamTableSkeleton() {
         <tbody>
           {Array.from({ length: 6 }, (_, index) => (
             <tr key={index} className="tb-dashboard-skeleton-row">
-              <td data-label="Work stream"><span className="tb-dashboard-skeleton is-table-name" /></td>
+              <td data-label="Work Streams"><span className="tb-dashboard-skeleton is-table-name" /></td>
               <td data-label="Epics" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
@@ -225,6 +253,7 @@ export function TeamDashboardScreen({
   const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLElement | null>(null);
   const [workStreamSortField, setWorkStreamSortField] = useState<WorkStreamSortField>("netFlow");
   const [workStreamSortDirection, setWorkStreamSortDirection] = useState<SortDirection>("desc");
+  const [issueSelection, setIssueSelection] = useState<TeamDashboardIssueSelection | null>(null);
   const initialLoading = loading && payload == null;
 
   const loadDashboard = useCallback(async () => {
@@ -305,6 +334,18 @@ export function TeamDashboardScreen({
     setWorkStreamSortField(field);
     setWorkStreamSortDirection(defaultSortDirection(field));
   };
+
+  const openIssueOverlay = (
+    metric: TeamDashboardIssueMetric,
+    scopeName: string,
+    groupIds: number[],
+    value: number,
+    completedCards?: number,
+    totalCards?: number,
+  ) => {
+    setIssueSelection({ metric, scopeName, groupIds, value, completedCards, totalCards });
+  };
+  const closeIssueOverlay = useCallback(() => setIssueSelection(null), []);
 
   const freshnessActions = (
     <div className="tb-dashboard-freshness">
@@ -441,7 +482,7 @@ export function TeamDashboardScreen({
                 <tr>
                   <SortableHeader
                     field="name"
-                    label="Work stream"
+                    label="Work Streams"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     onSort={updateWorkStreamSort}
@@ -501,24 +542,67 @@ export function TeamDashboardScreen({
                   const progress = clampPercentage(workStream.completionPercent);
                   return (
                     <tr key={workStream.id}>
-                      <td data-label="Work stream" className="tb-dashboard-work-stream-name">
+                      <td data-label="Work Streams" className="tb-dashboard-work-stream-name">
                         <button type="button" onClick={() => onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
                         {workStream.error ? <small className="tb-error-note">Flow data unavailable</small> : null}
                       </td>
-                      <td data-label="Epics" className="is-number">{workStream.epicCount}</td>
-                      <td data-label="Created" className="is-number is-new">{workStream.newCount}</td>
-                      <td data-label="Completed" className="is-number is-completed">{workStream.completedCount}</td>
-                      <td data-label="Flow gap">
-                        <span className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}>
-                          {flowGapLabel(workStream.netFlow)}
-                        </span>
+                      <td data-label="Epics" className="is-number">
+                        <MetricDrilldownButton
+                          label={`View ${workStream.epicCount} configured JIRA epics for ${workStream.name}`}
+                          onClick={() => openIssueOverlay("epics", workStream.name, [workStream.id], workStream.epicCount)}
+                        >
+                          {workStream.epicCount}
+                        </MetricDrilldownButton>
                       </td>
-                      <td data-label="Current WIP" className="is-number">{workStream.currentWipCount}</td>
+                      <td data-label="Created" className="is-number is-new">
+                        <MetricDrilldownButton
+                          label={`View ${workStream.newCount} created JIRA cards for ${workStream.name}`}
+                          onClick={() => openIssueOverlay("created", workStream.name, [workStream.id], workStream.newCount)}
+                        >
+                          {workStream.newCount}
+                        </MetricDrilldownButton>
+                      </td>
+                      <td data-label="Completed" className="is-number is-completed">
+                        <MetricDrilldownButton
+                          label={`View ${workStream.completedCount} completed JIRA cards for ${workStream.name}`}
+                          onClick={() => openIssueOverlay("completed", workStream.name, [workStream.id], workStream.completedCount)}
+                        >
+                          {workStream.completedCount}
+                        </MetricDrilldownButton>
+                      </td>
+                      <td data-label="Flow gap">
+                        <MetricDrilldownButton
+                          className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}
+                          label={`View JIRA cards contributing to the ${flowGapLabel(workStream.netFlow)} flow gap for ${workStream.name}`}
+                          onClick={() => openIssueOverlay("flowGap", workStream.name, [workStream.id], workStream.netFlow)}
+                        >
+                          {flowGapLabel(workStream.netFlow)}
+                        </MetricDrilldownButton>
+                      </td>
+                      <td data-label="Current WIP" className="is-number">
+                        <MetricDrilldownButton
+                          label={`View ${workStream.currentWipCount} current WIP JIRA cards for ${workStream.name}`}
+                          onClick={() => openIssueOverlay("currentWip", workStream.name, [workStream.id], workStream.currentWipCount)}
+                        >
+                          {workStream.currentWipCount}
+                        </MetricDrilldownButton>
+                      </td>
                       <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
-                        <div className="tb-dashboard-progress-copy">
+                        <MetricDrilldownButton
+                          className="tb-dashboard-progress-copy"
+                          label={`View ${workStream.totalCards} delivery progress JIRA cards for ${workStream.name}`}
+                          onClick={() => openIssueOverlay(
+                            "deliveryProgress",
+                            workStream.name,
+                            [workStream.id],
+                            workStream.completionPercent,
+                            workStream.totalCompletedCards,
+                            workStream.totalCards,
+                          )}
+                        >
                           <strong>{workStream.completionPercent.toFixed(0)}%</strong>
                           <span>{workStream.totalCompletedCards}/{workStream.totalCards} completed</span>
-                        </div>
+                        </MetricDrilldownButton>
                         <div
                           className="tb-dashboard-progress"
                           role="progressbar"
@@ -536,21 +620,64 @@ export function TeamDashboardScreen({
               </tbody>
               <tfoot>
                 <tr>
-                  <th scope="row" data-label="Work stream">All work streams</th>
-                  <td data-label="Epics" className="is-number">{workStreamTotals.epicCount}</td>
-                  <td data-label="Created" className="is-number is-new">{workStreamTotals.newCount}</td>
-                  <td data-label="Completed" className="is-number is-completed">{workStreamTotals.completedCount}</td>
-                  <td data-label="Flow gap">
-                    <span className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}>
-                      {flowGapLabel(workStreamTotals.netFlow)}
-                    </span>
+                  <th scope="row" data-label="Work Streams">All work streams</th>
+                  <td data-label="Epics" className="is-number">
+                    <MetricDrilldownButton
+                      label={`View ${workStreamTotals.epicCount} configured JIRA epics for all work streams`}
+                      onClick={() => openIssueOverlay("epics", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.epicCount)}
+                    >
+                      {workStreamTotals.epicCount}
+                    </MetricDrilldownButton>
                   </td>
-                  <td data-label="Current WIP" className="is-number">{workStreamTotals.currentWipCount}</td>
+                  <td data-label="Created" className="is-number is-new">
+                    <MetricDrilldownButton
+                      label={`View ${workStreamTotals.newCount} created JIRA cards for all work streams`}
+                      onClick={() => openIssueOverlay("created", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.newCount)}
+                    >
+                      {workStreamTotals.newCount}
+                    </MetricDrilldownButton>
+                  </td>
+                  <td data-label="Completed" className="is-number is-completed">
+                    <MetricDrilldownButton
+                      label={`View ${workStreamTotals.completedCount} completed JIRA cards for all work streams`}
+                      onClick={() => openIssueOverlay("completed", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)}
+                    >
+                      {workStreamTotals.completedCount}
+                    </MetricDrilldownButton>
+                  </td>
+                  <td data-label="Flow gap">
+                    <MetricDrilldownButton
+                      className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}
+                      label={`View JIRA cards contributing to the ${flowGapLabel(workStreamTotals.netFlow)} flow gap for all work streams`}
+                      onClick={() => openIssueOverlay("flowGap", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.netFlow)}
+                    >
+                      {flowGapLabel(workStreamTotals.netFlow)}
+                    </MetricDrilldownButton>
+                  </td>
+                  <td data-label="Current WIP" className="is-number">
+                    <MetricDrilldownButton
+                      label={`View ${workStreamTotals.currentWipCount} current WIP JIRA cards for all work streams`}
+                      onClick={() => openIssueOverlay("currentWip", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.currentWipCount)}
+                    >
+                      {workStreamTotals.currentWipCount}
+                    </MetricDrilldownButton>
+                  </td>
                   <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
-                    <div className="tb-dashboard-progress-copy">
+                    <MetricDrilldownButton
+                      className="tb-dashboard-progress-copy"
+                      label={`View ${workStreamTotals.totalCards} delivery progress JIRA cards for all work streams`}
+                      onClick={() => openIssueOverlay(
+                        "deliveryProgress",
+                        "All work streams",
+                        sortedWorkStreams.map(({ id }) => id),
+                        workStreamTotals.completionPercent,
+                        workStreamTotals.totalCompletedCards,
+                        workStreamTotals.totalCards,
+                      )}
+                    >
                       <strong>{workStreamTotals.completionPercent.toFixed(0)}%</strong>
                       <span>{workStreamTotals.totalCompletedCards}/{workStreamTotals.totalCards} completed</span>
-                    </div>
+                    </MetricDrilldownButton>
                   </td>
                 </tr>
               </tfoot>
@@ -558,6 +685,14 @@ export function TeamDashboardScreen({
           </div>
         ) : null}
       </section>
+
+      {issueSelection ? (
+        <TeamDashboardIssueOverlay
+          selection={issueSelection}
+          flowWeeks={flowWeeks}
+          onClose={closeIssueOverlay}
+        />
+      ) : null}
 
     </div>
   );

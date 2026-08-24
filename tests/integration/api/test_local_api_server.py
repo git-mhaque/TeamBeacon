@@ -1156,6 +1156,14 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertIn("cycleTimeStatusMode", team_dashboard_parameter_names)
         self.assertIn("cycleTimeStatus", team_dashboard_parameter_names)
 
+        initiative_deep_dive_get = body["paths"]["/api/initiative-deep-dive"]["get"]
+        activity_parameter = next(
+            parameter
+            for parameter in initiative_deep_dive_get.get("parameters", [])
+            if parameter.get("name") == "activity"
+        )
+        self.assertIn("scope", activity_parameter["schema"]["enum"])
+
         team_insights_get = body["paths"]["/api/team/insights"]["get"]
         sprint_limit_param = next(
             (parameter for parameter in team_insights_get.get("parameters", []) if parameter.get("name") == "sprintLimit"),

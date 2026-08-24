@@ -128,13 +128,13 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
     - `chartWeeks=12` (1-52) sets the shared Monday-based reporting period for the chart and activity table
     - `chartStart=2026-07-24&chartEnd=2026-07-30` sets an explicit inclusive reporting period (both required, no future end date, maximum 366 days); explicit dates take precedence over `chartWeeks`
     - deprecated `tableWindowWeeks=1|2|4|12` overrides only the activity table for legacy clients; omit it to use the shared reporting period
-    - `activity=all|new|in_progress|completed|current_wip`
+    - `activity=all|new|in_progress|completed|current_wip|scope` (`scope` returns every current card in the selected epics, regardless of reporting-period activity)
     - `timezone=Australia/Melbourne` (IANA timezone; defaults to `UTC`)
     - `limit=500` (1-1000)
   - `reportingPeriod` returns the applied shared inclusive `startDate`, `endDate`, and day count; `chartRange` is retained as a compatibility alias.
   - Weekly buckets start Monday and return `newCount`, `completedCount`, and `netFlow`; explicit custom boundaries can produce partial first or last buckets.
   - `periods` returns the 1/2/4/12/26/52-week shortcut totals; `currentWipCount` remains an all-age snapshot.
-  - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first.
+  - Table cards include Jira `issueUrl`/`epicUrl` links, activity badges, and created/in-progress/completed timestamps, newest qualifying activity first. Epic options include their Jira `issueUrl`.
   - Epics and subtasks are excluded.
 - `GET /api/metadata/lookup`
   - Returns lookup/reference data:

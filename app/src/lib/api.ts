@@ -170,11 +170,12 @@ export type EpicLookupConfig = {
   workTypes: EpicLookupItem[];
 };
 
-export type InitiativeDeepDiveActivity = "all" | "new" | "in_progress" | "completed" | "current_wip";
+export type InitiativeDeepDiveActivity = "all" | "new" | "in_progress" | "completed" | "current_wip" | "scope";
 
 export type InitiativeDeepDiveEpicOption = {
   epicKey: string;
   epicName: string;
+  issueUrl?: string | null;
 };
 
 export type InitiativeDeepDiveWeeklyBucket = {

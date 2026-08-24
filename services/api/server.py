@@ -595,7 +595,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "in": "query",
                             "schema": {
                                 "type": "string",
-                                "enum": ["all", "new", "in_progress", "completed", "current_wip"],
+                                "enum": ["all", "new", "in_progress", "completed", "current_wip", "scope"],
                                 "default": "all",
                             },
                         },

@@ -269,6 +269,10 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["scope"], "initiative-deep-dive")
             self.assertEqual(payload["group"]["name"], "Platform")
             self.assertEqual(payload["group"]["epicCount"], 2)
+            self.assertEqual(
+                payload["epicOptions"][0]["issueUrl"],
+                f"https://jira.example.test/browse/{payload['epicOptions'][0]['epicKey']}",
+            )
             self.assertEqual(payload["selectionMode"], "all")
             self.assertEqual(payload["selectedEpicKeys"], [])
             self.assertEqual(len(payload["weekly"]), 12)
@@ -299,6 +303,28 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertNotIn("TB-6", cards_by_key, "A reopened card must not count as completed")
             self.assertNotIn("TB-8", cards_by_key, "Subtasks must not contribute to initiative flow")
             self.assertNotIn("TB-9", cards_by_key, "Cards from another group must be excluded")
+
+    def test_scope_activity_returns_every_current_non_subtask_card(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform_id, _ = self._seed_database(db_path)
+
+            payload = get_initiative_deep_dive(
+                group_id=platform_id,
+                chart_weeks=2,
+                activity="scope",
+                db_path=db_path,
+                now=datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc),
+                jira_base_url="https://jira.example.test",
+            )
+
+            self.assertEqual(payload["activity"], "scope")
+            self.assertEqual(payload["count"], 7)
+            self.assertEqual(
+                {card["issueKey"] for card in payload["cards"]},
+                {"TB-1", "TB-2", "TB-3", "TB-4", "TB-5", "TB-6", "TB-7"},
+            )
+            self.assertTrue(all(card["issueUrl"] for card in payload["cards"]))
 
     def test_supports_custom_chart_range_with_partial_week_buckets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

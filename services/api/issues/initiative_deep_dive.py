@@ -13,7 +13,7 @@ from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 from services.api.issues.current_sprint_work import is_subtask_issue_type
 
 
-_ALLOWED_ACTIVITY_FILTERS = {"all", "new", "in_progress", "completed", "current_wip"}
+_ALLOWED_ACTIVITY_FILTERS = {"all", "new", "in_progress", "completed", "current_wip", "scope"}
 _ALLOWED_TABLE_WINDOWS = {1, 2, 4, 12}
 _MAX_REPORTING_PERIOD_DAYS = 366
 _DONE_STATUS_NAMES = {"closed", "complete", "completed", "done", "resolved"}
@@ -590,6 +590,13 @@ def get_initiative_deep_dive(
             or _resolve_jira_base_url_from_db(conn)
         )
         groups, epic_options = _load_group_epics(conn, normalized_group_ids)
+        epic_options = [
+            {
+                **epic,
+                "issueUrl": _jira_issue_url(resolved_jira_base_url, str(epic.get("epicKey") or "")),
+            }
+            for epic in epic_options
+        ]
         available_epic_keys = [str(epic["epicKey"]) for epic in epic_options]
         available_epic_set = set(available_epic_keys)
         unknown_epic_keys = [key for key in requested_epic_keys if key not in available_epic_set]
@@ -764,6 +771,7 @@ def get_initiative_deep_dive(
             "in_progress": is_in_progress,
             "completed": is_completed,
             "current_wip": is_current_wip,
+            "scope": True,
         }
         if not filter_matches[normalized_activity]:
             continue

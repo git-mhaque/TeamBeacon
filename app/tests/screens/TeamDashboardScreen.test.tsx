@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { vi } from "vitest";
 import * as persistence from "../../src/lib/persistence";
 import { TeamDashboardScreen } from "../../src/components/content/screens/TeamDashboardScreen";
+import {
+  TeamDashboardIssueOverlay,
+  type TeamDashboardIssueSelection,
+} from "../../src/components/content/screens/TeamDashboardIssueOverlay";
 import { setupFetchMock } from "../utils/fetchMock";
 
 const dashboardPayload = {
@@ -159,7 +163,7 @@ describe("TeamDashboardScreen", () => {
     const comparisonRegion = screen.getByRole("region", { name: "Work stream comparison" });
     const comparisonTable = within(comparisonRegion).getByRole("table");
     const streamOrder = () => Array.from(comparisonTable.querySelectorAll("tbody tr")).map((row) => (
-      within(row as HTMLElement).getByRole("button").textContent
+      within(row as HTMLElement).getByRole("button", { name: /^(Customer Operations|Platform Delivery)$/ }).textContent
     ));
     expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
     expect(within(comparisonTable).getByRole("columnheader", { name: /Flow gap/ })).toHaveAttribute(
@@ -185,7 +189,7 @@ describe("TeamDashboardScreen", () => {
     expect(within(totalsRow as HTMLElement).getByText("Balanced")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("17/30 completed")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("57%")).toBeInTheDocument();
-    for (const label of ["Work stream", "Epics", "Created", "Flow gap", "Current WIP", "Delivery progress"]) {
+    for (const label of ["Work Streams", "Epics", "Created", "Flow gap", "Current WIP", "Delivery progress"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
@@ -201,6 +205,382 @@ describe("TeamDashboardScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
 
+  });
+
+  it("opens a sortable, scrollable JIRA-card overlay from dashboard metrics", async () => {
+    const deepDivePayload = {
+      source: "local",
+      scope: "initiative-deep-dive",
+      generatedAt: "2026-08-11T02:05:00+00:00",
+      timezone: "Australia/Melbourne",
+      group: { id: 5, name: "Platform Delivery", epicCount: 3 },
+      groups: [{ id: 5, name: "Platform Delivery", epicCount: 3 }],
+      selectedGroupIds: [5],
+      epicOptions: [
+        { epicKey: "TB-100", epicName: "Team reporting", issueUrl: "https://jira.example.test/browse/TB-100" },
+      ],
+      selectedEpicKeys: [],
+      selectionMode: "all",
+      chartWeeks: 4,
+      chartRange: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      reportingPeriod: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      weekly: [],
+      periods: [],
+      selectedPeriod: { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      currentWipCount: 2,
+      tableCounts: { all: 2, new: 2, inProgress: 1, completed: 0 },
+      activity: "new",
+      count: 2,
+      limit: 1000,
+      truncated: false,
+      cards: [
+        {
+          issueKey: "TB-12",
+          issueUrl: "https://jira.example.test/browse/TB-12",
+          summary: "Build dashboard overlay",
+          issueType: "Story",
+          epicKey: "TB-100",
+          epicName: "Team reporting",
+          epicUrl: "https://jira.example.test/browse/TB-100",
+          status: "In Progress",
+          statusCategory: "In Progress",
+          storyPoints: 5,
+          assigneeDisplayName: "Avery Chen",
+          activityTypes: ["new"],
+          latestActivityAt: "2026-08-10T03:00:00+00:00",
+          createdAt: "2026-08-10T03:00:00+00:00",
+        },
+        {
+          issueKey: "TB-2",
+          issueUrl: "https://jira.example.test/browse/TB-2",
+          summary: "Add issue links",
+          issueType: "Task",
+          epicKey: "TB-100",
+          epicName: "Team reporting",
+          epicUrl: "https://jira.example.test/browse/TB-100",
+          status: "To Do",
+          statusCategory: "To Do",
+          storyPoints: 3,
+          assigneeDisplayName: null,
+          activityTypes: ["new"],
+          latestActivityAt: "2026-08-09T03:00:00+00:00",
+          createdAt: "2026-08-09T03:00:00+00:00",
+        },
+      ],
+      error: null,
+    };
+    const fetchSpy = setupFetchMock({
+      "/api/team/dashboard": dashboardPayload,
+      "/api/initiative-deep-dive": deepDivePayload,
+    });
+
+    render(<TeamDashboardScreen />);
+
+    const createdButton = await screen.findByRole("button", {
+      name: "View 12 created JIRA cards for Platform Delivery",
+    });
+    fireEvent.click(createdButton);
+
+    const dialog = await screen.findByRole("dialog", { name: "Created cards" });
+    expect(within(dialog).getByText("12 cards created in the last 4 weeks.")).toBeInTheDocument();
+    const tableRegion = within(dialog).getByRole("region", { name: "Created cards table" });
+    expect(tableRegion).toHaveClass("tb-dashboard-issue-table-wrap");
+    expect(within(tableRegion).getAllByRole("columnheader")).toHaveLength(8);
+    expect(within(tableRegion).getByRole("link", { name: "TB-12" })).toHaveAttribute(
+      "href",
+      "https://jira.example.test/browse/TB-12",
+    );
+
+    const issueOrder = () => Array.from(tableRegion.querySelectorAll("tbody tr a")).map((link) => link.textContent);
+    expect(issueOrder()).toEqual(["TB-2", "TB-12"]);
+    fireEvent.click(within(tableRegion).getByRole("button", { name: "Sort by Summary (descending)" }));
+    expect(issueOrder()).toEqual(["TB-2", "TB-12"]);
+    fireEvent.click(within(tableRegion).getByRole("button", { name: "Sort by Summary (ascending)" }));
+    expect(issueOrder()).toEqual(["TB-12", "TB-2"]);
+
+    const drilldownRequest = fetchSpy.mock.calls.find(([input]) => String(input).includes("/api/initiative-deep-dive"));
+    expect(drilldownRequest).toBeDefined();
+    const drilldownUrl = new URL(String(drilldownRequest?.[0]));
+    expect(drilldownUrl.searchParams.getAll("groupId")).toEqual(["5"]);
+    expect(drilldownUrl.searchParams.get("activity")).toBe("new");
+    expect(drilldownUrl.searchParams.get("tableWindowWeeks")).toBe("4");
+    expect(drilldownUrl.searchParams.get("limit")).toBe("1000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close JIRA cards" }));
+    expect(screen.queryByRole("dialog", { name: "Created cards" })).not.toBeInTheDocument();
+  });
+
+  it("makes every work-stream and total metric available as a drill-down", async () => {
+    const emptyDeepDivePayload = {
+      source: "local",
+      scope: "initiative-deep-dive",
+      generatedAt: "2026-08-11T02:05:00+00:00",
+      timezone: "Australia/Melbourne",
+      group: null,
+      groups: [],
+      selectedGroupIds: [],
+      epicOptions: [],
+      selectedEpicKeys: [],
+      selectionMode: "all",
+      chartWeeks: 4,
+      chartRange: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      reportingPeriod: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      weekly: [],
+      periods: [],
+      selectedPeriod: { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      currentWipCount: 0,
+      tableCounts: { all: 0, new: 0, inProgress: 0, completed: 0 },
+      activity: "all",
+      count: 0,
+      limit: 1000,
+      truncated: false,
+      cards: [],
+      error: null,
+    };
+    setupFetchMock({
+      "/api/team/dashboard": dashboardPayload,
+      "/api/initiative-deep-dive": emptyDeepDivePayload,
+    });
+    render(<TeamDashboardScreen />);
+
+    await screen.findByRole("button", { name: "View 3 configured JIRA epics for Platform Delivery" });
+    const drilldowns = [
+      ["View 3 configured JIRA epics for Platform Delivery", "Configured epics"],
+      ["View 15 completed JIRA cards for Platform Delivery", "Completed cards"],
+      ["View JIRA cards contributing to the 3 reduced flow gap for Platform Delivery", "Flow gap cards"],
+      ["View 4 current WIP JIRA cards for Platform Delivery", "Current WIP cards"],
+      ["View 20 delivery progress JIRA cards for Platform Delivery", "Delivery progress cards"],
+      ["View 4 configured JIRA epics for all work streams", "Configured epics"],
+      ["View 19 created JIRA cards for all work streams", "Created cards"],
+      ["View 19 completed JIRA cards for all work streams", "Completed cards"],
+      ["View JIRA cards contributing to the Balanced flow gap for all work streams", "Flow gap cards"],
+      ["View 6 current WIP JIRA cards for all work streams", "Current WIP cards"],
+      ["View 30 delivery progress JIRA cards for all work streams", "Delivery progress cards"],
+    ] as const;
+
+    for (const [buttonName, dialogName] of drilldowns) {
+      fireEvent.click(screen.getByRole("button", { name: buttonName }));
+      const dialog = await screen.findByRole("dialog", { name: dialogName });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Close JIRA cards" }));
+    }
+  });
+
+  it("renders metric-specific issue details, epic links, and keyboard dismissal", async () => {
+    const overlayPayload = {
+      source: "local",
+      scope: "initiative-deep-dive",
+      generatedAt: "2026-08-11T02:05:00+00:00",
+      timezone: "Australia/Melbourne",
+      group: { id: 5, name: "Platform Delivery", epicCount: 2 },
+      groups: [{ id: 5, name: "Platform Delivery", epicCount: 2 }],
+      selectedGroupIds: [5],
+      epicOptions: [
+        { epicKey: "TB-100", epicName: "Team reporting", issueUrl: "https://jira.example.test/browse/TB-100" },
+        { epicKey: "TB-200", epicName: "Internal tooling", issueUrl: null },
+      ],
+      selectedEpicKeys: [],
+      selectionMode: "all",
+      chartWeeks: 4,
+      chartRange: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      reportingPeriod: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      weekly: [],
+      periods: [],
+      selectedPeriod: { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      currentWipCount: 1,
+      tableCounts: { all: 1, new: 1, inProgress: 1, completed: 1 },
+      activity: "all",
+      count: 1,
+      limit: 1000,
+      truncated: true,
+      cards: [
+        {
+          issueKey: "TB-12",
+          issueUrl: "https://jira.example.test/browse/TB-12",
+          summary: "Build dashboard overlay",
+          issueType: "Story",
+          epicKey: "TB-100",
+          epicName: "Team reporting",
+          status: "In Progress",
+          statusCategory: "In Progress",
+          storyPoints: 5,
+          assigneeDisplayName: "Avery Chen",
+          activityTypes: ["new", "in_progress", "completed"],
+          latestActivityAt: "2026-08-10T03:00:00+00:00",
+          createdAt: "2026-08-08T03:00:00+00:00",
+          inProgressStartedAt: "2026-08-09T03:00:00+00:00",
+          completedAt: "2026-08-10T03:00:00+00:00",
+        },
+      ],
+      error: null,
+    };
+    setupFetchMock({ "/api/initiative-deep-dive": overlayPayload });
+
+    const metrics: Array<{
+      selection: TeamDashboardIssueSelection;
+      title: string;
+      description: string;
+      activity?: string;
+    }> = [
+      {
+        selection: { metric: "completed", scopeName: "Platform Delivery", groupIds: [5], value: 1 },
+        title: "Completed cards",
+        description: "1 card completed in the last week.",
+        activity: "Completed",
+      },
+      {
+        selection: { metric: "currentWip", scopeName: "Platform Delivery", groupIds: [5], value: 1 },
+        title: "Current WIP cards",
+        description: "1 card is currently in progress.",
+        activity: "Current WIP",
+      },
+      {
+        selection: { metric: "flowGap", scopeName: "Platform Delivery", groupIds: [5], value: 2 },
+        title: "Flow gap cards",
+        description: "+2 net flow. 1 unique card was created or completed in the last week; a card can contribute to both.",
+        activity: "Created, In progress, Completed",
+      },
+      {
+        selection: {
+          metric: "deliveryProgress",
+          scopeName: "Platform Delivery",
+          groupIds: [5],
+          value: 50,
+          completedCards: 1,
+          totalCards: 2,
+        },
+        title: "Delivery progress cards",
+        description: "1 of 2 scoped cards are complete.",
+        activity: "In scope",
+      },
+    ];
+
+    for (const entry of metrics) {
+      const { unmount } = render(
+        <TeamDashboardIssueOverlay selection={entry.selection} flowWeeks={1} onClose={vi.fn()} />,
+      );
+      const dialog = await screen.findByRole("dialog", { name: entry.title });
+      expect(within(dialog).getByText(entry.description)).toBeInTheDocument();
+      expect(within(dialog).getByText(entry.activity as string)).toBeInTheDocument();
+      unmount();
+    }
+
+    const onClose = vi.fn();
+    render(
+      <TeamDashboardIssueOverlay
+        selection={{ metric: "epics", scopeName: "Platform Delivery", groupIds: [5], value: 2 }}
+        flowWeeks={4}
+        onClose={onClose}
+      />,
+    );
+    const epicDialog = await screen.findByRole("dialog", { name: "Configured epics" });
+    expect(within(epicDialog).getByText("2 configured JIRA epics.")).toBeInTheDocument();
+    expect(within(epicDialog).getByRole("link", { name: "TB-100" })).toHaveAttribute(
+      "href",
+      "https://jira.example.test/browse/TB-100",
+    );
+    expect(within(epicDialog).getByText("TB-200")).not.toHaveRole("link");
+    expect(within(epicDialog).queryByText(/Showing the first/)).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("handles issue-overlay errors, retry, truncation, sorting, and empty results", async () => {
+    const responsePayload = {
+      source: "local",
+      scope: "initiative-deep-dive",
+      generatedAt: "2026-08-11T02:05:00+00:00",
+      timezone: "Australia/Melbourne",
+      group: null,
+      groups: [],
+      selectedGroupIds: [5],
+      epicOptions: [],
+      selectedEpicKeys: [],
+      selectionMode: "all",
+      chartWeeks: 4,
+      chartRange: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      reportingPeriod: { startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      weekly: [],
+      periods: [],
+      selectedPeriod: { weeks: 4, startDate: "2026-07-20", endDate: "2026-08-16", days: 28 },
+      currentWipCount: 0,
+      tableCounts: { all: 2, new: 2, inProgress: 0, completed: 0 },
+      activity: "new",
+      count: 12,
+      limit: 2,
+      truncated: true,
+      cards: [
+        {
+          issueKey: "TB-9",
+          issueUrl: null,
+          summary: "Zebra task",
+          issueType: "Task",
+          epicKey: "TB-100",
+          epicName: "",
+          status: "",
+          statusCategory: "To Do",
+          storyPoints: null,
+          assigneeDisplayName: null,
+          activityTypes: [],
+          latestActivityAt: "invalid",
+          createdAt: "invalid",
+        },
+        {
+          issueKey: "TB-2",
+          issueUrl: "https://jira.example.test/browse/TB-2",
+          summary: "Alpha task",
+          issueType: "Story",
+          epicKey: "TB-200",
+          epicName: "Delivery",
+          status: "To Do",
+          statusCategory: "To Do",
+          storyPoints: 3,
+          assigneeDisplayName: "Morgan Lee",
+          activityTypes: ["new"],
+          latestActivityAt: "2026-08-09T03:00:00+00:00",
+          createdAt: "2026-08-09T03:00:00+00:00",
+        },
+      ],
+      error: null,
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new Error("JIRA details offline"))
+      .mockResolvedValue(new Response(JSON.stringify(responsePayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <TeamDashboardIssueOverlay
+        selection={{ metric: "created", scopeName: "All work streams", groupIds: [5, 8], value: 12 }}
+        flowWeeks={4}
+        onClose={onClose}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("JIRA details offline");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    const tableRegion = await screen.findByRole("region", { name: "Created cards table" });
+    expect(screen.getByText("Showing the first 2 of 12 matching cards.")).toBeInTheDocument();
+    expect(within(tableRegion).getByText("TB-9")).not.toHaveRole("link");
+    expect(within(tableRegion).getAllByText("—").length).toBeGreaterThan(0);
+    fireEvent.click(within(tableRegion).getByRole("button", { name: "Sort by Story points (descending)" }));
+    fireEvent.click(within(tableRegion).getByRole("button", { name: "Sort by Relevant date (descending)" }));
+    fireEvent.click(document.querySelector(".tb-modal-backdrop") as HTMLElement);
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    unmount();
+
+    setupFetchMock({
+      "/api/initiative-deep-dive": { ...responsePayload, count: 0, truncated: false, cards: [] },
+    });
+    render(
+      <TeamDashboardIssueOverlay
+        selection={{ metric: "created", scopeName: "Platform Delivery", groupIds: [5], value: 0 }}
+        flowWeeks={4}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("No matching JIRA cards were found.")).toBeInTheDocument();
   });
 
   it("persists and refreshes the selected work-stream flow period", async () => {
