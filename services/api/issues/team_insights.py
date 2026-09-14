@@ -513,8 +513,12 @@ def get_team_insights(
                   i.created_at_source,
                   i.resolved_at_source,
                   i.epic_key,
-                  em.epic_name
+                  COALESCE(
+                    NULLIF(TRIM(e.summary), ''),
+                    NULLIF(TRIM(em.epic_name), '')
+                  ) AS epic_name
                 FROM issues i
+                LEFT JOIN issues e ON e.issue_key = i.epic_key
                 LEFT JOIN epic_metadata em ON em.epic_key = i.epic_key
                 WHERE i.sprint_external_id IN ({placeholders})
                 """,

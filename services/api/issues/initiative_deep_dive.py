@@ -307,12 +307,12 @@ def _load_single_group_epics(
         """
         SELECT
           em.epic_key,
-          COALESCE(NULLIF(TRIM(em.epic_name), ''), NULLIF(TRIM(i.summary), ''), em.epic_key) AS epic_name
+          COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
         FROM epic_metadata_groups emg
         JOIN epic_metadata em ON em.id = emg.epic_metadata_id
         LEFT JOIN issues i ON i.issue_key = em.epic_key
         WHERE emg.group_id = ?
-        ORDER BY LOWER(COALESCE(NULLIF(TRIM(em.epic_name), ''), NULLIF(TRIM(i.summary), ''), em.epic_key)), em.epic_key
+        ORDER BY LOWER(COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key)), em.epic_key
         """,
         (group_id,),
     ).fetchall()

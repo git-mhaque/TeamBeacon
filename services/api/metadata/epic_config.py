@@ -1408,7 +1408,7 @@ def get_configured_epics_completed_cards(
         epic_name_by_key: dict[str, str] = {}
         for row in configured_rows:
             key = str(row["epic_key"])
-            name_raw = row["epic_name"] if row["epic_name"] is not None else row["issue_summary"]
+            name_raw = row["issue_summary"] if row["issue_summary"] is not None else row["epic_name"]
             name = str(name_raw).strip() if name_raw is not None else ""
             epic_name_by_key[key] = name
 

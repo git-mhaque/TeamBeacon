@@ -80,7 +80,7 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
                     VALUES (?, ?, ?)
                     """,
                     [
-                        (1, "EPIC-1", "Platform Improvements"),
+                        (1, "EPIC-1", "Old Platform Improvements"),
                         (2, "EPIC-2", "Operational Hardening"),
                     ],
                 )
@@ -123,6 +123,34 @@ class TeamInsightsServiceUnitTests(unittest.TestCase):
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
+                        (
+                            "EPIC-1",
+                            "1001",
+                            "TEAM",
+                            "Epic",
+                            "Platform Improvements",
+                            "In Progress",
+                            "In Progress",
+                            None,
+                            None,
+                            None,
+                            "2026-02-28T00:00:00+00:00",
+                            None,
+                        ),
+                        (
+                            "EPIC-2",
+                            "1002",
+                            "TEAM",
+                            "Epic",
+                            "Operational Hardening",
+                            "In Progress",
+                            "In Progress",
+                            None,
+                            None,
+                            None,
+                            "2026-02-28T00:00:00+00:00",
+                            None,
+                        ),
                         (
                             "TEAM-1",
                             "1",
