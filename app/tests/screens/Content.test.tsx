@@ -268,7 +268,6 @@ describe("Content", () => {
     expect(screen.queryByText("Attention Queue")).not.toBeInTheDocument();
     expect(await screen.findByText("CEG-101")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Configure Epic" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     const initiativeViewSelect = await screen.findByRole("combobox", { name: "Select View" });
     await waitFor(() => {
       expect(initiativeViewSelect).toHaveTextContent("All Configured (1)");
@@ -283,6 +282,8 @@ describe("Content", () => {
     const initiativeConfigureButton = screen.getByRole("button", { name: "Configure Initiative" });
     const initiativeTopbarActions = initiativeManageButton.closest(".tb-topbar-actions");
     expect(initiativeTopbarActions).not.toBeNull();
+    expect(within(initiativeTopbarActions as HTMLElement).getByText("Data as of")).toBeInTheDocument();
+    expect(within(initiativeTopbarActions as HTMLElement).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     expect(within(initiativeTopbarActions as HTMLElement).getByRole("combobox", { name: "Select View" })).toBeInTheDocument();
     fireEvent.click(initiativeManageButton);
     expect(await screen.findByRole("dialog", { name: "Create Initiative View" })).toBeInTheDocument();

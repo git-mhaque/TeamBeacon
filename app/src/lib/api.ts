@@ -322,6 +322,7 @@ export type InitiativeView = {
 
 export type ConfiguredEpicSummaryResponse = {
   epics: InitiativeEpicSummary[];
+  generatedAt?: string | null;
   reportingPeriod?: EpicSummaryReportingPeriod;
   view?: InitiativeView;
   error?: string | null;

@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { RefreshCw } from "lucide-react";
 import {
   chatWithOciGenAi,
   ConfiguredEpicSummaryResponse,
@@ -689,12 +691,14 @@ export function InitiativesScreen() {
   const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [allConfiguredEpicSummary, setAllConfiguredEpicSummary] = useState<InitiativeEpicSummary[]>([]);
   const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [initiativeViews, setInitiativeViews] = useState<InitiativeView[]>([]);
   const [activeViewId, setActiveViewId] = useState<InitiativeViewId>(readPersistedInitiativeViewId);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
   const [aiProviderName, setAiProviderName] = useState("AI");
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
   const [loading, setLoading] = useState(true);
+  const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [metaSuccess, setMetaSuccess] = useState<string | null>(null);
@@ -813,6 +817,7 @@ export function InitiativesScreen() {
         setAllConfiguredEpicSummary([]);
       }
       setReportingPeriod(summaryResult.value.reportingPeriod);
+      setGeneratedAt(summaryResult.value.generatedAt ?? new Date().toISOString());
 
       if (jiraResult.status === "fulfilled") {
         setJiraBaseUrl(
@@ -839,6 +844,7 @@ export function InitiativesScreen() {
       setEpicSummary([]);
       setAllConfiguredEpicSummary([]);
       setReportingPeriod(undefined);
+      setGeneratedAt(null);
       setJiraBaseUrl(null);
       setAiProviderName("AI");
     } finally {
@@ -879,6 +885,10 @@ export function InitiativesScreen() {
       // refresh already updates local state.
     });
   }, [refresh]);
+
+  useLayoutEffect(() => {
+    setTopbarActionsTarget(document.querySelector<HTMLElement>(".tb-main-initiatives .tb-topbar-actions-initiative"));
+  }, []);
 
   useEffect(() => {
     if (!metaSuccess) {
@@ -1891,8 +1901,22 @@ export function InitiativesScreen() {
     }
   }, [activeReportingPeriod, activeView.id, activeView.name, aiProviderName]);
 
+  const freshnessActions = (
+    <div className="tb-dashboard-freshness tb-initiative-freshness">
+      <span className="tb-dashboard-freshness-copy">
+        <span>Data as of</span>
+        <strong>{loading ? generatedAt ? "Refreshing…" : "Loading…" : formatTimestamp(generatedAt)}</strong>
+      </span>
+      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void refresh()} disabled={loading}>
+        <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh
+      </button>
+    </div>
+  );
+
   return (
-    <div className="tb-screen-grid">
+    <>
+      {topbarActionsTarget ? createPortal(freshnessActions, topbarActionsTarget) : null}
+      <div className="tb-screen-grid">
       <div className="tb-initiative-context-bar">
         <p className="tb-muted-note tb-initiative-period">Reporting period: {periodLabel(reportingPeriod ?? activeReportingPeriod)}</p>
         <button type="button" className="tb-btn tb-btn-sm tb-no-print" onClick={openReportingConfig}>
@@ -2939,6 +2963,7 @@ export function InitiativesScreen() {
           </div>
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   );
 }

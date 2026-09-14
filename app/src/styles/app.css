@@ -1012,6 +1012,10 @@ body {
   white-space: nowrap;
 }
 
+.tb-initiative-freshness {
+  margin-left: 0.35rem;
+}
+
 .tb-topbar-trend-window {
   display: flex;
   align-items: center;

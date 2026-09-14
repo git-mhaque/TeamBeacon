@@ -1239,6 +1239,7 @@ def get_configured_epic_summary(
         conn.close()
     return {
         "epics": epics,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
         "reportingPeriod": {
             "startDate": period_start_date.isoformat(),
             "endDate": period_end_date.isoformat(),

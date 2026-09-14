@@ -146,6 +146,7 @@ class EpicMetadataServiceUnitTests(unittest.TestCase):
 
             payload = get_configured_epic_summary(limit=10, db_path=db_path)
             self.assertEqual(len(payload["epics"]), 1)
+            self.assertIsNotNone(datetime.fromisoformat(payload["generatedAt"]))
             self.assertTrue(payload["epics"][0]["timelineEnabled"])
             self.assertEqual(payload["epics"][0]["timelineStartDate"], "2026-04-01")
             self.assertEqual(payload["epics"][0]["targetCompletionDate"], "2026-05-15")
