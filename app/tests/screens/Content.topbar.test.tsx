@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 const mockedContentState = vi.hoisted(() => {
@@ -235,6 +235,74 @@ import { Content } from "../../src/components/content";
 import { TEAM_INSIGHTS_TREND_WINDOW_SYNC_EVENT as SYNC_EVENT_NAME } from "../../src/components/content/screens/TeamInsightsScreen";
 
 describe("Content topbar controls", () => {
+  it.each([
+    { destination: /Team Insights:/, selectName: "Trend Window", firstOption: "1 sprint", lastOption: "Last 12 sprints" },
+    { destination: /Initiative Insights:/, selectName: "Select View", firstOption: "All Configured (59)", lastOption: "Q1 FY27 (12)" },
+  ])("preserves keyboard navigation and dismissal in $selectName after changing screens", ({ destination, selectName, firstOption, lastOption }) => {
+    render(<Content appName="TeamBeacon" />);
+    fireEvent.click(screen.getByRole("button", { name: destination }));
+    const select = screen.getByRole("combobox", { name: selectName });
+
+    fireEvent.keyDown(select, { key: "ArrowUp" });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.mouseDown(select);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: lastOption })).toHaveFocus();
+    fireEvent.keyDown(select, { key: "ArrowUp" });
+    fireEvent.keyDown(screen.getByRole("option", { name: lastOption }), { key: "Home" });
+    expect(screen.getByRole("option", { name: firstOption })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("option", { name: firstOption }), { key: "ArrowUp" });
+    expect(screen.getByRole("option", { name: firstOption })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("option", { name: firstOption }), { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: firstOption })).not.toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("option", { name: firstOption }), { key: "End" });
+    expect(screen.getByRole("option", { name: lastOption })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("option", { name: lastOption }), { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: lastOption })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("option", { name: lastOption }), { key: "ArrowUp" });
+    expect(screen.getByRole("option", { name: lastOption })).not.toHaveFocus();
+    fireEvent.keyDown(select, { key: "a" });
+    fireEvent.keyDown(screen.getByRole("option", { name: lastOption }), { key: "a" });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(select).toHaveFocus();
+
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(select, { key: "Enter" });
+    fireEvent.keyDown(select, { key: " " });
+    fireEvent.keyDown(screen.getByRole("option", { name: firstOption }), { key: " " });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(select).toHaveTextContent(firstOption);
+    fireEvent.keyDown(select, { key: " " });
+    fireEvent.keyDown(screen.getByRole("option", { name: firstOption }), { key: "Enter" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(select).toHaveFocus();
+  });
+
+  it("recovers the initiative selector when saved-view state is missing or stale", () => {
+    render(<Content appName="TeamBeacon" />);
+    fireEvent.click(screen.getByRole("button", { name: /Initiative Insights:/ }));
+    const select = screen.getByRole("combobox", { name: "Select View" });
+    act(() => window.dispatchEvent(new CustomEvent(mockedContentState.initiativesViewStateEvent)));
+    expect(select).toHaveTextContent("All Configured (0)");
+    act(() => window.dispatchEvent(new CustomEvent(mockedContentState.initiativesViewStateEvent, {
+      detail: { views: [], activeViewId: "deleted" },
+    })));
+    expect(select).toHaveTextContent("All Configured (0)");
+    act(() => window.dispatchEvent(new CustomEvent(mockedContentState.initiativesViewStateEvent, {
+      detail: { views: [{ id: 7, name: "Saved delivery", epicCount: 3 }], activeViewId: 999 },
+    })));
+    expect(select).toHaveTextContent("Saved delivery (3)");
+    fireEvent.click(select);
+    expect(screen.getByRole("option", { name: "Saved delivery (3)" })).toHaveFocus();
+  });
+
   it("supports trend-window keyboard controls, sync updates, and settings events", () => {
     render(<Content appName="TeamBeacon" />);
 

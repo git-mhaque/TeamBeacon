@@ -7,21 +7,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
-  ChartColumn,
-  FileText,
-  Gauge,
-  LayoutDashboard,
-  ListTodo,
   Menu,
   PanelLeftClose,
-  Rocket,
-  Settings,
-  ShieldCheck,
-  UsersRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
+import { PrimaryNavigation, type ScreenId } from "./PrimaryNavigation";
 import { InitiativeDeepDiveScreen, persistInitiativeDeepDiveScope } from "./screens/InitiativeDeepDiveScreen";
 import {
   INITIATIVES_VIEW_STATE_EVENT,
@@ -53,26 +43,6 @@ import {
   normalizeTrendWindow,
 } from "./screens/TeamInsightsScreen";
 
-type ScreenId =
-  | "dashboard"
-  | "integrations"
-  | "initiatives"
-  | "initiative-deep-dive"
-  | "team"
-  | "sprint"
-  | "security"
-  | "incidents"
-  | "releases"
-  | "team-report";
-
-type NavItem = {
-  id: ScreenId;
-  label: string;
-  blurb: string;
-  showConstruction: boolean;
-  icon: LucideIcon;
-};
-
 type Props = {
   appName: string;
 };
@@ -93,19 +63,6 @@ const DEFAULT_INITIATIVE_TOPBAR_STATE: InitiativeTopbarState = {
   views: [{ id: "all", name: "All Configured", epicCount: 0, isDefault: true }],
   activeViewId: "all",
 };
-
-const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Team Dashboard", blurb: "Flow / Releases / Blockers / Outcomes", showConstruction: false, icon: LayoutDashboard },
-  { id: "initiatives", label: "Initiative Insights", blurb: "Epic Config / Progress / RAG", showConstruction: false, icon: Gauge },
-  { id: "initiative-deep-dive", label: "Initiative Deep Dive", blurb: "New / WIP / Completed Flow", showConstruction: false, icon: ChartColumn },
-  { id: "sprint", label: "Sprint Insights", blurb: "Overview / Progress / Scope Creep / Blockers", showConstruction: false, icon: ListTodo },
-  { id: "team", label: "Team Insights", blurb: "Sprint Trend / Cycle Time", showConstruction: false, icon: UsersRound },
-  { id: "security", label: "Security Insights", blurb: "Scan / Vulnerability Posture", showConstruction: true, icon: ShieldCheck },
-  { id: "incidents", label: "Operations Insights", blurb: "Incidents / DR / Observability", showConstruction: true, icon: Activity },
-  { id: "releases", label: "Release Insights", blurb: "Cycle Time / Readiness / Risk", showConstruction: false, icon: Rocket },
-  { id: "team-report", label: "Team Report", blurb: "Summary / Wins / Risks / Progress / Work Mix", showConstruction: false, icon: FileText },
-  { id: "integrations", label: "Settings", blurb: "Work Streams / Work Types / Metadata", showConstruction: false, icon: Settings },
-];
 
 function screenTitle(id: ScreenId): string {
   const mapping: Record<ScreenId, string> = {
@@ -630,40 +587,7 @@ export function Content({ appName }: Props) {
         </div>
       </header>
 
-      <aside
-        id="tb-primary-sidebar"
-        className={`tb-sidebar${isSidebarExpanded ? " is-expanded" : ""}`}
-      >
-        <nav className="tb-nav">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`tb-nav-item${active === item.id ? " is-active" : ""}`}
-              aria-label={`${item.label}: ${item.blurb}`}
-              data-tooltip={item.label}
-              onClick={() => setActive(item.id)}
-            >
-              <item.icon className="tb-nav-icon" aria-hidden="true" strokeWidth={1.8} />
-              <div className="tb-nav-copy">
-                <div className="tb-nav-title-row">
-                  <span className="tb-nav-title">{item.label}</span>
-                </div>
-                <small>{item.blurb}</small>
-              </div>
-              {item.showConstruction ? (
-                <span
-                  className="tb-nav-construction"
-                  title="Under construction"
-                  aria-label={`${item.label} is under construction`}
-                >
-                  <span aria-hidden="true">•</span>
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </nav>
-      </aside>
+      <PrimaryNavigation active={active} isExpanded={isSidebarExpanded} onNavigate={setActive} />
 
       <main className={`tb-main tb-main-${active}`}>
         <header className="tb-topbar">

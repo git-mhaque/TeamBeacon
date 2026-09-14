@@ -88,7 +88,7 @@ Default thresholds:
   - Team Report
   - Settings
 - Interaction pattern:
-  - Compact fixed left rail for screen navigation, with hamburger-controlled label expansion.
+  - `PrimaryNavigation` renders an 88-pixel left rail with icons and short labels, with hamburger-controlled expansion to a 288-pixel sidebar showing full names and descriptions. Settings remains at the bottom while the other destinations scroll on short screens; full-name tooltips support hover, focus and Escape dismissal.
   - Main pane for KPI cards, trend widgets, and narrative insights.
   - Team Dashboard is the startup destination and composes work-stream flow/progress, latest completed-release health, completed-sprint cycle-time movement, current blockers, and recent completions through `GET /api/team/dashboard`.
   - Initiative Deep Dive defaults to all work streams, supports checkbox-based multi-work-stream selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.

@@ -245,30 +245,23 @@ describe("Content", () => {
     expect(document.querySelector(".tb-app-frame")).not.toHaveClass("is-nav-expanded");
     expect(within(appHeader as HTMLElement).getByText("TeamBeacon")).toBeInTheDocument();
 
-    expect(screen.getByLabelText("Security Insights is under construction")).toBeInTheDocument();
-    expect(screen.getByLabelText("Operations Insights is under construction")).toBeInTheDocument();
-
-    expect(screen.getByText("Epic Config / Progress / RAG")).toBeInTheDocument();
-    expect(screen.getByText("Flow / Releases / Blockers / Outcomes")).toBeInTheDocument();
-    expect(screen.getByText("Overview / Progress / Scope Creep / Blockers")).toBeInTheDocument();
-    expect(screen.getByText("Sprint Trend / Cycle Time")).toBeInTheDocument();
-    expect(screen.getByText("Scan / Vulnerability Posture")).toBeInTheDocument();
-    expect(screen.getByText("Incidents / DR / Observability")).toBeInTheDocument();
-    expect(screen.getByText("Cycle Time / Readiness / Risk")).toBeInTheDocument();
-    expect(screen.getByText("Summary / Wins / Risks / Progress / Work Mix")).toBeInTheDocument();
-    expect(screen.getByText("Work Streams / Work Types / Metadata")).toBeInTheDocument();
-
-    expect(screen.queryByLabelText("Team Report is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Team Dashboard is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Team Insights is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Settings is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Initiative Insights is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Sprint Insights is under construction")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Release Insights is under construction")).not.toBeInTheDocument();
+    expect(within(nav).getAllByRole("button", { name: /under construction/ })).toHaveLength(2);
+    expect(within(nav).getByRole("button", { name: /Security Insights.*under construction/ })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Operations Insights.*under construction/ })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Team Dashboard/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Epic progress & RAG")).toBeInTheDocument();
+    expect(screen.getByText("Delivery overview")).toBeInTheDocument();
+    expect(screen.getByText("Progress, scope & blockers")).toBeInTheDocument();
+    expect(screen.getByText("Trends & cycle time")).toBeInTheDocument();
+    expect(screen.getByText("Readiness & release risk")).toBeInTheDocument();
+    expect(screen.getByText("Wins, risks & work mix")).toBeInTheDocument();
+    expect(screen.getByText("Work streams & configuration")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Individual Insights/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Team Insights Settings" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Initiative Insights/ }));
+    expect(within(nav).getByRole("button", { name: /Initiative Insights/ })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("button", { name: /Team Dashboard/ })).not.toHaveAttribute("aria-current");
     expect(await screen.findByRole("heading", { name: "Initiative Insights" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Configured Initiative Summary" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Initiative Progress Matrix" })).toBeInTheDocument();

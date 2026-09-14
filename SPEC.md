@@ -52,6 +52,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - AI draft generation using selected provider/model from Settings.
 - UX mockups:
   - Maintain design documentation for current screens and preserve functional parity during frontend modernization.
+  - Keep navigation identifiable in both states: icons and short labels in the compact rail, full labels and concise descriptions when expanded, clear selection/focus indicators, and explicit under-construction markers. Settings stays reachable at the bottom on short screens.
 
 ## 5. Out of Scope (MVP)
 - Two-way updates to JIRA/Confluence.

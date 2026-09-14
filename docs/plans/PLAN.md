@@ -55,6 +55,7 @@ Exit criteria:
 ## Phase 4 (Week 8): Hardening and Release
 - Improve performance for large project datasets.
 - Add integration and end-to-end tests for key user flows.
+- Validate the labeled compact rail and expanded sidebar, including current-page state, keyboard/hover tooltips, construction markers, and navigation reachability on short screens.
 - Prepare release packaging and onboarding docs.
 
 Exit criteria:

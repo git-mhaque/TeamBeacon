@@ -138,6 +138,8 @@ npm run lint
 npm run test:coverage
 ```
 
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell and primary navigation.
+
 ## ✅ CI Pipeline
 - GitHub Actions workflow: `.github/workflows/ci.yml`
 - Checks:

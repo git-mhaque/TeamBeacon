@@ -13,6 +13,14 @@ export default defineConfig({
       all: true,
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
+      thresholds: {
+        "src/components/content/PrimaryNavigation.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/index.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+      },
       include: ["src/**/*.ts", "src/**/*.tsx"],
       exclude: [
         "tests/**",

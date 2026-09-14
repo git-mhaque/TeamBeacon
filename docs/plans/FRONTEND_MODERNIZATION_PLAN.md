@@ -38,7 +38,7 @@ The modernization is an implementation and visual-design change only. It must no
 The functional-parity screen migration is complete on `codex/frontend-shell-initiative`:
 
 - React 19, Vite 8, strict TypeScript, Tailwind CSS 4, Lucide icons, Vitest, React Testing Library, and ESLint are active.
-- The component-state navigation remains in place behind a compact, hamburger-expandable application rail.
+- The component-state navigation remains in place behind an 88-pixel rail with icons and short labels, expandable to a 288-pixel sidebar.
 - Initiative Insights uses browser-page vertical scrolling so the Progress Matrix no longer introduces a nested vertical scrollbar.
 - Initiative Insights, Sprint Insights, Team Insights, Release Insights, Team Report, Settings, Security Insights, and Operations Insights now share the same visual system and responsive shell, including a persistent header control for connection health and JIRA sync operations.
 - Security and Operations use one accessible construction-state component while preserving their existing placeholder behavior.
@@ -146,9 +146,10 @@ Team Dashboard is the initial screen. In-session navigation remains component-st
 
 The shell should have:
 
-- A fixed compact navigation rail that uses substantially less width than the current 304-pixel sidebar.
-- A hamburger control that expands the same rail to reveal labels and descriptions, while keeping the compact rail as the default.
-- The same navigation labels and destinations.
+- An 88-pixel compact navigation rail with 22-pixel icons, persistent short labels, and full-name tooltips on hover and keyboard focus. Tooltips remain hoverable, dismiss with Escape, and stay outside the scrolling list.
+- A hamburger control that expands the same rail to 288 pixels, showing full labels and concise descriptions, while keeping the compact rail as the default.
+- The same navigation destinations and order, with Settings separated at the bottom and the destination list scrolling independently on short screens.
+- A terracotta selected background, bright edge indicator and icon, plus a separate visible keyboard-focus outline. Security and Operations use a wrench marker and explicit under-construction text rather than notification-like dots.
 - A compact global header for page title, reporting period, data freshness, and page-level actions.
 - A skip link, semantic landmarks, visible keyboard focus, and predictable focus movement.
 - A content area that grows to the full remaining width.
