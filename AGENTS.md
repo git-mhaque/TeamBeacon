@@ -56,6 +56,7 @@ When frontend or FastAPI tooling changes, add runnable commands to `README.md` a
 - Name tests by behavior (`test_incremental_sync_cursor.py`, `initiative-rag.spec.ts`).
 - Cover at least one success path and one failure path per unit.
 - Prioritize metric correctness and sync idempotency tests.
+- When changing a UI default, sync option, or request payload, update affected assertions in the same change. Before committing frontend work, run the full CI-equivalent suite with `cd app && npm run build && npm run lint && npm run test:coverage`; targeted tests alone are not sufficient.
 - Enforce `>=90%` coverage across touched modules using unit + integration tests. If coverage tooling is missing for a component, add it in the same change before merging.
 
 ## Commit & Pull Request Guidelines

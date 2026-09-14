@@ -303,9 +303,8 @@ describe("SystemStatusControl", () => {
     const deletionCheckbox = screen.getByRole("checkbox", {
       name: /Remove cards deleted from JIRA/,
     });
-    expect(deletionCheckbox).not.toBeChecked();
+    expect(deletionCheckbox).toBeChecked();
     fireEvent.click(screen.getByRole("radio", { name: /Full sync/ }));
-    fireEvent.click(deletionCheckbox);
     fireEvent.click(screen.getByRole("button", { name: "Start sync" }));
 
     await waitFor(() => {
