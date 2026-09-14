@@ -72,7 +72,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         def fake_sync_start(  # noqa: ANN001
             mode=None,
             since_date=None,
-            reconcile_deleted_issues=False,
+            reconcile_deleted_issues=True,
         ):
             if mode not in {None, "full", "since_last", "since_date"}:
                 raise ValueError("Unsupported sync mode. Allowed values: full, since_last, since_date.")
@@ -1251,7 +1251,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertTrue(body["started"])
         self.assertEqual(body["syncMode"], "since_date")
         self.assertEqual(body["requestedSince"], "2026-03-01")
-        self.assertEqual(self.sync_start_calls[-1], ("since_date", "2026-03-01", False))
+        self.assertEqual(self.sync_start_calls[-1], ("since_date", "2026-03-01", True))
 
     def test_jira_sync_start_endpoint_rejects_invalid_deletion_option(self) -> None:
         request = Request(

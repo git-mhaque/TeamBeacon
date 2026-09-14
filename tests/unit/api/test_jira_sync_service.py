@@ -610,11 +610,12 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 runtime=runtime,
                 connector=_DeletedIssueConnectorStub(),
                 sync_mode="since_last",
-                reconcile_deleted_issues=True,
             )
 
             self.assertEqual(summary["state"], "completed")
             self.assertEqual(summary["deletedIssuesRemoved"], 1)
+            self.assertEqual(summary["deletedEpicMappingsRemoved"], 0)
+            self.assertTrue(summary["reconcileDeletedIssues"])
             self.assertIn("Removed 1 issue", summary["message"])
             self.assertTrue(any(event.get("deletedIssuesRemoved") == 1 for event in progress_events))
 
@@ -644,6 +645,119 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             self.assertEqual(deleted_release_link_count, 0)
             self.assertEqual(checkpoint_cursor, "2026-03-22T10:00:00+00:00")
 
+    def test_run_sync_removes_deleted_epic_metadata_and_all_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute("UPDATE issues SET issue_type = 'Epic' WHERE issue_key = 'CEGBUPOL-2'")
+                conn.execute("INSERT INTO epic_groups (name) VALUES ('Platform')")
+                conn.execute("INSERT INTO work_types (name) VALUES ('Feature')")
+                conn.execute(
+                    """
+                    INSERT INTO epic_metadata (epic_key, epic_name, success_criteria_json)
+                    VALUES ('CEGBUPOL-2', 'Deleted Epic', '[\"Retire after delivery\"]')
+                    """
+                )
+                metadata_id = conn.execute(
+                    "SELECT id FROM epic_metadata WHERE epic_key = 'CEGBUPOL-2'"
+                ).fetchone()[0]
+                group_id = conn.execute("SELECT id FROM epic_groups WHERE name = 'Platform'").fetchone()[0]
+                work_type_id = conn.execute("SELECT id FROM work_types WHERE name = 'Feature'").fetchone()[0]
+                view_id = conn.execute("INSERT INTO initiative_views (name) VALUES ('Leadership')").lastrowid
+                conn.execute(
+                    "INSERT INTO epic_metadata_groups (epic_metadata_id, group_id) VALUES (?, ?)",
+                    (metadata_id, group_id),
+                )
+                conn.execute(
+                    "INSERT INTO epic_metadata_work_types (epic_metadata_id, work_type_id) VALUES (?, ?)",
+                    (metadata_id, work_type_id),
+                )
+                conn.execute(
+                    "INSERT INTO initiative_view_epics (view_id, epic_metadata_id) VALUES (?, ?)",
+                    (view_id, metadata_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_DeletedIssueConnectorStub(),
+                sync_mode="since_last",
+            )
+
+            self.assertEqual(summary["deletedIssuesRemoved"], 1)
+            self.assertEqual(summary["deletedEpicMappingsRemoved"], 1)
+            conn = sqlite3.connect(str(db_path))
+            try:
+                metadata_count = conn.execute(
+                    "SELECT COUNT(*) FROM epic_metadata WHERE epic_key = 'CEGBUPOL-2'"
+                ).fetchone()[0]
+                group_link_count = conn.execute("SELECT COUNT(*) FROM epic_metadata_groups").fetchone()[0]
+                work_type_link_count = conn.execute("SELECT COUNT(*) FROM epic_metadata_work_types").fetchone()[0]
+                view_link_count = conn.execute("SELECT COUNT(*) FROM initiative_view_epics").fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertEqual(metadata_count, 0)
+            self.assertEqual(group_link_count, 0)
+            self.assertEqual(work_type_link_count, 0)
+            self.assertEqual(view_link_count, 0)
+
+    def test_run_sync_removes_orphaned_epic_metadata_from_prior_reconciliation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "teambeacon.db"
+            runtime = self._runtime()
+            run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_SuccessfulConnectorStub(),
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO epic_metadata (epic_key, epic_name, success_criteria_json)
+                    VALUES ('CEGBUPOL-2', 'Previously deleted epic', '[]')
+                    """
+                )
+                # Replicate the state produced by the old reconciliation path:
+                # Jira data is gone but its metadata mapping remains.
+                conn.execute("DELETE FROM issue_changelog WHERE issue_key = 'CEGBUPOL-2'")
+                conn.execute("DELETE FROM issue_release_links WHERE issue_key = 'CEGBUPOL-2'")
+                conn.execute("DELETE FROM issues WHERE issue_key = 'CEGBUPOL-2'")
+                conn.commit()
+            finally:
+                conn.close()
+
+            summary = run_jira_sync_once(
+                db_path=str(db_path),
+                runtime=runtime,
+                connector=_DeletedIssueConnectorStub(),
+                sync_mode="since_last",
+            )
+
+            self.assertEqual(summary["deletedIssuesRemoved"], 0)
+            self.assertEqual(summary["deletedEpicMappingsRemoved"], 1)
+            conn = sqlite3.connect(str(db_path))
+            try:
+                metadata_count = conn.execute(
+                    "SELECT COUNT(*) FROM epic_metadata WHERE epic_key = 'CEGBUPOL-2'"
+                ).fetchone()[0]
+            finally:
+                conn.close()
+            self.assertEqual(metadata_count, 0)
+
     def test_run_sync_keeps_local_issues_when_deletion_snapshot_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
@@ -670,7 +784,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 conn.close()
             self.assertEqual(issue_count, 2)
 
-    def test_run_sync_skips_deletion_snapshot_by_default(self) -> None:
+    def test_run_sync_can_skip_deletion_snapshot_when_explicitly_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = Path(tmp_dir) / "teambeacon.db"
             runtime = self._runtime()
@@ -685,6 +799,7 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
                 runtime=runtime,
                 connector=_SnapshotFailureConnectorStub(),
                 sync_mode="since_last",
+                reconcile_deleted_issues=False,
             )
 
             self.assertEqual(summary["state"], "completed")
@@ -1132,11 +1247,11 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
             db_path,
             sync_mode,
             since_date=None,
-            reconcile_deleted_issues=False,
+            reconcile_deleted_issues=True,
         ):
             _ = db_path
             _ = since_date
-            self.assertFalse(reconcile_deleted_issues)
+            self.assertTrue(reconcile_deleted_issues)
             captured_modes.append(sync_mode)
             progress_callback(
                 {

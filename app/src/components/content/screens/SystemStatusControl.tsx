@@ -143,7 +143,7 @@ export function SystemStatusControl() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedSyncMode, setSelectedSyncMode] = useState<JiraSyncMode>("since_last");
   const [selectedSinceDate, setSelectedSinceDate] = useState(todayLocalDate);
-  const [removeDeletedIssues, setRemoveDeletedIssues] = useState(false);
+  const [removeDeletedIssues, setRemoveDeletedIssues] = useState(true);
 
   const closeOverlay = useCallback(() => {
     setIsOpen(false);
@@ -328,11 +328,15 @@ export function SystemStatusControl() {
     : null;
   const hasStructuredSyncDetail = Boolean(issueProgressText || changelogCount !== null || candidateProgressText);
   const deletedIssuesRemoved = jiraSyncStatus?.deletedIssuesRemoved ?? 0;
+  const deletedEpicMappingsRemoved = jiraSyncStatus?.deletedEpicMappingsRemoved ?? 0;
   const completedResult = jiraSyncStatus?.state === "completed"
     ? (
       `${downloadedIssues} issue${downloadedIssues === 1 ? "" : "s"} synced`
       + (deletedIssuesRemoved > 0
         ? ` · ${deletedIssuesRemoved} deleted issue${deletedIssuesRemoved === 1 ? "" : "s"} removed`
+        : "")
+      + (deletedEpicMappingsRemoved > 0
+        ? ` · ${deletedEpicMappingsRemoved} epic mapping${deletedEpicMappingsRemoved === 1 ? "" : "s"} removed`
         : "")
     )
     : null;
@@ -358,7 +362,7 @@ export function SystemStatusControl() {
     if (isJiraSyncRunning) return;
     setSelectedSyncMode("since_last");
     setSelectedSinceDate(todayLocalDate);
-    setRemoveDeletedIssues(false);
+    setRemoveDeletedIssues(true);
     setView("sync");
   };
 

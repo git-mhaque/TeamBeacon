@@ -272,10 +272,10 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                                         "sinceDate": {"type": "string", "description": "ISO date or timestamp"},
                                         "reconcileDeletedIssues": {
                                             "type": "boolean",
-                                            "default": False,
+                                            "default": True,
                                             "description": (
                                                 "Compare against a complete project key snapshot and remove "
-                                                "local issues that no longer exist in JIRA."
+                                                "local issues and deleted epic mappings that no longer exist in JIRA."
                                             ),
                                         },
                                     },
@@ -1364,13 +1364,13 @@ def build_handler(
             if path == "/api/integrations/jira/sync/start":
                 mode = None
                 since_date = None
-                reconcile_deleted_issues = False
+                reconcile_deleted_issues = True
                 if isinstance(body_payload, dict):
                     mode_raw = body_payload.get("mode")
                     mode = mode_raw if isinstance(mode_raw, str) else None
                     since_date_raw = body_payload.get("sinceDate")
                     since_date = since_date_raw if isinstance(since_date_raw, str) else None
-                    reconcile_raw = body_payload.get("reconcileDeletedIssues", False)
+                    reconcile_raw = body_payload.get("reconcileDeletedIssues", True)
                     if not isinstance(reconcile_raw, bool):
                         self._set_json_headers(400)
                         self.wfile.write(

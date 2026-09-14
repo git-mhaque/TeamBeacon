@@ -1182,14 +1182,14 @@ def _remove_issues_absent_from_project_snapshot(
     conn: sqlite3.Connection,
     project_key: str,
     live_issue_keys: set[str],
-) -> int:
+) -> tuple[int, int]:
     normalized_project_key = project_key.strip()
     if not normalized_project_key:
         return 0
 
     rows = conn.execute(
         """
-        SELECT issue_key
+        SELECT issue_key, issue_type
         FROM issues
         WHERE project_key = ? COLLATE NOCASE
         """,
@@ -1201,8 +1201,70 @@ def _remove_issues_absent_from_project_snapshot(
         if row[0] is not None and str(row[0]).strip()
     }
     stale_issue_keys = sorted(local_issue_keys - live_issue_keys)
-    if not stale_issue_keys:
-        return 0
+
+    stale_epic_keys = {
+        str(row[0]).strip()
+        for row in rows
+        if row[0] is not None
+        and str(row[0]).strip() in stale_issue_keys
+        and str(row[1] or "").strip().casefold() == "epic"
+    }
+
+    # Earlier reconciliation runs could remove a deleted Jira issue while
+    # leaving its TeamBeacon metadata behind. Those orphaned mappings no
+    # longer have an `issues` row to identify them as epics, so reconcile the
+    # project-scoped metadata keys against the same complete Jira snapshot.
+    project_epic_prefix = f"{normalized_project_key.upper()}-"
+    configured_epic_rows = conn.execute(
+        """
+        SELECT epic_key
+        FROM epic_metadata
+        WHERE UPPER(epic_key) LIKE ?
+        """,
+        (f"{project_epic_prefix}%",),
+    ).fetchall()
+    stale_epic_keys.update(
+        str(row[0]).strip()
+        for row in configured_epic_rows
+        if row[0] is not None
+        and str(row[0]).strip()
+        and str(row[0]).strip() not in live_issue_keys
+    )
+    if not stale_issue_keys and not stale_epic_keys:
+        return 0, 0
+
+    removed_epic_mappings = 0
+    if stale_epic_keys:
+        sorted_stale_epic_keys = sorted(stale_epic_keys)
+        placeholders = ",".join("?" for _ in sorted_stale_epic_keys)
+        metadata_rows = conn.execute(
+            f"""
+            SELECT id
+            FROM epic_metadata
+            WHERE epic_key IN ({placeholders})
+            """,
+            sorted_stale_epic_keys,
+        ).fetchall()
+        metadata_ids = [int(row[0]) for row in metadata_rows]
+        if metadata_ids:
+            metadata_placeholders = ",".join("?" for _ in metadata_ids)
+            conn.execute(
+                f"DELETE FROM initiative_view_epics WHERE epic_metadata_id IN ({metadata_placeholders})",
+                metadata_ids,
+            )
+            conn.execute(
+                f"DELETE FROM epic_metadata_groups WHERE epic_metadata_id IN ({metadata_placeholders})",
+                metadata_ids,
+            )
+            conn.execute(
+                f"DELETE FROM epic_metadata_work_types WHERE epic_metadata_id IN ({metadata_placeholders})",
+                metadata_ids,
+            )
+            metadata_result = conn.execute(
+                f"DELETE FROM epic_metadata WHERE id IN ({metadata_placeholders})",
+                metadata_ids,
+            )
+            removed_epic_mappings = int(metadata_result.rowcount or 0)
 
     removed = 0
     for issue_key in stale_issue_keys:
@@ -1220,7 +1282,7 @@ def _remove_issues_absent_from_project_snapshot(
         )
         removed += int(result.rowcount or 0)
 
-    return removed
+    return removed, removed_epic_mappings
 
 
 def _active_sprint_ids(sprints: list[SprintRecord]) -> list[int]:
@@ -1552,7 +1614,7 @@ def run_jira_sync_once(
     connector: JiraRestConnector | None = None,
     sync_mode: SyncMode | str = SYNC_MODE_FULL,
     since_date: str | None = None,
-    reconcile_deleted_issues: bool = False,
+    reconcile_deleted_issues: bool = True,
 ) -> dict[str, Any]:
     runtime = runtime or _load_runtime()
     if runtime.board_id is None:
@@ -1743,6 +1805,7 @@ def run_jira_sync_once(
         active_sprint_changelog_entries_synced = 0
         active_sprint_changelog_failures = 0
         deleted_issues_removed = 0
+        deleted_epic_mappings_removed = 0
         incremental_filter_inclusive = requested_mode == SYNC_MODE_SINCE_DATE
         if incremental_since_utc is not None:
             count_incremental = getattr(connector, "count_incremental_issues", None)
@@ -1888,7 +1951,7 @@ def run_jira_sync_once(
                 }
             )
             live_project_issue_keys = connector.get_project_issue_keys(project_key_for_versions)
-            deleted_issues_removed = _remove_issues_absent_from_project_snapshot(
+            deleted_issues_removed, deleted_epic_mappings_removed = _remove_issues_absent_from_project_snapshot(
                 conn,
                 project_key_for_versions,
                 live_project_issue_keys,
@@ -1904,6 +1967,7 @@ def run_jira_sync_once(
                     "candidateIssues": candidate_issues_checked,
                     "candidateTotalIssues": candidate_total_issues,
                     "deletedIssuesRemoved": deleted_issues_removed,
+                    "deletedEpicMappingsRemoved": deleted_epic_mappings_removed,
                     "percent": _safe_percent(downloaded, total_issues),
                     "message": (
                         f"JIRA deletion reconcile complete; removed {deleted_issues_removed} stale issue"
@@ -2083,6 +2147,7 @@ def run_jira_sync_once(
             "changelogFailures": changelog_failures,
             "activeSprintChangelogFailures": active_sprint_changelog_failures,
             "deletedIssuesRemoved": deleted_issues_removed,
+            "deletedEpicMappingsRemoved": deleted_epic_mappings_removed,
             "reconcileDeletedIssues": reconcile_deleted_issues,
             "error": None,
             "message": (
@@ -2170,7 +2235,8 @@ class JiraSyncManager:
             "candidateIssues": 0,
             "candidateTotalIssues": None,
             "deletedIssuesRemoved": 0,
-            "reconcileDeletedIssues": False,
+            "deletedEpicMappingsRemoved": 0,
+            "reconcileDeletedIssues": True,
             "percent": None,
             "currentStep": 1,
             "totalSteps": SYNC_TOTAL_STEPS,
@@ -2204,6 +2270,9 @@ class JiraSyncManager:
             )
             self._state["deletedIssuesRemoved"] = update.get(
                 "deletedIssuesRemoved", self._state["deletedIssuesRemoved"]
+            )
+            self._state["deletedEpicMappingsRemoved"] = update.get(
+                "deletedEpicMappingsRemoved", self._state["deletedEpicMappingsRemoved"]
             )
             self._state["percent"] = update.get("percent", self._state["percent"])
             self._state["currentStep"] = update.get("currentStep", self._state["currentStep"])
@@ -2323,7 +2392,7 @@ class JiraSyncManager:
         self,
         mode: str | None = None,
         since_date: str | None = None,
-        reconcile_deleted_issues: bool = False,
+        reconcile_deleted_issues: bool = True,
     ) -> dict[str, Any]:
         normalized_mode = _normalize_sync_mode(mode)
         requested_since = _parse_requested_since(since_date) if normalized_mode == SYNC_MODE_SINCE_DATE else None
@@ -2356,6 +2425,7 @@ class JiraSyncManager:
                     "candidateIssues": 0,
                     "candidateTotalIssues": None,
                     "deletedIssuesRemoved": 0,
+                    "deletedEpicMappingsRemoved": 0,
                     "reconcileDeletedIssues": reconcile_deleted_issues,
                     "percent": None,
                     **_sync_step_payload("initializing"),
@@ -2381,7 +2451,7 @@ class JiraSyncManager:
         self,
         sync_mode: SyncMode,
         since_date: str | None = None,
-        reconcile_deleted_issues: bool = False,
+        reconcile_deleted_issues: bool = True,
     ) -> None:
         try:
             result = self._sync_runner(
@@ -2424,6 +2494,7 @@ class JiraSyncManager:
                     "candidateIssues": result.get("candidateIssues", self._state.get("candidateIssues", 0)),
                     "candidateTotalIssues": result.get("candidateTotalIssues"),
                     "deletedIssuesRemoved": result.get("deletedIssuesRemoved", 0),
+                    "deletedEpicMappingsRemoved": result.get("deletedEpicMappingsRemoved", 0),
                     "reconcileDeletedIssues": result.get(
                         "reconcileDeletedIssues", reconcile_deleted_issues
                     ),
@@ -2447,7 +2518,7 @@ def get_jira_sync_status() -> dict[str, Any]:
 def start_jira_sync(
     mode: str | None = None,
     since_date: str | None = None,
-    reconcile_deleted_issues: bool = False,
+    reconcile_deleted_issues: bool = True,
 ) -> dict[str, Any]:
     return JIRA_SYNC_MANAGER.start(
         mode=mode,
