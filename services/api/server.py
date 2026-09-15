@@ -51,6 +51,7 @@ from services.api.metadata.epic_config import (
     update_work_type,
     upsert_epic_metadata,
 )
+from services.api.response_cache import ResponseCache
 
 
 StatusProvider = Callable[[], dict[str, Any]]
@@ -494,6 +495,12 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                                 "cycleTimeStatusMode=custom."
                             ),
                         },
+                        {
+                            "name": "refresh",
+                            "in": "query",
+                            "schema": {"type": "boolean", "default": False},
+                            "description": "Bypass the 24-hour analytics cache.",
+                        },
                     ],
                     "responses": {
                         "200": {"description": "Team dashboard payload", "content": json_payload},
@@ -849,6 +856,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
                         {"name": "timezone", "in": "query", "schema": {"type": "string"}},
                         {"name": "viewId", "in": "query", "schema": {"type": "string"}},
+                        {"name": "refresh", "in": "query", "schema": {"type": "boolean", "default": False}},
                     ],
                     "responses": {"200": {"description": "Configured epic summary", "content": json_payload}, "400": error_payload},
                 }
@@ -943,8 +951,37 @@ def build_handler(
     web_dir: str | Path | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     web_root = Path(web_dir).expanduser().resolve() if web_dir is not None else None
+    analytics_cache = ResponseCache()
+
+    def data_as_of() -> str | None:
+        try:
+            value = jira_sync_status_provider().get("lastSyncedAt")
+        except Exception:
+            return None
+        return value if isinstance(value, str) and value else None
+
+    def cache_payload(
+        key: str,
+        *,
+        force_refresh: bool,
+        loader: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
+        source_timestamp = data_as_of()
+        payload = analytics_cache.get_or_load(
+            key,
+            data_version=source_timestamp or "unsynced",
+            force_refresh=force_refresh,
+            loader=loader,
+        )
+        if source_timestamp:
+            payload["dataAsOf"] = source_timestamp
+        return payload
 
     class TeamBeaconHandler(BaseHTTPRequestHandler):
+        @staticmethod
+        def _invalidate_analytics_cache() -> None:
+            analytics_cache.clear()
+
         def _set_headers(self, content_type: str, status_code: int = 200) -> None:
             self.send_response(status_code)
             self.send_header("Content-Type", content_type)
@@ -1132,12 +1169,22 @@ def build_handler(
                 query = parse_qs(parsed.query)
                 cycle_time_status_mode = query.get("cycleTimeStatusMode", ["default"])[0]
                 cycle_time_status_keys = query.get("cycleTimeStatus", []) if cycle_time_status_mode == "custom" else None
+                force_refresh = query.get("refresh", ["false"])[0].lower() == "true"
                 try:
-                    payload = team_dashboard_provider(
-                        flow_weeks=query.get("flowWeeks", ["4"])[0],
-                        recent_limit=query.get("recentLimit", ["5"])[0],
-                        timezone_name=query.get("timezone", [None])[0],
-                        cycle_time_status_keys=cycle_time_status_keys,
+                    payload = cache_payload(
+                        "dashboard:" + json.dumps({
+                            "flowWeeks": query.get("flowWeeks", ["4"])[0],
+                            "recentLimit": query.get("recentLimit", ["5"])[0],
+                            "timezone": query.get("timezone", [None])[0],
+                            "cycleTimeStatus": cycle_time_status_keys,
+                        }, sort_keys=True),
+                        force_refresh=force_refresh,
+                        loader=lambda: team_dashboard_provider(
+                            flow_weeks=query.get("flowWeeks", ["4"])[0],
+                            recent_limit=query.get("recentLimit", ["5"])[0],
+                            timezone_name=query.get("timezone", [None])[0],
+                            cycle_time_status_keys=cycle_time_status_keys,
+                        ),
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)
@@ -1232,13 +1279,24 @@ def build_handler(
                 timezone_name = timezone_raw.strip() if isinstance(timezone_raw, str) else None
                 view_id_raw = query.get("viewId", [None])[0]
                 view_id = view_id_raw.strip() if isinstance(view_id_raw, str) else None
+                force_refresh = query.get("refresh", ["false"])[0].lower() == "true"
                 try:
-                    payload = metadata_summary_provider(
-                        limit=limit,
-                        period_start=period_start,
-                        period_end=period_end,
-                        timezone_name=timezone_name,
-                        view_id=view_id,
+                    payload = cache_payload(
+                        "initiatives:" + json.dumps({
+                            "limit": limit,
+                            "periodStart": period_start,
+                            "periodEnd": period_end,
+                            "timezone": timezone_name,
+                            "viewId": view_id,
+                        }, sort_keys=True),
+                        force_refresh=force_refresh,
+                        loader=lambda: metadata_summary_provider(
+                            limit=limit,
+                            period_start=period_start,
+                            period_end=period_end,
+                            timezone_name=timezone_name,
+                            view_id=view_id,
+                        ),
                     )
                 except ValueError as exc:
                     self._set_json_headers(400)
@@ -1360,6 +1418,10 @@ def build_handler(
 
             parsed = urlparse(self.path)
             path = parsed.path
+            # POST routes can mutate local state or begin an asynchronous sync.
+            # Clearing broadly keeps derived analytics correct without coupling cache
+            # invalidation to every individual write handler.
+            self._invalidate_analytics_cache()
 
             if path == "/api/integrations/jira/sync/start":
                 mode = None

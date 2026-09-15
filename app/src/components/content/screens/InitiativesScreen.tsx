@@ -26,6 +26,12 @@ import {
   upsertEpicMetadata,
 } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
+import { formatDisplayTimestamp } from "../../../lib/dateTime";
+import {
+  buildInitiativeSnapshotKey,
+  readInitiativeSnapshot,
+  writeInitiativeSnapshot,
+} from "../../../lib/initiativeSnapshotCache";
 
 type RagLabel = "Red" | "Amber" | "Green";
 
@@ -60,6 +66,15 @@ type PersistedReportingSelection = {
   preset: ReportingPreset;
   startDate: string;
   endDate: string;
+};
+
+type InitiativeSummarySnapshot = {
+  epicSummary: InitiativeEpicSummary[];
+  allConfiguredEpicSummary: InitiativeEpicSummary[];
+  reportingPeriod: ConfiguredEpicSummaryResponse["reportingPeriod"];
+  generatedAt: string | null;
+  jiraBaseUrl: string | null;
+  aiProviderName: string;
 };
 
 type ViewEditorMode = "create" | "edit";
@@ -300,16 +315,7 @@ function formatReportingPeriodLabel(startDate: string, endDate: string): string 
 }
 
 function formatTimestamp(value: string | null | undefined): string {
-  if (!value) return "Not generated yet";
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDisplayTimestamp(value, "Not generated yet");
 }
 
 function buildCompletedCardsSummaryPrompt(params: {
@@ -680,6 +686,7 @@ function parsePersistedReportingSelection(
 }
 
 export function InitiativesScreen() {
+  const useSummarySnapshot = import.meta.env.MODE !== "test";
   const initialRange = useMemo(() => buildRelativeRange(7), []);
   const initialReportingSelection = useMemo(() => readPersistedReportingSelection(initialRange), [initialRange]);
   const browserTimezone = useMemo(() => {
@@ -687,17 +694,29 @@ export function InitiativesScreen() {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   }, []);
   const hasHydratedReportingSelectionFromStore = useRef(false);
+  const initialActiveViewId = useMemo(() => readPersistedInitiativeViewId(), []);
+  const initialSnapshotKey = useMemo(() => buildInitiativeSnapshotKey({
+    periodStart: initialReportingSelection.startDate,
+    periodEnd: initialReportingSelection.endDate,
+    timezone: browserTimezone,
+    viewId: initialActiveViewId,
+  }), [browserTimezone, initialActiveViewId, initialReportingSelection.endDate, initialReportingSelection.startDate]);
+  const initialSummarySnapshot = useMemo(
+    () => useSummarySnapshot ? readInitiativeSnapshot<InitiativeSummarySnapshot>(initialSnapshotKey) : null,
+    [initialSnapshotKey, useSummarySnapshot],
+  );
+  const initialSummarySnapshotRef = useRef(initialSummarySnapshot);
 
-  const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>([]);
-  const [allConfiguredEpicSummary, setAllConfiguredEpicSummary] = useState<InitiativeEpicSummary[]>([]);
-  const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(undefined);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [epicSummary, setEpicSummary] = useState<InitiativeEpicSummary[]>(() => initialSummarySnapshot?.epicSummary ?? []);
+  const [allConfiguredEpicSummary, setAllConfiguredEpicSummary] = useState<InitiativeEpicSummary[]>(() => initialSummarySnapshot?.allConfiguredEpicSummary ?? []);
+  const [reportingPeriod, setReportingPeriod] = useState<ConfiguredEpicSummaryResponse["reportingPeriod"]>(() => initialSummarySnapshot?.reportingPeriod);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(() => initialSummarySnapshot?.generatedAt ?? null);
   const [initiativeViews, setInitiativeViews] = useState<InitiativeView[]>([]);
-  const [activeViewId, setActiveViewId] = useState<InitiativeViewId>(readPersistedInitiativeViewId);
-  const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
-  const [aiProviderName, setAiProviderName] = useState("AI");
+  const [activeViewId, setActiveViewId] = useState<InitiativeViewId>(initialActiveViewId);
+  const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(() => initialSummarySnapshot?.jiraBaseUrl ?? null);
+  const [aiProviderName, setAiProviderName] = useState(() => initialSummarySnapshot?.aiProviderName ?? "AI");
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => initialSummarySnapshot === null);
   const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
@@ -781,7 +800,7 @@ export function InitiativesScreen() {
   const [completedSummaryModelId, setCompletedSummaryModelId] = useState<string | null>(null);
   const [completedSummaryGeneratedAt, setCompletedSummaryGeneratedAt] = useState<string | null>(null);
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -792,6 +811,7 @@ export function InitiativesScreen() {
           periodEnd: reportingRange.endDate,
           timezone: browserTimezone,
           viewId: selectedViewId,
+          forceRefresh,
         }),
         selectedViewId === null
           ? Promise.resolve(null)
@@ -799,6 +819,7 @@ export function InitiativesScreen() {
               periodStart: reportingRange.startDate,
               periodEnd: reportingRange.endDate,
               timezone: browserTimezone,
+              forceRefresh,
             }),
         fetchJiraIntegrationStatus(),
         fetchAiIntegrationStatus(),
@@ -817,7 +838,32 @@ export function InitiativesScreen() {
         setAllConfiguredEpicSummary([]);
       }
       setReportingPeriod(summaryResult.value.reportingPeriod);
-      setGeneratedAt(summaryResult.value.generatedAt ?? new Date().toISOString());
+      const nextGeneratedAt = summaryResult.value.dataAsOf ?? summaryResult.value.generatedAt ?? new Date().toISOString();
+      setGeneratedAt(nextGeneratedAt);
+
+      const nextJiraBaseUrl = jiraResult.status === "fulfilled" && jiraResult.value.config.baseUrl
+        ? jiraResult.value.config.baseUrl.replace(/\/$/, "")
+        : null;
+      const nextAiProviderName = aiStatusResult.status === "fulfilled"
+        ? formatAiProviderName(aiStatusResult.value.provider ?? aiStatusResult.value.configuredProvider ?? aiStatusResult.value.source)
+        : "AI";
+      if (useSummarySnapshot) {
+        writeInitiativeSnapshot(buildInitiativeSnapshotKey({
+          periodStart: reportingRange.startDate,
+          periodEnd: reportingRange.endDate,
+          timezone: browserTimezone,
+          viewId: activeViewId,
+        }), {
+          epicSummary: summaryResult.value.epics ?? [],
+          allConfiguredEpicSummary: selectedViewId === null
+            ? summaryResult.value.epics ?? []
+            : allSummaryResult.status === "fulfilled" && allSummaryResult.value ? allSummaryResult.value.epics ?? [] : [],
+          reportingPeriod: summaryResult.value.reportingPeriod,
+          generatedAt: nextGeneratedAt,
+          jiraBaseUrl: nextJiraBaseUrl,
+          aiProviderName: nextAiProviderName,
+        });
+      }
 
       if (jiraResult.status === "fulfilled") {
         setJiraBaseUrl(
@@ -850,7 +896,7 @@ export function InitiativesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeViewId, browserTimezone, reportingRange.endDate, reportingRange.startDate]);
+  }, [activeViewId, browserTimezone, reportingRange.endDate, reportingRange.startDate, useSummarySnapshot]);
 
   const loadViews = useCallback(async () => {
     try {
@@ -876,15 +922,20 @@ export function InitiativesScreen() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    await Promise.all([loadSummary(), loadLookup(), loadViews()]);
+  const refresh = useCallback(async (forceRefresh = false) => {
+    await Promise.all([loadSummary(forceRefresh), loadLookup(), loadViews()]);
   }, [loadLookup, loadSummary, loadViews]);
 
   useEffect(() => {
+    if (initialSummarySnapshotRef.current) {
+      initialSummarySnapshotRef.current = null;
+      void Promise.all([loadLookup(), loadViews()]);
+      return;
+    }
     refresh().catch(() => {
       // refresh already updates local state.
     });
-  }, [refresh]);
+  }, [loadLookup, loadViews, refresh]);
 
   useLayoutEffect(() => {
     setTopbarActionsTarget(document.querySelector<HTMLElement>(".tb-main-initiatives .tb-topbar-actions-initiative"));
@@ -1907,7 +1958,7 @@ export function InitiativesScreen() {
         <span>Data as of</span>
         <strong>{loading ? generatedAt ? "Refreshing…" : "Loading…" : formatTimestamp(generatedAt)}</strong>
       </span>
-      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void refresh()} disabled={loading}>
+      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void refresh(true)} disabled={loading}>
         <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh
       </button>
     </div>

@@ -116,6 +116,38 @@ describe("api initiative views", () => {
     );
   });
 
+  it("adds refresh=true when a configured epic summary is manually refreshed", async () => {
+    (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({ epics: [] }));
+    const { fetchConfiguredEpicSummary } = await import("../../src/lib/api");
+
+    await fetchConfiguredEpicSummary(50, { forceRefresh: true });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://teambeacon.test/api/metadata/epics/summary?limit=50&refresh=true",
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+    );
+  });
+
+  it("adds refresh=true when the dashboard is manually refreshed", async () => {
+    (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({}));
+    const { fetchTeamDashboard } = await import("../../src/lib/api");
+
+    await fetchTeamDashboard(4, 5, "UTC", undefined, true);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://teambeacon.test/api/team/dashboard?flowWeeks=4&recentLimit=5&timezone=UTC&refresh=true",
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+    );
+  });
+
   it("omits all-configured view id from configured completed cards request", async () => {
     (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
     const payload = {

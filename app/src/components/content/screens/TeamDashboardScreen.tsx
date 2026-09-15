@@ -15,6 +15,7 @@ import {
   type TeamDashboardSprintCycleTime,
   type TeamDashboardWorkStream,
 } from "../../../lib/api";
+import { formatDisplayTimestamp } from "../../../lib/dateTime";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { readTeamInsightsCycleTimeStatusKeys } from "../../../lib/teamInsightsSettings";
 import {
@@ -159,15 +160,7 @@ function formatDate(value?: string | null): string {
 }
 
 function formatTimestamp(value?: string | null): string {
-  if (!value) return "Not available";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Not available";
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
+  return formatDisplayTimestamp(value);
 }
 
 function formatDays(value?: number | null): string {
@@ -256,7 +249,7 @@ export function TeamDashboardScreen({
   const [issueSelection, setIssueSelection] = useState<TeamDashboardIssueSelection | null>(null);
   const initialLoading = loading && payload == null;
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -265,6 +258,7 @@ export function TeamDashboardScreen({
         5,
         Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
         cycleTimeStatusKeys,
+        forceRefresh,
       );
       setPayload(response);
     } catch (loadError) {
@@ -351,9 +345,9 @@ export function TeamDashboardScreen({
     <div className="tb-dashboard-freshness">
       <span className="tb-dashboard-freshness-copy">
         <span>Data as of</span>
-        <strong>{loading ? payload ? "Refreshing…" : "Loading…" : formatTimestamp(payload?.generatedAt)}</strong>
+        <strong>{loading ? payload ? "Refreshing…" : "Loading…" : formatTimestamp(payload?.dataAsOf ?? payload?.generatedAt)}</strong>
       </span>
-      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void loadDashboard()} disabled={loading}>
+      <button type="button" className="tb-btn tb-btn-sm" onClick={() => void loadDashboard(true)} disabled={loading}>
         <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh
       </button>
     </div>

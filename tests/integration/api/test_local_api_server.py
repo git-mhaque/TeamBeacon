@@ -1584,6 +1584,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["workStreams"][0]["name"], "Platform")
         self.assertEqual(body["latestRelease"]["name"], "Search 26.4")
         self.assertEqual(body["sprintCycleTime"]["direction"], "down")
+        self.assertEqual(body["dataAsOf"], "2026-03-25T00:00:00+00:00")
         self.assertEqual(
             self.team_dashboard_calls[-1],
             {
@@ -1593,6 +1594,14 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
                 "cycle_time_status_keys": ["in progress", "code review"],
             },
         )
+
+        with urlopen(url, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(self.team_dashboard_calls), 1)
+
+        with urlopen(f"{url}&refresh=true", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(self.team_dashboard_calls), 2)
 
         with self.assertRaises(HTTPError) as invalid_context:
             urlopen(f"{self.base_url}/api/team/dashboard?flowWeeks=2", timeout=5)  # noqa: S310
@@ -2011,11 +2020,24 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["reportingPeriod"]["startDate"], "2026-03-01")
         self.assertEqual(body["reportingPeriod"]["endDate"], "2026-03-30")
         self.assertEqual(body["reportingPeriod"]["timezone"], "Australia/Melbourne")
+        self.assertEqual(body["dataAsOf"], "2026-03-25T00:00:00+00:00")
         self.assertIsNone(body["epics"][0]["ragScore"])
         self.assertEqual(
             self.epic_summary_calls[-1],
             (30, "2026-03-01", "2026-03-30", "Australia/Melbourne", None),
         )
+
+        summary_url = (
+            f"{self.base_url}/api/metadata/epics/summary?limit=30&periodStart=2026-03-01"
+            "&periodEnd=2026-03-30&timezone=Australia%2FMelbourne"
+        )
+        with urlopen(summary_url, timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(self.epic_summary_calls), 1)
+
+        with urlopen(f"{summary_url}&refresh=true", timeout=5) as response:  # noqa: S310
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(self.epic_summary_calls), 2)
 
     def test_metadata_epic_summary_endpoint_supports_view_id(self) -> None:
         with urlopen(  # noqa: S310

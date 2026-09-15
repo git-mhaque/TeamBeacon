@@ -323,6 +323,7 @@ export type InitiativeView = {
 export type ConfiguredEpicSummaryResponse = {
   epics: InitiativeEpicSummary[];
   generatedAt?: string | null;
+  dataAsOf?: string | null;
   reportingPeriod?: EpicSummaryReportingPeriod;
   view?: InitiativeView;
   error?: string | null;
@@ -509,6 +510,7 @@ export type TeamDashboardCompletedItem = {
 export type TeamDashboardResponse = {
   source: "local";
   generatedAt: string;
+  dataAsOf?: string | null;
   timezone: string;
   flowPeriod: {
     weeks: TeamDashboardFlowWeeks;
@@ -930,6 +932,7 @@ export async function fetchConfiguredEpicSummary(
     periodEnd?: string | null;
     timezone?: string | null;
     viewId?: InitiativeViewId | null;
+    forceRefresh?: boolean;
   },
 ): Promise<ConfiguredEpicSummaryResponse> {
   const params = new URLSearchParams();
@@ -945,6 +948,9 @@ export async function fetchConfiguredEpicSummary(
   }
   if (options?.viewId !== undefined && options.viewId !== null && options.viewId !== "all") {
     params.set("viewId", String(options.viewId));
+  }
+  if (options?.forceRefresh) {
+    params.set("refresh", "true");
   }
 
   const response = await fetch(`${API_BASE}/api/metadata/epics/summary?${params.toString()}`, {
@@ -1317,6 +1323,7 @@ export async function fetchTeamDashboard(
   recentLimit = 5,
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
   cycleTimeStatusKeys?: string[] | null,
+  forceRefresh = false,
 ): Promise<TeamDashboardResponse> {
   const params = new URLSearchParams();
   params.set("flowWeeks", String(flowWeeks));
@@ -1327,6 +1334,9 @@ export async function fetchTeamDashboard(
     for (const statusKey of cycleTimeStatusKeys) {
       params.append("cycleTimeStatus", statusKey);
     }
+  }
+  if (forceRefresh) {
+    params.set("refresh", "true");
   }
   const response = await fetch(`${API_BASE}/api/team/dashboard?${params.toString()}`, {
     method: "GET",
