@@ -681,6 +681,34 @@ describe("SystemStatusControl", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
   });
 
+  it("keeps AI model failures compact until their details are requested", async () => {
+    const handlers = connectedHandlers();
+    const providerError = "OCI GenAI chat request failed: Entity with key cohere.command-b-03-2025 not found.";
+    handlers["/api/integrations/ai/status"] = {
+      source: "oci_genai",
+      provider: "oci",
+      configuredProvider: "oci",
+      connected: false,
+      checkedAt: "2026-03-30T09:15:00Z",
+      config: { modelId: "cohere.command-b-03-2025" },
+      checks: [
+        { name: "oci_sdk", ok: true, detail: "available" },
+        { name: "oci_profile", ok: true, detail: "loaded" },
+        { name: "model_inference", ok: false, detail: "model request failed" },
+      ],
+      error: providerError,
+    };
+    setupFetchMock(handlers);
+
+    renderSystemStatusControl();
+
+    expect(await screen.findByText("Live model check failed. Update the configured model or view details.")).toBeInTheDocument();
+    const disclosure = screen.getByText("View details").closest("details");
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(within(disclosure as HTMLDetailsElement).getByText(providerError)).toBeInTheDocument();
+  });
+
   it("validates date-based sync and reports start failures", async () => {
     const handlers = {
       ...connectedHandlers(),

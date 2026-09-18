@@ -73,6 +73,7 @@ Expected key checks:
 - `"checks"` includes:
   - `"name":"oci_sdk"` with `"ok":true`
   - `"name":"oci_profile"` with `"ok":true`
+  - `"name":"model_inference"` with `"ok":true`, confirming the configured model completed a live minimal chat request.
 
 ## 4. Smoke Test: OCI Chat Request
 

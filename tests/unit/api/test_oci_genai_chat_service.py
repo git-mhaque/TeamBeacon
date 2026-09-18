@@ -110,7 +110,7 @@ class OciGenAiChatServiceUnitTests(unittest.TestCase):
         self.assertIn("missing required environment variables", payload["error"])
         self.assertTrue(payload["checks"])
 
-    def test_status_returns_connected_when_profile_is_loadable(self) -> None:
+    def test_status_returns_connected_when_model_inference_succeeds(self) -> None:
         with patch("services.api.integrations.oci_genai_chat.load_env_files"), patch(
             "services.api.integrations.oci_genai_chat.OciGenAiRuntimeConfig.from_env",
             return_value=self._runtime(),
@@ -127,7 +127,41 @@ class OciGenAiChatServiceUnitTests(unittest.TestCase):
         self.assertEqual(payload["config"]["modelId"], "cohere.command-r-08-2024")
         self.assertEqual(payload["checks"][0]["name"], "oci_sdk")
         self.assertEqual(payload["checks"][1]["name"], "oci_profile")
+        self.assertEqual(payload["checks"][2]["name"], "model_inference")
+        self.assertTrue(payload["checks"][2]["ok"])
         self.assertIsNone(payload["error"])
+
+        client = _FakeInferenceClient.last_instance
+        self.assertIsNotNone(client)
+        if client is None:
+            self.fail("Expected a live health-check inference request.")
+        self.assertIsNotNone(client.last_chat_detail)
+        if client.last_chat_detail is None:
+            self.fail("Expected health-check request details.")
+        self.assertEqual(client.last_chat_detail.chat_request.message, "Reply with OK.")
+        self.assertEqual(client.last_chat_detail.chat_request.max_tokens, 4)
+        self.assertEqual(client.last_chat_detail.chat_request.temperature, 0.0)
+
+    def test_status_returns_disconnected_when_model_inference_fails(self) -> None:
+        with patch("services.api.integrations.oci_genai_chat.load_env_files"), patch(
+            "services.api.integrations.oci_genai_chat.OciGenAiRuntimeConfig.from_env",
+            return_value=self._runtime(),
+        ), patch(
+            "services.api.integrations.oci_genai_chat._load_oci_module",
+            return_value=_FakeOciModule(),
+        ), patch(
+            "services.api.integrations.oci_genai_chat._load_oci_profile",
+            return_value={"tenancy": "ocid1.tenancy.oc1..example"},
+        ), patch(
+            "services.api.integrations.oci_genai_chat.chat_with_oci_genai",
+            side_effect=RuntimeError("OCI GenAI chat request failed: model is retired"),
+        ):
+            payload = get_oci_genai_status()
+
+        self.assertFalse(payload["connected"])
+        self.assertEqual(payload["checks"][-1]["name"], "model_inference")
+        self.assertFalse(payload["checks"][-1]["ok"])
+        self.assertIn("model is retired", payload["error"])
 
     def test_chat_calls_oci_and_returns_text_response(self) -> None:
         runtime = self._runtime()

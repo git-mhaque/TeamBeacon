@@ -301,7 +301,12 @@ export function SystemStatusControl() {
   const confluenceHint = confluenceError ?? (confluenceLoading ? "Testing Confluence REST API and PAT access." : confluenceStatus?.error ?? checksSummary(confluenceStatus?.checks));
   const aiProviderName = formatAiProviderName(aiStatus?.provider ?? aiStatus?.configuredProvider ?? aiStatus?.source);
   const aiModelName = typeof aiStatus?.config?.modelId === "string" && aiStatus.config.modelId.trim() ? aiStatus.config.modelId.trim() : "n/a";
-  const aiHint = aiError ?? (aiLoading ? `Testing ${aiProviderName} connectivity.` : aiStatus?.error ?? checksSummary(aiStatus?.checks));
+  const aiFailureDetail = aiError ?? aiStatus?.error ?? null;
+  const aiHint = aiLoading
+    ? `Testing ${aiProviderName} connectivity.`
+    : aiFailureDetail
+      ? "Live model check failed. Update the configured model or view details."
+      : checksSummary(aiStatus?.checks);
   const syncStepLabel = isJiraSyncRunning ? normalizeSyncStepLabel(jiraSyncStatus?.stepLabel, jiraSyncStatus?.phase) : null;
   const syncStepCounter = isJiraSyncRunning
     && typeof jiraSyncStatus?.currentStep === "number"
@@ -547,6 +552,12 @@ export function SystemStatusControl() {
                       <span className={`tb-status-pill ${aiStatus?.connected && !aiError ? "is-good" : aiLoading ? "is-neutral" : "is-risk"}`}>{aiValue}</span>
                     </div>
                     <p>{aiHint}</p>
+                    {aiFailureDetail ? (
+                      <details className="tb-system-connection-details">
+                        <summary>View details</summary>
+                        <pre>{aiFailureDetail}</pre>
+                      </details>
+                    ) : null}
                     <small>Last checked: {formatCheckedAt(aiStatus?.checkedAt)}</small>
                     <dl className="tb-system-inline-facts">
                       <div><dt>Provider</dt><dd>{aiProviderName}</dd></div>

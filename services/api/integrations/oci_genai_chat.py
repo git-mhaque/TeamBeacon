@@ -7,6 +7,10 @@ from packages.connectors.jira_config import load_env_files
 from packages.connectors.oci_genai_config import OciGenAiRuntimeConfig
 
 
+_HEALTH_CHECK_PROMPT = "Reply with OK."
+_HEALTH_CHECK_MAX_TOKENS = 4
+
+
 def _utc_iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -124,6 +128,31 @@ def get_oci_genai_status() -> dict[str, Any]:
             "name": "oci_profile",
             "ok": True,
             "detail": f"Profile {runtime.config_profile} loaded from {runtime.config_file_path}.",
+        }
+    )
+
+    try:
+        chat_with_oci_genai(
+            message=_HEALTH_CHECK_PROMPT,
+            max_tokens=_HEALTH_CHECK_MAX_TOKENS,
+            temperature=0.0,
+        )
+    except (RuntimeError, ValueError) as exc:
+        base_payload["error"] = str(exc)
+        base_payload["checks"].append(
+            {
+                "name": "model_inference",
+                "ok": False,
+                "detail": f"Model {runtime.model_id} did not complete the live inference check.",
+            }
+        )
+        return base_payload
+
+    base_payload["checks"].append(
+        {
+            "name": "model_inference",
+            "ok": True,
+            "detail": f"Model {runtime.model_id} completed a live inference check.",
         }
     )
     base_payload["connected"] = True

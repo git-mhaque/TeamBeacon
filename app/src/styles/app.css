@@ -382,6 +382,32 @@ body {
   font-size: 0.65rem;
 }
 
+.tb-system-connection-details {
+  color: #6e665f;
+  font-size: 0.66rem;
+}
+
+.tb-system-connection-details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #7a453e;
+  font-weight: 700;
+}
+
+.tb-system-connection-details pre {
+  max-height: 9rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin: 0.4rem 0 0;
+  padding: 0.45rem;
+  border: 1px solid #eaded8;
+  border-radius: 0.4rem;
+  background: #fcf8f6;
+  color: #5f5851;
+  font: inherit;
+}
+
 .tb-system-connection-indicator {
   width: 0.56rem;
   height: 0.56rem;
