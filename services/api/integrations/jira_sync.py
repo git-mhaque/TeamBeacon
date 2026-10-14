@@ -2515,6 +2515,19 @@ def get_jira_sync_status() -> dict[str, Any]:
     return JIRA_SYNC_MANAGER.get_status()
 
 
+def get_jira_data_as_of() -> str | None:
+    """Read source freshness without reconciling or changing sync-run state."""
+    scope = JIRA_SYNC_MANAGER._resolve_runtime_scope()
+    if not scope:
+        return None
+    try:
+        checkpoint = _read_checkpoint(_resolve_db_path(), scope)
+    except Exception:
+        return None
+    value = checkpoint.get("lastSyncedAt") if checkpoint else None
+    return value if isinstance(value, str) and value else None
+
+
 def start_jira_sync(
     mode: str | None = None,
     since_date: str | None = None,

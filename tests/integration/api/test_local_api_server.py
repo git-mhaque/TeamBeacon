@@ -1069,6 +1069,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             }
 
         handler_cls = build_handler(
+            jira_data_as_of_provider=lambda: "2026-03-25T00:00:00+00:00",
             jira_status_provider=fake_status,
             jira_sync_status_provider=fake_sync_status,
             jira_sync_start_provider=fake_sync_start,

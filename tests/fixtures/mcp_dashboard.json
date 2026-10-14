@@ -1,0 +1,17 @@
+{
+  "source": "local", "generatedAt": "2026-10-09T00:00:00Z", "dataAsOf": "2026-10-08T23:00:00Z",
+  "timezone": "Australia/Melbourne", "flowPeriod": {"weeks": 4, "startDate": "2026-09-14", "endDate": "2026-10-11"},
+  "workStreams": [
+    {"id": 1, "name": "Platform", "epicCount": 3, "newCount": 12, "completedCount": 15, "netFlow": -3, "currentWipCount": 4, "totalCards": 20, "totalCompletedCards": 13, "completionPercent": 65},
+    {"id": 2, "name": "Customer experience", "epicCount": 2, "newCount": 9, "completedCount": 6, "netFlow": 3, "currentWipCount": 5, "totalCards": 16, "totalCompletedCards": 8, "completionPercent": 50}
+  ],
+  "latestRelease": {"name": "October delivery", "releaseDate": "2026-10-05", "cycleTimeDays": 18.5},
+  "sprintCycleTime": {"latestSprintName": "Sprint 42", "latestAverageDays": 3.4, "previousSprintName": "Sprint 41", "previousAverageDays": 4.2, "deltaDays": -0.8, "deltaPercent": -19, "direction": "down"},
+  "blockedItems": {"sprintName": "Sprint 43", "count": 1, "storyPointsTotal": 5, "items": [
+    {"issueKey": "DEMO-421", "issueUrl": "https://jira.example.test/browse/DEMO-421", "summary": "Waiting for integration environment", "status": "Blocked"}
+  ]},
+  "recentlyCompleted": {"windowDays": 7, "count": 1, "items": [
+    {"issueKey": "DEMO-419", "issueUrl": "https://jira.example.test/browse/DEMO-419", "summary": "Ship the delivery dashboard", "completedAt": "2026-10-08T10:00:00Z", "workStreamName": "Platform"}
+  ]},
+  "errors": {}
+}

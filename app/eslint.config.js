@@ -10,10 +10,15 @@ export default tseslint.config(
       "coverage/**",
       "staged-themes/**",
       "web/**",
+      "mcp-build/**",
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["scripts/*.mjs"],
+    languageOptions: { globals: globals.node },
+  },
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {

@@ -6,6 +6,11 @@ config/.env
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv-mcp/
+.coverage*
+.ruff_cache/
+services/mcp/ui/
+app/mcp-build/
 
 # Frontend build artifacts
 node_modules/

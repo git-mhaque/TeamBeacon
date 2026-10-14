@@ -14,6 +14,12 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       thresholds: {
+        "src/mcp/bridge.ts": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/mcp/DashboardApp.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/components/content/PrimaryNavigation.tsx": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },
@@ -26,6 +32,7 @@ export default defineConfig({
         "tests/**",
         "src/components/app.tsx",
         "src/main.tsx",
+        "src/mcp/main.tsx",
       ],
     },
   },

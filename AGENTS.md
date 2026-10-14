@@ -35,9 +35,13 @@ Tooling is minimal right now. Use:
 - `PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile packages/connectors/*.py` for connector syntax checks.
 - `python3 -m unittest discover -s tests/unit -p "test_*.py" -v` for unit tests.
 - `python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v` for local API integration tests.
+- For the API server and JIRA sync coverage gate, install `coverage==7.16.2` in a Python 3.11 virtual environment, then run `python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/unit -p "test_*.py" -v` and `python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/integration/api -p "test_*.py" -v`. Enforce each module separately with `python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90` and `python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90`. The optional `.venv-mcp` development environment already includes coverage.
 - `RUN_LIVE_JIRA_TESTS=1 python3 -m unittest discover -s tests/integration -p "test_*.py" -v` for live integration tests.
 - `cd app && npm run typecheck && npm run lint && npm run build` for frontend static and production build validation.
 - `cd app && npm run test:coverage` for frontend coverage validation.
+- `cd app && npm run build:mcp` to bundle the read-only MCP dashboard widget.
+- `.venv-mcp/bin/ruff check --config services/mcp/ruff.toml services/mcp tests/mcp` for MCP lint; see `services/mcp/README.md` for optional dependency installation.
+- `.venv-mcp/bin/python -m coverage run --branch --source=services.mcp -m unittest discover -s tests/mcp -v && .venv-mcp/bin/python -m coverage report --fail-under=90` for MCP unit/protocol tests; build the widget first.
 - `docker compose up -d --build` to run the containerized web+API stack (local image mode; builds from `Dockerfile`).
 - `docker build -t teambeacon:local .` to build the distributable TeamBeacon image.
 - Review `docs/plans/FRONTEND_MODERNIZATION_PLAN.md` for the active UI direction and parity constraints.

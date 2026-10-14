@@ -74,6 +74,8 @@ Default thresholds:
 - Single-container, single-user deployment for MVP.
 - The Python runtime serves both `/api/*` endpoints and the compiled SPA from one origin.
 - Future-ready for shared service mode (Postgres + hosted API) with same domain model.
+- Codex dashboard integration: `services/mcp/` provides an optional Python stdio adapter calling the running API. Two read tools expose dashboard facts and a bundled React MCP Apps widget. The widget uses the host bridge. See [setup](../../services/mcp/README.md) and the [roadmap](../plans/MCP_INTEGRATION_PLAN.md). Native Codex rendering remains a client compatibility check.
+- Analytics cache freshness reads the JIRA checkpoint without invoking sync-run recovery; operational status endpoints retain existing recovery behavior.
 
 ## 9. UI Information Architecture
 - Primary navigation:
@@ -108,6 +110,7 @@ Default thresholds:
 
 ## 11. Team Dashboard Composition
 - `GET /api/team/dashboard` is a read-only composite endpoint over existing local insight services; it does not introduce a second metric definition.
+- The compact MCP widget displays work-stream progress, flow, filters, and freshness only; detailed highlights and issue lists remain available through the data tools and full web UI.
 - Work-stream flow uses the same weekly created/completed semantics as Initiative Deep Dive, while progress uses completed cards divided by all currently scoped cards.
 - Section failures are isolated and returned in an `errors` map so healthy dashboard regions remain usable.
 - The frontend persists only the selected 1/4/12-week flow window; source data remains authoritative in SQLite.

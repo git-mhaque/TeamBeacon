@@ -5,6 +5,8 @@
 - Scope: Web frontend design and implementation stack
 - Decision owner: TeamBeacon maintainers
 
+The optional read-only MCP dashboard uses a separate React entry point in `app/src/mcp/`, sharing the existing Vite/TypeScript/test toolchain. `npm run build:mcp` produces a self-contained HTML resource for the Python MCP adapter without changing SPA routes or production static-serving behavior. Native Codex widget rendering remains a compatibility check. See [MCP setup](../../services/mcp/README.md).
+
 ## 1. Executive Decision
 
 Replace the Oracle JET/Preact/RequireJS frontend with a React and Vite single-page application while preserving the existing Python API, SQLite data model, container deployment, API routes, local development ports, and `app/web` production artifact contract.
@@ -555,3 +557,7 @@ The Initiative and Team Report screens are the largest uncertainty because they 
 - [shadcn/ui principles](https://ui.shadcn.com/docs)
 - [OpenAPI TypeScript](https://openapi-ts.dev/introduction)
 - [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing)
+
+### MCP dashboard density
+
+The chat dashboard focuses on work-stream rows with inline progress and flow metrics, a compact header, filters, and source freshness. Rows reflow at 640px and 380px. The metric strip, blocker/recent-completion lists, cycle-time status text, and issue-list truncation notices are omitted from this view. Relevant availability warnings remain visible; the MCP data tools and full web dashboard still expose the detailed insights.

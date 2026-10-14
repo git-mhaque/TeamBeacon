@@ -20,6 +20,7 @@ from services.api.issues.team_insights import get_team_insights
 from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
 from services.api.integrations.jira_sync import (
+    get_jira_data_as_of,
     get_jira_sync_history,
     get_jira_sync_status,
     start_jira_sync,
@@ -949,13 +950,14 @@ def build_handler(
     release_refresh_result_provider: ReleaseRefreshResultProvider = get_release_refresh_result,
     release_refresh_start_provider: ReleaseRefreshStartProvider = start_release_refresh,
     web_dir: str | Path | None = None,
+    jira_data_as_of_provider: Callable[[], str | None] = get_jira_data_as_of,
 ) -> type[BaseHTTPRequestHandler]:
     web_root = Path(web_dir).expanduser().resolve() if web_dir is not None else None
     analytics_cache = ResponseCache()
 
     def data_as_of() -> str | None:
         try:
-            value = jira_sync_status_provider().get("lastSyncedAt")
+            value = jira_data_as_of_provider()
         except Exception:
             return None
         return value if isinstance(value, str) and value else None

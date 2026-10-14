@@ -130,6 +130,21 @@ python3 -m unittest discover -s tests/unit -p "test_*.py" -v
 python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```
 
+CI also enforces at least 90% combined statement/branch coverage **for each** of
+`services/api/server.py` and `services/api/integrations/jira_sync.py`. In an activated
+Python 3.11 virtual environment (the optional `.venv-mcp` environment also works):
+
+```bash
+python -m pip install coverage==7.16.2
+python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/unit -p "test_*.py" -v
+python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/integration/api -p "test_*.py" -v
+python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90
+python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90
+```
+
+Run the two backend suites before the reports; a fresh `coverage run` replaces
+previous coverage data. The integration suite uses temporary loopback HTTP servers.
+
 6. Run frontend checks:
 ```bash
 cd app
@@ -140,11 +155,20 @@ npm run test:coverage
 
 The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell and primary navigation.
 
+## Codex dashboard integration
+
+Read the [illustrated web-app-to-MCP tutorial](docs/tutorials/web-app-to-mcp.html) for the full journey, concepts, sequence diagrams, setup, and host compatibility checks.
+
+The optional [dashboard MCP server](services/mcp/README.md) exposes read-only facts and an MCP Apps widget using the running local API. No additional model API key is required. The linked guide covers Python environment installation, Codex registration, lint and protocol/coverage tests. Native widget rendering depends on client MCP Apps support.
+
+Build the widget with `cd app && npm run build:mcp`.
+
 ## ✅ CI Pipeline
 - GitHub Actions workflow: `.github/workflows/ci.yml`
 - Checks:
   - Backend unit tests
   - Backend API integration tests
+  - Per-module 90% API server and JIRA sync coverage gates
   - Frontend typecheck, React/Vite build, lint, and coverage tests
   - Docker image build on PRs; build + publish to GHCR on `main`
 
@@ -157,6 +181,8 @@ The coverage command enforces at least 90% statements, branches, functions, and 
 - [SPEC.md](SPEC.md): product requirements and scope boundaries
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): technical architecture baseline
 - [docs/plans/PLAN.md](docs/plans/PLAN.md): phased delivery roadmap
+- [docs/plans/MCP_INTEGRATION_PLAN.md](docs/plans/MCP_INTEGRATION_PLAN.md): MCP roadmap and dashboard implementation status
+- [services/mcp/README.md](services/mcp/README.md): dashboard tools/widget setup and validation
 - [docs/plans/FRONTEND_MODERNIZATION_PLAN.md](docs/plans/FRONTEND_MODERNIZATION_PLAN.md): proposed frontend design and stack migration plan
 - [docs/design/README.md](docs/design/README.md): design artifact overview
 - [docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md](docs/ops/OCI_GENAI_CONNECTIVITY_SMOKE_TEST.md): OCI-specific smoke test (use when `INTELLIGENCE_PROVIDER=oci`)

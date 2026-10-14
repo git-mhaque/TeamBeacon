@@ -71,9 +71,13 @@ Exit criteria:
   - Mitigation: transparent metric formulas and drill-down links.
 
 ## 4. Immediate Next Tasks
+Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with read-insights-only scope. Dashboard data/render tools, contextual resources and the React widget are implemented; native Codex rendering needs client verification. Broader read tools remain planned; sync and editing are optional future scope.
+
 1. Complete the hardening gates in the [Frontend Modernization Plan](FRONTEND_MODERNIZATION_PLAN.md) while preserving the containerized Python API and SQLite runtime.
 2. Create initial schema and migration scripts.
 3. Implement JIRA smoke sync using a known project and board.
 4. Add first dashboard: initiative list + RAG overview.
 5. Harden Initiative Deep Dive with browser accessibility checks and production-container smoke coverage.
 6. Add route-level code splitting and complete the remaining modernized-frontend hardening gates.
+
+- MCP dashboard presentation simplified to work-stream progress, flow, filters, and freshness; removed metric cards and issue lists from the widget while retaining the data-tool contract.

@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "build:mcp": "vite build --config vite.mcp.config.ts && node scripts/package-mcp.mjs"
   },
   "dependencies": {
     "chart.js": "4.5.1",

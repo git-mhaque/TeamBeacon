@@ -2,10 +2,15 @@
 
 This directory contains product, architecture, plan, and design artifacts for TeamBeacon.
 
+## Tutorials
+- [From web app to MCP App](tutorials/web-app-to-mcp.html): self-contained HTML guide to the TeamBeacon implementation, with architecture and sequence diagrams, configuration, interactive walkthrough, and troubleshooting.
+
 ## Core Documents
 - [../SPEC.md](../SPEC.md): product requirements, MVP boundaries, and success metrics.
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): technical architecture and data flow.
 - [plans/PLAN.md](plans/PLAN.md): phased execution plan and delivery milestones.
+- [plans/MCP_INTEGRATION_PLAN.md](plans/MCP_INTEGRATION_PLAN.md): local Codex MCP roadmap and dashboard implementation status.
+- [../services/mcp/README.md](../services/mcp/README.md): dashboard tools/widget setup, configuration and validation.
 - [plans/FRONTEND_MODERNIZATION_PLAN.md](plans/FRONTEND_MODERNIZATION_PLAN.md): proposed frontend design system, target stack, migration phases, and acceptance gates.
 - [design/README.md](design/README.md): design artifact guide.
 - [../services/api/README.md](../services/api/README.md): local API routes, including AI provider and Team Insights endpoints.

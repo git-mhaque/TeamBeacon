@@ -168,6 +168,14 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Usable in modern browsers on macOS and Windows.
 - Fast dashboard loads from local cache.
 
+## 7.1 Codex Chat Integration
+- The dashboard slice exposes existing analytics through typed MCP read tools, contextual resources and a React widget for MCP Apps-compatible hosts.
+- The compact MCP widget displays work-stream progress, flow, filters, and freshness only; detailed highlights and issue lists remain available through the data tools and full web UI.
+- Version one supports read insights only; it does not start syncs, edit metadata or trigger AI refreshes.
+- Reuse backend metric definitions and return scope, reporting periods, freshness and evidence links.
+- Consider sync control, local metadata editing and report parity as separate future scope; upstream JIRA/Confluence writes remain out of scope.
+- Dashboard tools/resources are implemented; native Codex rendering needs client verification. Broader read tools remain planned. See [MCP Integration Plan](docs/plans/MCP_INTEGRATION_PLAN.md) and [setup](services/mcp/README.md).
+
 ## 8. Success Metrics
 - <10 minutes to configure a new initiative.
 - >80% reduction in manual weekly status compilation time.
