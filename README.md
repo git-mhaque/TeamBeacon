@@ -131,16 +131,17 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```
 
 CI also enforces at least 90% combined statement/branch coverage **for each** of
-`services/api/server.py`, `services/api/integrations/jira_sync.py`, and `services/api/metadata/epic_mapping.py`. In an activated
+`services/api/server.py`, `services/api/integrations/jira_sync.py`, `services/api/metadata/epic_mapping.py`, and `packages/connectors/epic_scope.py`. In an activated
 Python 3.11 virtual environment (the optional `.venv-mcp` environment also works):
 
 ```bash
 python -m pip install coverage==7.16.2
-python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping -m unittest discover -s tests/unit -p "test_*.py" -v
-python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping -m unittest discover -s tests/integration/api -p "test_*.py" -v
+python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope -m unittest discover -s tests/unit -p "test_*.py" -v
+python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope -m unittest discover -s tests/integration/api -p "test_*.py" -v
 python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/metadata/epic_mapping.py --precision=2 --fail-under=90
+python -m coverage report --include=packages/connectors/epic_scope.py --precision=2 --fail-under=90
 ```
 
 Run the two backend suites before the reports; a fresh `coverage run` replaces

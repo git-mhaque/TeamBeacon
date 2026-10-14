@@ -1435,3 +1435,205 @@ class JiraSyncServiceUnitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _ProjectEpicConnector(_SuccessfulConnectorStub):
+    def __init__(self):
+        super().__init__()
+        from dataclasses import replace
+
+        self.epics = [
+            replace(
+                self.issue_1,
+                issue_key="CEGBUPOL-OLD",
+                issue_type="Epic",
+                epic_key=None,
+                updated_at_source=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                labels=[],
+            ),
+            replace(
+                self.issue_1,
+                issue_key="CEGBUPOL-RECENT",
+                issue_type="Epic",
+                epic_key=None,
+                labels=["Platform"],
+            ),
+            replace(
+                self.issue_1,
+                issue_key="CEGBUPOL-TRIAD",
+                issue_type="Epic",
+                labels=["Triad"],
+            ),
+            replace(
+                self.issue_1, issue_key="CEGBUPOL-TEST", issue_type="Test", labels=[]
+            ),
+        ]
+        self.epic_queries = []
+        self.changelog_calls = []
+        self.bad_page = False
+        self.fail_page = False
+
+    def search_issues(self, jql, start_at=0, max_results=100):
+        if "issuetype = Epic" not in jql:
+            return super().search_issues(jql, start_at, max_results)
+        self.epic_queries.append(jql)
+        if start_at and self.fail_page:
+            raise RuntimeError("Epic snapshot unavailable")
+        if self.bad_page:
+            return [], SyncBatch(next_cursor="0", has_more=True)
+        page = self.epics[start_at : start_at + 1]
+        following = start_at + len(page)
+        return page, SyncBatch(
+            next_cursor=str(following) if following < len(self.epics) else None,
+            has_more=following < len(self.epics),
+        )
+
+    def get_issue_changelog(self, issue_key):
+        self.changelog_calls.append(issue_key)
+        return super().get_issue_changelog(issue_key)
+
+
+class ProjectEpicSyncTests(unittest.TestCase):
+    setUp = JiraSyncServiceUnitTests.setUp
+    tearDown = JiraSyncServiceUnitTests.tearDown
+    _runtime = JiraSyncServiceUnitTests._runtime
+
+    def test_full_sync_pages_epics_preserves_metadata_and_incremental_backfills_old_missing(
+        self,
+    ):
+        from services.api.metadata.epic_config import (
+            add_epic_group,
+            upsert_epic_metadata,
+            get_epic_metadata,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "epics.db")
+            connector = _ProjectEpicConnector()
+            group = add_epic_group("Platform", db_path=db)["id"]
+            upsert_epic_metadata(
+                epic_key="CEGBUPOL-OLD",
+                success_criteria=["Keep"],
+                group_ids=[group],
+                work_type_ids=[],
+                db_path=db,
+            )
+            args = dict(
+                db_path=db,
+                runtime=self._runtime(),
+                connector=connector,
+                reconcile_deleted_issues=False,
+            )
+            first = run_jira_sync_once(**args)
+            self.assertEqual(
+                (first["projectEpicCount"], first["projectEpicsSynced"]), (2, 2)
+            )
+            self.assertEqual(first["downloadedIssues"], 4)
+            self.assertEqual(len(connector.epic_queries), 4)
+            self.assertIn("labels not in (Triad)", connector.epic_queries[0])
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM issues WHERE LOWER(issue_type)='epic'"
+                    ).fetchone()[0],
+                    2,
+                )
+                conn.execute("DELETE FROM issues WHERE issue_key='CEGBUPOL-OLD'")
+            recovered = run_jira_sync_once(sync_mode="since_last", **args)
+            self.assertEqual(recovered["projectEpicsSynced"], 1)
+            self.assertEqual(first["lastCursor"], recovered["lastCursor"])
+            metadata = get_epic_metadata(epic_key="CEGBUPOL-OLD", db_path=db)["epics"][
+                0
+            ]
+            self.assertEqual(metadata["successCriteria"], ["Keep"])
+            self.assertEqual(metadata["groupIds"], [group])
+            repeated = run_jira_sync_once(sync_mode="since_last", **args)
+            self.assertEqual(repeated["projectEpicsSynced"], 0)
+            refreshed = run_jira_sync_once(**args)
+            self.assertEqual(refreshed["projectEpicsSynced"], 2)
+
+    def test_changed_epic_downloaded_in_incremental_query_is_not_downloaded_twice(self):
+        from dataclasses import replace
+
+        with tempfile.TemporaryDirectory() as tmp:
+            connector = _ProjectEpicConnector()
+            args = dict(
+                db_path=str(Path(tmp) / "epics.db"),
+                runtime=self._runtime(),
+                connector=connector,
+                reconcile_deleted_issues=False,
+            )
+            run_jira_sync_once(**args)
+            connector.epics[0] = replace(
+                connector.epics[0],
+                summary="Changed",
+                updated_at_source=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            )
+            connector.changelog_calls.clear()
+            connector.incremental_issues = lambda **kwargs: (
+                [connector.epics[0]],
+                SyncBatch(next_cursor=None, has_more=False),
+            )
+            result = run_jira_sync_once(sync_mode="since_last", **args)
+            self.assertEqual(result["projectEpicsSynced"], 0)
+            self.assertEqual(connector.changelog_calls.count("CEGBUPOL-OLD"), 1)
+
+    def test_snapshot_failure_does_not_advance_checkpoint_or_partially_backfill_epics(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            connector = _ProjectEpicConnector()
+            args = dict(
+                db_path=str(Path(tmp) / "epics.db"),
+                runtime=self._runtime(),
+                connector=connector,
+                reconcile_deleted_issues=False,
+            )
+            first = run_jira_sync_once(**args)
+            with sqlite3.connect(args["db_path"]) as conn:
+                conn.execute("DELETE FROM issues WHERE issue_type='Epic'")
+            connector.fail_page = True
+            with self.assertRaisesRegex(RuntimeError, "snapshot unavailable"):
+                run_jira_sync_once(sync_mode="since_last", **args)
+            with sqlite3.connect(args["db_path"]) as conn:
+                self.assertEqual(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM issues WHERE issue_type='Epic'"
+                    ).fetchone()[0],
+                    0,
+                )
+                self.assertEqual(
+                    conn.execute("SELECT last_cursor FROM sync_checkpoints").fetchone()[
+                        0
+                    ],
+                    first["lastCursor"],
+                )
+            connector.fail_page = False
+            connector.bad_page = True
+            with self.assertRaisesRegex(ValueError, "pagination"):
+                run_jira_sync_once(sync_mode="since_last", **args)
+
+    def test_manager_exposes_reconciliation_counts_and_preserves_completed_summary(
+        self,
+    ):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "epics.db")
+            connector = _ProjectEpicConnector()
+
+            def runner(**kwargs):
+                return run_jira_sync_once(
+                    runtime=self._runtime(), connector=connector, **kwargs
+                )
+
+            manager = JiraSyncManager(db_path_provider=lambda: db, sync_runner=runner)
+            manager._run_background("full", reconcile_deleted_issues=False)
+            with patch(
+                "services.api.integrations.jira_sync._load_runtime",
+                return_value=self._runtime(),
+            ):
+                status = manager.get_status()
+            self.assertEqual(status["projectEpicCount"], 2)
+            self.assertEqual(status["projectEpicsSynced"], 2)
+            self.assertIn("Reconciled 2 eligible project epics", status["message"])

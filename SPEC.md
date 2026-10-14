@@ -72,7 +72,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 
 ## 6.1 JIRA Sync Semantics (Current Behavior)
 - Sync modes:
-  - `full`: fetch full board issue dataset.
+  - `full`: fetch the full board issue dataset and refresh all eligible project epics through project search.
   - `since_last`: incremental sync from last cursor.
   - `since_date`: incremental sync from a user-specified past date.
 - Incremental cursor logic:
@@ -83,6 +83,12 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - For `since_date`, cursor is the provided date at `00:00:00Z` (or provided ISO-8601 timestamp) and must be in the past.
 - Incremental JQL pattern:
   - `project = <JIRA_PROJECT_KEY> AND updated >= '<UTC timestamp>' ORDER BY updated ASC`
+- Project epic reconciliation runs in every sync mode:
+  - Uses `project = <JIRA_PROJECT_KEY> AND issuetype = Epic AND (labels is EMPTY OR labels not in (Triad)) ORDER BY key ASC` with complete pagination.
+  - Missing eligible epics are backfilled regardless of the incremental cursor. Existing epics refresh in full mode or when their source update timestamp changes.
+  - Epics already downloaded by the primary issue pass are not fetched for changelog a second time. Other initiative metadata and saved views are preserved.
+  - Incomplete epic pagination or search failures fail the run without advancing its checkpoint. Older backfilled epics never move the cursor backwards.
+  - Progress/results report `projectEpicCount` and `projectEpicsSynced`; completed sync messages include reconciliation counts.
 - Deletion reconciliation:
   - A per-run “Remove cards deleted from JIRA” option is available and is off by default so routine incremental syncs remain fast.
   - When selected, sync fetches a lightweight, paginated snapshot of all current issue keys in the configured JIRA project.
@@ -127,7 +133,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 
 ## 6.2.1 Bulk Work Stream Epic Mapping
 - Settings has two tabs: Initiative Metadata and Work Stream Epic Mapping.
-- Mapping inventory includes all locally synced JIRA epics, including epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
+- Mapping inventory includes locally synced epics from the configured JIRA project, excluding epics labelled Triad, including epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
 - Saved mapping statistics show total, mapped, unmapped, coverage, and work stream distribution including unmapped. Counts are epic counts, not effort estimates.
 - Search, mapping/work stream/status filters, unmapped-first sorting, and 50-row pagination operate on saved assignments. Drafts and explicit selections persist across pages, filters, and tabs.
 - Epic keys link directly to the configured JIRA browse page and open in a new tab.

@@ -10,7 +10,7 @@ TeamBeacon is a self-hosted web analytics system:
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
 - Screens: Team Dashboard, Initiative Insights, Initiative Deep Dive, Sprint Insights, Team Insights, Security, Incident Response, Releases, Team Report, Settings.
-- The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata, with Initiative Metadata and Work Stream Epic Mapping tabs. The mapping inventory reads synced epics with optional metadata; a dedicated assignment-only batch endpoint validates expected assignments under a SQLite write transaction and preserves other metadata.
+- The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata, with Initiative Metadata and Work Stream Epic Mapping tabs. The mapping inventory reads synced epics from the configured project with optional metadata, excluding Triad labels; a dedicated assignment-only batch endpoint validates expected assignments under a SQLite write transaction and preserves other metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
 
@@ -114,3 +114,6 @@ Default thresholds:
 - Work-stream flow uses the same weekly created/completed semantics as Initiative Deep Dive, while progress uses completed cards divided by all currently scoped cards.
 - Section failures are isolated and returned in an `errors` map so healthy dashboard regions remain usable.
 - The frontend persists only the selected 1/4/12-week flow window; source data remains authoritative in SQLite.
+
+### Project epic reconciliation
+Each sync mode pages the eligible project epic search independently of the board issue API. Missing epics are backfilled regardless of the cursor; full sync refreshes every eligible epic, while incremental sync refreshes source changes. A shared connector scope rule excludes Triad labels and is also applied to the Settings mapping inventory. The existing board issue and child-issue sync paths continue to operate. No schema migration is required.

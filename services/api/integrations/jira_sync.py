@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal
 
+from packages.connectors.epic_scope import eligible_epic_jql, is_eligible_epic
 from packages.connectors.jira_config import JiraRuntimeConfig, load_env_files
 from packages.connectors.jira_rest_stub import JiraAPIError, JiraRestConnector
 from packages.connectors.models import (
@@ -1607,6 +1608,35 @@ def _build_connector(runtime: JiraRuntimeConfig) -> JiraRestConnector:
     )
 
 
+def _load_project_epics(
+    connector: JiraRestConnector, project_key: str
+) -> list[IssueRecord]:
+    """Read a complete eligible snapshot; never accept non-advancing pagination."""
+    epics: dict[str, IssueRecord] = {}
+    start_at = 0
+    while True:
+        issues, batch = connector.search_issues(
+            jql=eligible_epic_jql(project_key),
+            start_at=start_at,
+            max_results=100,
+        )
+        for issue in issues:
+            if issue.project_key == project_key and is_eligible_epic(
+                issue.issue_type, issue.labels
+            ):
+                epics[issue.issue_key] = issue
+        if not batch.has_more:
+            return list(epics.values())
+        if (
+            not issues
+            or batch.next_cursor is None
+            or int(batch.next_cursor) <= start_at
+        ):
+            raise ValueError(
+                "Incomplete project epic inventory: pagination did not advance."
+            )
+        start_at = int(batch.next_cursor)
+
 def run_jira_sync_once(
     progress_callback: ProgressCallback | None = None,
     db_path: str | None = None,
@@ -1795,6 +1825,7 @@ def run_jira_sync_once(
             }
         )
         downloaded = 0
+        processed_issue_keys: set[str] = set()
         candidate_issues_checked = 0
         candidate_total_issues: int | None = None
         changelog_entries_synced = 0
@@ -1841,6 +1872,7 @@ def run_jira_sync_once(
                 total_issues = page_total
 
             _upsert_issues(conn, issues)
+            processed_issue_keys.update(issue.issue_key for issue in issues)
             for index, issue in enumerate(issues, start=1):
                 changelog_count, changelog_failed = _sync_issue_changelog(
                     conn,
@@ -1933,6 +1965,64 @@ def run_jira_sync_once(
                         f"Checked {candidate_issues_checked} candidate issues; "
                         f"no Jira issues changed since {cursor_display}."
                     ),
+                }
+            )
+
+        project_epic_count = 0
+        project_epics_synced = 0
+        if project_key_for_versions:
+            emit(
+                {
+                    "phase": "issues",
+                    "message": f"Reconciling eligible epics for {project_key_for_versions}.",
+                }
+            )
+            project_epics = _load_project_epics(connector, project_key_for_versions)
+            project_epic_count = len(project_epics)
+            for epic in project_epics:
+                existing = conn.execute(
+                    "SELECT issue_type, updated_at_source FROM issues WHERE issue_key = ?",
+                    (epic.issue_key,),
+                ).fetchone()
+                unchanged = (
+                    epic.updated_at_source is not None
+                    and existing is not None
+                    and str(existing[0] or "").casefold() == "epic"
+                    and existing[1] == _to_iso(epic.updated_at_source)
+                )
+                if epic.issue_key in processed_issue_keys or (
+                    incremental_since_utc is not None and unchanged
+                ):
+                    continue
+                _upsert_issues(conn, [epic])
+                changelog_count, changelog_failed = _sync_issue_changelog(
+                    conn,
+                    connector,
+                    epic.issue_key,
+                    sync_log_path=sync_log_path,
+                    sync_run_id=sync_run_id,
+                    board_id=runtime.board_id,
+                    phase="issues",
+                )
+                changelog_entries_synced += changelog_count
+                changelog_failures += int(changelog_failed)
+                project_epics_synced += 1
+                processed_issue_keys.add(epic.issue_key)
+            downloaded += project_epics_synced
+            if total_issues is not None:
+                total_issues += project_epics_synced
+            _update_sync_run(
+                conn, sync_run_id, issues_synced=downloaded, total_issues=total_issues
+            )
+            conn.commit()
+            emit(
+                {
+                    "phase": "issues",
+                    "downloadedIssues": downloaded,
+                    "totalIssues": total_issues,
+                    "projectEpicCount": project_epic_count,
+                    "projectEpicsSynced": project_epics_synced,
+                    "message": f"Reconciled {project_epic_count} eligible project epics; downloaded {project_epics_synced} epic records.",
                 }
             )
 
@@ -2140,6 +2230,8 @@ def run_jira_sync_once(
             "requestedSince": requested_since,
             "candidateIssues": candidate_issues_checked,
             "candidateTotalIssues": candidate_total_issues,
+            "projectEpicCount": project_epic_count,
+            "projectEpicsSynced": project_epics_synced,
             "releaseVersionsSynced": release_versions_synced,
             "staleSprintLinksCleared": stale_sprint_links_cleared,
             "activeSprintIssuesHydrated": active_sprint_issues_hydrated,
@@ -2156,6 +2248,7 @@ def run_jira_sync_once(
                     if active_sprint_issues_hydrated <= 0
                     else f"Sync complete. Hydrated {active_sprint_issues_hydrated} active sprint issues."
                 )
+                + f" Reconciled {project_epic_count} eligible project epics; downloaded {project_epics_synced} epic records."
                 + (
                     f" Skipped changelog for {changelog_failures} issue(s) after transient JIRA failures."
                     if changelog_failures
@@ -2232,6 +2325,8 @@ class JiraSyncManager:
             "sprintsSynced": 0,
             "downloadedIssues": 0,
             "totalIssues": None,
+            "projectEpicCount": None,
+            "projectEpicsSynced": None,
             "candidateIssues": 0,
             "candidateTotalIssues": None,
             "deletedIssuesRemoved": 0,
@@ -2262,6 +2357,8 @@ class JiraSyncManager:
                 "downloadedIssues", self._state["downloadedIssues"]
             )
             self._state["totalIssues"] = update.get("totalIssues", self._state["totalIssues"])
+            for field in ("projectEpicCount", "projectEpicsSynced"):
+                self._state[field] = update.get(field, self._state[field])
             self._state["candidateIssues"] = update.get(
                 "candidateIssues", self._state["candidateIssues"]
             )
@@ -2320,6 +2417,9 @@ class JiraSyncManager:
             mapped_state = mapped_status if mapped_status in {"running", "completed", "failed"} else "idle"
             phase = "issues" if mapped_state == "running" else ("done" if mapped_state == "completed" else "failed" if mapped_state == "failed" else "idle")
             message = "Sync complete." if mapped_state == "completed" else ("JIRA sync failed." if mapped_state == "failed" else "Idle")
+            if (mapped_state == "completed" and state.get("finishedAt") == latest_run.get("finishedAt")
+                    and state.get("projectEpicCount") is not None):
+                message += f" Reconciled {state['projectEpicCount']} eligible project epics; downloaded {state['projectEpicsSynced']} epic records."
             step_payload = _sync_step_payload(phase)
 
             state.update(
@@ -2422,6 +2522,8 @@ class JiraSyncManager:
                     "sprintsSynced": 0,
                     "downloadedIssues": 0,
                     "totalIssues": None,
+                    "projectEpicCount": None,
+                    "projectEpicsSynced": None,
                     "candidateIssues": 0,
                     "candidateTotalIssues": None,
                     "deletedIssuesRemoved": 0,
@@ -2491,6 +2593,8 @@ class JiraSyncManager:
                     "sprintsSynced": result.get("sprintsSynced", self._state.get("sprintsSynced", 0)),
                     "downloadedIssues": result.get("downloadedIssues", 0),
                     "totalIssues": result.get("totalIssues"),
+                    "projectEpicCount": result.get("projectEpicCount"),
+                    "projectEpicsSynced": result.get("projectEpicsSynced"),
                     "candidateIssues": result.get("candidateIssues", self._state.get("candidateIssues", 0)),
                     "candidateTotalIssues": result.get("candidateTotalIssues"),
                     "deletedIssuesRemoved": result.get("deletedIssuesRemoved", 0),

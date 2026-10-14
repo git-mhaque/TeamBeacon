@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import os
 from typing import Any
 
+from packages.connectors.epic_scope import is_eligible_epic
+from packages.connectors.jira_config import load_env_files
 from services.api.metadata.epic_config import (
     _connect,
     _ensure_metadata_schema,
@@ -15,24 +19,38 @@ class MappingConflict(ValueError):
     """An assignment changed after the client loaded its draft."""
 
 
-def get_epic_mapping_inventory(db_path: str | None = None) -> dict[str, Any]:
+def get_epic_mapping_inventory(
+    db_path: str | None = None, project_key: str | None = None
+) -> dict[str, Any]:
+    load_env_files()
+    project_key = project_key or os.getenv("JIRA_PROJECT_KEY")
     conn = _connect(db_path or _resolve_db_path())
     try:
         _ensure_metadata_schema(conn)
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT i.issue_key AS epicKey, i.summary AS title,
-                   i.status_name AS status, g.group_id AS workStreamId
+                   i.status_name AS status, g.group_id AS workStreamId, i.labels_json
             FROM issues i
             LEFT JOIN epic_metadata em ON em.epic_key = i.issue_key
             LEFT JOIN epic_metadata_groups g ON g.epic_metadata_id = em.id
             WHERE LOWER(COALESCE(i.issue_type, '')) = 'epic'
+              AND (? IS NULL OR i.project_key = ?)
             ORDER BY i.issue_key
-        """).fetchall()
+        """,
+            (project_key, project_key),
+        ).fetchall()
+        epics = []
+        for row in rows:
+            if is_eligible_epic("Epic", json.loads(row["labels_json"])):
+                epic = dict(row)
+                del epic["labels_json"]
+                epics.append(epic)
         sync = conn.execute("""
             SELECT MAX(finished_at) FROM sync_run_history
             WHERE source_type = 'jira' AND status = 'completed'
         """).fetchone()[0]
-        return {"epics": [dict(row) for row in rows], "lastSyncedAt": sync}
+        return {"epics": epics, "lastSyncedAt": sync}
     finally:
         conn.close()
 
@@ -60,11 +78,12 @@ def save_epic_mappings(changes: Any, db_path: str | None = None) -> dict[str, An
         conn.execute("BEGIN IMMEDIATE")
         for change in changes:
             key, target = change["epicKey"], change["workStreamId"]
-            if not conn.execute(
-                "SELECT 1 FROM issues WHERE issue_key = ? AND LOWER(issue_type) = 'epic'",
+            issue = conn.execute(
+                "SELECT issue_type, labels_json FROM issues WHERE issue_key = ?",
                 (key,),
-            ).fetchone():
-                raise ValueError(f"{key}: synced epic no longer exists.")
+            ).fetchone()
+            if issue is None or not is_eligible_epic(issue[0], json.loads(issue[1])):
+                raise ValueError(f"{key}: eligible synced epic no longer exists.")
             if (
                 target is not None
                 and not conn.execute(

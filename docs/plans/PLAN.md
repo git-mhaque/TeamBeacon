@@ -86,3 +86,8 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 - Delivered Settings tabs for Initiative Metadata and Work Stream Epic Mapping.
 - Includes saved coverage/distribution, all synced epics, filters, sorting, 50-row pages, explicit bulk selection and draft save/discard.
 - Assignment-only batches validate stale mappings and commit atomically, preserving other metadata and saved views. No schema or connector configuration change.
+
+### Eligible project epic sync
+- Added paginated project epic reconciliation to full, since-last, and since-date syncs, preserving the Test/Triad scope exclusions.
+- Backfills old missing epics and preserves metadata and source watermarks; repeated incremental runs skip unchanged epics.
+- Settings mapping inventory follows configured project and Triad exclusions.
