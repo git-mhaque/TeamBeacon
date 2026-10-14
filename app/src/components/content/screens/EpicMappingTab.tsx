@@ -4,6 +4,10 @@ import { fetchEpicMappingInventory, fetchJiraIntegrationStatus, saveEpicMappings
 import { formatDisplayTimestamp } from "../../../lib/dateTime";
 
 const PAGE_SIZE = 50;
+const SORT_COLUMNS = [
+  ["key", "Epic key"], ["title", "Title"], ["status", "Status"],
+  ["stream", "Work stream"], ["changes", "Changes"],
+] as const;
 export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
   const [inventory, setInventory] = useState<EpicMappingInventory | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
@@ -14,6 +18,7 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
   const [streamFilter, setStreamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState("unmapped");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
   const [bulkStream, setBulkStream] = useState("");
   const [saving, setSaving] = useState(false);
@@ -55,10 +60,20 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
     (streamFilter === "all" || epic.workStreamId === Number(streamFilter)) &&
     (statusFilter === "all" || epic.status === statusFilter),
   ).sort((a, b) => {
-    if (sort === "unmapped") return Number(a.workStreamId !== null) - Number(b.workStreamId !== null) || a.epicKey.localeCompare(b.epicKey);
-    if (sort === "title") return a.title.localeCompare(b.title);
-    if (sort === "status") return a.status.localeCompare(b.status) || a.epicKey.localeCompare(b.epicKey);
-    return a.epicKey.localeCompare(b.epicKey);
+    const compareKey = a.epicKey.localeCompare(b.epicKey, undefined, { numeric: true });
+    let comparison = 0;
+    if (sort === "unmapped") comparison = Number(a.workStreamId !== null) - Number(b.workStreamId !== null);
+    if (sort === "title") comparison = a.title.localeCompare(b.title);
+    if (sort === "status") comparison = a.status.localeCompare(b.status);
+    if (sort === "stream") {
+      const streamName = (id: number | null) => lookup.groups.find((group) => group.id === id)?.name ?? "Unmapped";
+      comparison = streamName(a.workStreamId).localeCompare(streamName(b.workStreamId));
+    }
+    if (sort === "changes") {
+      const rank = (key: string, streamId: number | null) => Object.hasOwn(draft, key) ? 0 : streamId === null ? 1 : 2;
+      comparison = rank(a.epicKey, a.workStreamId) - rank(b.epicKey, b.workStreamId);
+    }
+    return (comparison || compareKey) * (sortDirection === "asc" ? 1 : -1);
   });
   const currentPage = Math.min(page, Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1));
   const visible = rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
@@ -86,6 +101,11 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
     finally { setSaving(false); }
   };
   const filter = (update: () => void) => { update(); setPage(0); };
+  const sortByHeader = (field: string) => {
+    setSortDirection(sort === field && sortDirection === "asc" ? "desc" : "asc");
+    setSort(field);
+    setPage(0);
+  };
   return <section className="tb-panel tb-epic-mapping">
     <header className="tb-panel-header"><div><h3>Work Stream Epic Mapping</h3>
       <p className="tb-muted-note">Assign work streams to synced epics in the configured JIRA project. Epics labelled Triad are excluded. Changes are saved together.</p>
@@ -111,7 +131,7 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
         <select aria-label="Mapping filter" value={mappingFilter} onChange={(event) => filter(() => setMappingFilter(event.target.value))}><option value="all">All epics</option><option value="unmapped">Unmapped</option><option value="mapped">Mapped</option></select>
         <select aria-label="Work stream filter" value={streamFilter} onChange={(event) => filter(() => setStreamFilter(event.target.value))}><option value="all">All work streams</option>{lookup.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
         <select aria-label="Status filter" value={statusFilter} onChange={(event) => filter(() => setStatusFilter(event.target.value))}><option value="all">All statuses</option>{[...new Set(epics.map((epic) => epic.status))].sort().map((status) => <option key={status}>{status}</option>)}</select>
-        <select aria-label="Sort epics" value={sort} onChange={(event) => setSort(event.target.value)}><option value="unmapped">Unmapped first</option><option value="key">Epic key</option><option value="title">Title</option><option value="status">Status</option></select>
+        <select aria-label="Sort epics" value={sort} onChange={(event) => { setSort(event.target.value); setSortDirection("asc"); setPage(0); }}><option value="unmapped">Unmapped first</option>{SORT_COLUMNS.map(([field, label]) => <option key={field} value={field}>{label}</option>)}</select>
       </div>
       <fieldset disabled={saving} className="tb-mapping-editor">
         <div className="tb-action-row"><span>{selected.length} selected across pages</span>
@@ -122,7 +142,11 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
         <p className="tb-muted-note">Filters and statistics use saved assignments. Edited rows remain visible until saved.</p>
         <div className="tb-mapping-table"><table><thead><tr>
           <th><input type="checkbox" aria-label="Select this page" checked={visible.length > 0 && visible.every((epic) => selected.includes(epic.epicKey))} onChange={(event) => setSelected((previous) => event.target.checked ? [...new Set([...previous, ...visible.map((epic) => epic.epicKey)])] : previous.filter((key) => !visible.some((epic) => epic.epicKey === key)))} /></th>
-          <th>Epic key</th><th>Title</th><th>Status</th><th>Work stream</th><th>Changes</th>
+          {SORT_COLUMNS.map(([field, label]) => <th key={field} scope="col" aria-sort={sort === field ? sortDirection === "asc" ? "ascending" : "descending" : undefined}>
+            <button type="button" className={`tb-table-sort${sort === field ? " is-active" : ""}`} aria-label={`Sort by ${label}`} onClick={() => sortByHeader(field)}>
+              <span>{label}</span><span className="tb-table-sort-indicator" aria-hidden="true">{sort === field ? sortDirection === "asc" ? "↑" : "↓" : "↕"}</span>
+            </button>
+          </th>)}
         </tr></thead><tbody>{visible.map((epic) => <tr key={epic.epicKey} className={Object.hasOwn(draft, epic.epicKey) ? "is-edited" : ""}>
           <td><input type="checkbox" aria-label={`Select ${epic.epicKey}`} checked={selected.includes(epic.epicKey)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, epic.epicKey] : previous.filter((key) => key !== epic.epicKey))} /></td>
           <td>{jiraBaseUrl ? <a href={`${jiraBaseUrl}/browse/${encodeURIComponent(epic.epicKey)}`} target="_blank" rel="noopener noreferrer" className="tb-initiative-epic-key" aria-label={`Open ${epic.epicKey} in JIRA (new tab)`}>{epic.epicKey}</a> : epic.epicKey}</td><td>{epic.title}</td><td>{epic.status}</td>

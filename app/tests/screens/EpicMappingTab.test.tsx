@@ -121,3 +121,42 @@ describe("Epic mapping", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Initiative Metadata" }));
   });
 });
+
+it("sorts every data header in both directions and preserves edits and selections", async () => {
+  mockInventory([...epics, { epicKey: "P-10", title: "Alpha", status: "Open", workStreamId: 2 }]);
+  await renderTab();
+  const rowKeys = () => screen.getAllByRole("row").slice(1).map((row) => row.querySelectorAll("td")[1].textContent);
+  const sort = (label: string) => fireEvent.click(screen.getByRole("button", { name: `Sort by ${label}` }));
+  sort("Epic key"); expect(rowKeys()).toEqual(["P-1", "P-2", "P-10"]);
+  sort("Epic key"); expect(rowKeys()).toEqual(["P-10", "P-2", "P-1"]);
+  expect(screen.getByRole("columnheader", { name: /Epic key/ })).toHaveAttribute("aria-sort", "descending");
+  sort("Title"); expect(rowKeys()).toEqual(["P-1", "P-10", "P-2"]);
+  sort("Title"); expect(rowKeys()).toEqual(["P-2", "P-10", "P-1"]);
+  sort("Status"); expect(rowKeys()).toEqual(["P-2", "P-1", "P-10"]);
+  sort("Status"); expect(rowKeys()).toEqual(["P-10", "P-1", "P-2"]);
+  sort("Work stream"); expect(rowKeys()).toEqual(["P-10", "P-2", "P-1"]);
+  sort("Work stream"); expect(rowKeys()).toEqual(["P-1", "P-2", "P-10"]);
+  fireEvent.click(screen.getByLabelText("Select P-2"));
+  fireEvent.change(screen.getByLabelText("Work stream for P-10"), { target: { value: "1" } });
+  sort("Changes"); expect(rowKeys()).toEqual(["P-10", "P-1", "P-2"]);
+  sort("Changes"); expect(rowKeys()).toEqual(["P-2", "P-1", "P-10"]);
+  expect(screen.getByLabelText("Select P-2")).toBeChecked();
+  expect(screen.getByLabelText("Work stream for P-10")).toHaveValue("1");
+  expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Sort epics"), { target: { value: "unmapped" } });
+  expect(rowKeys()).toEqual(["P-1", "P-2", "P-10"]);
+});
+
+it("resets pagination and keeps native sort controls focusable", async () => {
+  mockInventory([...epics, ...Array.from({ length: 50 }, (_, i) => ({ epicKey: `X-${i}`, title: `Extra ${i}`, status: "Open", workStreamId: null }))]);
+  await renderTab();
+  fireEvent.click(screen.getByLabelText("Select P-1"));
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  const header = screen.getByRole("button", { name: "Sort by Epic key" });
+  expect(header).toHaveAttribute("type", "button");
+  header.focus(); expect(header).toHaveFocus();
+  fireEvent.click(header);
+  expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+  expect(screen.getByLabelText("Select P-1")).toBeChecked();
+  expect(screen.getByRole("columnheader", { name: /Epic key/ })).toHaveAttribute("aria-sort", "ascending");
+});

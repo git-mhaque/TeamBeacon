@@ -135,7 +135,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Settings has two tabs: Initiative Metadata and Work Stream Epic Mapping.
 - Mapping inventory includes locally synced epics from the configured JIRA project, excluding epics labelled Triad, including epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
 - Saved mapping statistics show total, mapped, unmapped, coverage, and work stream distribution including unmapped. Counts are epic counts, not effort estimates.
-- Search, mapping/work stream/status filters, unmapped-first sorting, and 50-row pagination operate on saved assignments. Drafts and explicit selections persist across pages, filters, and tabs.
+- Search, mapping/work stream/status filters, unmapped-first sorting, and 50-row pagination operate on saved assignments. Drafts and explicit selections persist across pages, filters, and tabs. Epic key, title, status, work stream, and changes headers toggle ascending/descending sorting with visible indicators and accessible sort state; sorting resets pagination and preserves edits/selections.
 - Epic keys link directly to the configured JIRA browse page and open in a new tab.
 - Users edit individual dropdowns or assign a work stream (including Unmapped) to selected epics. Select this page affects only visible rows; the selected count includes hidden selections.
 - Save changes submits only modified assignments, up to 1000 per batch. Validation and assignment conflict checks precede an atomic transaction; failure preserves the draft.
