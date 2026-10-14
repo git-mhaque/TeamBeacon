@@ -81,3 +81,8 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 6. Add route-level code splitting and complete the remaining modernized-frontend hardening gates.
 
 - MCP dashboard presentation simplified to work-stream progress, flow, filters, and freshness; removed metric cards and issue lists from the widget while retaining the data-tool contract.
+
+### Bulk work stream epic mapping
+- Delivered Settings tabs for Initiative Metadata and Work Stream Epic Mapping.
+- Includes saved coverage/distribution, all synced epics, filters, sorting, 50-row pages, explicit bulk selection and draft save/discard.
+- Assignment-only batches validate stale mappings and commit atomically, preserving other metadata and saved views. No schema or connector configuration change.

@@ -209,7 +209,7 @@ Use this structure:
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
 - **Release Insights:** separate release readiness from historical cycle-time analysis.
 - **Global system status:** expose connection health, JIRA sync actions/history, and diagnostics from a compact header control. Use one accessible side sheet with internal views, keyboard focus containment, Escape dismissal, and trigger-focus restoration.
-- **Settings:** keep the screen focused on editable work streams and work types; operational integration state belongs to the global system-status sheet.
+- **Settings:** provide Initiative Metadata and Work Stream Epic Mapping tabs, with saved mapping statistics, searchable/filterable epic assignments, page-scoped selection, persistent drafts and atomic bulk save; operational integration state belongs to the global system-status sheet.
 - **Security and Operations:** use one reusable coming-soon state until real workflows exist.
 
 ### 4.7 Visual System

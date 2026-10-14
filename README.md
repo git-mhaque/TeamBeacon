@@ -131,19 +131,24 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```
 
 CI also enforces at least 90% combined statement/branch coverage **for each** of
-`services/api/server.py` and `services/api/integrations/jira_sync.py`. In an activated
+`services/api/server.py`, `services/api/integrations/jira_sync.py`, and `services/api/metadata/epic_mapping.py`. In an activated
 Python 3.11 virtual environment (the optional `.venv-mcp` environment also works):
 
 ```bash
 python -m pip install coverage==7.16.2
-python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/unit -p "test_*.py" -v
-python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync -m unittest discover -s tests/integration/api -p "test_*.py" -v
+python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping -m unittest discover -s tests/unit -p "test_*.py" -v
+python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping -m unittest discover -s tests/integration/api -p "test_*.py" -v
 python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90
+python -m coverage report --include=services/api/metadata/epic_mapping.py --precision=2 --fail-under=90
 ```
 
 Run the two backend suites before the reports; a fresh `coverage run` replaces
 previous coverage data. The integration suite uses temporary loopback HTTP servers.
+
+CI also checks API startup imports on Python 3.9 and 3.11. To verify compatibility
+with the interpreter used by the local dev launcher, run
+`python3 -c "import services.api.server"`.
 
 6. Run frontend checks:
 ```bash
@@ -153,7 +158,7 @@ npm run lint
 npm run test:coverage
 ```
 
-The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell and primary navigation.
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, and Work Stream Epic Mapping.
 
 ## Codex dashboard integration
 

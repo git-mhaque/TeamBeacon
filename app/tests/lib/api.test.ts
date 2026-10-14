@@ -270,3 +270,19 @@ describe("api initiative deep dive", () => {
     expect(requestUrl.searchParams.has("tableWindowWeeks")).toBe(false);
   });
 });
+
+describe("api epic mapping", () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.resetModules(); });
+  it("reports inventory HTTP failures", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => jsonResponse({ detail: "Inventory unavailable" }, 503));
+    const { fetchEpicMappingInventory } = await import("../../src/lib/api");
+    await expect(fetchEpicMappingInventory()).rejects.toThrow("Inventory unavailable");
+  });
+  it("returns saved batch count and reports save errors", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(() => jsonResponse({ savedCount: 1 })).mockImplementationOnce(() => jsonResponse({ detail: "Stale assignment" }, 409));
+    const { saveEpicMappings } = await import("../../src/lib/api");
+    const changes = [{ epicKey: "P-1", workStreamId: 1, expectedWorkStreamId: null }];
+    await expect(saveEpicMappings(changes)).resolves.toEqual({ savedCount: 1 });
+    await expect(saveEpicMappings(changes)).rejects.toThrow("Stale assignment");
+  });
+});

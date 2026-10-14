@@ -1422,3 +1422,21 @@ export async function fetchReleaseInsights(releaseLimit = 12, projectKey?: strin
   }
   return (await response.json()) as ReleaseInsightsResponse;
 }
+
+export type EpicMapping = { epicKey: string; title: string; status: string; workStreamId: number | null };
+export type EpicMappingInventory = { epics: EpicMapping[]; lastSyncedAt: string | null };
+export type EpicMappingChange = { epicKey: string; workStreamId: number | null; expectedWorkStreamId: number | null };
+
+export async function fetchEpicMappingInventory(): Promise<EpicMappingInventory> {
+  const response = await fetch(`${API_BASE}/api/metadata/epic-mappings`);
+  if (!response.ok) throw await parseError(response, "Failed to load epic mappings");
+  return response.json() as Promise<EpicMappingInventory>;
+}
+
+export async function saveEpicMappings(changes: EpicMappingChange[]): Promise<{ savedCount: number }> {
+  const response = await fetch(`${API_BASE}/api/metadata/epic-mappings`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }),
+  });
+  if (!response.ok) throw await parseError(response, "Failed to save epic mappings");
+  return response.json() as Promise<{ savedCount: number }>;
+}

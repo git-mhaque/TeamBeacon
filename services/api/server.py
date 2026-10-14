@@ -52,6 +52,7 @@ from services.api.metadata.epic_config import (
     update_work_type,
     upsert_epic_metadata,
 )
+from services.api.metadata.epic_mapping import MappingConflict, get_epic_mapping_inventory, save_epic_mappings
 from services.api.response_cache import ResponseCache
 
 
@@ -725,6 +726,21 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "responses": {"200": {"description": "Work type deleted", "content": json_payload}, "400": error_payload},
                 }
             },
+            "/api/metadata/epic-mappings": {
+                "get": {"summary": "List all synced epics and saved work stream assignments", "responses": {"200": {"description": "Inventory with last successful JIRA sync timestamp", "content": json_payload}}},
+                "post": {
+                    "summary": "Atomically update work stream assignments only",
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                        "type": "object", "required": ["changes"], "properties": {"changes": {
+                            "type": "array", "minItems": 1, "maxItems": 1000, "items": {
+                                "type": "object", "required": ["epicKey", "workStreamId", "expectedWorkStreamId"],
+                                "properties": {"epicKey": {"type": "string"}, "workStreamId": {"type": ["integer", "null"], "minimum": 1}, "expectedWorkStreamId": {"type": ["integer", "null"], "minimum": 1}}
+                            }
+                        }}
+                    }}}},
+                    "responses": {"200": {"description": "Saved batch count"}, "400": {"description": "Invalid batch; nothing saved"}, "409": {"description": "Stale assignment; nothing saved"}}
+                }
+            },
             "/api/metadata/epics": {
                 "get": {
                     "tags": ["metadata"],
@@ -924,6 +940,8 @@ def build_handler(
     team_insights_provider: TeamInsightsProvider = get_team_insights,
     release_insights_provider: ReleaseInsightsProvider = get_release_insights,
     initiative_deep_dive_provider: InitiativeDeepDiveProvider = get_initiative_deep_dive,
+    metadata_mapping_inventory_provider: Callable[[], dict[str, Any]] = get_epic_mapping_inventory,
+    metadata_mapping_save_provider: Callable[[Any], dict[str, Any]] = save_epic_mappings,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
     metadata_add_work_type_provider: MetadataCreateProvider = add_work_type,
@@ -1238,6 +1256,11 @@ def build_handler(
                     return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epic-mappings":
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(metadata_mapping_inventory_provider()))
                 return
 
             if path == "/api/metadata/lookup":
@@ -1805,6 +1828,17 @@ def build_handler(
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/epic-mappings":
+                try:
+                    payload = metadata_mapping_save_provider(body_payload.get("changes") if isinstance(body_payload, dict) else None)
+                except ValueError as exc:
+                    self._set_json_headers(409 if isinstance(exc, MappingConflict) else 400)
+                    self.wfile.write(_json_bytes({"error": "mapping_save_failed", "detail": str(exc)}))
                     return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))

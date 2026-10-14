@@ -125,6 +125,17 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - `epic_metadata_groups`
   - `epic_metadata_work_types`
 
+## 6.2.1 Bulk Work Stream Epic Mapping
+- Settings has two tabs: Initiative Metadata and Work Stream Epic Mapping.
+- Mapping inventory includes all locally synced JIRA epics, including epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
+- Saved mapping statistics show total, mapped, unmapped, coverage, and work stream distribution including unmapped. Counts are epic counts, not effort estimates.
+- Search, mapping/work stream/status filters, unmapped-first sorting, and 50-row pagination operate on saved assignments. Drafts and explicit selections persist across pages, filters, and tabs.
+- Epic keys link directly to the configured JIRA browse page and open in a new tab.
+- Users edit individual dropdowns or assign a work stream (including Unmapped) to selected epics. Select this page affects only visible rows; the selected count includes hidden selections.
+- Save changes submits only modified assignments, up to 1000 per batch. Validation and assignment conflict checks precede an atomic transaction; failure preserves the draft.
+- Assignment-only writes preserve success criteria, work types, timeline fields and saved-view membership. Mapping an unconfigured epic creates minimal metadata and makes it part of All Configured.
+- Pending edits are highlighted with a sticky save/discard bar; navigation or reload warns before discarding drafts. Saving blocks navigation and further edits.
+
 ## 6.3 Team Insights Semantics (Current Behavior)
 - Trend window:
   - API accepts `sprintLimit` in range 1-12.

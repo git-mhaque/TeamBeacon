@@ -331,3 +331,16 @@ describe("Content", () => {
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
   });
 });
+
+it("blocks navigation when the active settings editor cancels leaving", async () => {
+  setupFetchMock({ "/api/metadata/lookup": { groups: [], workTypes: [] } });
+  render(<Content appName="TeamBeacon" />);
+  fireEvent.click(screen.getByRole("button", { name: "Settings: Work streams & configuration" }));
+  await screen.findByRole("tab", { name: "Initiative Metadata" });
+  const guard = (event: Event) => event.preventDefault();
+  window.addEventListener("tb-before-navigation", guard);
+  fireEvent.click(screen.getByRole("button", { name: "Team Report: Wins, risks & work mix" }));
+  expect(screen.getByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Settings: Work streams & configuration" }));
+  window.removeEventListener("tb-before-navigation", guard);
+});

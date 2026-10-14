@@ -14,6 +14,12 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       thresholds: {
+        "src/components/content/screens/EpicMappingTab.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/IntegrationsScreen.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/mcp/bridge.ts": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },

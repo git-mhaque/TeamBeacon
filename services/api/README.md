@@ -201,3 +201,8 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
   - `epic_metadata` (success checklist by epic)
   - `epic_metadata_groups`, `epic_metadata_work_types` (many-to-many mapping)
 - Serves the TeamBeacon web frontend in the container runtime and supports the separate frontend development server.
+
+### Bulk work stream epic mapping
+- `GET /api/metadata/epic-mappings`: all synced epics (`epicKey`, `title`, `status`, nullable `workStreamId`) and `lastSyncedAt` for the last completed JIRA sync.
+- `POST /api/metadata/epic-mappings`: `{ "changes": [{ "epicKey": "PROJECT-1", "workStreamId": 1, "expectedWorkStreamId": null }] }`. A null target clears the assignment; each row requires its previously loaded assignment. Accepts 1–1000 unique epic keys.
+- Returns `savedCount`; invalid batches return 400 and stale assignments return 409. Entire batches roll back on failure. Only work stream assignments change; existing metadata/view membership is preserved. Previously unconfigured epics gain minimal metadata.

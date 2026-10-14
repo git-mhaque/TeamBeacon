@@ -587,7 +587,7 @@ export function Content({ appName }: Props) {
         </div>
       </header>
 
-      <PrimaryNavigation active={active} isExpanded={isSidebarExpanded} onNavigate={setActive} />
+      <PrimaryNavigation active={active} isExpanded={isSidebarExpanded} onNavigate={(screen) => { if (screen === active || window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))) setActive(screen); }} />
 
       <main className={`tb-main tb-main-${active}`}>
         <header className="tb-topbar">
