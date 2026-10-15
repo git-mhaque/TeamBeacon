@@ -1,12 +1,23 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
-import { vi } from "vitest";
+import { beforeEach, vi } from "vitest";
+import * as persistence from "../../src/lib/persistence";
 import {
   EXPORT_TEAM_REPORT_HTML_EVENT,
   OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT,
   OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT,
   TeamReportScreen,
 } from "../../src/components/content/screens/TeamReportScreen";
+
+const INITIATIVE_SELECTION_KEY = "teambeacon.executive.initiative.visibleEpicKeys";
+
+// Each test represents a fresh browser profile; preserve preferences within a test only.
+beforeEach(() => {
+  const store = new Map<string, string>();
+  vi.spyOn(persistence, "getPreferenceSync").mockImplementation((key) => store.get(key) ?? null);
+  vi.spyOn(persistence, "getPreference").mockImplementation(async (key) => store.get(key) ?? null);
+  vi.spyOn(persistence, "setPreference").mockImplementation(async (key, value) => { store.set(key, value); });
+});
 
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
@@ -331,6 +342,7 @@ describe("TeamReportScreen", () => {
     await waitFor(() => {
       expect(screen.queryByText("Executive reporting automation")).not.toBeInTheDocument();
     });
+    expect(JSON.parse(persistence.getPreferenceSync(INITIATIVE_SELECTION_KEY)!)).toEqual({ mode: "manual", keys: ["CEG-EPIC-34"] });
 
     window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT));
     expect(await screen.findByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
@@ -340,6 +352,7 @@ describe("TeamReportScreen", () => {
 });
 
 it.each([null, "invalid"])("does not assess report RAG for an enabled timeline with target %s", async (targetCompletionDate) => {
+  expect(persistence.getPreferenceSync(INITIATIVE_SELECTION_KEY)).toBeNull();
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     if (String(input).includes("/metadata/epics/summary")) return new Response(JSON.stringify({ epics: [{
       epicKey: "CEG-EPIC-12", epicName: "Incomplete timeline", groups: [], workTypes: [], successCriteria: [],
