@@ -241,3 +241,5 @@ TeamBeacon/
 - Manual additions/removals, Select All and Clear All switch the draft to manual mode. Reordering preserves automatic mode; unchecking freezes the current draft selection.
 - Save persists both mode and ordered keys; Cancel discards draft changes. Legacy key-array preferences remain supported, automatic mode defaults off, and explicit empty manual/automatic selections survive reloads.
 - The dialog previews qualifying count and reporting dates. Report sections, AI context and exports continue to use the resulting shared selection.
+
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives, Wins and Risks, Executive Summary.

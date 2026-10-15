@@ -101,3 +101,5 @@ Initiative RAG requires an enabled timeline and valid target completion date. Un
 ### Automatic Team Report initiative selection
 - Added opt-in period-completion selection, saved mode/order, qualifying-count preview and manual overrides.
 - Preserved legacy preferences and explicit empty selections; automatic selection recalculates after period changes while keeping reordered qualifying initiatives.
+
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives, Wins and Risks, Executive Summary.

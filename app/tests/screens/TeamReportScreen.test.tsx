@@ -224,6 +224,14 @@ describe("TeamReportScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
     expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      "Report Signals",
+      "Completed Work Summary",
+      "Work Mix by Work Stream and Type",
+      "Progress for Key Initiatives",
+      "Wins and Risks",
+      "Executive Summary",
+    ]);
     expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
     expect(await screen.findByText(/selected initiatives advanced during the reporting period/i)).toBeInTheDocument();
 
