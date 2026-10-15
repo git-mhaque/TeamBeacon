@@ -111,7 +111,7 @@ vi.mock("../../src/components/content/screens/TeamReportScreen", async () => {
 
       return (
         <section>
-          <h3>Executive Summary</h3>
+          <h3>Report Signals</h3>
           <p>{`Exports: ${exportCount}`}</p>
           {isReportingOpen ? <div role="dialog" aria-label="Configure Reporting Period"></div> : null}
           {isInitiativesOpen ? <div role="dialog" aria-label="Configure Initiative Epics"></div> : null}
@@ -393,7 +393,7 @@ describe("Content topbar controls", () => {
     expect(screen.getByText("Releases stub")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Team Report/ }));
-    expect(screen.getByText("Executive Summary")).toBeInTheDocument();
+    expect(screen.getByText("Report Signals")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reporting Period" }));
     expect(screen.getByRole("dialog", { name: "Configure Reporting Period" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Configure Initiatives" }));

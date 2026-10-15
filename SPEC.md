@@ -10,7 +10,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 ## 3. Goals
 - Centralize initiative and sprint performance views.
 - Reduce manual reporting effort.
-- Generate consistent RAG status and executive summaries.
+- Generate consistent RAG status and source-linked completed-work summaries.
 - Enable configurable team- and project-specific definitions (custom fields, success criteria, aliases).
 - Support pluggable AI providers for intelligence workflows (`oci`, `ollama`, `openai`).
 
@@ -242,7 +242,7 @@ TeamBeacon/
 - Save persists both mode and ordered keys; Cancel discards draft changes. Legacy key-array preferences remain supported, automatic mode defaults off, and explicit empty manual/automatic selections survive reloads.
 - The dialog previews qualifying count and reporting dates. Report sections, AI context and exports continue to use the resulting shared selection.
 
-Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives, Wins and Risks, Executive Summary.
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; only Completed Work Summary generates an AI narrative.
 
 Completed Work Summary is grouped by work stream, then epic. Each linked epic title appears once above its outcome bullets; each bullet shows its linked issue key and original issue title on a smaller, muted second line. Screen and HTML exports use the same layout and open JIRA links in new tabs. Source metadata comes from synced records; AI bullets are matched by card ID, with original-outcome fallbacks for missing or invalid references. Without a valid JIRA URL, source details remain visible as plain text.
 

@@ -18,7 +18,7 @@ function jsonResponse(payload: unknown, status = 200): Promise<Response> {
 }
 
 describe("TeamReportScreen", () => {
-  it("loads executive data, drafts summary/wins-risks, and supports initiative selection", async () => {
+  it("loads report data, drafts only completed work, and supports initiative selection", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url =
         typeof input === "string"
@@ -174,38 +174,7 @@ describe("TeamReportScreen", () => {
           });
         }
 
-        if (bodyText.includes("Return JSON only with this schema")) {
-          return jsonResponse({
-            source: "ollama",
-            provider: "ollama",
-            configuredProvider: "ollama",
-            modelId: "gemma4:e2b",
-            response: {
-              text: JSON.stringify({
-                wins: [
-                  "Executive automation epic delivered five cards this period.",
-                  "Core platform progress remains on-track against timeline.",
-                  "Risk hardening work continued with measurable completion movement.",
-                ],
-                risks: [
-                  "Reliability epic completion remains below midpoint and needs focus.",
-                  "Delivery risk rises if period throughput drops next week.",
-                  "Timeline variance can grow without cross-team dependency closure.",
-                ],
-              }),
-            },
-          });
-        }
-
-        return jsonResponse({
-          source: "ollama",
-          provider: "ollama",
-          configuredProvider: "ollama",
-          modelId: "gemma4:e2b",
-          response: {
-            text: "The selected initiatives advanced during the reporting period with stronger momentum in core platform delivery while reliability work still requires focused risk mitigation.",
-          },
-        });
+        return Promise.reject(new Error("Unexpected AI request outside completed-work summary"));
       }
 
       return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
@@ -213,26 +182,22 @@ describe("TeamReportScreen", () => {
 
     render(<TeamReportScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Completed Work Summary" })).toBeInTheDocument();
     expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
       "Report Signals",
       "Completed Work Summary",
       "Work Mix by Work Stream and Type",
       "Progress for Key Initiatives",
-      "Wins and Risks",
-      "Executive Summary",
     ]);
-    expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
-    expect(await screen.findByText(/selected initiatives advanced during the reporting period/i)).toBeInTheDocument();
-
-    expect(await screen.findByText(/Executive automation epic delivered five cards this period\./i)).toBeInTheDocument();
-    expect(await screen.findByText(/Reliability epic completion remains below midpoint and needs focus\./i)).toBeInTheDocument();
-    expect(screen.queryByText(/Drafted by OCI GenAI from selected Progress for Key Initiatives data\./i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Executive Summary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Wins and Risks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh Summary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh Wins and Risks" })).not.toBeInTheDocument();
+    await screen.findByText(/assembles leadership-ready dashboard narratives/i);
     const selectedInitiativesCard = screen.getByRole("heading", { name: "Selected Initiatives" }).closest("article")!;
     expect(within(selectedInitiativesCard).getByText("Initiatives included in this report.")).toBeInTheDocument();
     expect(within(selectedInitiativesCard).getByText("2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh Wins and Risks" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeInTheDocument();
 
     const completedWorkPanel = screen.getByRole("heading", { name: "Completed Work Summary" }).closest("section");
@@ -275,6 +240,9 @@ describe("TeamReportScreen", () => {
         reader.readAsText(write.mock.calls[0][0]);
       });
       const report = new DOMParser().parseFromString(html, "text/html");
+      expect([...report.querySelectorAll("h2")].map((heading) => heading.textContent)).toEqual([
+        "Report Signals", "Completed Work Summary", "Work Mix by Work Stream and Type", "Progress for Key Initiatives",
+      ]);
       const issue = report.querySelector('a[href="https://jira.example.com/browse/CEG-1010"]')!;
       expect(issue.textContent).toBe("CEG-1010");
       expect(issue.getAttribute("target")).toBe("_blank");
@@ -342,16 +310,12 @@ describe("TeamReportScreen", () => {
       expect(within(chart).getByText("28.6%")).toBeInTheDocument();
     }
 
-    const winsRisksPanel = screen.getByRole("heading", { name: "Wins and Risks" }).closest("section");
-    expect(winsRisksPanel).not.toBeNull();
-    if (!winsRisksPanel) {
-      throw new Error("Wins and Risks section not found.");
-    }
-    const scopedWinsRisks = within(winsRisksPanel);
-    expect(scopedWinsRisks.getByText("Generated with Ollama")).toBeInTheDocument();
-    expect(scopedWinsRisks.getByText(/Model:/i)).toBeInTheDocument();
-    expect(scopedWinsRisks.getByText(/Updated:/i)).toBeInTheDocument();
-    expect(scopedWinsRisks.getByText(/words/i)).toBeInTheDocument();
+    const aiCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("/api/ai/chat"));
+    expect(aiCalls.length).toBeGreaterThan(0);
+    for (const [, init] of aiCalls) expect(String(init?.body)).toContain("Draft a completed-work summary grouped by work stream for engineering leaders.");
+    const initialAiCallCount = aiCalls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Completed Work Summary" }));
+    await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/api/ai/chat")).length).toBe(initialAiCallCount + 1));
 
     window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT));
     const dialog = await screen.findByRole("dialog", { name: "Configure Initiative Epics" });
@@ -392,4 +356,16 @@ it.each([null, "invalid"])("does not assess report RAG for an enabled timeline w
   expect(within(mix).queryByRole("table")).not.toBeInTheDocument();
   const summary = screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!;
   for (const label of ["0 Red", "0 Amber", "0 Green"]) expect(within(summary).getByText(label)).toBeInTheDocument();
+});
+
+it("keeps report loading failures visible without requesting removed narratives", async () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input).includes("/metadata/epics/summary")) return new Response("Unavailable", { status: 500 });
+    return jsonResponse({ config: {} });
+  });
+  render(<TeamReportScreen />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Team report error:");
+  expect(screen.queryByRole("heading", { name: "Executive Summary" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Wins and Risks" })).not.toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/api/ai/chat"))).toBe(false);
 });

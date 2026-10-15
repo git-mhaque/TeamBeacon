@@ -44,13 +44,13 @@ Exit criteria:
 - UX behavior is validated against design screens.
 
 ## Phase 3 (Weeks 6-7): Executive Reporting
-- Generate executive summary and initiative delta since last report.
+- Generate source-linked completed-work summaries and initiative progress for the reporting period.
 - Add report history and baseline comparison.
 - Export in Markdown (PDF rendering optional stretch).
 
 Exit criteria:
 - One-click report generation works from UI.
-- Report includes progress, risks, and open concerns.
+- Report includes delivery signals, completed-work summaries, work mix, and initiative progress with timeline health.
 
 ## Phase 4 (Week 8): Hardening and Release
 - Improve performance for large project datasets.
@@ -102,7 +102,7 @@ Initiative RAG requires an enabled timeline and valid target completion date. Un
 - Added opt-in period-completion selection, saved mode/order, qualifying-count preview and manual overrides.
 - Preserved legacy preferences and explicit empty selections; automatic selection recalculates after period changes while keeping reordered qualifying initiatives.
 
-Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives, Wins and Risks, Executive Summary.
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; only Completed Work Summary generates an AI narrative.
 
 Completed Work Summary is grouped by work stream, then epic. Each linked epic title appears once above its outcome bullets; each bullet shows its linked issue key and original issue title on a smaller, muted second line. Screen and HTML exports use the same layout and open JIRA links in new tabs. Source metadata comes from synced records; AI bullets are matched by card ID, with original-outcome fallbacks for missing or invalid references. Without a valid JIRA URL, source details remain visible as plain text.
 
