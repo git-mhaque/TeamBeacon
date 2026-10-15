@@ -8583,3 +8583,26 @@ body {
 .tb-exec-auto-select { margin-bottom: 1rem; padding: 0.85rem; border: 1px solid var(--tb-line); border-radius: 0.6rem; background: var(--tb-surface); }
 .tb-exec-auto-select label { display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 600; }
 .tb-exec-auto-select input { margin-top: 0.2rem; flex-shrink: 0; }
+
+.tb-exec-completed-epic {
+  margin-top: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.tb-exec-completed-epic-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.tb-exec-completed-source {
+  margin-top: 0.2rem;
+  color: #625a54;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.tb-exec-completed-epic .tb-exec-narrative-list li + li {
+  margin-top: 0.65rem;
+}

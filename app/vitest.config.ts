@@ -14,6 +14,9 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       thresholds: {
+        "src/lib/reportCompletedWork.ts": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/lib/reportInitiativeSelection.ts": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },

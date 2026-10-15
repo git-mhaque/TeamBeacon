@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { vi } from "vitest";
 import {
+  EXPORT_TEAM_REPORT_HTML_EVENT,
   OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT,
   OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT,
   TeamReportScreen,
@@ -163,20 +164,10 @@ describe("TeamReportScreen", () => {
             modelId: "gemma4:e2b",
             response: {
               text: JSON.stringify({
-                groups: [
-                  {
-                    group: "Core Platform",
-                    bullets: [
-                      "Completed workflow automation now assembles leadership-ready dashboard narratives for the selected period.",
-                      "Delivery strengthened reporting consistency and reduced manual summary preparation overhead.",
-                    ],
-                  },
-                  {
-                    group: "Operations",
-                    bullets: [
-                      "Completed validation enhancements improved reliability of risk insights used in dashboard decision reviews.",
-                    ],
-                  },
+                items: [
+                  { cardId: "card-3", bullet: "Completed validation enhancements improved reliability of risk insights used in dashboard decision reviews." },
+                  { cardId: "card-1", bullet: "Completed workflow automation now assembles leadership-ready dashboard narratives for the selected period." },
+                  { cardId: "card-2", bullet: "Delivery strengthened reporting consistency and reduced manual summary preparation overhead." },
                 ],
               }),
             },
@@ -255,10 +246,52 @@ describe("TeamReportScreen", () => {
     expect(await scopedCompletedWork.findByText(/assembles leadership-ready dashboard narratives/i)).toBeInTheDocument();
     expect(await scopedCompletedWork.findByText(/improved reliability of risk insights/i)).toBeInTheDocument();
     expect(scopedCompletedWork.getAllByRole("listitem")).toHaveLength(3);
+    const completedBullet = scopedCompletedWork.getAllByRole("listitem")[0];
+    expect(within(completedBullet).getByText(/assembles leadership-ready dashboard narratives/)).toBeInTheDocument();
+    const epicHeading = scopedCompletedWork.getByRole("heading", { level: 5, name: "Executive reporting automation" });
+    expect(within(epicHeading).getByRole("link")).toHaveAttribute("href", "https://jira.example.com/browse/CEG-EPIC-12");
+    expect(within(epicHeading).getByRole("link")).toHaveAttribute("target", "_blank");
+    expect(scopedCompletedWork.getAllByRole("link", { name: "Executive reporting automation" })).toHaveLength(1);
+    expect(within(epicHeading.parentElement!).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(completedBullet).queryByRole("link", { name: "Executive reporting automation" })).not.toBeInTheDocument();
+    const issueLink = within(completedBullet).getByRole("link", { name: "CEG-1010" });
+    expect(issueLink).toHaveAttribute("href", "https://jira.example.com/browse/CEG-1010");
+    expect(issueLink).toHaveAttribute("target", "_blank");
+    expect(issueLink).toHaveAttribute("rel", "noopener noreferrer");
+    expect(issueLink.parentElement).toHaveClass("tb-exec-completed-source");
+    expect(issueLink.parentElement).toHaveTextContent("CEG-1010 · Automated executive dashboard summary workflow");
+    expect(within(scopedCompletedWork.getAllByRole("listitem")[2]).getByRole("link", { name: "CEG-2012" })).toBeInTheDocument();
 
-    expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
-    expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();
-    const unassessedRow = screen.getByText("Risk reporting hardening").closest("tr")!;
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window, "showSaveFilePicker", { configurable: true, value: vi.fn().mockResolvedValue({
+      createWritable: async () => ({ write, close: async () => undefined }),
+    }) });
+    try {
+      window.dispatchEvent(new CustomEvent(EXPORT_TEAM_REPORT_HTML_EVENT));
+      await waitFor(() => expect(write).toHaveBeenCalledOnce());
+      const html = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsText(write.mock.calls[0][0]);
+      });
+      const report = new DOMParser().parseFromString(html, "text/html");
+      const issue = report.querySelector('a[href="https://jira.example.com/browse/CEG-1010"]')!;
+      expect(issue.textContent).toBe("CEG-1010");
+      expect(issue.getAttribute("target")).toBe("_blank");
+      expect(issue.closest("li")?.textContent).toContain("Automated executive dashboard summary workflow");
+      const epicBlock = issue.closest(".completed-epic")!;
+      expect(epicBlock.querySelector('h5 a[href="https://jira.example.com/browse/CEG-EPIC-12"]')?.textContent).toBe("Executive reporting automation");
+      expect(epicBlock.querySelectorAll("li")).toHaveLength(2);
+      expect(epicBlock.querySelectorAll('a[href="https://jira.example.com/browse/CEG-EPIC-12"]')).toHaveLength(1);
+      expect(issue.parentElement?.className).toBe("completed-source");
+    } finally {
+      Reflect.deleteProperty(window, "showSaveFilePicker");
+    }
+
+
+    const progressPanel = screen.getByRole("heading", { name: "Progress for Key Initiatives" }).closest("section")!;
+    expect(within(progressPanel).getByText("Executive reporting automation")).toBeInTheDocument();
+    const unassessedRow = within(progressPanel).getByText("Risk reporting hardening").closest("tr")!;
     expect(within(unassessedRow).getByText("Not assessed")).toHaveClass("is-neutral");
     expect(within(screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!).getByText(/1 not assessed/)).toBeInTheDocument();
     expect(screen.getByLabelText("Work stream effort distribution chart")).toBeInTheDocument();

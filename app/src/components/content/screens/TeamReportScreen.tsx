@@ -8,6 +8,7 @@ import {
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
 } from "../../../lib/api";
+import { groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSummaryGroup, type CompletedWorkSource } from "../../../lib/reportCompletedWork";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 import { readReportInitiativeSelection, resolveReportInitiativeSelection, type ReportSelectionMode } from "../../../lib/reportInitiativeSelection";
@@ -28,11 +29,6 @@ type DistributionSlice = {
   value: number;
   percent: number;
   color: string;
-};
-
-type CompletedWorkSummaryGroup = {
-  group: string;
-  bullets: string[];
 };
 
 type ReportingPreset = "last_7_days" | "last_14_days" | "last_30_days" | "custom";
@@ -334,6 +330,7 @@ function buildTeamReportExportHtml(params: {
   timezone: string;
   executiveSummary: string;
   completedWork: CompletedWorkSummaryGroup[];
+  jiraBaseUrl: string | null;
   wins: string[];
   risks: string[];
   totalInitiatives: number;
@@ -361,13 +358,22 @@ function buildTeamReportExportHtml(params: {
     percent: number;
   }>;
 }): string {
+  const sourceLink = (key: string, label: string): string => {
+    const url = reportJiraIssueUrl(params.jiraBaseUrl, key);
+    return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>` : escapeHtml(label);
+  };
   const completedSections = params.completedWork.length > 0
     ? params.completedWork.map((entry) => `
         <section class="section-block">
           <h4>${escapeHtml(entry.group)}</h4>
-          <ul>
-            ${entry.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
-          </ul>
+          ${groupCompletedWorkByEpic(entry.bullets).map((epic) => `
+            <div class="completed-epic">
+              ${epic.epicKey ? `<h5>${sourceLink(epic.epicKey, epic.epicName)}</h5>` : ""}
+              <ul>
+                ${epic.bullets.map((bullet) => `<li><div>${escapeHtml(bullet.text)}</div>${bullet.source ? `<div class="completed-source">${sourceLink(bullet.source.issueKey, bullet.source.issueKey)} · ${escapeHtml(bullet.source.issueTitle)}</div>` : ""}</li>`).join("")}
+              </ul>
+            </div>
+          `).join("")}
         </section>
       `).join("")
     : `
@@ -598,6 +604,10 @@ function buildTeamReportExportHtml(params: {
         border-top: 1px solid #e5ecf8;
         padding-top: 10px;
       }
+      .completed-epic { margin-top: 14px; overflow-wrap: anywhere; }
+      .completed-epic h5 { margin: 0; font-size: 13px; font-weight: 600; }
+      .completed-epic li { margin-bottom: 10px; }
+      .completed-source { margin-top: 3px; font-size: 12px; color: #625a54; line-height: 1.45; }
       .section-block:first-child {
         border-top: none;
         padding-top: 0;
@@ -1261,11 +1271,11 @@ function buildCompletedWorkSummaryPrompt(params: {
   completedCardsCount: number;
   groupCounts: Array<{ name: string; count: number }>;
   maxCards?: number;
-  cards: Array<{ group: string; initiativeAlias: string; status: string; completedAt: string; outcome: string }>;
+  cards: Array<{ cardId: string; group: string; initiativeAlias: string; status: string; completedAt: string; outcome: string }>;
 }): string {
   const promptCards = params.cards.slice(0, params.maxCards ?? 220);
   const cardLines = promptCards.map((card, index) => (
-    `${index + 1}. Work stream: ${card.group}` +
+    `${index + 1}. Card ID: ${card.cardId} | Work stream: ${card.group}` +
     ` | Initiative: ${card.initiativeAlias}` +
     ` | Status: ${card.status}` +
     ` | Completed: ${formatCompletedDateForPrompt(card.completedAt)}` +
@@ -1281,10 +1291,10 @@ function buildCompletedWorkSummaryPrompt(params: {
   return [
     "Draft a completed-work summary grouped by work stream for engineering leaders.",
     "Return JSON only with this schema:",
-    "{\"items\":[{\"group\":\"...\",\"bullet\":\"...\"}]}",
+    "{\"items\":[{\"cardId\":\"card-1\",\"bullet\":\"...\"}]}",
     "Rules:",
-    `- Return exactly ${params.completedCardsCount} items, one bullet per completed card.`,
-    "- Keep item order aligned with the completed card list.",
+    `- Return exactly ${promptCards.length} items, one bullet per listed completed card.`,
+    "- Copy the exact Card ID for each item. Do not merge cards or invent IDs.",
     "- Each bullet must describe a delivered outcome for that completed card and be <= 22 words.",
     "- Use only provided data. Do not invent metrics, dependencies, or blockers.",
     "- Do not reference issue keys, ticket IDs, or story points (SP).",
@@ -1309,8 +1319,7 @@ function buildCompletedWorkSummaryPrompt(params: {
 function parseCompletedWorkSummaryDraft(
   text: string,
   options: {
-    expectedCount: number;
-    fallbackCards: Array<{ group: string; outcome: string }>;
+    fallbackCards: CompletedWorkSource[];
     replacements?: Map<string, string>;
   },
 ): CompletedWorkSummaryGroup[] {
@@ -1345,63 +1354,17 @@ function parseCompletedWorkSummaryDraft(
     throw new Error("AI provider did not return valid JSON for completed work summary.");
   }
 
-  const normalizedItems: Array<{ group: string; bullet: string }> = [];
-
-  const appendItem = (rawGroup: unknown, rawBullet: unknown): void => {
-    if (typeof rawBullet !== "string") return;
-    const group = typeof rawGroup === "string" && rawGroup.trim().length > 0
-      ? rawGroup.trim().replace(/\s+/g, " ")
-      : "Unassigned";
-    const sanitized = sanitizeNarrativeText(stripIsoTimestamps(rawBullet), options.replacements);
-    if (!sanitized) return;
-    normalizedItems.push({
-      group,
-      bullet: clipWords(sanitized, 22),
-    });
-  };
-
+  const normalizedItems: Array<{ cardId: unknown; text: string }> = [];
   if (Array.isArray(parsed.items)) {
     for (const entry of parsed.items) {
       if (!entry || typeof entry !== "object") continue;
-      const record = entry as { group?: unknown; bullet?: unknown };
-      appendItem(record.group, record.bullet);
-      if (normalizedItems.length >= options.expectedCount) break;
-    }
-  } else if (Array.isArray(parsed.groups)) {
-    for (const entry of parsed.groups) {
-      if (!entry || typeof entry !== "object") continue;
-      const record = entry as { group?: unknown; bullets?: unknown };
-      if (!Array.isArray(record.bullets)) continue;
-      for (const bullet of record.bullets) {
-        appendItem(record.group, bullet);
-        if (normalizedItems.length >= options.expectedCount) break;
-      }
-      if (normalizedItems.length >= options.expectedCount) break;
+      const record = entry as { cardId?: unknown; bullet?: unknown };
+      if (typeof record.bullet !== "string") continue;
+      const text = clipWords(sanitizeNarrativeText(stripIsoTimestamps(record.bullet), options.replacements), 22);
+      normalizedItems.push({ cardId: record.cardId, text });
     }
   }
-
-  for (let index = normalizedItems.length; index < options.expectedCount; index += 1) {
-    const fallback = options.fallbackCards[index];
-    if (!fallback) break;
-    normalizedItems.push({
-      group: fallback.group,
-      bullet: buildCompletedCardFallbackBullet(fallback.outcome, options.replacements),
-    });
-  }
-
-  const scopedItems = normalizedItems.slice(0, options.expectedCount);
-  if (scopedItems.length === 0) {
-    throw new Error("AI provider response did not include completed work bullets.");
-  }
-
-  const grouped = new Map<string, string[]>();
-  for (const item of scopedItems) {
-    const existing = grouped.get(item.group) ?? [];
-    existing.push(item.bullet);
-    grouped.set(item.group, existing);
-  }
-
-  return [...grouped.entries()].map(([group, bullets]) => ({ group, bullets }));
+  return groupCompletedWork(options.fallbackCards, normalizedItems);
 }
 
 function ragToneClass(value: RagLabel): string {
@@ -1417,6 +1380,11 @@ function formatAiProviderName(value: string | null | undefined): string {
   if (normalized === "ollama") return "Ollama";
   if (normalized === "openai") return "OpenAI";
   return "AI";
+}
+
+function ReportJiraLink({ baseUrl, issueKey, children }: { baseUrl: string | null; issueKey: string; children: string }) {
+  const url = reportJiraIssueUrl(baseUrl, issueKey);
+  return url ? <a className="tb-external-link" href={url} target="_blank" rel="noopener noreferrer">{children}</a> : <>{children}</>;
 }
 
 export function TeamReportScreen() {
@@ -1968,6 +1936,7 @@ export function TeamReportScreen() {
       timezone: effectivePeriodTimezone,
       executiveSummary: executiveSummaryDraft,
       completedWork: completedWorkDraft,
+      jiraBaseUrl,
       wins: winsDraft,
       risks: risksDraft,
       totalInitiatives: visibleInitiativeSignals.totalEpics,
@@ -1986,6 +1955,7 @@ export function TeamReportScreen() {
     await saveHtmlWithDialogOrDownload(html, fileName);
   }, [
     completedWorkDraft,
+    jiraBaseUrl,
     effectivePeriodEnd,
     effectivePeriodTimezone,
     executiveSummaryDraft,
@@ -2287,7 +2257,7 @@ export function TeamReportScreen() {
       setCompletedWorkDraft([
         {
           group: "Unavailable",
-          bullets: ["Unable to generate completed work summary because initiative data failed to load."],
+          bullets: [{ text: "Unable to generate completed work summary because initiative data failed to load." }],
         },
       ]);
       setCompletedWorkModelId(null);
@@ -2302,14 +2272,14 @@ export function TeamReportScreen() {
         setCompletedWorkDraft([
           {
             group: "No Selection",
-            bullets: ["No initiatives are selected in Progress for Key Initiatives."],
+            bullets: [{ text: "No initiatives are selected in Progress for Key Initiatives." }],
           },
         ]);
       } else {
         setCompletedWorkDraft([
           {
             group: "No Data",
-            bullets: ["No configured epic data available to summarize completed work."],
+            bullets: [{ text: "No configured epic data available to summarize completed work." }],
           },
         ]);
       }
@@ -2344,8 +2314,7 @@ export function TeamReportScreen() {
 
         if (completedWorkRequestSequence.current !== requestId) return;
 
-        const scopedCards: Array<{
-          group: string;
+        const scopedCards: Array<CompletedWorkSource & {
           initiativeAlias: string;
           status: string;
           completedAt: string;
@@ -2367,6 +2336,12 @@ export function TeamReportScreen() {
           const outcome = stripIsoTimestamps(card.summary?.trim() || "No summary provided.");
 
           scopedCards.push({
+            cardId: `card-${scopedCards.length + 1}`,
+            epicKey,
+            epicName: row.epicName || card.epicName || epicKey,
+            issueKey: card.issueKey,
+            issueTitle: card.summary?.trim() || "No summary provided.",
+            fallbackText: buildCompletedCardFallbackBullet(outcome, completedWorkReplacements),
             group: groupName,
             initiativeAlias,
             status,
@@ -2380,7 +2355,7 @@ export function TeamReportScreen() {
           setCompletedWorkDraft([
             {
               group: "No Completed Cards",
-              bullets: ["No completed cards were found for selected initiatives in this reporting period."],
+              bullets: [{ text: "No completed cards were found for selected initiatives in this reporting period." }],
             },
           ]);
           setCompletedWorkModelId(null);
@@ -2415,11 +2390,7 @@ export function TeamReportScreen() {
         if (completedWorkRequestSequence.current !== requestId) return;
 
         const parsed = parseCompletedWorkSummaryDraft(response.response.text ?? "", {
-          expectedCount: scopedCards.length,
-          fallbackCards: scopedCards.map((card) => ({
-            group: card.group,
-            outcome: card.outcome,
-          })),
+          fallbackCards: scopedCards,
           replacements: completedWorkReplacements,
         });
         setCompletedWorkDraft(parsed);
@@ -2433,7 +2404,7 @@ export function TeamReportScreen() {
         setCompletedWorkDraft([
           {
             group: "Summary Unavailable",
-            bullets: ["Unable to generate completed work summary draft from AI provider."],
+            bullets: [{ text: "Unable to generate completed work summary draft from AI provider." }],
           },
         ]);
         setCompletedWorkModelId(null);
@@ -2461,7 +2432,7 @@ export function TeamReportScreen() {
 
   const completedWorkWordCount = useMemo(() => {
     const text = completedWorkDraft
-      .flatMap((entry) => entry.bullets)
+      .flatMap((entry) => entry.bullets.map((bullet) => bullet.text))
       .join(" ")
       .trim();
     if (!text) return 0;
@@ -2625,11 +2596,28 @@ export function TeamReportScreen() {
           {completedWorkDraft.map((entry) => (
             <div key={entry.group}>
               <h4 className="tb-exec-list-title">{entry.group}</h4>
-              <ul className="tb-list tb-exec-narrative-list">
-                {entry.bullets.map((item) => (
-                  <li key={`${entry.group}:${item}`}>{item}</li>
-                ))}
-              </ul>
+              {groupCompletedWorkByEpic(entry.bullets).map((epic) => (
+                <div className="tb-exec-completed-epic" key={epic.epicKey ?? "notice"}>
+                  {epic.epicKey ? (
+                    <h5 className="tb-exec-completed-epic-title">
+                      <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={epic.epicKey}>{epic.epicName}</ReportJiraLink>
+                    </h5>
+                  ) : null}
+                  <ul className="tb-list tb-exec-narrative-list">
+                    {epic.bullets.map((item) => (
+                      <li key={item.source?.cardId ?? `${entry.group}:${item.text}`}>
+                        <div>{item.text}</div>
+                        {item.source ? (
+                          <div className="tb-exec-completed-source">
+                            <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={item.source.issueKey}>{item.source.issueKey}</ReportJiraLink>
+                            {" · "}{item.source.issueTitle}
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           ))}
           {completedWorkLoading ? <p className="tb-muted-note">Generating completed work summary with {aiProviderName}...</p> : null}
