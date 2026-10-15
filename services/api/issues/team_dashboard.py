@@ -140,7 +140,7 @@ def get_team_dashboard(
         "progress",
         errors,
         get_configured_epic_summary,
-        limit=200,
+        limit=None,
         timezone_name=timezone_name,
         db_path=db_path,
     )

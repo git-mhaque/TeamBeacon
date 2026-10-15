@@ -209,3 +209,6 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
 
 ### Eligible project epic reconciliation
 Every sync independently searches the configured project for Epic issues with empty labels or labels not containing Triad. Full mode refreshes all eligible epics; incremental modes backfill missing epics regardless of age and refresh existing source changes. Results/progress include `projectEpicCount` and `projectEpicsSynced`; the final message summarizes reconciliation. Existing board issue sync remains in place. Mapping inventory uses the same project/label scope and rejects assignment of excluded epics. Metadata and saved views remain intact, and older backfills never lower the checkpoint. Search/pagination failures mark the sync failed rather than recording a successful complete inventory.
+
+### Complete configured epic summaries
+Use `GET /api/metadata/epics/summary?limit=all` (with optional `viewId`, reporting period and timezone) to return every configured epic in the selected view. Numeric limits retain the default 50 and maximum 200. Initiative Insights, Team Report, and Team Dashboard delivery progress explicitly use complete summaries so counts and calculations include records beyond 200. No schema or configuration migration is required.

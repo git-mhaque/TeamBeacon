@@ -868,7 +868,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "tags": ["metadata"],
                     "summary": "Configured epic summary",
                     "parameters": [
-                        {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50}},
+                        {"name": "limit", "in": "query", "description": "Use all for complete configured-view analytics; numeric limits are capped at 200.", "schema": {"oneOf": [{"type": "integer", "minimum": 1, "maximum": 200}, {"type": "string", "enum": ["all"]}], "default": 50}},
                         {"name": "periodStart", "in": "query", "schema": {"type": "string"}},
                         {"name": "periodEnd", "in": "query", "schema": {"type": "string"}},
                         {"name": "timezone", "in": "query", "schema": {"type": "string"}},
@@ -1293,7 +1293,7 @@ def build_handler(
                 query = parse_qs(parsed.query)
                 limit_raw = query.get("limit", ["50"])[0]
                 try:
-                    limit = int(limit_raw)
+                    limit = None if limit_raw == "all" else int(limit_raw)
                 except ValueError:
                     limit = 50
                 period_start_raw = query.get("periodStart", [None])[0]

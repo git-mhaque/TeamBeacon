@@ -78,6 +78,14 @@ describe("api initiative views", () => {
     delete (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE;
   });
 
+  it("requests all configured epics without a numeric cap", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(await jsonResponse({ epics: [] }));
+    const { fetchConfiguredEpicSummary } = await import("../../src/lib/api");
+    await fetchConfiguredEpicSummary("all", { viewId: 7 });
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("limit=all");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("viewId=7");
+  });
+
   it("fetches configured epic summary with view query params", async () => {
     (globalThis as unknown as { TEAMBEACON_API_BASE?: string }).TEAMBEACON_API_BASE = "https://teambeacon.test";
     const payload = {

@@ -31,7 +31,7 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.epic_upsert_calls: list[dict[str, object]] = []
         self.epic_delete_calls: list[str] = []
         self.epic_candidate_calls: list[tuple[str | None, int]] = []
-        self.epic_summary_calls: list[tuple[int, str | None, str | None, str | None, str | None]] = []
+        self.epic_summary_calls: list[tuple[int | None, str | None, str | None, str | None, str | None]] = []
         self.epic_completed_cards_calls: list[tuple[str, int, str | None, str | None, str | None]] = []
         self.configured_completed_cards_calls: list[tuple[int, str | None, str | None, str | None, str | None]] = []
         self.initiative_view_create_calls: list[dict[str, object]] = []
@@ -1997,6 +1997,12 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["epics"][0]["epicKey"], "CEGBUPOL-5000")
         self.assertEqual(body["epics"][0]["epicName"], "Unified Engineering Pulse")
         self.assertEqual(self.epic_candidate_calls[-1], ("pulse", 12))
+
+    def test_metadata_epic_summary_endpoint_supports_complete_views(self) -> None:
+        for suffix, expected_limit in [("limit=all", None), ("limit=200", 200), ("limit=invalid", 50)]:
+            with urlopen(f"{self.base_url}/api/metadata/epics/summary?{suffix}", timeout=5) as response:
+                self.assertEqual(response.status, 200)
+            self.assertEqual(self.epic_summary_calls[-1][0], expected_limit)
 
     def test_metadata_epic_summary_endpoint(self) -> None:
         with urlopen(  # noqa: S310

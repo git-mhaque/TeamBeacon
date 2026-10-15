@@ -142,6 +142,10 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Assignment-only writes preserve success criteria, work types, timeline fields and saved-view membership. Mapping an unconfigured epic creates minimal metadata and makes it part of All Configured.
 - Pending edits are highlighted with a sticky save/discard bar; navigation or reload warns before discarding drafts. Saving blocks navigation and further edits.
 
+### Complete configured epic analytics
+- Initiative Insights, Team Dashboard delivery progress, and Team Report consume the complete configured epic set for the selected view. Counts, completion averages, RAG and per-work-stream progress are not truncated to 200 epics.
+- `GET /api/metadata/epics/summary?limit=all` requests the full selected view. Numeric requests retain the default 50 and maximum 200 for compatibility.
+
 ## 6.3 Team Insights Semantics (Current Behavior)
 - Trend window:
   - API accepts `sprintLimit` in range 1-12.

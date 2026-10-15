@@ -91,3 +91,7 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 - Added paginated project epic reconciliation to full, since-last, and since-date syncs, preserving the Test/Triad scope exclusions.
 - Backfills old missing epics and preserves metadata and source watermarks; repeated incremental runs skip unchanged epics.
 - Settings mapping inventory follows configured project and Triad exclusions.
+
+### Complete configured-epic summaries
+- Removed implicit 200-row truncation from Initiative Insights, Team Dashboard delivery progress and Team Report by explicitly requesting complete configured views.
+- Preserved bounded numeric API requests and added >200-epic regression fixtures covering default/named views, completion metrics and work-stream totals.

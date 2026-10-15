@@ -561,3 +561,5 @@ The Initiative and Team Report screens are the largest uncertainty because they 
 ### MCP dashboard density
 
 The chat dashboard focuses on work-stream rows with inline progress and flow metrics, a compact header, filters, and source freshness. Rows reflow at 640px and 380px. The metric strip, blocker/recent-completion lists, cycle-time status text, and issue-list truncation notices are omitted from this view. Relevant availability warnings remain visible; the MCP data tools and full web dashboard still expose the detailed insights.
+
+Configured-epic summary consumers (Initiative Insights and Team Report) request complete selected-view datasets rather than a fixed 200-row subset. Team Dashboard aggregates the same complete set; summaries and visible epic counts must match the full view membership.

@@ -806,7 +806,7 @@ export function InitiativesScreen() {
     try {
       const selectedViewId = activeViewId === "all" ? null : activeViewId;
       const [summaryResult, allSummaryResult, jiraResult, aiStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary(200, {
+        fetchConfiguredEpicSummary("all", {
           periodStart: reportingRange.startDate,
           periodEnd: reportingRange.endDate,
           timezone: browserTimezone,
@@ -815,7 +815,7 @@ export function InitiativesScreen() {
         }),
         selectedViewId === null
           ? Promise.resolve(null)
-          : fetchConfiguredEpicSummary(200, {
+          : fetchConfiguredEpicSummary("all", {
               periodStart: reportingRange.startDate,
               periodEnd: reportingRange.endDate,
               timezone: browserTimezone,

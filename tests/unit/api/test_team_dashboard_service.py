@@ -199,3 +199,13 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DashboardSourceBoundaryTests(unittest.TestCase):
+    def test_cycle_time_skips_invalid_points_and_handles_increase(self) -> None:
+        from services.api.issues.team_dashboard import _cycle_time_comparison, _parse_datetime
+        self.assertIsNone(_parse_datetime(" "))
+        self.assertEqual(_parse_datetime("2026-03-01T12:00:00").tzinfo, timezone.utc)
+        result = _cycle_time_comparison({"trend": [None, {"state": "closed", "avgCycleTimeDays": 1}, {"state": "closed", "avgCycleTimeDays": 3}]})
+        self.assertEqual(result["direction"], "up")
+        self.assertEqual(result["deltaDays"], 2)

@@ -223,6 +223,7 @@ describe("TeamReportScreen", () => {
     render(<TeamReportScreen />);
 
     expect(await screen.findByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
     expect(screen.queryByText(/Drafted by OCI GenAI from selected progress data and reporting period movement\./i)).not.toBeInTheDocument();
     expect(await screen.findByText(/selected initiatives advanced during the reporting period/i)).toBeInTheDocument();
 

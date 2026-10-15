@@ -1484,7 +1484,7 @@ export function TeamReportScreen() {
 
     try {
       const [summaryResult, jiraStatusResult, aiStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary(200, {
+        fetchConfiguredEpicSummary("all", {
           periodStart: range.startDate,
           periodEnd: range.endDate,
           timezone: browserTimezone,

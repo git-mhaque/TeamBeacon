@@ -117,3 +117,6 @@ Default thresholds:
 
 ### Project epic reconciliation
 Each sync mode pages the eligible project epic search independently of the board issue API. Missing epics are backfilled regardless of the cursor; full sync refreshes every eligible epic, while incremental sync refreshes source changes. A shared connector scope rule excludes Triad labels and is also applied to the Settings mapping inventory. The existing board issue and child-issue sync paths continue to operate. No schema migration is required.
+
+### Complete configured-epic analytics
+Initiative Insights and Team Report explicitly request `limit=all` summaries; the API maps that to an unbounded configured-view query. Team Dashboard uses the same complete summary internally for work-stream epic counts and delivery progress. Explicit numeric API limits remain bounded for backward compatibility. Summary cache keys include the requested limit and selected view.

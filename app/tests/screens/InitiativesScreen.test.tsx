@@ -766,3 +766,21 @@ describe("InitiativesScreen", () => {
     expect(screen.getByText(/Epic metadata will remain configured/i)).toBeInTheDocument();
   });
 });
+
+
+it("loads and summarizes all 245 configured epics", async () => {
+  const epics = Array.from({ length: 245 }, (_, index) => ({
+    ...DEFAULT_EPICS[0], epicKey: `CEG-${1000 + index}`, epicName: `Epic ${index}`,
+    timelineEnabled: false, completedCards: index < 200 ? 1 : 0, totalCards: 1,
+    completionPercent: index < 200 ? 100 : 0,
+  }));
+  const fetchSpy = mockInitiativesEndpoints(epics);
+  render(<InitiativesScreen />);
+  await screen.findByText("CEG-1244");
+  const countCard = screen.getByRole("heading", { name: "Configured Epics" }).closest("article")!;
+  expect(within(countCard).getByText("245")).toBeInTheDocument();
+  const averageCard = screen.getByRole("heading", { name: "Avg Completion" }).closest("article")!;
+  expect(within(averageCard).getByText(/81\.6/)).toBeInTheDocument();
+  expect(screen.getByText("245 visible")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
+});

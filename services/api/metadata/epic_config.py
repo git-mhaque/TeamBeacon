@@ -1153,7 +1153,7 @@ def _fetch_configured_epic_rows(
 
 def get_configured_epic_summary(
     *,
-    limit: int = 50,
+    limit: int | None = 50,
     period_start: str | None = None,
     period_end: str | None = None,
     timezone_name: str | None = None,
@@ -1161,7 +1161,7 @@ def get_configured_epic_summary(
     db_path: str | None = None,
 ) -> dict[str, Any]:
     resolved_db_path = db_path or _resolve_db_path()
-    safe_limit = max(1, min(int(limit), 200))
+    safe_limit = None if limit is None else max(1, min(int(limit), 200))
     (
         period_start_date,
         period_end_date,

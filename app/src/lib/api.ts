@@ -928,7 +928,7 @@ export async function fetchJiraSyncHistory(limit = 20): Promise<JiraSyncHistoryE
 }
 
 export async function fetchConfiguredEpicSummary(
-  limit = 50,
+  limit: number | "all" = 50,
   options?: {
     periodStart?: string | null;
     periodEnd?: string | null;
