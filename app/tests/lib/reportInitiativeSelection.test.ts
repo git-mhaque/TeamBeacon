@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readReportInitiativeSelection as read, resolveReportInitiativeSelection as resolve } from "../../src/lib/reportInitiativeSelection";
+import { groupReportInitiatives, readReportInitiativeSelection as read, resolveReportInitiativeSelection as resolve } from "../../src/lib/reportInitiativeSelection";
 
 const rows = [{ epicKey: "A", completedInPeriodValue: 0 }, { epicKey: "B", completedInPeriodValue: 2 }, { epicKey: "C", completedInPeriodValue: 1 }];
 describe("report initiative selection", () => {
@@ -18,4 +18,18 @@ describe("report initiative selection", () => {
     expect(resolve(rows, [], "automatic")).toEqual(["B", "C"]);
     expect(resolve([], ["B"], "automatic")).toEqual([]);
   });
+});
+
+it("shows each work stream once and preserves initiative order within it", () => {
+  const rows = [
+    { epicKey: "A", groupText: "Platform" },
+    { epicKey: "B", groupText: "Platform" },
+    { epicKey: "C", groupText: "Security" },
+    { epicKey: "D", groupText: "Platform" },
+  ];
+  expect(groupReportInitiatives(rows)).toEqual([
+    { workStream: "Platform", rows: [rows[0], rows[1], rows[3]] },
+    { workStream: "Security", rows: [rows[2]] },
+  ]);
+  expect(groupReportInitiatives([])).toEqual([]);
 });

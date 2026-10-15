@@ -290,6 +290,15 @@ describe("TeamReportScreen", () => {
       expect(exportedMix.querySelector(".workmix-centre")?.textContent).toBe("");
       expect(exportedMix.textContent).toContain("71.4%");
       expect(exportedMix.textContent).toContain("28.6%");
+      const exportedProgress = [...report.querySelectorAll("h2")].find((heading) => heading.textContent === "Progress for Key Initiatives")!.closest("section")!;
+      expect([...exportedProgress.querySelectorAll("thead th")].map((header) => header.textContent)).toEqual([
+        "Initiative", "Period progress", "Overall completion", "Timeline health",
+      ]);
+      expect([...exportedProgress.querySelectorAll('th[scope="rowgroup"]')].map((header) => header.textContent)).toEqual(["Core Platform", "Operations"]);
+      expect(exportedProgress.textContent).toContain("5/30 cards (16.7%)");
+      expect(exportedProgress.textContent).toContain("Delivery progress for initiatives included in this report.");
+      expect(exportedProgress.querySelector("table")?.classList.contains("initiative-table")).toBe(true);
+
     } finally {
       Reflect.deleteProperty(window, "showSaveFilePicker");
     }
@@ -299,6 +308,26 @@ describe("TeamReportScreen", () => {
     expect(within(progressPanel).getByText("Executive reporting automation")).toBeInTheDocument();
     const unassessedRow = within(progressPanel).getByText("Risk reporting hardening").closest("tr")!;
     expect(within(unassessedRow).getByText("Not assessed")).toHaveClass("is-neutral");
+    const progress = within(progressPanel);
+    expect(progress.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "Initiative", "Period progress", "Overall completion", "Timeline health",
+    ]);
+    expect(progress.getAllByRole("rowheader").map((header) => header.textContent)).toEqual(["Core Platform", "Operations"]);
+    expect(progress.getByText("5/30 cards (16.7%)")).toBeInTheDocument();
+    expect(progress.getByText("Delivery progress for initiatives included in this report.")).toBeInTheDocument();
+    expect(progress.getByRole("table")).toHaveClass("tb-exec-initiative-table");
+    expect(progress.queryByText("+16.7 pp")).not.toBeInTheDocument();
+    const health = within(unassessedRow).getByRole("button", { name: "Not assessed" });
+    fireEvent.focus(health);
+    expect(progress.getByRole("tooltip")).toHaveTextContent(/timeline/i);
+    expect(health).toHaveAttribute("aria-describedby", progress.getByRole("tooltip").id);
+    fireEvent.keyDown(health, { key: "Escape" });
+    expect(progress.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(health.parentElement!);
+    expect(progress.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.mouseLeave(health.parentElement!);
+    expect(progress.queryByRole("tooltip")).not.toBeInTheDocument();
+
     expect(within(screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!).getByText(/1 not assessed/)).toBeInTheDocument();
     expect(screen.getByLabelText("Work stream effort distribution chart")).toBeInTheDocument();
     expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();

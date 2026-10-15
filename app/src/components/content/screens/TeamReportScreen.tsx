@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useEffect, useMemo, useRef, useState } from "react";
 import {
   chatWithOciGenAi,
   EpicSummaryReportingPeriod,
@@ -11,7 +11,7 @@ import {
 import { groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSummaryGroup, type CompletedWorkSource } from "../../../lib/reportCompletedWork";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
-import { readReportInitiativeSelection, resolveReportInitiativeSelection, type ReportSelectionMode } from "../../../lib/reportInitiativeSelection";
+import { groupReportInitiatives, readReportInitiativeSelection, resolveReportInitiativeSelection, type ReportSelectionMode } from "../../../lib/reportInitiativeSelection";
 
 type RagLabel = "Red" | "Amber" | "Green" | "Not assessed";
 
@@ -339,13 +339,14 @@ function buildTeamReportExportHtml(params: {
   amberCount: number;
   redCount: number;
   progressRows: Array<{
-    group: string;
+    groupText: string;
     initiative: string;
     periodProgressLabel: string;
     periodProgressPercent: number;
     overallProgressLabel: string;
     overallProgressPercent: number;
     rag: RagLabel;
+    ragTooltip: string;
   }>;
   groupMixRows: Array<{
     name: string;
@@ -404,18 +405,14 @@ function buildTeamReportExportHtml(params: {
   const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
 
   const progressRows = params.progressRows.length > 0
-    ? params.progressRows.map((row) => {
+    ? groupReportInitiatives(params.progressRows).map((group) => `<tbody><tr class="initiative-group"><th scope="rowgroup" colspan="4">${escapeHtml(group.workStream)}</th></tr>${group.rows.map((row) => {
       const ragClass = `rag-${row.rag.toLowerCase().replace(/\s+/g, "-")}`;
       return `
         <tr>
-          <td>${escapeHtml(row.group)}</td>
           <td>${escapeHtml(row.initiative)}</td>
           <td>
             <div class="progress-cell">
               <span class="progress-label">${escapeHtml(row.periodProgressLabel)}</span>
-              <span class="progress-track">
-                <span class="progress-fill progress-period ${ragClass}" style="width:${clampPercent(row.periodProgressPercent).toFixed(1)}%;"></span>
-              </span>
             </div>
           </td>
           <td>
@@ -426,11 +423,11 @@ function buildTeamReportExportHtml(params: {
               </span>
             </div>
           </td>
-          <td class="${ragClass}">${escapeHtml(row.rag)}</td>
+          <td class="${ragClass}"><span tabindex="0" title="${escapeHtml(row.ragTooltip)}" aria-label="${escapeHtml(`${row.rag}: ${row.ragTooltip}`)}">${escapeHtml(row.rag)}</span></td>
         </tr>
       `;
-    }).join("")
-    : `<tr><td colspan="5" class="empty">No initiatives selected for this export.</td></tr>`;
+    }).join("")}</tbody>`).join("")
+    : `<tbody><tr><td colspan="4" class="empty">No initiatives selected for this export.</td></tr></tbody>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -752,6 +749,10 @@ function buildTeamReportExportHtml(params: {
       .progress-period.rag-green, .progress-overall.rag-green { background: linear-gradient(90deg, #1f8f63 0%, #33aa7a 100%); }
       .progress-period.rag-amber, .progress-overall.rag-amber { background: linear-gradient(90deg, #b77700 0%, #d19319 100%); }
       .progress-period.rag-red, .progress-overall.rag-red { background: linear-gradient(90deg, #c2372e 0%, #d74d45 100%); }
+      .initiative-table thead th { background: #454039; color: #fff; }
+      .initiative-table th, .initiative-table td { padding: 6px 10px; line-height: 1.3; }
+      .initiative-table .initiative-group th { background: #f3f0eb; color: #514943; font-weight: 600; text-align: left; }
+      .initiative-table td:nth-child(2) { white-space: nowrap; }
       .footer {
         color: #5b6f90;
         font-size: 11px;
@@ -848,17 +849,17 @@ function buildTeamReportExportHtml(params: {
 
       <section class="panel">
         <h2>Progress for Key Initiatives</h2>
-        <table>
+        <p>Delivery progress for initiatives included in this report.</p>
+        <table class="initiative-table">
           <thead>
             <tr>
-              <th>Work Stream</th>
               <th>Initiative</th>
-              <th>Period Progress</th>
-              <th>Overall Progress</th>
-              <th>RAG</th>
+              <th>Period progress</th>
+              <th>Overall completion</th>
+              <th>Timeline health</th>
             </tr>
           </thead>
-          <tbody>${progressRows}</tbody>
+          ${progressRows}
         </table>
       </section>
 
@@ -1352,6 +1353,21 @@ function ReportWorkMixChart({ title, label, slices, total, loading }: {
         </ul>
       </div>
     </section>
+  );
+}
+
+function ReportTimelineHealth({ rag, explanation }: { rag: RagLabel; explanation: string }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="tb-exec-timeline-health" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button type="button" className={`tb-status-pill ${ragToneClass(rag)}`} aria-describedby={open ? id : undefined}
+        onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={() => setOpen(true)}
+        onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
+        {rag}
+      </button>
+      {open ? <span id={id} role="tooltip" className="tb-exec-health-tooltip">{explanation}</span> : null}
+    </span>
   );
 }
 
@@ -1892,13 +1908,14 @@ export function TeamReportScreen() {
 
     const generatedAt = new Date().toISOString();
     const progressRows = visibleInitiativeRows.map((row, index) => ({
-      group: row.groupText,
+      groupText: row.groupText,
       initiative: buildSimplifiedInitiativeName(row.epicName || row.epicKey, buildInitiativeAlias(index)),
       periodProgressLabel: `${row.completedInPeriodValue}/${row.totalCards} cards (${formatPercent(row.deltaPercentValue)})`,
       periodProgressPercent: row.deltaPercentValue,
       overallProgressLabel: formatPercent(row.completionPercent),
       overallProgressPercent: row.completionPercent,
       rag: row.rag,
+      ragTooltip: row.ragTooltip,
     }));
 
     const html = buildTeamReportExportHtml({
@@ -2625,58 +2642,48 @@ export function TeamReportScreen() {
         <header className="tb-panel-header">
           <div>
             <h3>Progress for Key Initiatives</h3>
-            <p className="tb-muted-note">Selected initiatives used for executive narrative generation.</p>
+            <p className="tb-muted-note">Delivery progress for initiatives included in this report.</p>
           </div>
         </header>
 
         <div className="tb-sync-history-wrap tb-sync-history-wrap-no-scroll">
-          <table className="tb-sync-history-table">
+          <table className="tb-sync-history-table tb-exec-initiative-table">
             <thead>
               <tr>
-                <th>Work Stream</th>
-                <th>Epic</th>
-                <th>Period Progress</th>
-                <th>Overall Progress</th>
-                <th>RAG</th>
+                <th scope="col">Initiative</th>
+                <th scope="col">Period progress</th>
+                <th scope="col">Overall completion</th>
+                <th scope="col">Timeline health</th>
               </tr>
             </thead>
-            <tbody>
-              {visibleInitiativeRows.map((row) => (
-                <tr key={row.epicKey}>
-                  <td>{row.groupText}</td>
-                  <td>
-                    {jiraBaseUrl ? (
-                      <a
-                        className="tb-external-link"
-                        href={`${jiraBaseUrl}/browse/${row.epicKey}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {row.epicName || row.epicKey}
-                      </a>
-                    ) : (
-                      row.epicName || row.epicKey
-                    )}
-                  </td>
-                  <td>
-                    {row.completedInPeriodValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
-                  </td>
-                  <td>
-                    <div className="tb-history-progress">
-                      <span className="tb-history-progress-track">
-                        <span className="tb-history-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
-                      </span>
-                      <span className="tb-history-progress-label">{formatPercent(row.completionPercent)}</span>
-                    </div>
-                  </td>
-                  <td title={row.ragTooltip}>
-                    <span className={`tb-status-pill ${ragToneClass(row.rag)}`}>{row.rag}</span>
-                  </td>
+            {groupReportInitiatives(visibleInitiativeRows).map((group, index) => (
+              <tbody key={`${index}:${group.workStream}`}>
+                <tr className="tb-exec-initiative-group">
+                  <th scope="rowgroup" colSpan={4}>{group.workStream}</th>
                 </tr>
-              ))}
+                {group.rows.map((row) => (
+                  <tr key={row.epicKey}>
+                    <td><ReportJiraLink baseUrl={jiraBaseUrl} issueKey={row.epicKey}>{row.epicName || row.epicKey}</ReportJiraLink></td>
+                    <td className="tb-exec-period-progress">
+                      {row.completedInPeriodValue}/{row.totalCards} cards ({formatPercent(row.deltaPercentValue)})
+                    </td>
+                    <td>
+                      <div className="tb-history-progress">
+                        <span className="tb-history-progress-track">
+                          <span className="tb-history-progress-fill" style={{ width: `${Math.min(100, row.completionPercent)}%` }} />
+                        </span>
+                        <span className="tb-history-progress-label">{formatPercent(row.completionPercent)}</span>
+                      </div>
+                    </td>
+                    <td><ReportTimelineHealth rag={row.rag} explanation={row.ragTooltip} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+            <tbody>
               {!loading && visibleInitiativeRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     {initiativeRows.length > 0
                       ? "No initiatives selected. Use Configure Initiatives to include epics in this section."
                       : "No configured epic data available yet."}

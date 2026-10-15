@@ -25,3 +25,14 @@ export function resolveReportInitiativeSelection(rows: SelectionRow[], previous:
   const retainedSet = new Set(retained);
   return [...retained, ...eligible.filter((key) => !retainedSet.has(key))];
 }
+
+/** Show each work stream once, preserving first-seen group order and initiative order within it. */
+export function groupReportInitiatives<T extends { groupText: string }>(rows: T[]): Array<{ workStream: string; rows: T[] }> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const initiatives = groups.get(row.groupText) ?? [];
+    initiatives.push(row);
+    groups.set(row.groupText, initiatives);
+  }
+  return [...groups].map(([workStream, rows]) => ({ workStream, rows }));
+}
