@@ -197,9 +197,9 @@ describe("TeamReportScreen", () => {
     expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
       "Report Signals",
-      "Completed Work Summary",
       "Work Mix by Work Stream and Type",
       "Progress for Key Initiatives",
+      "Completed Work Summary",
     ]);
     expect(screen.queryByRole("heading", { name: "Executive Summary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wins and Risks" })).not.toBeInTheDocument();
@@ -252,7 +252,7 @@ describe("TeamReportScreen", () => {
       });
       const report = new DOMParser().parseFromString(html, "text/html");
       expect([...report.querySelectorAll("h2")].map((heading) => heading.textContent)).toEqual([
-        "Report Signals", "Completed Work Summary", "Work Mix by Work Stream and Type", "Progress for Key Initiatives",
+        "Report Signals", "Work Mix by Work Stream and Type", "Progress for Key Initiatives", "Completed Work Summary",
       ]);
       const issue = report.querySelector('a[href="https://jira.example.com/browse/CEG-1010"]')!;
       expect(issue.textContent).toBe("CEG-1010");

@@ -102,7 +102,7 @@ Initiative RAG requires an enabled timeline and valid target completion date. Un
 - Added opt-in period-completion selection, saved mode/order, qualifying-count preview and manual overrides.
 - Preserved legacy preferences and explicit empty selections; automatic selection recalculates after period changes while keeping reordered qualifying initiatives.
 
-Team Report displays panels in this order on screen and in HTML exports: Report Signals, Completed Work Summary, Work Mix by Work Stream and Type, Progress for Key Initiatives. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; only Completed Work Summary generates an AI narrative.
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Work Mix by Work Stream and Type, Progress for Key Initiatives, Completed Work Summary. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; only Completed Work Summary generates an AI narrative.
 
 Completed Work Summary is grouped by work stream, then epic. Each linked epic title appears once above its outcome bullets; each bullet shows its linked issue key and original issue title on a smaller, muted second line. Screen and HTML exports use the same layout and open JIRA links in new tabs. Source metadata comes from synced records; AI bullets are matched by card ID, with original-outcome fallbacks for missing or invalid references. Without a valid JIRA URL, source details remain visible as plain text.
 
