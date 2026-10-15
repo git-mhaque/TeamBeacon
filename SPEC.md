@@ -142,6 +142,11 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Assignment-only writes preserve success criteria, work types, timeline fields and saved-view membership. Mapping an unconfigured epic creates minimal metadata and makes it part of All Configured.
 - Pending edits are highlighted with a sticky save/discard bar; navigation or reload warns before discarding drafts. Saving blocks navigation and further edits.
 
+### Timeline-dependent RAG
+- Initiative Insights and Team Report assess RAG only when the timeline is enabled and the target completion date is valid. A start date remains optional.
+- Disabled timelines and missing/invalid target dates display neutral `Not assessed`, without completion-based fallback. They are excluded from Red/Amber/Green totals, with a separate unassessed count.
+- Initiative Insights supports filtering and sorting unassessed initiatives. Report exports and AI prompts preserve the distinction between unassessed and assessed risk.
+
 ### Complete configured epic analytics
 - Initiative Insights, Team Dashboard delivery progress, and Team Report consume the complete configured epic set for the selected view. Counts, completion averages, RAG and per-work-stream progress are not truncated to 200 epics.
 - `GET /api/metadata/epics/summary?limit=all` requests the full selected view. Numeric requests retain the default 50 and maximum 200 for compatibility.

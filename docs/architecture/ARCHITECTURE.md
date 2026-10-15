@@ -120,3 +120,5 @@ Each sync mode pages the eligible project epic search independently of the board
 
 ### Complete configured-epic analytics
 Initiative Insights and Team Report explicitly request `limit=all` summaries; the API maps that to an unbounded configured-view query. Team Dashboard uses the same complete summary internally for work-stream epic counts and delivery progress. Explicit numeric API limits remain bounded for backward compatibility. Summary cache keys include the requested limit and selected view.
+
+Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.

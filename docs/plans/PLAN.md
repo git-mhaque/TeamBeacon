@@ -95,3 +95,5 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 ### Complete configured-epic summaries
 - Removed implicit 200-row truncation from Initiative Insights, Team Dashboard delivery progress and Team Report by explicitly requesting complete configured views.
 - Preserved bounded numeric API requests and added >200-epic regression fixtures covering default/named views, completion metrics and work-stream totals.
+
+Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.

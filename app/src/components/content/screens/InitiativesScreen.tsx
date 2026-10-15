@@ -33,7 +33,7 @@ import {
   writeInitiativeSnapshot,
 } from "../../../lib/initiativeSnapshotCache";
 
-type RagLabel = "Red" | "Amber" | "Green";
+type RagLabel = "Red" | "Amber" | "Green" | "Not assessed";
 
 type SummaryRow = InitiativeEpicSummary & {
   groupText: string;
@@ -103,9 +103,10 @@ const RAG_SORT_RANK: Record<RagLabel, number> = {
   Red: 0,
   Amber: 1,
   Green: 2,
+  "Not assessed": 3,
 };
 
-const RAG_FILTER_OPTIONS: RagLabel[] = ["Red", "Amber", "Green"];
+const RAG_FILTER_OPTIONS: RagLabel[] = ["Red", "Amber", "Green", "Not assessed"];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -132,7 +133,7 @@ function isReportingPreset(value: unknown): value is ReportingPreset {
 }
 
 function isRagLabel(value: string): value is RagLabel {
-  return value === "Red" || value === "Amber" || value === "Green";
+  return value === "Red" || value === "Amber" || value === "Green" || value === "Not assessed";
 }
 
 function isIsoDate(value: unknown): value is string {
@@ -174,11 +175,10 @@ function ragFromCompletion(percent: number): RagLabel {
 
 function evaluateInitiativeRag(entry: InitiativeEpicSummary): { label: RagLabel; reason: string } {
   const completion = Math.max(0, Math.min(100, entry.completionPercent));
-  const fallback = ragFromCompletion(completion);
   if (!entry.timelineEnabled) {
     return {
-      label: fallback,
-      reason: `Timeline not enabled. RAG from completion (${completion.toFixed(1)}%).`,
+      label: "Not assessed",
+      reason: "Timeline not configured. RAG is not assessed.",
     };
   }
 
@@ -187,8 +187,8 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): { label: RagLabel;
   const startUtcDay = parseIsoDateToUtcDay(entry.timelineStartDate);
   if (todayUtcDay === null || targetUtcDay === null) {
     return {
-      label: fallback,
-      reason: `Timeline metadata incomplete. Fallback to completion (${completion.toFixed(1)}%).`,
+      label: "Not assessed",
+      reason: "Timeline target date is missing or invalid. RAG is not assessed.",
     };
   }
 
@@ -245,12 +245,13 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): { label: RagLabel;
   }
 
   return {
-    label: fallback,
+    label: ragFromCompletion(completion),
     reason: `Timeline start date not set. Fallback to completion (${completion.toFixed(1)}%).`,
   };
 }
 
 function ragToneClass(label: RagLabel): string {
+  if (label === "Not assessed") return "is-neutral";
   if (label === "Red") return "is-red";
   if (label === "Amber") return "is-amber";
   return "is-green";
@@ -1553,7 +1554,7 @@ export function InitiativesScreen() {
     return total / rows.length;
   }, [rows]);
   const ragCounts = useMemo<Record<RagLabel, number>>(() => {
-    const counts: Record<RagLabel, number> = { Red: 0, Amber: 0, Green: 0 };
+    const counts: Record<RagLabel, number> = { Red: 0, Amber: 0, Green: 0, "Not assessed": 0 };
     for (const row of rows) {
       counts[row.ragLabel] += 1;
     }
@@ -2004,7 +2005,7 @@ export function InitiativesScreen() {
                 <span className="tb-initiative-rag-text tb-initiative-rag-green">{ragCounts.Green} Green</span>
               </span>
             </strong>
-            <p>{activeView.id === "all" ? "For configured initiatives." : "For selected initiative view."}</p>
+            <p>For initiatives with a configured timeline. {ragCounts["Not assessed"]} not assessed.</p>
           </article>
           <article className="tb-metric-card">
             <h4>Completed In Period</h4>

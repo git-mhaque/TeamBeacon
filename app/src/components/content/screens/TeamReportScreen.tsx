@@ -10,7 +10,7 @@ import {
 } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
-type RagLabel = "Red" | "Amber" | "Green";
+type RagLabel = "Red" | "Amber" | "Green" | "Not assessed";
 
 type ExecutiveRow = InitiativeEpicSummary & {
   groupText: string;
@@ -182,11 +182,10 @@ type RagEvaluation = {
 
 function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
   const completion = Math.max(0, Math.min(100, entry.completionPercent));
-  const fallback = ragFromCompletion(completion);
   if (!entry.timelineEnabled) {
     return {
-      label: fallback,
-      reason: `Timeline not enabled. RAG from completion (${completion.toFixed(1)}%).`,
+      label: "Not assessed",
+      reason: "Timeline not configured. RAG is not assessed.",
     };
   }
 
@@ -196,8 +195,8 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
 
   if (todayUtcDay === null || targetUtcDay === null) {
     return {
-      label: fallback,
-      reason: `Timeline metadata incomplete. Fallback to completion (${completion.toFixed(1)}%).`,
+      label: "Not assessed",
+      reason: "Timeline target date is missing or invalid. RAG is not assessed.",
     };
   }
 
@@ -241,7 +240,7 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): RagEvaluation {
   }
 
   return {
-    label: fallback,
+    label: ragFromCompletion(completion),
     reason: `Timeline start date not set. Fallback to completion (${completion.toFixed(1)}%).`,
   };
 }
@@ -421,7 +420,7 @@ function buildTeamReportExportHtml(params: {
 
   const progressRows = params.progressRows.length > 0
     ? params.progressRows.map((row) => {
-      const ragClass = `rag-${row.rag.toLowerCase()}`;
+      const ragClass = `rag-${row.rag.toLowerCase().replace(/\s+/g, "-")}`;
       return `
         <tr>
           <td>${escapeHtml(row.group)}</td>
@@ -728,6 +727,8 @@ function buildTeamReportExportHtml(params: {
       }
       td.rag-green { color: var(--good); font-weight: 700; }
       td.rag-amber { color: var(--warn); font-weight: 700; }
+      td.rag-not-assessed { color: var(--muted); font-weight: 700; }
+      .progress-period.rag-not-assessed, .progress-overall.rag-not-assessed { background: #7b8490; }
       td.rag-red { color: var(--risk); font-weight: 700; }
       .progress-cell {
         display: grid;
@@ -869,7 +870,7 @@ function buildTeamReportExportHtml(params: {
                 <span class="rag-green">${params.greenCount} G</span>
               </span>
             </div>
-            <p class="metric-note">For selected initiatives.</p>
+            <p class="metric-note">Timeline-assessed initiatives only. ${params.totalInitiatives - params.redCount - params.amberCount - params.greenCount} not assessed.</p>
           </article>
         </div>
       </section>
@@ -1106,6 +1107,7 @@ function buildExecutiveSummaryPrompt(params: {
     `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
     `Selected initiatives: ${params.totalEpics}`,
     `Completed cards in period (selected): ${params.totalCompletedInPeriod}`,
+    "RAG is assessed only for configured timelines. Do not infer health or risk for initiatives marked Not assessed.",
     `Selected RAG mix: ${params.greenCount} Green, ${params.amberCount} Amber, ${params.redCount} Red`,
     truncationNote,
     "",
@@ -1229,6 +1231,7 @@ function buildWinsRisksPrompt(params: {
     "- Do not use work stream names or numbered initiative aliases.",
     "- Each bullet must be <= 24 words.",
     "- Use only the provided data. No invented metrics.",
+    "- RAG is assessed only for configured timelines. Do not infer health or risk for initiatives marked Not assessed.",
     "- Do not reference JIRA issue keys.",
     "- Do not use full initiative names literally; use initiative aliases or work stream descriptions.",
     "",
@@ -1400,6 +1403,7 @@ function parseCompletedWorkSummaryDraft(
 }
 
 function ragToneClass(value: RagLabel): string {
+  if (value === "Not assessed") return "is-neutral";
   if (value === "Green") return "is-good";
   if (value === "Amber") return "is-warn";
   return "is-risk";
@@ -2740,7 +2744,7 @@ export function TeamReportScreen() {
                 </span>
               )}
             </strong>
-            <p>For selected initiatives.</p>
+            <p>For initiatives with a configured timeline. {visibleInitiativeSignals.totalEpics - visibleInitiativeSignals.redCount - visibleInitiativeSignals.amberCount - visibleInitiativeSignals.greenCount} not assessed.</p>
           </article>
         </div>
       </section>

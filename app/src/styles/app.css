@@ -8577,3 +8577,5 @@ body {
 .tb-settings-tabs button { flex: 0 1 auto; min-width: 0; }
 .tb-epic-mapping .tb-action-row { flex-wrap: wrap; }
 .tb-epic-mapping .tb-panel-header > div { min-width: 0; overflow-wrap: anywhere; }
+
+.tb-rag-pill.is-neutral { border-color: #d5d9df; background: #f3f4f6; color: #59616d; }

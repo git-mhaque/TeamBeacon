@@ -199,6 +199,7 @@ function mockInitiativesEndpoints(epics = DEFAULT_EPICS) {
 }
 
 describe("InitiativesScreen", () => {
+  afterEach(() => { vi.useRealTimers(); });
   beforeEach(() => {
     if (typeof window.localStorage?.removeItem === "function") {
       window.localStorage.removeItem("teambeacon.initiatives.visibleOptionalColumns");
@@ -505,6 +506,8 @@ describe("InitiativesScreen", () => {
   });
 
   it("filters initiative matrix with multi-select dropdown filters", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T12:00:00Z"));
     mockInitiativesEndpoints([
       {
         epicKey: "CEG-101",
@@ -517,9 +520,9 @@ describe("InitiativesScreen", () => {
         groups: [{ id: 1, name: "Core Platform" }],
         workTypes: [{ id: 2, name: "Feature" }],
         successCriteria: ["Latency under 120ms"],
-        timelineEnabled: false,
-        timelineStartDate: null,
-        targetCompletionDate: null,
+        timelineEnabled: true,
+        timelineStartDate: "2000-01-01",
+        targetCompletionDate: "2035-01-01",
         insightComment: "Delivery is aligned with sprint capacity.",
       },
       {
@@ -533,9 +536,9 @@ describe("InitiativesScreen", () => {
         groups: [{ id: 3, name: "Customer Experience" }],
         workTypes: [{ id: 4, name: "Tech Debt" }],
         successCriteria: ["Failover exercised in staging"],
-        timelineEnabled: false,
-        timelineStartDate: null,
-        targetCompletionDate: null,
+        timelineEnabled: true,
+        timelineStartDate: "2000-01-01",
+        targetCompletionDate: "2035-01-01",
         insightComment: "Workstream was paused for incident load.",
       },
       {
@@ -549,9 +552,9 @@ describe("InitiativesScreen", () => {
         groups: [{ id: 1, name: "Core Platform" }],
         workTypes: [{ id: 6, name: "Automation" }],
         successCriteria: ["Alerts tuned for regressions"],
-        timelineEnabled: false,
-        timelineStartDate: null,
-        targetCompletionDate: null,
+        timelineEnabled: true,
+        timelineStartDate: "2000-01-01",
+        targetCompletionDate: "2035-01-01",
         insightComment: "Alert tuning is moving steadily.",
       },
     ]);
@@ -621,6 +624,7 @@ describe("InitiativesScreen", () => {
       expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101"]);
     });
     expect(ragFilter).toHaveTextContent("2 selected");
+    vi.useRealTimers();
     expect(within(matrixTitle as HTMLElement).getByText("2 visible")).toBeInTheDocument();
   });
 
@@ -783,4 +787,33 @@ it("loads and summarizes all 245 configured epics", async () => {
   expect(within(averageCard).getByText(/81\.6/)).toBeInTheDocument();
   expect(screen.getByText("245 visible")).toBeInTheDocument();
   expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/epics/summary?limit=all"))).toBe(true);
+});
+
+
+it("does not assess RAG without an enabled timeline and valid target", async () => {
+  const fixtures = [
+    { epicKey: "CEG-910", timelineEnabled: false, targetCompletionDate: "2099-01-01", completionPercent: 0 },
+    { epicKey: "CEG-911", timelineEnabled: false, targetCompletionDate: "2099-01-01", completionPercent: 100 },
+    { epicKey: "CEG-912", timelineEnabled: true, targetCompletionDate: null, completionPercent: 70 },
+    { epicKey: "CEG-913", timelineEnabled: true, targetCompletionDate: "invalid", completionPercent: 70 },
+    { epicKey: "CEG-914", timelineEnabled: true, targetCompletionDate: "2099-01-01", completionPercent: 100 },
+  ];
+  mockInitiativesEndpoints(fixtures.map((fixture) => ({ ...DEFAULT_EPICS[0], ...fixture })));
+  render(<InitiativesScreen />);
+  await screen.findByText("CEG-914");
+  for (const key of ["CEG-910", "CEG-911", "CEG-912", "CEG-913"]) {
+    const row = screen.getByText(key).closest("tr")!;
+    expect(within(row).getByText("Not assessed")).toHaveClass("is-neutral");
+    expect(within(row).queryByText(/^(Red|Amber|Green)$/)).not.toBeInTheDocument();
+  }
+  expect(within(screen.getByText("CEG-914").closest("tr")!).getByText("Green")).toBeInTheDocument();
+  const summary = screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!;
+  expect(within(summary).getByText("0 Red")).toBeInTheDocument();
+  expect(within(summary).getByText("0 Amber")).toBeInTheDocument();
+  expect(within(summary).getByText("1 Green")).toBeInTheDocument();
+  expect(within(summary).getByText(/4 not assessed/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("combobox", { name: "RAG" }));
+  fireEvent.click(within(screen.getByRole("listbox", { name: "RAG options" })).getByLabelText("Not assessed"));
+  expect(screen.queryByText("CEG-914")).not.toBeInTheDocument();
+  expect(screen.getByText("4 visible")).toBeInTheDocument();
 });

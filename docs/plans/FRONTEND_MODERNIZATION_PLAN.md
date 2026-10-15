@@ -563,3 +563,5 @@ The Initiative and Team Report screens are the largest uncertainty because they 
 The chat dashboard focuses on work-stream rows with inline progress and flow metrics, a compact header, filters, and source freshness. Rows reflow at 640px and 380px. The metric strip, blocker/recent-completion lists, cycle-time status text, and issue-list truncation notices are omitted from this view. Relevant availability warnings remain visible; the MCP data tools and full web dashboard still expose the detailed insights.
 
 Configured-epic summary consumers (Initiative Insights and Team Report) request complete selected-view datasets rather than a fixed 200-row subset. Team Dashboard aggregates the same complete set; summaries and visible epic counts must match the full view membership.
+
+Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.

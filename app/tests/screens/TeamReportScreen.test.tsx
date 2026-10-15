@@ -55,9 +55,9 @@ describe("TeamReportScreen", () => {
               groups: [{ id: 3, name: "Operations" }],
               workTypes: [{ id: 4, name: "Reliability" }],
               successCriteria: ["Reduce late risk discovery"],
-              timelineEnabled: true,
-              timelineStartDate: "2026-02-20",
-              targetCompletionDate: "2026-04-25",
+              timelineEnabled: false,
+              timelineStartDate: null,
+              targetCompletionDate: null,
             },
           ],
           reportingPeriod: {
@@ -247,6 +247,9 @@ describe("TeamReportScreen", () => {
 
     expect(screen.getByText("Executive reporting automation")).toBeInTheDocument();
     expect(screen.getByText("Risk reporting hardening")).toBeInTheDocument();
+    const unassessedRow = screen.getByText("Risk reporting hardening").closest("tr")!;
+    expect(within(unassessedRow).getByText("Not assessed")).toHaveClass("is-neutral");
+    expect(within(screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!).getByText(/1 not assessed/)).toBeInTheDocument();
     expect(screen.getByLabelText("Work stream effort distribution chart")).toBeInTheDocument();
     expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();
 
@@ -281,4 +284,20 @@ describe("TeamReportScreen", () => {
 
     expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
+});
+
+it.each([null, "invalid"])("does not assess report RAG for an enabled timeline with target %s", async (targetCompletionDate) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input).includes("/metadata/epics/summary")) return new Response(JSON.stringify({ epics: [{
+      epicKey: "CEG-EPIC-12", epicName: "Incomplete timeline", groups: [], workTypes: [], successCriteria: [],
+      timelineEnabled: true, timelineStartDate: null, targetCompletionDate,
+      completedCards: 10, totalCards: 10, completionPercent: 100, completedInPeriod: 0,
+    }] }));
+    return new Response(JSON.stringify({ config: {} }));
+  });
+  render(<TeamReportScreen />);
+  const row = (await screen.findByText("Incomplete timeline")).closest("tr")!;
+  expect(within(row).getByText("Not assessed")).toHaveClass("is-neutral");
+  const summary = screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!;
+  for (const label of ["0 Red", "0 Amber", "0 Green"]) expect(within(summary).getByText(label)).toBeInTheDocument();
 });
