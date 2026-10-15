@@ -43,7 +43,7 @@ type WorkStreamSortField =
   | "completedCount"
   | "netFlow"
   | "currentWipCount"
-  | "completionPercent";
+  | "completionSharePercent";
 
 type SortDirection = "asc" | "desc";
 
@@ -69,7 +69,7 @@ function compareWorkStreams(
 ): number {
   const comparison = field === "name"
     ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" })
-    : left[field] - right[field];
+    : field === "completionSharePercent" ? left.completedCount - right.completedCount : left[field] - right[field];
   if (comparison === 0 && field !== "name") {
     return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
   }
@@ -131,8 +131,17 @@ function MetricDrilldownButton({
   );
 }
 
-function clampPercentage(value: number): number {
-  return Math.max(0, Math.min(100, value));
+function CompletionShare({ count, total, name, onClick }: { count: number; total: number; name: string; onClick: () => void }) {
+  if (total === 0) return <span aria-label={`${name} completion share unavailable`}>—</span>;
+  const share = Math.max(0, Math.min(100, count / total * 100));
+  const label = `${Number(share.toFixed(1))}%`;
+  return <>
+    <MetricDrilldownButton label={`View ${count} completed JIRA cards contributing to ${name} completion share`} onClick={onClick}>{label}</MetricDrilldownButton>
+    <div className="tb-dashboard-progress tb-dashboard-completion-share" role="meter" aria-label={`${name} share of completions`}
+      aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(share.toFixed(1))}>
+      <span style={{ width: `${share}%` }} />
+    </div>
+  </>;
 }
 
 function flowGapLabel(value: number): string {
@@ -205,9 +214,9 @@ function WorkStreamTableSkeleton() {
             <th scope="col" className="is-number">Epics</th>
             <th scope="col" className="is-number">Created</th>
             <th scope="col" className="is-number">Completed</th>
-            <th scope="col" className="is-flow-gap">Flow gap</th>
+            <th scope="col" className="is-flow-gap">Net backlog change</th>
             <th scope="col" className="is-number">Current WIP</th>
-            <th scope="col" className="is-progress">Delivery progress</th>
+            <th scope="col" className="is-progress">Share of completions</th>
           </tr>
         </thead>
         <tbody>
@@ -217,9 +226,9 @@ function WorkStreamTableSkeleton() {
               <td data-label="Epics" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Flow gap"><span className="tb-dashboard-skeleton is-table-pill" /></td>
+              <td data-label="Net backlog change"><span className="tb-dashboard-skeleton is-table-pill" /></td>
               <td data-label="Current WIP" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Delivery progress" className="tb-dashboard-delivery-cell">
+              <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
                 <span className="tb-dashboard-skeleton is-table-progress-copy" />
                 <span className="tb-dashboard-skeleton is-table-progress" />
               </td>
@@ -296,23 +305,14 @@ export function TeamDashboardScreen({
       completedCount: current.completedCount + workStream.completedCount,
       netFlow: current.netFlow + workStream.netFlow,
       currentWipCount: current.currentWipCount + workStream.currentWipCount,
-      totalCards: current.totalCards + workStream.totalCards,
-      totalCompletedCards: current.totalCompletedCards + workStream.totalCompletedCards,
     }), {
       epicCount: 0,
       newCount: 0,
       completedCount: 0,
       netFlow: 0,
       currentWipCount: 0,
-      totalCards: 0,
-      totalCompletedCards: 0,
     });
-    return {
-      ...totals,
-      completionPercent: totals.totalCards > 0
-        ? (totals.totalCompletedCards / totals.totalCards) * 100
-        : 0,
-    };
+    return totals;
   }, [payload?.workStreams]);
 
   const updateFlowWeeks = (value: TeamDashboardFlowWeeks) => {
@@ -334,10 +334,8 @@ export function TeamDashboardScreen({
     scopeName: string,
     groupIds: number[],
     value: number,
-    completedCards?: number,
-    totalCards?: number,
   ) => {
-    setIssueSelection({ metric, scopeName, groupIds, value, completedCards, totalCards });
+    setIssueSelection({ metric, scopeName, groupIds, value });
   };
   const closeIssueOverlay = useCallback(() => setIssueSelection(null), []);
 
@@ -439,9 +437,9 @@ export function TeamDashboardScreen({
         <header className="tb-panel-header">
           <div>
             <p className="tb-eyebrow">Work stream insights</p>
-            <h3>Intake, completion, and delivery progress</h3>
+            <h3>Intake, throughput, and work mix</h3>
             <p className="tb-muted-note">
-              Created and completed cards use {flowRangeLabel(flowWeeks).toLowerCase()}. Flow gap is created minus completed; progress covers all scoped cards.
+              Created, completed, and completion share use {flowRangeLabel(flowWeeks).toLowerCase()}. Net backlog change is created minus completed; Current WIP is a current snapshot. Each card is counted once under its primary work stream, including Unmapped.
             </p>
           </div>
           <label className="tb-dashboard-range">
@@ -470,7 +468,7 @@ export function TeamDashboardScreen({
           <div className="tb-dashboard-work-stream-table-wrap" role="region" aria-label="Work stream comparison" tabIndex={0}>
             <table className="tb-data-table tb-dashboard-work-stream-table">
               <caption className="tb-visually-hidden">
-                Work streams compared by recent card flow, current work in progress, and overall delivery progress.
+                Work streams compared by card flow and share of completions in the selected period, plus current work in progress.
               </caption>
               <thead>
                 <tr>
@@ -507,7 +505,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="netFlow"
-                    label="Flow gap"
+                    label="Net backlog change"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-flow-gap"
@@ -522,8 +520,8 @@ export function TeamDashboardScreen({
                     onSort={updateWorkStreamSort}
                   />
                   <SortableHeader
-                    field="completionPercent"
-                    label="Delivery progress"
+                    field="completionSharePercent"
+                    label="Share of completions"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-progress"
@@ -533,11 +531,10 @@ export function TeamDashboardScreen({
               </thead>
               <tbody>
                 {sortedWorkStreams.map((workStream) => {
-                  const progress = clampPercentage(workStream.completionPercent);
                   return (
                     <tr key={workStream.id}>
                       <td data-label="Work Streams" className="tb-dashboard-work-stream-name">
-                        <button type="button" onClick={() => onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
+                        <button type="button" onClick={() => workStream.id === 0 ? onOpenSettings?.() : onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
                         {workStream.error ? <small className="tb-error-note">Flow data unavailable</small> : null}
                       </td>
                       <td data-label="Epics" className="is-number">
@@ -564,10 +561,10 @@ export function TeamDashboardScreen({
                           {workStream.completedCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Flow gap">
+                      <td data-label="Net backlog change">
                         <MetricDrilldownButton
                           className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}
-                          label={`View JIRA cards contributing to the ${flowGapLabel(workStream.netFlow)} flow gap for ${workStream.name}`}
+                          label={`View JIRA cards contributing to the ${flowGapLabel(workStream.netFlow)} net backlog change for ${workStream.name}`}
                           onClick={() => openIssueOverlay("flowGap", workStream.name, [workStream.id], workStream.netFlow)}
                         >
                           {flowGapLabel(workStream.netFlow)}
@@ -581,32 +578,9 @@ export function TeamDashboardScreen({
                           {workStream.currentWipCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
-                        <MetricDrilldownButton
-                          className="tb-dashboard-progress-copy"
-                          label={`View ${workStream.totalCards} delivery progress JIRA cards for ${workStream.name}`}
-                          onClick={() => openIssueOverlay(
-                            "deliveryProgress",
-                            workStream.name,
-                            [workStream.id],
-                            workStream.completionPercent,
-                            workStream.totalCompletedCards,
-                            workStream.totalCards,
-                          )}
-                        >
-                          <strong>{workStream.completionPercent.toFixed(0)}%</strong>
-                          <span>{workStream.totalCompletedCards}/{workStream.totalCards} completed</span>
-                        </MetricDrilldownButton>
-                        <div
-                          className="tb-dashboard-progress"
-                          role="progressbar"
-                          aria-label={`${workStream.name} delivery progress`}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={progress}
-                        >
-                          <span style={{ width: `${progress}%` }} />
-                        </div>
+                      <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                        <CompletionShare count={workStream.completedCount} total={workStreamTotals.completedCount} name={workStream.name}
+                          onClick={() => openIssueOverlay("completionShare", workStream.name, [workStream.id], workStream.completedCount)} />
                       </td>
                     </tr>
                   );
@@ -639,10 +613,10 @@ export function TeamDashboardScreen({
                       {workStreamTotals.completedCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Flow gap">
+                  <td data-label="Net backlog change">
                     <MetricDrilldownButton
                       className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}
-                      label={`View JIRA cards contributing to the ${flowGapLabel(workStreamTotals.netFlow)} flow gap for all work streams`}
+                      label={`View JIRA cards contributing to the ${flowGapLabel(workStreamTotals.netFlow)} net backlog change for all work streams`}
                       onClick={() => openIssueOverlay("flowGap", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.netFlow)}
                     >
                       {flowGapLabel(workStreamTotals.netFlow)}
@@ -656,22 +630,9 @@ export function TeamDashboardScreen({
                       {workStreamTotals.currentWipCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Overall delivery" className="tb-dashboard-delivery-cell">
-                    <MetricDrilldownButton
-                      className="tb-dashboard-progress-copy"
-                      label={`View ${workStreamTotals.totalCards} delivery progress JIRA cards for all work streams`}
-                      onClick={() => openIssueOverlay(
-                        "deliveryProgress",
-                        "All work streams",
-                        sortedWorkStreams.map(({ id }) => id),
-                        workStreamTotals.completionPercent,
-                        workStreamTotals.totalCompletedCards,
-                        workStreamTotals.totalCards,
-                      )}
-                    >
-                      <strong>{workStreamTotals.completionPercent.toFixed(0)}%</strong>
-                      <span>{workStreamTotals.totalCompletedCards}/{workStreamTotals.totalCards} completed</span>
-                    </MetricDrilldownButton>
+                  <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                    <CompletionShare count={workStreamTotals.completedCount} total={workStreamTotals.completedCount} name="All work streams"
+                      onClick={() => openIssueOverlay("completionShare", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)} />
                   </td>
                 </tr>
               </tfoot>

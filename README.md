@@ -16,6 +16,7 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Release Insights: release overview, selectable cycle-time trend, overdue readiness, and completed-release quality signals.
+- Dashboard completion share measures each work stream’s share of completed cards in the selected flow period, including Unmapped work and counting primary assignments once.
 - Team Report: delivery signals, AI-generated completed-work summaries with source links, work-mix charts, and initiative progress for leadership updates.
 
 ## 📣 Communication One-Pager
@@ -161,7 +162,7 @@ npm run lint
 npm run test:coverage
 ```
 
-The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, and Team Report initiative-selection state and completed-work source matching.
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, and Team Report initiative-selection state and completed-work source matching, and Team Dashboard with its issue drilldowns.
 
 ## Codex dashboard integration
 

@@ -560,10 +560,10 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "name": "groupId",
                             "in": "query",
                             "required": True,
-                            "schema": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+                            "schema": {"type": "array", "items": {"type": "integer", "minimum": 0}},
                             "style": "form",
                             "explode": True,
-                            "description": "Selected work stream IDs. Repeat to combine multiple work streams.",
+                            "description": "Selected work stream IDs (0 requires workStreamScope=primary). Repeat to combine multiple work streams.",
                         },
                         {
                             "name": "epicKey",
@@ -573,6 +573,12 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "style": "form",
                             "explode": True,
                             "description": "Selected epic keys. Omit to include all configured epics in the work stream.",
+                        },
+                        {
+                            "name": "workStreamScope",
+                            "in": "query",
+                            "description": "primary counts each epic once using its lowest group ID; groupId=0 includes unmapped configured epics. all retains multi-membership.",
+                            "schema": {"type": "string", "enum": ["all", "primary"], "default": "all"},
                         },
                         {
                             "name": "chartWeeks",
@@ -1241,6 +1247,7 @@ def build_handler(
                 try:
                     payload = initiative_deep_dive_provider(
                         group_ids=group_ids,
+                        **({"work_stream_scope": query["workStreamScope"][0]} if "workStreamScope" in query else {}),
                         epic_keys=query.get("epicKey", []),
                         chart_weeks=query.get("chartWeeks", ["12"])[0],
                         chart_start=query.get("chartStart", [None])[0],

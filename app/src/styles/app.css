@@ -8671,3 +8671,7 @@ body {
   line-height: 1.5;
   white-space: normal;
 }
+
+.tb-dashboard-progress.tb-dashboard-completion-share > span {
+  background: #607d8b;
+}

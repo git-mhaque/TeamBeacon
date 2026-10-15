@@ -129,7 +129,7 @@ describe("TeamDashboardScreen", () => {
 
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
     expect(screen.getByText("TeamBeacon 2.4")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Platform Delivery delivery progress" })).toBeInTheDocument();
+    expect(screen.getByRole("meter", { name: "Platform Delivery share of completions" })).toBeInTheDocument();
   });
 
   it("summarizes delivery health and supports dashboard drill-downs", async () => {
@@ -158,15 +158,15 @@ describe("TeamDashboardScreen", () => {
       "Current sprint blockers",
     ]);
 
-    const progress = screen.getByRole("progressbar", { name: "Platform Delivery delivery progress" });
-    expect(progress).toHaveAttribute("aria-valuenow", "65");
+    const progress = screen.getByRole("meter", { name: "Platform Delivery share of completions" });
+    expect(progress).toHaveAttribute("aria-valuenow", "78.9");
     const comparisonRegion = screen.getByRole("region", { name: "Work stream comparison" });
     const comparisonTable = within(comparisonRegion).getByRole("table");
     const streamOrder = () => Array.from(comparisonTable.querySelectorAll("tbody tr")).map((row) => (
       within(row as HTMLElement).getByRole("button", { name: /^(Customer Operations|Platform Delivery)$/ }).textContent
     ));
     expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
-    expect(within(comparisonTable).getByRole("columnheader", { name: /Flow gap/ })).toHaveAttribute(
+    expect(within(comparisonTable).getByRole("columnheader", { name: /Net backlog change/ })).toHaveAttribute(
       "aria-sort",
       "descending",
     );
@@ -176,7 +176,7 @@ describe("TeamDashboardScreen", () => {
     const platformRow = screen.getByRole("button", { name: "Platform Delivery" }).closest("tr");
     expect(platformRow).not.toBeNull();
     expect(within(platformRow as HTMLElement).getByText("3 reduced")).toHaveClass("is-good");
-    expect(within(platformRow as HTMLElement).getByText("13/20 completed")).toBeInTheDocument();
+    expect(within(platformRow as HTMLElement).getByText("78.9%")).toBeInTheDocument();
     expect(screen.getByText("Flow data unavailable")).toBeInTheDocument();
 
     fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Completed (descending)" }));
@@ -187,9 +187,8 @@ describe("TeamDashboardScreen", () => {
     const totalsRow = within(comparisonTable).getByRole("rowheader", { name: "All work streams" }).closest("tr");
     expect(totalsRow).not.toBeNull();
     expect(within(totalsRow as HTMLElement).getByText("Balanced")).toBeInTheDocument();
-    expect(within(totalsRow as HTMLElement).getByText("17/30 completed")).toBeInTheDocument();
-    expect(within(totalsRow as HTMLElement).getByText("57%")).toBeInTheDocument();
-    for (const label of ["Work Streams", "Epics", "Created", "Flow gap", "Current WIP", "Delivery progress"]) {
+    expect(within(totalsRow as HTMLElement).getByText("100%")).toBeInTheDocument();
+    for (const label of ["Work Streams", "Epics", "Created", "Net backlog change", "Current WIP", "Share of completions"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
@@ -347,15 +346,15 @@ describe("TeamDashboardScreen", () => {
     const drilldowns = [
       ["View 3 configured JIRA epics for Platform Delivery", "Configured epics"],
       ["View 15 completed JIRA cards for Platform Delivery", "Completed cards"],
-      ["View JIRA cards contributing to the 3 reduced flow gap for Platform Delivery", "Flow gap cards"],
+      ["View JIRA cards contributing to the 3 reduced net backlog change for Platform Delivery", "Net backlog change cards"],
       ["View 4 current WIP JIRA cards for Platform Delivery", "Current WIP cards"],
-      ["View 20 delivery progress JIRA cards for Platform Delivery", "Delivery progress cards"],
+      ["View 15 completed JIRA cards contributing to Platform Delivery completion share", "Completion share cards"],
       ["View 4 configured JIRA epics for all work streams", "Configured epics"],
       ["View 19 created JIRA cards for all work streams", "Created cards"],
       ["View 19 completed JIRA cards for all work streams", "Completed cards"],
-      ["View JIRA cards contributing to the Balanced flow gap for all work streams", "Flow gap cards"],
+      ["View JIRA cards contributing to the Balanced net backlog change for all work streams", "Net backlog change cards"],
       ["View 6 current WIP JIRA cards for all work streams", "Current WIP cards"],
-      ["View 30 delivery progress JIRA cards for all work streams", "Delivery progress cards"],
+      ["View 19 completed JIRA cards contributing to All work streams completion share", "Completion share cards"],
     ] as const;
 
     for (const [buttonName, dialogName] of drilldowns) {
@@ -435,22 +434,20 @@ describe("TeamDashboardScreen", () => {
       },
       {
         selection: { metric: "flowGap", scopeName: "Platform Delivery", groupIds: [5], value: 2 },
-        title: "Flow gap cards",
-        description: "+2 net flow. 1 unique card was created or completed in the last week; a card can contribute to both.",
+        title: "Net backlog change cards",
+        description: "+2 net backlog change. 1 unique card was created or completed in the last week; a card can contribute to both.",
         activity: "Created, In progress, Completed",
       },
       {
         selection: {
-          metric: "deliveryProgress",
+          metric: "completionShare",
           scopeName: "Platform Delivery",
           groupIds: [5],
-          value: 50,
-          completedCards: 1,
-          totalCards: 2,
+          value: 1,
         },
-        title: "Delivery progress cards",
-        description: "1 of 2 scoped cards are complete.",
-        activity: "In scope",
+        title: "Completion share cards",
+        description: "1 card completed in the last week; these cards contribute to the completion share.",
+        activity: "Completed",
       },
     ];
 
@@ -584,15 +581,22 @@ describe("TeamDashboardScreen", () => {
   });
 
   it("persists and refreshes the selected work-stream flow period", async () => {
-    const fetchSpy = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const twelveWeeks = new URL(String(input), "http://localhost").searchParams.get("flowWeeks") === "12";
+      return new Response(JSON.stringify({ ...dashboardPayload, workStreams: dashboardPayload.workStreams.map((row, index) => ({
+        ...row, completedCount: twelveWeeks ? index === 0 ? 3 : 1 : row.completedCount,
+      })) }));
+    });
     render(<TeamDashboardScreen />);
 
     expect(await screen.findByRole("combobox", { name: /Flow period/ })).toHaveValue("4");
+    await screen.findByRole("meter", { name: "Platform Delivery share of completions" });
     fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "12" } });
 
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => new URL(String(input)).searchParams.get("flowWeeks") === "12")).toBe(true);
     });
+    await waitFor(() => expect(screen.getByRole("meter", { name: "Platform Delivery share of completions" })).toHaveAttribute("aria-valuenow", "75"));
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowWeeks", "12");
   });
 
@@ -661,4 +665,54 @@ describe("TeamDashboardScreen", () => {
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
+});
+
+it("shows no completion share for zero completions and includes Unmapped drilldowns", async () => {
+  const onOpenSettings = vi.fn();
+  const empty = {
+    ...dashboardPayload,
+    workStreams: [{ ...dashboardPayload.workStreams[0], id: 0, name: "Unmapped", completedCount: 0, totalCompletedCards: 999, completionPercent: 99 }],
+  };
+  const fetchSpy = setupFetchMock({
+    "/api/team/dashboard": empty,
+    "/api/initiative-deep-dive": { cards: [], epicOptions: [], count: 0, limit: 1000, truncated: false },
+  });
+  render(<TeamDashboardScreen onOpenSettings={onOpenSettings} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Unmapped" }));
+  expect(onOpenSettings).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Unmapped completion share unavailable")).toHaveTextContent("—");
+  expect(screen.getByLabelText("All work streams completion share unavailable")).toHaveTextContent("—");
+  fireEvent.click(screen.getByRole("button", { name: "View 0 completed JIRA cards for Unmapped" }));
+  expect(await screen.findByRole("dialog", { name: "Completed cards" })).toBeInTheDocument();
+  await waitFor(() => {
+    const call = fetchSpy.mock.calls.find(([input]) => String(input).includes("/api/initiative-deep-dive"));
+    expect(call).toBeDefined();
+    const query = new URL(String(call![0]), "http://localhost").searchParams;
+    expect(query.get("groupId")).toBe("0");
+    expect(query.get("workStreamScope")).toBe("primary");
+    expect(query.get("activity")).toBe("completed");
+  });
+});
+
+it("sorts completion-share details with missing estimates and dates", async () => {
+  setupFetchMock({ "/api/initiative-deep-dive": {
+    count: 4, truncated: false, epicOptions: [], cards: [null, 4, null, 2].map((storyPoints, index) => ({
+      issueKey: `TB-${index + 1}`, summary: "", status: "Done", storyPoints,
+      completedAt: index % 2 ? "2026-08-09T03:00:00Z" : null,
+      activityTypes: ["completed"],
+    })),
+  } });
+  render(<TeamDashboardIssueOverlay selection={{ metric: "completionShare", scopeName: "Unmapped", groupIds: [0], value: 4 }} flowWeeks={4} onClose={vi.fn()} />);
+  const dialog = await screen.findByRole("dialog", { name: "Completion share cards" });
+  await within(dialog).findByText("TB-4");
+  const issueKeys = () => [...dialog.querySelectorAll("tbody tr")].map((row) => row.querySelector("td")?.textContent);
+  fireEvent.click(within(dialog).getByRole("button", { name: /Sort by Story points/ }));
+  expect(issueKeys().slice(0, 2)).toEqual(["TB-3", "TB-1"]);
+  fireEvent.click(within(dialog).getByRole("button", { name: /Sort by Story points/ }));
+  expect(issueKeys()).toEqual(["TB-4", "TB-2", "TB-1", "TB-3"]);
+  fireEvent.click(within(dialog).getByRole("button", { name: /Sort by Relevant date/ }));
+  expect(issueKeys().slice(0, 2)).toEqual(["TB-3", "TB-1"]);
+  fireEvent.click(within(dialog).getByRole("button", { name: /Sort by Relevant date/ }));
+  expect(issueKeys()).toEqual(["TB-2", "TB-4", "TB-1", "TB-3"]);
 });

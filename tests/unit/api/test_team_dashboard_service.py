@@ -134,6 +134,8 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
         self.assertEqual(platform["newCount"], 5)
         self.assertEqual(platform["completedCount"], 5)
         self.assertEqual(platform["completionPercent"], 60.0)
+        self.assertEqual(platform["completionSharePercent"], 71.4)
+        self.assertEqual(deep_dive_mock.call_args.kwargs["work_stream_scope"], "primary")
         self.assertEqual(payload["latestRelease"]["name"], "August Release")
         self.assertEqual(payload["sprintCycleTime"]["latestSprintName"], "Sprint 11")
         self.assertEqual(payload["sprintCycleTime"]["deltaDays"], -1.5)
@@ -177,6 +179,7 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
         payload = get_team_dashboard(now=datetime(2026, 8, 11, tzinfo=timezone.utc))
 
         self.assertEqual(payload["workStreams"][0]["completionPercent"], 0.0)
+        self.assertIsNone(payload["workStreams"][0]["completionSharePercent"])
         self.assertEqual(payload["workStreams"][0]["error"], "flow unavailable")
         self.assertIsNone(payload["latestRelease"])
         self.assertIsNone(payload["sprintCycleTime"])

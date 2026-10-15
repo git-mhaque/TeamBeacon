@@ -14,15 +14,13 @@ export type TeamDashboardIssueMetric =
   | "completed"
   | "flowGap"
   | "currentWip"
-  | "deliveryProgress";
+  | "completionShare";
 
 export type TeamDashboardIssueSelection = {
   metric: TeamDashboardIssueMetric;
   scopeName: string;
   groupIds: number[];
   value: number;
-  completedCards?: number;
-  totalCards?: number;
 };
 
 type Props = {
@@ -65,16 +63,16 @@ function metricTitle(metric: TeamDashboardIssueMetric): string {
   if (metric === "epics") return "Configured epics";
   if (metric === "created") return "Created cards";
   if (metric === "completed") return "Completed cards";
-  if (metric === "flowGap") return "Flow gap cards";
+  if (metric === "flowGap") return "Net backlog change cards";
   if (metric === "currentWip") return "Current WIP cards";
-  return "Delivery progress cards";
+  return "Completion share cards";
 }
 
 function metricActivity(metric: TeamDashboardIssueMetric): InitiativeDeepDiveActivity {
   if (metric === "created") return "new";
   if (metric === "completed") return "completed";
   if (metric === "currentWip") return "current_wip";
-  if (metric === "deliveryProgress") return "scope";
+  if (metric === "completionShare") return "completed";
   return "all";
 }
 
@@ -86,7 +84,7 @@ function formatActivity(activity: InitiativeDeepDiveCard["activityTypes"][number
 
 function relevantTimestamp(card: InitiativeDeepDiveCard, metric: TeamDashboardIssueMetric): string | null | undefined {
   if (metric === "created") return card.createdAt;
-  if (metric === "completed") return card.completedAt;
+  if (metric === "completed" || metric === "completionShare") return card.completedAt;
   if (metric === "currentWip") return card.inProgressStartedAt;
   return card.latestActivityAt;
 }
@@ -95,7 +93,7 @@ function cardActivity(card: InitiativeDeepDiveCard, metric: TeamDashboardIssueMe
   if (metric === "created") return "Created";
   if (metric === "completed") return "Completed";
   if (metric === "currentWip") return "Current WIP";
-  if (metric === "deliveryProgress") return "In scope";
+  if (metric === "completionShare") return "Completed";
   return card.activityTypes.map(formatActivity).join(", ") || "In scope";
 }
 
@@ -179,10 +177,10 @@ function description(
   if (selection.metric === "flowGap") {
     const sign = selection.value > 0 ? "+" : "";
     const cardCount = payload?.count ?? 0;
-    return `${sign}${selection.value} net flow. ${cardCount} unique card${cardCount === 1 ? " was" : "s were"} created or completed in ${period}; a card can contribute to both.`;
+    return `${sign}${selection.value} net backlog change. ${cardCount} unique card${cardCount === 1 ? " was" : "s were"} created or completed in ${period}; a card can contribute to both.`;
   }
-  if (selection.metric === "deliveryProgress") {
-    return `${selection.completedCards ?? 0} of ${selection.totalCards ?? 0} scoped cards are complete.`;
+  if (selection.metric === "completionShare") {
+    return `${selection.value} card${selection.value === 1 ? "" : "s"} completed in ${period}; these cards contribute to the completion share.`;
   }
   if (selection.metric === "epics") {
     return `${payload?.epicOptions.length ?? selection.value} configured JIRA epic${selection.value === 1 ? "" : "s"}.`;
@@ -218,6 +216,7 @@ export function TeamDashboardIssueOverlay({ selection, flowWeeks, onClose }: Pro
     setPayload(null);
     void fetchInitiativeDeepDive({
       groupIds: selection.groupIds,
+      workStreamScope: "primary",
       chartWeeks: flowWeeks,
       tableWindowWeeks: flowWeeks,
       activity: metricActivity(selection.metric),

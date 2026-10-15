@@ -1652,6 +1652,12 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
             },
         )
 
+    def test_initiative_deep_dive_endpoint_forwards_primary_work_stream_scope(self) -> None:
+        with urlopen(f"{self.base_url}/api/initiative-deep-dive?groupId=0&workStreamScope=primary", timeout=5) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(self.initiative_deep_dive_calls[-1]["work_stream_scope"], "primary")
+        self.assertEqual(self.initiative_deep_dive_calls[-1]["group_ids"], ["0"])
+
     def test_initiative_deep_dive_endpoint_requires_group(self) -> None:
         with self.assertRaises(HTTPError) as raised:
             urlopen(f"{self.base_url}/api/initiative-deep-dive", timeout=5)  # noqa: S310

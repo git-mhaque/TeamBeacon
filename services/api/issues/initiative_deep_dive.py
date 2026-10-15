@@ -55,6 +55,7 @@ def _normalize_group_id(group_id: int | str) -> int:
 def _normalize_group_ids(
     group_ids: Iterable[int | str] | int | str | None,
     group_id: int | str | None,
+    *, primary_only: bool = False,
 ) -> list[int]:
     if group_ids is None:
         raw_values: list[int | str] = []
@@ -70,7 +71,7 @@ def _normalize_group_ids(
     normalized: list[int] = []
     seen: set[int] = set()
     for raw_value in raw_values:
-        value = _normalize_group_id(raw_value)
+        value = 0 if primary_only and str(raw_value).strip() == "0" else _normalize_group_id(raw_value)
         if value in seen:
             continue
         seen.add(value)
@@ -295,27 +296,44 @@ def _jira_issue_url(jira_base_url: str | None, issue_key: str | None) -> str | N
 def _load_single_group_epics(
     conn: sqlite3.Connection,
     group_id: int,
+    *, primary_only: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     group_row = conn.execute(
         "SELECT id, name FROM epic_groups WHERE id = ? LIMIT 1",
         (group_id,),
     ).fetchone()
+    if group_id == 0 and primary_only:
+        group_row = {"id": 0, "name": "Unmapped"}
     if group_row is None:
         raise ValueError(f"Unknown groupId: {group_id}")
 
-    epic_rows = conn.execute(
-        """
-        SELECT
-          em.epic_key,
-          COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
-        FROM epic_metadata_groups emg
-        JOIN epic_metadata em ON em.id = emg.epic_metadata_id
-        LEFT JOIN issues i ON i.issue_key = em.epic_key
-        WHERE emg.group_id = ?
-        ORDER BY LOWER(COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key)), em.epic_key
-        """,
-        (group_id,),
-    ).fetchall()
+    if primary_only:
+        epic_rows = conn.execute(
+            """
+            SELECT em.epic_key,
+              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
+            FROM epic_metadata em
+            LEFT JOIN issues i ON i.issue_key = em.epic_key
+            WHERE COALESCE((SELECT MIN(emg.group_id) FROM epic_metadata_groups emg
+                            WHERE emg.epic_metadata_id = em.id), 0) = ?
+            ORDER BY LOWER(epic_name), em.epic_key
+            """,
+            (group_id,),
+        ).fetchall()
+    else:
+        epic_rows = conn.execute(
+            """
+            SELECT
+              em.epic_key,
+              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
+            FROM epic_metadata_groups emg
+            JOIN epic_metadata em ON em.id = emg.epic_metadata_id
+            LEFT JOIN issues i ON i.issue_key = em.epic_key
+            WHERE emg.group_id = ?
+            ORDER BY LOWER(COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key)), em.epic_key
+            """,
+            (group_id,),
+        ).fetchall()
     epics = [
         {"epicKey": str(row["epic_key"]), "epicName": str(row["epic_name"])}
         for row in epic_rows
@@ -331,11 +349,12 @@ def _load_single_group_epics(
 def _load_group_epics(
     conn: sqlite3.Connection,
     group_ids: Iterable[int],
+    *, primary_only: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     groups: list[dict[str, Any]] = []
     epics_by_key: dict[str, dict[str, Any]] = {}
     for group_id in group_ids:
-        group, epics = _load_single_group_epics(conn, group_id)
+        group, epics = _load_single_group_epics(conn, group_id, primary_only=primary_only)
         groups.append(group)
         for epic in epics:
             epics_by_key.setdefault(str(epic["epicKey"]), epic)
@@ -454,7 +473,11 @@ def _load_fallback_completion_dates(
     return completed_at_by_issue
 
 
-def _resolve_owning_epic(row: sqlite3.Row, selected_epic_set: set[str]) -> str | None:
+def _resolve_owning_epic(row: sqlite3.Row, selected_epic_set: set[str], *, primary_only: bool = False) -> str | None:
+    if primary_only:
+        parent_is_epic = str(row["parent_issue_type"] or "").lower() == "epic"
+        owner = str(row["epic_key"] or (row["parent_issue_key"] if parent_is_epic else row["parent_epic_key"]) or "").strip().upper()
+        return owner if owner in selected_epic_set else None
     candidates = (row["epic_key"], row["parent_issue_key"], row["parent_epic_key"])
     for candidate in candidates:
         normalized = str(candidate or "").strip().upper()
@@ -550,8 +573,12 @@ def get_initiative_deep_dive(
     db_path: str | None = None,
     now: datetime | None = None,
     jira_base_url: str | None = None,
+    work_stream_scope: str = "all",
 ) -> dict[str, Any]:
-    normalized_group_ids = _normalize_group_ids(group_ids, group_id)
+    if work_stream_scope not in {"all", "primary"}:
+        raise ValueError("workStreamScope must be all or primary.")
+    primary_only = work_stream_scope == "primary"
+    normalized_group_ids = _normalize_group_ids(group_ids, group_id, primary_only=primary_only)
     requested_epic_keys = _normalize_epic_keys(epic_keys)
     normalized_table_window = _normalize_table_window(table_window_weeks)
     normalized_activity = _normalize_activity_filter(activity)
@@ -589,7 +616,7 @@ def get_initiative_deep_dive(
             or _resolve_jira_base_url()
             or _resolve_jira_base_url_from_db(conn)
         )
-        groups, epic_options = _load_group_epics(conn, normalized_group_ids)
+        groups, epic_options = _load_group_epics(conn, normalized_group_ids, primary_only=primary_only)
         epic_options = [
             {
                 **epic,
@@ -640,6 +667,7 @@ def get_initiative_deep_dive(
               i.resolved_at_source,
               i.epic_key,
               i.parent_issue_key,
+              p.issue_type AS parent_issue_type,
               p.epic_key AS parent_epic_key
             FROM issues i
             LEFT JOIN issues p ON p.issue_key = i.parent_issue_key
@@ -660,7 +688,7 @@ def get_initiative_deep_dive(
             row
             for row in issue_rows
             if not is_subtask_issue_type(row["issue_type"])
-            and _resolve_owning_epic(row, selected_epic_set) is not None
+            and _resolve_owning_epic(row, selected_epic_set, primary_only=primary_only) is not None
         ]
         current_wip_rows = [
             row
@@ -714,7 +742,7 @@ def get_initiative_deep_dive(
                 "row": row,
                 "issueKey": issue_key,
                 "statusBucket": status_bucket,
-                "owningEpicKey": _resolve_owning_epic(row, selected_epic_set),
+                "owningEpicKey": _resolve_owning_epic(row, selected_epic_set, primary_only=primary_only),
                 "createdAt": created_at,
                 "createdDate": created_local_date,
                 "inProgressStartedAt": started_at,

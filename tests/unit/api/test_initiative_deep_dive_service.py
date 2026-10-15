@@ -512,6 +512,56 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(payload["limit"], 1_000)
             self.assertEqual(payload["cards"], [])
 
+    def test_primary_dashboard_scope_counts_shared_epics_once_and_includes_unmapped(self) -> None:
+        from services.api.issues.team_dashboard import get_team_dashboard
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform, operations = self._seed_database(db_path)
+            conn = sqlite3.connect(db_path)
+            conn.execute("INSERT INTO epic_metadata_groups (epic_metadata_id, group_id) SELECT id, ? FROM epic_metadata WHERE epic_key = 'TB-100'", (operations,))
+            conn.commit()
+            conn.close()
+            upsert_epic_metadata(epic_key="TB-300", success_criteria=[], group_ids=[], work_type_ids=[], db_path=db_path)
+            now = datetime(2026, 8, 10, 12, tzinfo=timezone.utc)
+            common = dict(db_path=db_path, now=now, chart_weeks=4, activity="completed", timezone_name="UTC")
+            primary = get_initiative_deep_dive(group_ids=[platform], work_stream_scope="primary", **common)
+            secondary = get_initiative_deep_dive(group_ids=[operations], work_stream_scope="primary", **common)
+            unmapped = get_initiative_deep_dive(group_ids=[0], work_stream_scope="primary", **common)
+            self.assertEqual(secondary["epicOptions"], [])
+            self.assertEqual(unmapped["group"]["name"], "Unmapped")
+            self.assertEqual([card["issueKey"] for card in unmapped["cards"]], ["TB-9"])
+            all_cards = get_initiative_deep_dive(group_ids=[platform, operations, 0], work_stream_scope="primary", **common)
+            primary_keys = {card["issueKey"] for card in primary["cards"]}
+            unmapped_keys = {card["issueKey"] for card in unmapped["cards"]}
+            self.assertFalse(primary_keys & unmapped_keys)
+            self.assertEqual(primary_keys | unmapped_keys, {card["issueKey"] for card in all_cards["cards"]})
+            # Default deep dive retains secondary membership for existing consumers.
+            legacy = get_initiative_deep_dive(group_ids=[operations], **common)
+            self.assertIn("TB-100", [epic["epicKey"] for epic in legacy["epicOptions"]])
+            payload = get_team_dashboard(flow_weeks=4, db_path=db_path, now=now, timezone_name="UTC")
+            streams = payload["workStreams"]
+            self.assertEqual(sum(row["epicCount"] for row in streams), 3)
+            self.assertEqual(sum(row["completedCount"] for row in streams), all_cards["count"])
+            self.assertAlmostEqual(sum(row["completionSharePercent"] for row in streams), 100, delta=0.11)
+            self.assertEqual(next(row for row in streams if row["id"] == 0)["completedCount"], 1)
+            for kwargs in [{"group_ids": [0]}, {"group_ids": [platform], "work_stream_scope": "invalid"}]:
+                with self.assertRaises(ValueError):
+                    get_initiative_deep_dive(**kwargs, **common)
+
+    def test_primary_scope_uses_canonical_epic_before_legacy_parent_link(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform, operations = self._seed_database(db_path)
+            conn = sqlite3.connect(db_path)
+            conn.execute("UPDATE issues SET parent_issue_key = 'TB-300' WHERE issue_key = 'TB-1'")
+            conn.commit()
+            conn.close()
+            common = dict(db_path=db_path, now=datetime(2026, 8, 10, tzinfo=timezone.utc), activity="completed", chart_weeks=4)
+            payload = get_initiative_deep_dive(group_ids=[operations], work_stream_scope="primary", **common)
+            self.assertNotIn("TB-1", [card["issueKey"] for card in payload["cards"]])
+            platform_payload = get_initiative_deep_dive(group_ids=[platform], work_stream_scope="primary", **common)
+            self.assertIn("TB-1", [card["issueKey"] for card in platform_payload["cards"]])
+
 
 if __name__ == "__main__":
     unittest.main()

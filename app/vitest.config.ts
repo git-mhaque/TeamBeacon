@@ -14,6 +14,12 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       thresholds: {
+        "src/components/content/screens/TeamDashboardScreen.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/TeamDashboardIssueOverlay.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/lib/reportCompletedWork.ts": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },

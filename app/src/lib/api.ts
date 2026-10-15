@@ -476,6 +476,7 @@ export type TeamDashboardWorkStream = {
   totalCards: number;
   totalCompletedCards: number;
   completionPercent: number;
+  completionSharePercent?: number | null;
   error?: string | null;
 };
 
@@ -1114,6 +1115,7 @@ export async function fetchEpicLookupConfig(): Promise<EpicLookupConfig> {
 
 export async function fetchInitiativeDeepDive(options: {
   groupIds: number[];
+  workStreamScope?: "all" | "primary";
   epicKeys?: string[];
   chartWeeks?: number;
   chartStart?: string;
@@ -1124,6 +1126,7 @@ export async function fetchInitiativeDeepDive(options: {
   limit?: number;
 }): Promise<InitiativeDeepDiveResponse> {
   const params = new URLSearchParams();
+  if (options.workStreamScope) params.set("workStreamScope", options.workStreamScope);
   for (const groupId of options.groupIds) {
     params.append("groupId", String(groupId));
   }

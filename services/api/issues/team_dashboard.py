@@ -150,14 +150,15 @@ def get_team_dashboard(
         if not isinstance(epic, dict):
             continue
         groups = epic.get("groups") if isinstance(epic.get("groups"), list) else []
-        for group in groups:
-            if not isinstance(group, dict) or not isinstance(group.get("id"), int):
-                continue
-            group_id = int(group["id"])
-            progress = progress_by_group.setdefault(group_id, {"total": 0, "completed": 0, "epics": 0})
-            progress["total"] += max(0, int(epic.get("totalCards") or 0))
-            progress["completed"] += max(0, int(epic.get("completedCards") or 0))
-            progress["epics"] += 1
+        valid_ids = [group["id"] for group in groups if isinstance(group, dict) and isinstance(group.get("id"), int)]
+        # Legacy multi-assignments have no explicit primary flag; the lowest group ID is canonical.
+        group_id = min(valid_ids, default=0)
+        progress = progress_by_group.setdefault(group_id, {"total": 0, "completed": 0, "epics": 0})
+        progress["total"] += max(0, int(epic.get("totalCards") or 0))
+        progress["completed"] += max(0, int(epic.get("completedCards") or 0))
+        progress["epics"] += 1
+    if 0 in progress_by_group:
+        work_streams = [*work_streams, {"id": 0, "name": "Unmapped"}]
 
     dashboard_work_streams: list[dict[str, Any]] = []
     recent_cards_by_key: dict[str, dict[str, Any]] = {}
@@ -178,7 +179,9 @@ def get_team_dashboard(
             group_ids=[group_id],
             chart_weeks=normalized_flow_weeks,
             activity="all",
+            work_stream_scope="primary",
             timezone_name=timezone_name,
+            now=generated_at,
             limit=1000,
             db_path=db_path,
         )
@@ -235,6 +238,12 @@ def get_team_dashboard(
                 "completedAt": card.get("completedAt"),
             }
 
+    total_period_completed = sum(item["completedCount"] for item in dashboard_work_streams)
+    for item in dashboard_work_streams:
+        item["completionSharePercent"] = (
+            round(item["completedCount"] / total_period_completed * 100.0, 1)
+            if total_period_completed > 0 else None
+        )
     dashboard_work_streams.sort(key=lambda item: str(item["name"]).lower())
     recent_cards = sorted(
         recent_cards_by_key.values(),
