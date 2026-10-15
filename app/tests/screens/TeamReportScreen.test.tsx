@@ -284,6 +284,12 @@ describe("TeamReportScreen", () => {
       expect(epicBlock.querySelectorAll("li")).toHaveLength(2);
       expect(epicBlock.querySelectorAll('a[href="https://jira.example.com/browse/CEG-EPIC-12"]')).toHaveLength(1);
       expect(issue.parentElement?.className).toBe("completed-source");
+      const exportedMix = [...report.querySelectorAll("h2")].find((heading) => heading.textContent === "Work Mix by Work Stream and Type")!.closest("section")!;
+      expect(exportedMix.querySelector("table")).toBeNull();
+      expect(exportedMix.querySelectorAll('[role="img"]')).toHaveLength(2);
+      expect(exportedMix.querySelector(".workmix-centre")?.textContent).toBe("");
+      expect(exportedMix.textContent).toContain("71.4%");
+      expect(exportedMix.textContent).toContain("28.6%");
     } finally {
       Reflect.deleteProperty(window, "showSaveFilePicker");
     }
@@ -296,6 +302,16 @@ describe("TeamReportScreen", () => {
     expect(within(screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!).getByText(/1 not assessed/)).toBeInTheDocument();
     expect(screen.getByLabelText("Work stream effort distribution chart")).toBeInTheDocument();
     expect(screen.getByLabelText("Type effort distribution chart")).toBeInTheDocument();
+    const mixPanel = screen.getByRole("heading", { name: "Work Mix by Work Stream and Type" }).closest("section")!;
+    expect(within(mixPanel).queryByRole("table")).not.toBeInTheDocument();
+    expect(within(mixPanel).getAllByRole("img")).toHaveLength(2);
+    for (const title of ["Work Stream Mix", "Work Type Mix"]) {
+      const chart = within(mixPanel).getByRole("heading", { name: title }).closest("section")!;
+      expect(within(chart).queryByText("7")).not.toBeInTheDocument();
+      expect(within(chart).queryByText("completed cards")).not.toBeInTheDocument();
+      expect(within(chart).getByText("71.4%")).toBeInTheDocument();
+      expect(within(chart).getByText("28.6%")).toBeInTheDocument();
+    }
 
     const winsRisksPanel = screen.getByRole("heading", { name: "Wins and Risks" }).closest("section");
     expect(winsRisksPanel).not.toBeNull();
@@ -342,6 +358,9 @@ it.each([null, "invalid"])("does not assess report RAG for an enabled timeline w
   render(<TeamReportScreen />);
   const row = (await screen.findByText("Incomplete timeline")).closest("tr")!;
   expect(within(row).getByText("Not assessed")).toHaveClass("is-neutral");
+  const mix = screen.getByRole("heading", { name: "Work Mix by Work Stream and Type" }).closest("section")!;
+  expect(within(mix).getAllByText("No data")).toHaveLength(2);
+  expect(within(mix).queryByRole("table")).not.toBeInTheDocument();
   const summary = screen.getByRole("heading", { name: "Initiative RAG" }).closest("article")!;
   for (const label of ["0 Red", "0 Amber", "0 Green"]) expect(within(summary).getByText(label)).toBeInTheDocument();
 });

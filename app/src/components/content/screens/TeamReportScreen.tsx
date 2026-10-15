@@ -390,39 +390,16 @@ function buildTeamReportExportHtml(params: {
     .map((item) => `<li>${escapeHtml(item)}</li>`)
     .join("");
 
-  const groupRows = params.groupMixRows.length > 0
-    ? params.groupMixRows.map((row, index) => `
-        <tr>
-          <td>${escapeHtml(row.name)}</td>
-          <td>${row.completedInPeriod}</td>
-          <td>
-            <div class="mix-bar-cell">
-              <span class="mix-bar-track">
-                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
-              </span>
-              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
-            </div>
-          </td>
-        </tr>
-      `).join("")
-    : `<tr><td colspan="3" class="empty">No work stream mix data available.</td></tr>`;
-
-  const typeRows = params.typeMixRows.length > 0
-    ? params.typeMixRows.map((row, index) => `
-        <tr>
-          <td>${escapeHtml(row.name)}</td>
-          <td>${row.completedInPeriod}</td>
-          <td>
-            <div class="mix-bar-cell">
-              <span class="mix-bar-track">
-                <span class="mix-bar-fill" style="width:${clampPercent(row.percent).toFixed(1)}%; background:${DISTRIBUTION_COLORS[index % DISTRIBUTION_COLORS.length]};"></span>
-              </span>
-              <span class="mix-bar-value">${escapeHtml(formatPercent(row.percent))}</span>
-            </div>
-          </td>
-        </tr>
-      `).join("")
-    : `<tr><td colspan="3" class="empty">No work-type mix data available.</td></tr>`;
+  const mixChart = (title: string, label: string, rows: typeof params.groupMixRows): string => {
+    const slices = buildDistributionSlices(rows, params.totalCompletedInPeriod);
+    return `<section class="workmix-card">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="workmix-chart"><div class="workmix-donut" role="img" aria-label="${escapeHtml(label)}" style="background:${params.totalCompletedInPeriod > 0 ? buildDonutBackground(slices) : "#e1ebf0"}">
+        <div class="workmix-centre">${params.totalCompletedInPeriod > 0 ? "" : "No data"}</div>
+      </div>
+      <ul class="workmix-legend">${slices.map((slice) => `<li><span class="workmix-swatch" style="background:${slice.color}" aria-hidden="true"></span><span>${escapeHtml(slice.label)}</span><span class="workmix-value">${escapeHtml(formatPercent(slice.percent))}</span></li>`).join("")}</ul></div>
+    </section>`;
+  };
 
   const modeClass = params.mode === "print" ? "mode-print" : "mode-interactive";
 
@@ -596,6 +573,17 @@ function buildTeamReportExportHtml(params: {
         gap: 14px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .workmix-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .workmix-card { min-width: 0; border: 1px solid #ded7d0; border-radius: 10px; padding: 16px; background: #faf8f6; }
+      .workmix-donut { width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; margin: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .workmix-centre { width: 77px; height: 77px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #625a54; font-size: 12px; }
+      .workmix-chart { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+      @media screen and (max-width: 600px) { .workmix-chart { grid-template-columns: 1fr; } }
+      .workmix-legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+      .workmix-legend li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
+      .workmix-swatch { width: 10px; height: 10px; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .workmix-value { white-space: nowrap; font-variant-numeric: tabular-nums; }
+      @media screen and (max-width: 900px) { .workmix-grid { grid-template-columns: 1fr; } }
       .section-stack {
         display: grid;
         gap: 10px;
@@ -764,29 +752,6 @@ function buildTeamReportExportHtml(params: {
       .progress-period.rag-green, .progress-overall.rag-green { background: linear-gradient(90deg, #1f8f63 0%, #33aa7a 100%); }
       .progress-period.rag-amber, .progress-overall.rag-amber { background: linear-gradient(90deg, #b77700 0%, #d19319 100%); }
       .progress-period.rag-red, .progress-overall.rag-red { background: linear-gradient(90deg, #c2372e 0%, #d74d45 100%); }
-      .mix-bar-cell {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .mix-bar-track {
-        flex: 1 1 auto;
-        height: 8px;
-        border-radius: 999px;
-        background: #e2eaf6;
-        overflow: hidden;
-      }
-      .mix-bar-fill {
-        height: 100%;
-        border-radius: 999px;
-        display: block;
-      }
-      .mix-bar-value {
-        min-width: 45px;
-        text-align: right;
-        color: #2a486f;
-        font-variant-numeric: tabular-nums;
-      }
       .footer {
         color: #5b6f90;
         font-size: 11px;
@@ -875,25 +840,9 @@ function buildTeamReportExportHtml(params: {
 
       <section class="panel">
         <h2>Work Mix by Work Stream and Type</h2>
-        <div class="section-stack">
-          <section>
-            <h3>By Work Stream</h3>
-            <table>
-              <thead>
-                <tr><th>Work Stream</th><th>Completed</th><th>%</th></tr>
-              </thead>
-              <tbody>${groupRows}</tbody>
-            </table>
-          </section>
-          <section>
-            <h3>By Type</h3>
-            <table>
-              <thead>
-                <tr><th>Type</th><th>Completed</th><th>%</th></tr>
-              </thead>
-              <tbody>${typeRows}</tbody>
-            </table>
-          </section>
+        <div class="workmix-grid">
+          ${mixChart("Work Stream Mix", "Work stream effort distribution chart", params.groupMixRows)}
+          ${mixChart("Work Type Mix", "Type effort distribution chart", params.typeMixRows)}
         </div>
       </section>
 
@@ -1380,6 +1329,30 @@ function formatAiProviderName(value: string | null | undefined): string {
   if (normalized === "ollama") return "Ollama";
   if (normalized === "openai") return "OpenAI";
   return "AI";
+}
+
+function ReportWorkMixChart({ title, label, slices, total, loading }: {
+  title: string; label: string; slices: DistributionSlice[]; total: number; loading: boolean;
+}) {
+  return (
+    <section className="tb-exec-workmix-card">
+      <h4 className="tb-exec-list-title">{title}</h4>
+      <div className="tb-exec-donut-wrap">
+        <div className="tb-exec-donut" style={{ background: total > 0 ? buildDonutBackground(slices) : "#e1ebf0" }} role="img" aria-label={label}>
+          {loading || total <= 0 ? <span>{loading ? "Loading…" : "No data"}</span> : null}
+        </div>
+        <ul className="tb-exec-donut-legend">
+          {slices.map((slice) => (
+            <li key={slice.label}>
+              <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+              <span>{slice.label}</span>
+              <span className="tb-exec-workmix-value">{formatPercent(slice.percent)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
 }
 
 function ReportJiraLink({ baseUrl, issueKey, children }: { baseUrl: string | null; issueKey: string; children: string }) {
@@ -2642,112 +2615,9 @@ export function TeamReportScreen() {
           </div>
         </header>
 
-        <div className="tb-exec-workmix-stack">
-          <section className="tb-exec-workmix-row">
-            <div>
-              <h4 className="tb-exec-list-title">Work Streams</h4>
-              <div className="tb-sync-history-wrap">
-                <table className="tb-sync-history-table">
-                  <thead>
-                    <tr>
-                      <th>Work Stream</th>
-                      <th>Completed in Period</th>
-                      <th>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupDistributionRows.map((row) => (
-                      <tr key={row.name}>
-                        <td>{row.name}</td>
-                        <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
-                        <td>{formatPercent(row.percent)}</td>
-                      </tr>
-                    ))}
-                    {!loading && groupDistributionRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={3}>No work-stream-tagged epics yet.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <h4 className="tb-exec-list-title">Work Stream Mix</h4>
-              <div className="tb-exec-donut-wrap">
-                <div
-                  className="tb-exec-donut"
-                  style={{ background: buildDonutBackground(groupDistributionSlices) }}
-                  role="img"
-                  aria-label="Work stream effort distribution chart"
-                >
-                  {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
-                </div>
-                <ul className="tb-exec-donut-legend">
-                  {groupDistributionSlices.map((slice) => (
-                    <li key={slice.label}>
-                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
-                      <span>{slice.label}</span>
-                      <span>{formatPercent(slice.percent)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          <section className="tb-exec-workmix-row">
-            <div>
-              <h4 className="tb-exec-list-title">Types</h4>
-              <div className="tb-sync-history-wrap">
-                <table className="tb-sync-history-table">
-                  <thead>
-                    <tr>
-                      <th>Type</th>
-                      <th>Completed in Period</th>
-                      <th>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {typeDistributionRows.map((row) => (
-                      <tr key={row.name}>
-                        <td>{row.name}</td>
-                        <td>{row.completedInPeriod}/{visibleInitiativeSignals.totalCompletedInPeriod}</td>
-                        <td>{formatPercent(row.percent)}</td>
-                      </tr>
-                    ))}
-                    {!loading && typeDistributionRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={3}>No type-tagged epics yet.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <h4 className="tb-exec-list-title">Type Mix</h4>
-              <div className="tb-exec-donut-wrap">
-                <div
-                  className="tb-exec-donut"
-                  style={{ background: buildDonutBackground(typeDistributionSlices) }}
-                  role="img"
-                  aria-label="Type effort distribution chart"
-                >
-                  {visibleInitiativeSignals.totalCompletedInPeriod <= 0 ? <span>No data</span> : null}
-                </div>
-                <ul className="tb-exec-donut-legend">
-                  {typeDistributionSlices.map((slice) => (
-                    <li key={slice.label}>
-                      <span className="tb-exec-donut-swatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
-                      <span>{slice.label}</span>
-                      <span>{formatPercent(slice.percent)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
+        <div className="tb-exec-workmix-grid">
+          <ReportWorkMixChart title="Work Stream Mix" label="Work stream effort distribution chart" slices={groupDistributionSlices} total={visibleInitiativeSignals.totalCompletedInPeriod} loading={loading} />
+          <ReportWorkMixChart title="Work Type Mix" label="Type effort distribution chart" slices={typeDistributionSlices} total={visibleInitiativeSignals.totalCompletedInPeriod} loading={loading} />
         </div>
       </section>
 
