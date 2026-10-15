@@ -234,3 +234,10 @@ TeamBeacon/
   - Sprint Insights
   - Security / Incident response / Releases
   - Team Report
+
+### Automatic Team Report initiative selection
+- Configure Initiative Epics includes an opt-in checkbox selecting initiatives with `completedInPeriod > 0` across the complete configured set, independent of dialog search.
+- The saved automatic mode recalculates membership after reporting-period data changes. Existing selected order is retained and newly qualifying epics are appended.
+- Manual additions/removals, Select All and Clear All switch the draft to manual mode. Reordering preserves automatic mode; unchecking freezes the current draft selection.
+- Save persists both mode and ordered keys; Cancel discards draft changes. Legacy key-array preferences remain supported, automatic mode defaults off, and explicit empty manual/automatic selections survive reloads.
+- The dialog previews qualifying count and reporting dates. Report sections, AI context and exports continue to use the resulting shared selection.

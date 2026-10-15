@@ -8579,3 +8579,7 @@ body {
 .tb-epic-mapping .tb-panel-header > div { min-width: 0; overflow-wrap: anywhere; }
 
 .tb-rag-pill.is-neutral { border-color: #d5d9df; background: #f3f4f6; color: #59616d; }
+
+.tb-exec-auto-select { margin-bottom: 1rem; padding: 0.85rem; border: 1px solid var(--tb-line); border-radius: 0.6rem; background: var(--tb-surface); }
+.tb-exec-auto-select label { display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 600; }
+.tb-exec-auto-select input { margin-top: 0.2rem; flex-shrink: 0; }

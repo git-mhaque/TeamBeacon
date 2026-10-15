@@ -10,6 +10,8 @@ import {
 } from "../../../lib/api";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
+import { readReportInitiativeSelection, resolveReportInitiativeSelection, type ReportSelectionMode } from "../../../lib/reportInitiativeSelection";
+
 type RagLabel = "Red" | "Amber" | "Green" | "Not assessed";
 
 type ExecutiveRow = InitiativeEpicSummary & {
@@ -1433,7 +1435,10 @@ export function TeamReportScreen() {
   const [aiProviderName, setAiProviderName] = useState("AI");
   const [resolvedReportingPeriod, setResolvedReportingPeriod] = useState<EpicSummaryReportingPeriod | null>(null);
 
-  const [selectedInitiativeEpicKeys, setSelectedInitiativeEpicKeys] = useState<string[]>([]);
+  const initialInitiativeSelection = useMemo(() => readReportInitiativeSelection(getPreferenceSync(INITIATIVE_SECTION_SELECTION_KEY)), []);
+  const [initiativeSelectionMode, setInitiativeSelectionMode] = useState<ReportSelectionMode>(initialInitiativeSelection?.mode ?? "manual");
+  const [selectedInitiativeEpicKeys, setSelectedInitiativeEpicKeys] = useState<string[]>(initialInitiativeSelection?.keys ?? []);
+  const [initiativeConfigDraftMode, setInitiativeConfigDraftMode] = useState<ReportSelectionMode>("manual");
   const [isInitiativeConfigOpen, setIsInitiativeConfigOpen] = useState(false);
   const [initiativeConfigDraftKeys, setInitiativeConfigDraftKeys] = useState<string[]>([]);
   const [initiativeConfigQuery, setInitiativeConfigQuery] = useState("");
@@ -1472,14 +1477,13 @@ export function TeamReportScreen() {
   const [completedWorkRefreshNonce, setCompletedWorkRefreshNonce] = useState(0);
 
   const hasInitializedInitiativeSelection = useRef(false);
-  const hasHydratedInitiativeSelectionFromStore = useRef(false);
   const hasHydratedReportingSelectionFromStore = useRef(false);
   const summaryRequestSequence = useRef(0);
   const winsRisksRequestSequence = useRef(0);
   const completedWorkRequestSequence = useRef(0);
 
-  const persistInitiativeSelection = useCallback((keys: string[]) => {
-    void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify(keys));
+  const persistInitiativeSelection = useCallback((keys: string[], mode: ReportSelectionMode) => {
+    void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify({ mode, keys }));
   }, []);
 
   const loadExecutiveData = useCallback(async (range: ReportingRange) => {
@@ -1755,88 +1759,21 @@ export function TeamReportScreen() {
     return sorted;
   }, [rows]);
 
-  useEffect(() => {
-    if (rows.length === 0) {
-      setSelectedInitiativeEpicKeys([]);
-      hasInitializedInitiativeSelection.current = false;
-      hasHydratedInitiativeSelectionFromStore.current = false;
-      return;
-    }
-
-    const allEpicKeys = rows.map((row) => row.epicKey);
-    const available = new Set(allEpicKeys);
-
-    if (!hasInitializedInitiativeSelection.current) {
-      let storedKeys: string[] = [];
-      try {
-        const raw = getPreferenceSync(INITIATIVE_SECTION_SELECTION_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            storedKeys = parsed.filter((value): value is string => typeof value === "string");
-          }
-        }
-      } catch {
-        storedKeys = [];
-      }
-
-      const initialKeys = storedKeys.filter((key) => available.has(key));
-      const nextSelection = initialKeys.length > 0 ? initialKeys : allEpicKeys;
-      setSelectedInitiativeEpicKeys(nextSelection);
-      persistInitiativeSelection(nextSelection);
-      hasInitializedInitiativeSelection.current = true;
-      return;
-    }
-
-    setSelectedInitiativeEpicKeys((previous) => {
-      const nextSelection = previous.filter((key) => available.has(key));
-      const normalized = nextSelection.length > 0 ? nextSelection : allEpicKeys;
-      if (normalized.length !== previous.length || normalized.some((key, index) => key !== previous[index])) {
-        persistInitiativeSelection(normalized);
-      }
-      return normalized;
-    });
-  }, [persistInitiativeSelection, rows]);
+  const qualifyingInitiativeKeys = useMemo(() => initiativeRows.filter((row) => row.completedInPeriodValue > 0).map((row) => row.epicKey), [initiativeRows]);
 
   useEffect(() => {
-    if (rows.length === 0 || !hasInitializedInitiativeSelection.current) return;
-    if (hasHydratedInitiativeSelectionFromStore.current) return;
-    hasHydratedInitiativeSelectionFromStore.current = true;
-
-    const available = new Set(rows.map((row) => row.epicKey));
-    let cancelled = false;
-
-    void (async () => {
-      const raw = await getPreference(INITIATIVE_SECTION_SELECTION_KEY);
-      if (cancelled || !raw) return;
-
-      try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-
-        const persistedKeys = parsed
-          .filter((value): value is string => typeof value === "string")
-          .filter((key) => available.has(key));
-        if (persistedKeys.length === 0) return;
-
-        setSelectedInitiativeEpicKeys((previous) => {
-          if (
-            previous.length === persistedKeys.length
-            && previous.every((value, index) => value === persistedKeys[index])
-          ) {
-            return previous;
-          }
-          return persistedKeys;
-        });
-      } catch {
-        // Ignore malformed persisted payloads.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
+    if (loading || rows.length === 0) return;
+    const previous = hasInitializedInitiativeSelection.current
+      ? selectedInitiativeEpicKeys
+      : initialInitiativeSelection?.keys ?? initiativeRows.map((row) => row.epicKey);
+    const next = resolveReportInitiativeSelection(initiativeRows, previous, initiativeSelectionMode);
+    const initial = !hasInitializedInitiativeSelection.current;
+    hasInitializedInitiativeSelection.current = true;
+    if (initial || next.length !== selectedInitiativeEpicKeys.length || next.some((key, index) => key !== selectedInitiativeEpicKeys[index])) {
+      setSelectedInitiativeEpicKeys(next);
+      persistInitiativeSelection(next, initiativeSelectionMode);
+    }
+  }, [loading, rows.length, initiativeRows, selectedInitiativeEpicKeys, initialInitiativeSelection, initiativeSelectionMode, persistInitiativeSelection]);
 
   const visibleInitiativeRows = useMemo(() => {
     const rowByKey = new Map(initiativeRows.map((row) => [row.epicKey, row]));
@@ -2561,10 +2498,11 @@ export function TeamReportScreen() {
 
   const openInitiativeConfig = useCallback(() => {
     setInitiativeConfigDraftKeys(selectedInitiativeEpicKeys);
+    setInitiativeConfigDraftMode(initiativeSelectionMode);
     setInitiativeConfigQuery("");
     setInitiativeConfigDraggingKey(null);
     setIsInitiativeConfigOpen(true);
-  }, [selectedInitiativeEpicKeys]);
+  }, [selectedInitiativeEpicKeys, initiativeSelectionMode]);
 
   const closeInitiativeConfig = useCallback(() => {
     setIsInitiativeConfigOpen(false);
@@ -2584,6 +2522,7 @@ export function TeamReportScreen() {
   }, [openInitiativeConfig]);
 
   const addInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftMode("manual");
     setInitiativeConfigDraftKeys((previous) => {
       if (previous.includes(epicKey)) return previous;
       return [...previous, epicKey];
@@ -2591,6 +2530,7 @@ export function TeamReportScreen() {
   }, []);
 
   const removeInitiativeDraftKey = useCallback((epicKey: string) => {
+    setInitiativeConfigDraftMode("manual");
     setInitiativeConfigDraftKeys((previous) => previous.filter((key) => key !== epicKey));
   }, []);
 
@@ -2608,15 +2548,13 @@ export function TeamReportScreen() {
   }, []);
 
   const saveInitiativeConfig = useCallback(() => {
-    const available = new Set(initiativeRows.map((row) => row.epicKey));
-    const normalized = initiativeConfigDraftKeys.filter(
-      (key, index, source) => available.has(key) && source.indexOf(key) === index,
-    );
-
+    const normalized = resolveReportInitiativeSelection(initiativeRows, initiativeConfigDraftKeys, initiativeConfigDraftMode);
+    setInitiativeSelectionMode(initiativeConfigDraftMode);
     setSelectedInitiativeEpicKeys(normalized);
-    persistInitiativeSelection(normalized);
+    hasInitializedInitiativeSelection.current = true;
+    persistInitiativeSelection(normalized, initiativeConfigDraftMode);
     closeInitiativeConfig();
-  }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeRows, persistInitiativeSelection]);
+  }, [closeInitiativeConfig, initiativeConfigDraftKeys, initiativeConfigDraftMode, initiativeRows, persistInitiativeSelection]);
 
   return (
     <div className="tb-screen-grid">
@@ -3055,11 +2993,24 @@ export function TeamReportScreen() {
                 <button type="button" className="tb-btn tb-btn-sm" onClick={closeInitiativeConfig}>
                   Cancel
                 </button>
-                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveInitiativeConfig}>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={saveInitiativeConfig} disabled={loading}>
                   Save
                 </button>
               </div>
             </header>
+
+            <div className="tb-exec-auto-select">
+              <label>
+                <input type="checkbox" checked={initiativeConfigDraftMode === "automatic"} disabled={loading}
+                  onChange={(event) => {
+                    setInitiativeConfigDraftMode(event.target.checked ? "automatic" : "manual");
+                    if (event.target.checked) setInitiativeConfigDraftKeys(resolveReportInitiativeSelection(initiativeRows, initiativeConfigDraftKeys, "automatic"));
+                  }} />
+                Automatically select initiatives with completed cards in the reporting period
+              </label>
+              <p className="tb-muted-note" aria-live="polite">{loading ? "Updating initiatives for the reporting period…" : `${qualifyingInitiativeKeys.length} initiatives qualify for ${reportingPeriodLabel}. Updates when the reporting period changes.`}</p>
+              <p className="tb-muted-note">Adding or removing initiatives switches to manual selection. Reordering keeps automatic selection enabled.</p>
+            </div>
 
             <label className="tb-exec-search">
               <span>Search epics</span>
@@ -3078,7 +3029,7 @@ export function TeamReportScreen() {
                   <button
                     type="button"
                     className="tb-btn tb-btn-sm"
-                    onClick={() => setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey))}
+                    onClick={() => { setInitiativeConfigDraftMode("manual"); setInitiativeConfigDraftKeys(initiativeRows.map((row) => row.epicKey)); }}
                   >
                     Select All
                   </button>
@@ -3109,7 +3060,7 @@ export function TeamReportScreen() {
                   <button
                     type="button"
                     className="tb-btn tb-btn-sm"
-                    onClick={() => setInitiativeConfigDraftKeys([])}
+                    onClick={() => { setInitiativeConfigDraftMode("manual"); setInitiativeConfigDraftKeys([]); }}
                   >
                     Clear All
                   </button>

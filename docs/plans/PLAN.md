@@ -97,3 +97,7 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 - Preserved bounded numeric API requests and added >200-epic regression fixtures covering default/named views, completion metrics and work-stream totals.
 
 Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.
+
+### Automatic Team Report initiative selection
+- Added opt-in period-completion selection, saved mode/order, qualifying-count preview and manual overrides.
+- Preserved legacy preferences and explicit empty selections; automatic selection recalculates after period changes while keeping reordered qualifying initiatives.

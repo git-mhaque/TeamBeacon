@@ -565,3 +565,5 @@ The chat dashboard focuses on work-stream rows with inline progress and flow met
 Configured-epic summary consumers (Initiative Insights and Team Report) request complete selected-view datasets rather than a fixed 200-row subset. Team Dashboard aggregates the same complete set; summaries and visible epic counts must match the full view membership.
 
 Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.
+
+Team Report initiative configuration supports an optional automatic mode based on period completions, with draft Save/Cancel behavior, independent search, persisted selection mode/order, empty selections and explicit manual overrides. Selection-state resolution has a dedicated frontend coverage gate.

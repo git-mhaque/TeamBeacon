@@ -161,7 +161,7 @@ npm run lint
 npm run test:coverage
 ```
 
-The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, and Work Stream Epic Mapping.
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, and Team Report initiative-selection state.
 
 ## Codex dashboard integration
 
