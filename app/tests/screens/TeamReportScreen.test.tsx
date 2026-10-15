@@ -238,6 +238,9 @@ describe("TeamReportScreen", () => {
     expect(await screen.findByText(/Executive automation epic delivered five cards this period\./i)).toBeInTheDocument();
     expect(await screen.findByText(/Reliability epic completion remains below midpoint and needs focus\./i)).toBeInTheDocument();
     expect(screen.queryByText(/Drafted by OCI GenAI from selected Progress for Key Initiatives data\./i)).not.toBeInTheDocument();
+    const selectedInitiativesCard = screen.getByRole("heading", { name: "Selected Initiatives" }).closest("article")!;
+    expect(within(selectedInitiativesCard).getByText("Initiatives included in this report.")).toBeInTheDocument();
+    expect(within(selectedInitiativesCard).getByText("2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh Wins and Risks" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeInTheDocument();
 

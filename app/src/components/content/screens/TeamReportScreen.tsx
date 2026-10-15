@@ -835,9 +835,9 @@ function buildTeamReportExportHtml(params: {
         <h2>Report Signals</h2>
         <div class="signals">
           <article class="metric">
-            <div class="label">Ongoing Initiatives</div>
+            <div class="label">Selected Initiatives</div>
             <div class="value">${params.totalInitiatives}</div>
-            <p class="metric-note">Included for this reporting period.</p>
+            <p class="metric-note">Initiatives included in this report.</p>
           </article>
           <article class="metric">
             <div class="label">Period Progress</div>
@@ -2571,9 +2571,9 @@ export function TeamReportScreen() {
         </header>
         <div className="tb-metrics-grid tb-three-up">
           <article className="tb-metric-card">
-            <h4>Ongoing Initiatives</h4>
+            <h4>Selected Initiatives</h4>
             <strong className="tb-value">{loading ? "..." : visibleInitiativeSignals.totalEpics}</strong>
-            <p>Selected for Progress for Key Initiatives.</p>
+            <p>Initiatives included in this report.</p>
           </article>
           <article className="tb-metric-card">
             <h4>Period Progress</h4>
