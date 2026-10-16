@@ -251,7 +251,6 @@ function evaluateInitiativeRag(entry: InitiativeEpicSummary): { label: RagLabel;
 }
 
 function ragToneClass(label: RagLabel): string {
-  if (label === "Not assessed") return "is-neutral";
   if (label === "Red") return "is-red";
   if (label === "Amber") return "is-amber";
   return "is-green";
@@ -2295,9 +2294,11 @@ export function InitiativesScreen() {
                         ) : null}
                         {visibleColumnSet.has("rag") ? (
                           <td>
-                            <span className={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
-                              {row.ragLabel}
-                            </span>
+                            {row.ragLabel !== "Not assessed" ? (
+                              <span className={`tb-rag-pill ${ragToneClass(row.ragLabel)}`} title={row.ragReason}>
+                                {row.ragLabel}
+                              </span>
+                            ) : null}
                           </td>
                         ) : null}
                         {visibleColumnSet.has("criteria") ? (

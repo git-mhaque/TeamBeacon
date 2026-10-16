@@ -801,9 +801,13 @@ it("does not assess RAG without an enabled timeline and valid target", async () 
   mockInitiativesEndpoints(fixtures.map((fixture) => ({ ...DEFAULT_EPICS[0], ...fixture })));
   render(<InitiativesScreen />);
   await screen.findByText("CEG-914");
+  const ragHeader = screen.getByRole("button", { name: /^Sort by RAG/ }).closest("th");
+  const ragColumnIndex = screen.getAllByRole("columnheader").findIndex((header) => header === ragHeader);
+  expect(ragColumnIndex).toBeGreaterThanOrEqual(0);
   for (const key of ["CEG-910", "CEG-911", "CEG-912", "CEG-913"]) {
     const row = screen.getByText(key).closest("tr")!;
-    expect(within(row).getByText("Not assessed")).toHaveClass("is-neutral");
+    expect(within(row).getAllByRole("cell")[ragColumnIndex]).toBeEmptyDOMElement();
+    expect(within(row).queryByText("Not assessed")).not.toBeInTheDocument();
     expect(within(row).queryByText(/^(Red|Amber|Green)$/)).not.toBeInTheDocument();
   }
   expect(within(screen.getByText("CEG-914").closest("tr")!).getByText("Green")).toBeInTheDocument();
