@@ -32,7 +32,7 @@ type Props = {
 
 type WorkStreamSortField =
   | "name"
-  | "epicCount"
+  | "epicProgress"
   | "newCount"
   | "completedCount"
   | "netFlow"
@@ -41,12 +41,12 @@ type WorkStreamSortField =
 
 const METRIC_DESCRIPTIONS: Record<WorkStreamSortField, string> = {
   name: "Each card is counted once under its primary work stream, including Unmapped.",
-  epicCount: "Configured epics assigned to this work stream. This count is independent of the flow period.",
+  epicProgress: "Completed configured epics / all configured epics, based on epic status at the latest sync. Independent of the Flow period.",
   newCount: "Cards created during the selected period.",
   completedCount: "Cards completed during the selected period.",
   netFlow: "Created minus completed during the selected period. Positive means backlog grew; negative means it shrank.",
   currentWipCount: "Cards currently in progress, regardless of the selected period.",
-  completionSharePercent: "This stream’s completed cards divided by all completed cards in the selected period.",
+  completionSharePercent: "Percentage of all cards completed during the selected period that belong to this work stream.",
 };
 
 type SortDirection = "asc" | "desc";
@@ -65,6 +65,10 @@ function defaultSortDirection(field: WorkStreamSortField): SortDirection {
   return field === "name" ? "asc" : "desc";
 }
 
+function epicProgressValue(stream: TeamDashboardWorkStream): number {
+  return stream.completedEpicCount == null ? -1 : stream.epicCount === 0 ? 0 : stream.completedEpicCount / stream.epicCount;
+}
+
 function compareWorkStreams(
   left: TeamDashboardWorkStream,
   right: TeamDashboardWorkStream,
@@ -73,6 +77,7 @@ function compareWorkStreams(
 ): number {
   const comparison = field === "name"
     ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" })
+    : field === "epicProgress" ? epicProgressValue(left) - epicProgressValue(right)
     : field === "completionSharePercent" ? left.completedCount - right.completedCount : left[field] - right[field];
   if (comparison === 0 && field !== "name") {
     return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
@@ -153,6 +158,20 @@ function CompletionShare({ count, total, name, onClick }: { count: number; total
   </>;
 }
 
+function EpicProgress({ total, completed, name, onAll, onCompleted }: {
+  total: number; completed?: number | null; name: string; onAll: () => void; onCompleted: () => void;
+}) {
+  return <div className="tb-dashboard-epic-progress">
+    <div className="tb-dashboard-epic-progress-copy">
+      {completed == null ? <span>Unavailable</span> : <MetricDrilldownButton
+        label={`View ${completed} completed JIRA epics for ${name}`} onClick={onCompleted}>{completed}</MetricDrilldownButton>}
+      <span> / </span>
+      <MetricDrilldownButton label={`View ${total} configured JIRA epics for ${name}`} onClick={onAll}>{total}</MetricDrilldownButton>
+      {" "}<small>{total === 0 ? "No epics" : "completed"}</small>
+    </div>
+  </div>;
+}
+
 function flowGapLabel(value: number): string {
   if (value > 0) return `+${value} growing`;
   if (value < 0) return `${Math.abs(value)} reduced`;
@@ -210,24 +229,24 @@ function WorkStreamTableSkeleton() {
         <thead>
           <tr>
             <th scope="col">Work Streams</th>
-            <th scope="col" className="is-number">Epics</th>
             <th scope="col" className="is-number">Cards Created</th>
             <th scope="col" className="is-number">Cards Completed</th>
             <th scope="col" className="is-flow-gap">Net backlog change</th>
             <th scope="col" className="is-number">WIP today</th>
-            <th scope="col" className="is-progress">Completion share</th>
+            <th scope="col" className="is-number is-epic-progress">Epic progress</th>
+            <th scope="col" className="is-progress">Share of completions</th>
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: 6 }, (_, index) => (
             <tr key={index} className="tb-dashboard-skeleton-row">
               <td data-label="Work Streams"><span className="tb-dashboard-skeleton is-table-name" /></td>
-              <td data-label="Epics" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Cards Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Cards Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Net backlog change"><span className="tb-dashboard-skeleton is-table-pill" /></td>
+              <td data-label="Net backlog change" className="is-flow-gap"><span className="tb-dashboard-skeleton is-table-pill" /></td>
               <td data-label="WIP today" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Completion share" className="tb-dashboard-delivery-cell">
+              <td data-label="Epic progress" className="is-number is-epic-progress"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
                 <span className="tb-dashboard-skeleton is-table-progress-copy" />
                 <span className="tb-dashboard-skeleton is-table-progress" />
               </td>
@@ -329,6 +348,9 @@ export function TeamDashboardScreen({
     });
     return totals;
   }, [payload?.workStreams]);
+
+  const completedEpicTotal = payload?.workStreams.some((stream) => stream.completedEpicCount == null)
+    ? null : (payload?.workStreams ?? []).reduce((total, stream) => total + (stream.completedEpicCount ?? 0), 0);
 
   const updateFlowWeeks = (value: TeamDashboardFlowWeeks) => {
     setFlowRange(null);
@@ -447,14 +469,6 @@ export function TeamDashboardScreen({
                     onSort={updateWorkStreamSort}
                   />
                   <SortableHeader
-                    field="epicCount"
-                    label="Epics"
-                    activeField={workStreamSortField}
-                    direction={workStreamSortDirection}
-                    className="is-number"
-                    onSort={updateWorkStreamSort}
-                  />
-                  <SortableHeader
                     field="newCount"
                     label="Cards Created"
                     activeField={workStreamSortField}
@@ -487,8 +501,16 @@ export function TeamDashboardScreen({
                     onSort={updateWorkStreamSort}
                   />
                   <SortableHeader
+                    field="epicProgress"
+                    label="Epic progress"
+                    activeField={workStreamSortField}
+                    direction={workStreamSortDirection}
+                    className="is-number is-epic-progress"
+                    onSort={updateWorkStreamSort}
+                  />
+                  <SortableHeader
                     field="completionSharePercent"
-                    label="Completion share"
+                    label="Share of completions"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-progress"
@@ -503,14 +525,6 @@ export function TeamDashboardScreen({
                       <td data-label="Work Streams" className="tb-dashboard-work-stream-name">
                         <button type="button" onClick={() => workStream.id === 0 ? onOpenSettings?.() : onOpenWorkStream?.(workStream.id)}>{workStream.name}</button>
                         {workStream.error ? <small className="tb-error-note">Flow data unavailable</small> : null}
-                      </td>
-                      <td data-label="Epics" className="is-number">
-                        <MetricDrilldownButton
-                          label={`View ${workStream.epicCount} configured JIRA epics for ${workStream.name}`}
-                          onClick={() => openIssueOverlay("epics", workStream.name, [workStream.id], workStream.epicCount)}
-                        >
-                          {workStream.epicCount}
-                        </MetricDrilldownButton>
                       </td>
                       <td data-label="Cards Created" className="is-number is-new">
                         <MetricDrilldownButton
@@ -528,7 +542,7 @@ export function TeamDashboardScreen({
                           {workStream.completedCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Net backlog change">
+                      <td data-label="Net backlog change" className="is-flow-gap">
                         <MetricDrilldownButton
                           title={flowGapDescription(workStream.netFlow)}
                           className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}
@@ -546,7 +560,12 @@ export function TeamDashboardScreen({
                           {workStream.currentWipCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Completion share" className="tb-dashboard-delivery-cell">
+                      <td data-label="Epic progress" className="is-number is-epic-progress">
+                        <EpicProgress total={workStream.epicCount} completed={workStream.completedEpicCount} name={workStream.name}
+                          onAll={() => openIssueOverlay("epics", workStream.name, [workStream.id], workStream.epicCount)}
+                          onCompleted={() => openIssueOverlay("completedEpics", workStream.name, [workStream.id], workStream.completedEpicCount ?? 0)} />
+                      </td>
+                      <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
                         <CompletionShare count={workStream.completedCount} total={workStreamTotals.completedCount} name={workStream.name}
                           onClick={() => openIssueOverlay("completionShare", workStream.name, [workStream.id], workStream.completedCount)} />
                       </td>
@@ -556,15 +575,7 @@ export function TeamDashboardScreen({
               </tbody>
               <tfoot>
                 <tr>
-                  <th scope="row" data-label="Work Streams">All work streams</th>
-                  <td data-label="Epics" className="is-number">
-                    <MetricDrilldownButton
-                      label={`View ${workStreamTotals.epicCount} configured JIRA epics for all work streams`}
-                      onClick={() => openIssueOverlay("epics", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.epicCount)}
-                    >
-                      {workStreamTotals.epicCount}
-                    </MetricDrilldownButton>
-                  </td>
+                  <th scope="row" data-label="Work Streams">Total · All work streams</th>
                   <td data-label="Cards Created" className="is-number is-new">
                     <MetricDrilldownButton
                       label={`View ${workStreamTotals.newCount} created JIRA cards for all work streams`}
@@ -581,7 +592,7 @@ export function TeamDashboardScreen({
                       {workStreamTotals.completedCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Net backlog change">
+                  <td data-label="Net backlog change" className="is-flow-gap">
                     <MetricDrilldownButton
                       title={flowGapDescription(workStreamTotals.netFlow)}
                       className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}
@@ -599,7 +610,12 @@ export function TeamDashboardScreen({
                       {workStreamTotals.currentWipCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Completion share" className="tb-dashboard-delivery-cell">
+                  <td data-label="Epic progress" className="is-number is-epic-progress">
+                    <EpicProgress total={workStreamTotals.epicCount} completed={completedEpicTotal} name="all work streams"
+                      onAll={() => openIssueOverlay("epics", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.epicCount)}
+                      onCompleted={() => openIssueOverlay("completedEpics", "All work streams", sortedWorkStreams.map(({ id }) => id), completedEpicTotal ?? 0)} />
+                  </td>
+                  <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
                     <CompletionShare count={workStreamTotals.completedCount} total={workStreamTotals.completedCount} name="All work streams"
                       onClick={() => openIssueOverlay("completionShare", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)} />
                   </td>

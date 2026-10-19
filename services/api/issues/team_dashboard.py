@@ -166,10 +166,11 @@ def get_team_dashboard(
         valid_ids = [group["id"] for group in groups if isinstance(group, dict) and isinstance(group.get("id"), int)]
         # Legacy multi-assignments have no explicit primary flag; the lowest group ID is canonical.
         group_id = min(valid_ids, default=0)
-        progress = progress_by_group.setdefault(group_id, {"total": 0, "completed": 0, "epics": 0})
+        progress = progress_by_group.setdefault(group_id, {"total": 0, "completed": 0, "epics": 0, "completedEpics": 0})
         progress["total"] += max(0, int(epic.get("totalCards") or 0))
         progress["completed"] += max(0, int(epic.get("completedCards") or 0))
         progress["epics"] += 1
+        progress["completedEpics"] += int(epic.get("isCompleted") is True)
     if 0 in progress_by_group:
         work_streams = [*work_streams, {"id": 0, "name": "Unmapped"}]
 
@@ -209,7 +210,7 @@ def get_team_dashboard(
             flow_period["startDate"] = chart_range.get("startDate")
             flow_period["endDate"] = chart_range.get("endDate")
 
-        progress = progress_by_group.get(group_id, {"total": 0, "completed": 0, "epics": 0})
+        progress = progress_by_group.get(group_id, {"total": 0, "completed": 0, "epics": 0, "completedEpics": 0})
         total_cards = progress["total"]
         total_completed_cards = progress["completed"]
         completion_percent = round((total_completed_cards / total_cards) * 100.0, 1) if total_cards > 0 else 0.0
@@ -218,6 +219,7 @@ def get_team_dashboard(
                 "id": group_id,
                 "name": group_name,
                 "epicCount": progress["epics"],
+                "completedEpicCount": None if "progress" in errors else progress["completedEpics"],
                 "newCount": new_count,
                 "completedCount": completed_in_period,
                 "netFlow": new_count - completed_in_period,

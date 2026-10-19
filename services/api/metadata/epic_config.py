@@ -329,6 +329,12 @@ def _parse_source_datetime(value: Any) -> datetime | None:
     return parsed
 
 
+def is_completed_epic(status_category: str | None, status_name: str | None) -> bool:
+    category = str(status_category or "").strip().lower()
+    name = str(status_name or "").strip().lower()
+    return category == "done" or (not category and name in {"done", "closed", "resolved", "complete", "completed"})
+
+
 def _is_done_issue(row: sqlite3.Row) -> bool:
     status_category = str(row["status_category"] or "").strip().lower()
     status_name = str(row["status_name"] or "").strip().lower()
@@ -1117,7 +1123,7 @@ def _fetch_configured_epic_rows(
               em.epic_key,
               em.epic_name,
               em.updated_at,
-              i.summary AS issue_summary
+              i.summary AS issue_summary, i.status_name, i.status_category
             FROM epic_metadata em
             LEFT JOIN issues i ON i.issue_key = em.epic_key
             ORDER BY datetime(em.updated_at) DESC, em.epic_key ASC
@@ -1134,7 +1140,7 @@ def _fetch_configured_epic_rows(
           em.epic_key,
           em.epic_name,
           em.updated_at,
-          i.summary AS issue_summary
+          i.summary AS issue_summary, i.status_name, i.status_category
         FROM initiative_view_epics ive
         JOIN epic_metadata em ON em.id = ive.epic_metadata_id
         LEFT JOIN issues i ON i.issue_key = em.epic_key
@@ -1214,6 +1220,7 @@ def get_configured_epic_summary(
                 {
                     "epicKey": epic_key,
                     "epicName": epic_name,
+                    "isCompleted": is_completed_epic(row["status_category"], row["status_name"]),
                     "completedCards": completed_cards,
                     "totalCards": total_cards,
                     "completionPercent": completion_percent,

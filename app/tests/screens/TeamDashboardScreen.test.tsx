@@ -22,6 +22,7 @@ const dashboardPayload = {
       id: 5,
       name: "Platform Delivery",
       epicCount: 3,
+      completedEpicCount: 1,
       newCount: 12,
       completedCount: 15,
       netFlow: -3,
@@ -35,6 +36,7 @@ const dashboardPayload = {
       id: 8,
       name: "Customer Operations",
       epicCount: 1,
+      completedEpicCount: 0,
       newCount: 7,
       completedCount: 4,
       netFlow: 3,
@@ -184,7 +186,9 @@ describe("TeamDashboardScreen", () => {
     expect(wip).toHaveAttribute("title", "Cards currently in progress, regardless of the selected period.");
     expect(screen.getByText("−3")).toHaveAttribute("title", "Backlog shrunk by 3 cards");
     expect(screen.getByText("+3")).toHaveAttribute("title", "Backlog grew by 3 cards");
-    expect(screen.getByRole("button", { name: /Sort by Completion share/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sort by Share of completions/ })).toHaveAttribute(
+      "title", "Percentage of all cards completed during the selected period that belong to this work stream.",
+    );
   });
 
   it("shows source freshness relative to now with the exact timestamp on hover", async () => {
@@ -219,6 +223,52 @@ describe("TeamDashboardScreen", () => {
     await waitFor(() => expect(periodButton).not.toBeDisabled());
     fireEvent.click(periodButton);
     expect(screen.getByRole("combobox", { name: /Flow period/ })).toHaveValue(stored.includes("2026") ? "custom" : "4");
+  });
+
+  it("shows epic completion from status and opens only completed epics", async () => {
+    setupFetchMock({
+      "/api/team/dashboard": dashboardPayload,
+      "/api/initiative-deep-dive": {
+        cards: [], count: 1001, truncated: true,
+        epicOptions: [
+          { epicKey: "TB-100", epicName: "Completed epic", status: "Closed", isCompleted: true },
+          { epicKey: "TB-200", epicName: "Still open", status: "In Progress", isCompleted: false },
+        ],
+      },
+    });
+    render(<TeamDashboardScreen />);
+    const completedEpics = await screen.findByRole("button", { name: "View 1 completed JIRA epics for Platform Delivery" });
+    expect(completedEpics.closest("td")).toHaveTextContent("1 / 3 completed");
+    expect(screen.getByRole("button", { name: "View 1 completed JIRA epics for all work streams" }).closest("td")).toHaveTextContent("1 / 4 completed");
+    expect(screen.queryByRole("meter", { name: /epic completion/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View 1 completed JIRA epics for Platform Delivery" }));
+    const dialog = screen.getByRole("dialog", { name: "Completed epics" });
+    expect(await within(dialog).findByText("Completed epic")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Still open")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Closed")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Showing the first/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/Independent of the Flow period/)).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "View 1 completed JIRA epics for all work streams" }));
+    expect(screen.getByRole("dialog", { name: "Completed epics" })).toHaveTextContent("1 configured epic is complete");
+  });
+
+  it("handles empty and unavailable epic completion and sorts progress ratios", async () => {
+    setupFetchMock({ "/api/team/dashboard": { ...dashboardPayload, workStreams: [
+      { ...dashboardPayload.workStreams[0], completedEpicCount: null },
+      { ...dashboardPayload.workStreams[1], epicCount: 0, completedEpicCount: 0 },
+    ] }, "/api/initiative-deep-dive": { epicOptions: [], cards: [], count: 0 } });
+    render(<TeamDashboardScreen />);
+    await screen.findByRole("button", { name: "Platform Delivery" });
+    expect(screen.getAllByText("Unavailable")).toHaveLength(2);
+    expect(screen.getByText("No epics")).toBeInTheDocument();
+    expect(screen.queryByRole("meter", { name: "Platform Delivery epic completion" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic progress/ }));
+    const rows = document.querySelectorAll(".tb-dashboard-work-stream-table tbody tr");
+    expect(rows[0]).toHaveTextContent("Customer Operations");
+    fireEvent.click(screen.getByRole("button", { name: "View 0 completed JIRA epics for Customer Operations" }));
+    expect(await screen.findByText("No matching JIRA cards were found.")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent("0 configured epics are complete");
   });
 
   it("uses layout-preserving skeletons during the initial load", () => {
@@ -282,6 +332,14 @@ describe("TeamDashboardScreen", () => {
       "descending",
     );
     expect(within(comparisonTable).getAllByRole("columnheader")).toHaveLength(7);
+    expect(Array.from(comparisonTable.querySelectorAll("thead th")).map((header) => header.querySelector(".tb-table-sort > span")?.textContent)).toEqual([
+      "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Epic progress", "Share of completions",
+    ]);
+    for (const row of comparisonTable.querySelectorAll("tbody tr, tfoot tr")) {
+      expect(Array.from(row.children).map((cell) => cell.getAttribute("data-label"))).toEqual([
+        "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Epic progress", "Share of completions",
+      ]);
+    }
     expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Created/ })).toBeInTheDocument();
     expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Completed/ })).toBeInTheDocument();
     expect(within(comparisonTable).queryByRole("columnheader", { name: "Recent flow · Last 4 weeks" })).not.toBeInTheDocument();
@@ -297,11 +355,11 @@ describe("TeamDashboardScreen", () => {
     fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Cards Completed (descending)" }));
     expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
 
-    const totalsRow = within(comparisonTable).getByRole("rowheader", { name: "All work streams" }).closest("tr");
+    const totalsRow = within(comparisonTable).getByRole("rowheader", { name: "Total · All work streams" }).closest("tr");
     expect(totalsRow).not.toBeNull();
     expect(within(totalsRow as HTMLElement).getByText("0")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("100%")).toBeInTheDocument();
-    for (const label of ["Work Streams", "Epics", "Cards Created", "Net backlog change", "WIP today", "Completion share"]) {
+    for (const label of ["Work Streams", "Epic progress", "Cards Created", "Net backlog change", "WIP today", "Share of completions"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
@@ -768,7 +826,7 @@ it("shows no completion share for zero completions and includes Unmapped drilldo
   render(<TeamDashboardScreen onOpenSettings={onOpenSettings} />);
   fireEvent.click(await screen.findByRole("button", { name: "Unmapped" }));
   expect(onOpenSettings).toHaveBeenCalledOnce();
-  expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+  expect(screen.queryByRole("meter", { name: "Unmapped share of completions" })).not.toBeInTheDocument();
   expect(screen.getByLabelText("Unmapped completion share unavailable")).toHaveTextContent("—");
   expect(screen.getByLabelText("All work streams completion share unavailable")).toHaveTextContent("—");
   fireEvent.click(screen.getByRole("button", { name: "View 0 completed JIRA cards for Unmapped" }));

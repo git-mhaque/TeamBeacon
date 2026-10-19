@@ -61,6 +61,7 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
             "epics": [
                 {
                     "epicKey": "TB-100",
+                    "isCompleted": True,
                     "totalCards": 10,
                     "completedCards": 6,
                     "groups": [{"id": 1, "name": "Platform"}],
@@ -208,6 +209,7 @@ class TeamDashboardServiceUnitTests(unittest.TestCase):
 
         payload = get_team_dashboard(now=datetime(2026, 8, 11, tzinfo=timezone.utc))
 
+        self.assertIsNone(payload["workStreams"][0]["completedEpicCount"])
         self.assertEqual(payload["workStreams"][0]["completionPercent"], 0.0)
         self.assertIsNone(payload["workStreams"][0]["completionSharePercent"])
         self.assertEqual(payload["workStreams"][0]["error"], "flow unavailable")

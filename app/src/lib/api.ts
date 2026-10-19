@@ -176,6 +176,8 @@ export type EpicLookupConfig = {
 export type InitiativeDeepDiveActivity = "all" | "new" | "in_progress" | "completed" | "current_wip" | "scope";
 
 export type InitiativeDeepDiveEpicOption = {
+  status?: string | null;
+  isCompleted?: boolean;
   epicKey: string;
   epicName: string;
   issueUrl?: string | null;
@@ -283,6 +285,7 @@ export type EpicMetadataEntry = {
 };
 
 export type InitiativeEpicSummary = {
+  isCompleted?: boolean;
   epicKey: string;
   epicName: string;
   completedCards: number;
@@ -467,6 +470,7 @@ export type CurrentSprintChangesResponse = {
 export type TeamDashboardFlowWeeks = 1 | 4 | 12;
 
 export type TeamDashboardWorkStream = {
+  completedEpicCount?: number | null;
   id: number;
   name: string;
   epicCount: number;

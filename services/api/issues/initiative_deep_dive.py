@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from packages.connectors.jira_config import load_env_files
 from services.api.integrations.jira_sync import _ensure_schema, _resolve_db_path
 from services.api.issues.current_sprint_work import is_subtask_issue_type
+from services.api.metadata.epic_config import is_completed_epic
 
 
 _ALLOWED_ACTIVITY_FILTERS = {"all", "new", "in_progress", "completed", "current_wip", "scope"}
@@ -312,7 +313,7 @@ def _load_single_group_epics(
         epic_rows = conn.execute(
             """
             SELECT em.epic_key,
-              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
+              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name, i.status_name, i.status_category
             FROM epic_metadata em
             LEFT JOIN issues i ON i.issue_key = em.epic_key
             WHERE COALESCE((SELECT MIN(emg.group_id) FROM epic_metadata_groups emg
@@ -326,7 +327,7 @@ def _load_single_group_epics(
             """
             SELECT
               em.epic_key,
-              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name
+              COALESCE(NULLIF(TRIM(i.summary), ''), NULLIF(TRIM(em.epic_name), ''), em.epic_key) AS epic_name, i.status_name, i.status_category
             FROM epic_metadata_groups emg
             JOIN epic_metadata em ON em.id = emg.epic_metadata_id
             LEFT JOIN issues i ON i.issue_key = em.epic_key
@@ -336,7 +337,8 @@ def _load_single_group_epics(
             (group_id,),
         ).fetchall()
     epics = [
-        {"epicKey": str(row["epic_key"]), "epicName": str(row["epic_name"])}
+        {"epicKey": str(row["epic_key"]), "epicName": str(row["epic_name"]),
+         "status": row["status_name"], "isCompleted": is_completed_epic(row["status_category"], row["status_name"])}
         for row in epic_rows
     ]
     group = {

@@ -19,6 +19,13 @@ class EpicMetadataBoundaryTests(unittest.TestCase):
         self.db = str(Path(directory.name) / "metadata.db")
         self.group = metadata.add_epic_group("Platform", db_path=self.db)["id"]
 
+    def test_epic_completion_respects_current_status_category(self) -> None:
+        for category, name, expected in [("Done", "Released", True), (None, " CLOSED ", True),
+                                         ("In Progress", "Closed", False), (None, None, False),
+                                         ("To Do", "Done", False)]:
+            with self.subTest(category=category, name=name):
+                self.assertEqual(metadata.is_completed_epic(category, name), expected)
+
     def test_rejects_invalid_lookup_and_view_requests_without_writes(self) -> None:
         actions = [
             lambda: metadata.add_epic_group(" ", db_path=self.db),

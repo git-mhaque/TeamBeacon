@@ -11,6 +11,7 @@ import {
 
 export type TeamDashboardIssueMetric =
   | "epics"
+  | "completedEpics"
   | "created"
   | "completed"
   | "flowGap"
@@ -63,6 +64,7 @@ const ISSUE_COLUMNS: Array<{ field: IssueSortField; label: string; className?: s
 
 function metricTitle(metric: TeamDashboardIssueMetric): string {
   if (metric === "epics") return "Configured epics";
+  if (metric === "completedEpics") return "Completed epics";
   if (metric === "created") return "Created cards";
   if (metric === "completed") return "Completed cards";
   if (metric === "flowGap") return "Net backlog change cards";
@@ -100,13 +102,13 @@ function cardActivity(card: InitiativeDeepDiveCard, metric: TeamDashboardIssueMe
 }
 
 function buildRows(payload: InitiativeDeepDiveResponse, metric: TeamDashboardIssueMetric): IssueRow[] {
-  if (metric === "epics") {
-    return payload.epicOptions.map((epic) => ({
+  if (metric === "epics" || metric === "completedEpics") {
+    return payload.epicOptions.filter((epic) => metric === "epics" || epic.isCompleted === true).map((epic) => ({
       issueKey: epic.epicKey,
       issueUrl: epic.issueUrl,
       summary: epic.epicName,
       epicName: "—",
-      status: "—",
+      status: epic.status || "—",
       activity: "Configured epic",
       assignee: "—",
       storyPoints: null,
@@ -184,6 +186,9 @@ function description(
   }
   if (selection.metric === "completionShare") {
     return `${selection.value} card${selection.value === 1 ? "" : "s"} completed in ${period}; these cards contribute to the completion share.`;
+  }
+  if (selection.metric === "completedEpics") {
+    return `${selection.value} configured epic${selection.value === 1 ? " is" : "s are"} complete as of the latest sync, based on epic status. Independent of the Flow period.`;
   }
   if (selection.metric === "epics") {
     return `${payload?.epicOptions.length ?? selection.value} configured JIRA epic${selection.value === 1 ? "" : "s"}.`;
@@ -282,7 +287,7 @@ export function TeamDashboardIssueOverlay({ selection, flowWeeks, flowRange, onC
         ) : null}
         {!loading && !error && rows.length > 0 ? (
           <>
-            {selection.metric !== "epics" && payload?.truncated ? (
+            {selection.metric !== "epics" && selection.metric !== "completedEpics" && payload?.truncated ? (
               <p className="tb-dashboard-issue-limit" role="status">Showing the first {rows.length} of {payload.count} matching cards.</p>
             ) : null}
             <div className="tb-dashboard-issue-table-wrap" role="region" aria-label={`${metricTitle(selection.metric)} table`} tabIndex={0}>

@@ -534,6 +534,7 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             platform, operations = self._seed_database(db_path)
             conn = sqlite3.connect(db_path)
             conn.execute("INSERT INTO epic_metadata_groups (epic_metadata_id, group_id) SELECT id, ? FROM epic_metadata WHERE epic_key = 'TB-100'", (operations,))
+            conn.execute("UPDATE issues SET status_name='Done', status_category='Done' WHERE issue_key IN ('TB-100', 'TB-300')")
             conn.commit()
             conn.close()
             upsert_epic_metadata(epic_key="TB-300", success_criteria=[], group_ids=[], work_type_ids=[], db_path=db_path)
@@ -556,6 +557,8 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             payload = get_team_dashboard(flow_weeks=4, db_path=db_path, now=now, timezone_name="UTC")
             streams = payload["workStreams"]
             self.assertEqual(sum(row["epicCount"] for row in streams), 3)
+            self.assertEqual(sum(row["completedEpicCount"] for row in streams), 2)
+            self.assertEqual(next(row for row in streams if row["id"] == 0)["completedEpicCount"], 1)
             self.assertEqual(sum(row["completedCount"] for row in streams), all_cards["count"])
             self.assertAlmostEqual(sum(row["completionSharePercent"] for row in streams), 100, delta=0.11)
             self.assertEqual(next(row for row in streams if row["id"] == 0)["completedCount"], 1)
