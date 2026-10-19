@@ -8528,20 +8528,52 @@ body {
 .tb-exec-auto-select input { margin-top: 0.2rem; flex-shrink: 0; }
 
 .tb-exec-completed-epic {
-  margin-top: 0.85rem;
+  margin-top: 0.75rem;
   overflow-wrap: anywhere;
+}
+
+.tb-exec-completed-epic + .tb-exec-completed-epic {
+  margin-top: 1.25rem;
+}
+
+.tb-main-team-report .tb-exec-completed-summary .tb-exec-list-title {
+  color: #625a54;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .tb-exec-completed-epic-title {
   margin: 0 0 0.4rem;
-  font-size: 0.9rem;
+  color: #302c28;
+  font-size: 0.9375rem;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
+.tb-exec-completed-key {
+  color: #466c77;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.tb-exec-completed-key a {
+  color: inherit;
+  text-decoration-color: #a5bac0;
+  text-underline-offset: 2px;
+}
+
+.tb-exec-completed-key a:hover,
+.tb-exec-completed-key a:focus-visible {
+  color: #20607a;
+  text-decoration-color: currentColor;
+}
 
 .tb-exec-completed-epic .tb-exec-narrative-list {
   gap: 0.2rem;
+  font-size: 0.875rem;
+  font-weight: 400;
   line-height: 1.4;
 }
 

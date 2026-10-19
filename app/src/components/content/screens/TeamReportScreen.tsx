@@ -7,7 +7,7 @@ import {
   fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
 } from "../../../lib/api";
-import { groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSummaryGroup, type CompletedWorkSource } from "../../../lib/reportCompletedWork";
+import { completedWorkHeading, groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSummaryGroup, type CompletedWorkSource } from "../../../lib/reportCompletedWork";
 import { getPreference, getPreferenceSync, setPreference } from "../../../lib/persistence";
 
 import { groupReportInitiatives, readReportInitiativeSelection, resolveReportInitiativeSelection, type ReportSelectionMode } from "../../../lib/reportInitiativeSelection";
@@ -362,12 +362,12 @@ function buildTeamReportExportHtml(params: {
   const completedSections = params.completedWork.length > 0
     ? params.completedWork.map((entry) => `
         <section class="section-block">
-          <h4>${escapeHtml(entry.group)}</h4>
+          <h4 class="completed-workstream">${escapeHtml(completedWorkHeading(entry.group))}</h4>
           ${groupCompletedWorkByEpic(entry.bullets).map((epic) => `
             <div class="completed-epic">
-              ${epic.epicKey ? `<h5><span>${escapeHtml(epic.epicName)}</span> (${sourceLink(epic.epicKey, epic.epicKey)})</h5>` : ""}
+              ${epic.epicKey ? `<h5><span>${escapeHtml(epic.epicName)}</span> <span class="completed-key">(${sourceLink(epic.epicKey, epic.epicKey)})</span></h5>` : ""}
               <ul>
-                ${epic.bullets.map((bullet) => `<li><span>${escapeHtml(bullet.text)}</span>${bullet.source ? ` (${sourceLink(bullet.source.issueKey, bullet.source.issueKey)})` : ""}</li>`).join("")}
+                ${epic.bullets.map((bullet) => `<li><span>${escapeHtml(bullet.text)}</span>${bullet.source ? ` <span class="completed-key">(${sourceLink(bullet.source.issueKey, bullet.source.issueKey)})</span>` : ""}</li>`).join("")}
               </ul>
             </div>
           `).join("")}
@@ -567,10 +567,15 @@ function buildTeamReportExportHtml(params: {
         border-top: 1px solid #e5ecf8;
         padding-top: 10px;
       }
-      .completed-epic { margin-top: 14px; overflow-wrap: anywhere; }
-      .completed-epic h5 { margin: 0; font-size: 13px; font-weight: 600; }
+      .completed-workstream { font-size: 12px; font-weight: 600; color: #625a54; letter-spacing: normal; text-transform: none; }
+      .completed-epic { margin-top: 12px; overflow-wrap: anywhere; }
+      .completed-epic + .completed-epic { margin-top: 20px; }
+      .completed-epic h5 { margin: 0; font-size: 15px; font-weight: 600; color: #302c28; line-height: 1.4; }
       .completed-epic ul { display: grid; gap: 3px; }
-      .completed-epic li { margin: 0; line-height: 1.4; }
+      .completed-epic li { margin: 0; font-size: 14px; font-weight: 400; line-height: 1.4; }
+      .completed-key { color: #466c77; font-size: 12px; font-weight: 400; }
+      .completed-key a { color: inherit; text-decoration: underline; text-decoration-color: #a5bac0; text-underline-offset: 2px; }
+      .completed-key a:hover, .completed-key a:focus-visible { color: #20607a; text-decoration-color: currentColor; }
       .section-block:first-child {
         border-top: none;
         padding-top: 0;
@@ -1789,14 +1794,15 @@ export function TeamReportScreen() {
         <div className="tb-exec-completed-summary">
           {completedWorkSummary.map((entry) => (
             <div key={entry.group}>
-              <h4 className="tb-exec-list-title">{entry.group}</h4>
+              <h4 className="tb-exec-list-title">{completedWorkHeading(entry.group)}</h4>
               {groupCompletedWorkByEpic(entry.bullets).map((epic) => (
                 <div className="tb-exec-completed-epic" key={epic.epicKey ?? "notice"}>
                   {epic.epicKey ? (
                     <h5 className="tb-exec-completed-epic-title">
-                      <span>{epic.epicName}</span>{" ("}
-                      <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={epic.epicKey}>{epic.epicKey}</ReportJiraLink>
-                      {")"}
+                      <span>{epic.epicName}</span>{" "}
+                      <span className="tb-exec-completed-key">
+                        {"("}<ReportJiraLink baseUrl={jiraBaseUrl} issueKey={epic.epicKey}>{epic.epicKey}</ReportJiraLink>{")"}
+                      </span>
                     </h5>
                   ) : null}
                   <ul className="tb-list tb-exec-narrative-list">
@@ -1804,11 +1810,9 @@ export function TeamReportScreen() {
                       <li key={item.source?.cardId ?? `${entry.group}:${item.text}`}>
                         <span>{item.text}</span>
                         {item.source ? (
-                          <>
-                            {" ("}
-                            <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={item.source.issueKey}>{item.source.issueKey}</ReportJiraLink>
-                            {")"}
-                          </>
+                          <>{" "}<span className="tb-exec-completed-key">
+                            {"("}<ReportJiraLink baseUrl={jiraBaseUrl} issueKey={item.source.issueKey}>{item.source.issueKey}</ReportJiraLink>{")"}
+                          </span></>
                         ) : null}
                       </li>
                     ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSource } from "../../src/lib/reportCompletedWork";
+import { completedWorkHeading, groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSource } from "../../src/lib/reportCompletedWork";
 
 const sources: CompletedWorkSource[] = [
   { cardId: "card-1", group: "Platform", epicKey: "P-1", epicName: "Search", issueKey: "P-2", issueTitle: "Fix timeout" },
@@ -8,6 +8,13 @@ const sources: CompletedWorkSource[] = [
 ];
 
 describe("completed work sources", () => {
+  it("uses sentence case for headings while preserving acronyms and DevOps", () => {
+    expect(completedWorkHeading("Feature Delivery")).toBe("Feature delivery");
+    expect(completedWorkHeading("DevOps and Automation")).toBe("DevOps and automation");
+    expect(completedWorkHeading("API Platform")).toBe("API platform");
+    expect(completedWorkHeading("Security")).toBe("Security");
+    expect(completedWorkHeading("")).toBe("");
+  });
   it("groups interleaved bullets by epic key, preserving epic and issue order", () => {
     const bullets = sources.map((source) => ({ text: source.issueTitle, source }));
     const sameNameDifferentEpic = { text: "Separate epic", source: { ...sources[0], epicKey: "P-99" } };

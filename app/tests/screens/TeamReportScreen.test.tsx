@@ -177,7 +177,7 @@ describe("TeamReportScreen", () => {
       throw new Error("Completed Work Summary section not found.");
     }
     const scopedCompletedWork = within(completedWorkPanel);
-    expect(await scopedCompletedWork.findByText("Core Platform")).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText("Core platform")).toBeInTheDocument();
     expect(await scopedCompletedWork.findByText("Operations")).toBeInTheDocument();
     expect(await scopedCompletedWork.findByText("Automated executive dashboard summary workflow")).toBeInTheDocument();
     expect(await scopedCompletedWork.findByText("Improved risk signal validation against release cadence")).toBeInTheDocument();
@@ -194,7 +194,8 @@ describe("TeamReportScreen", () => {
     expect(issueLink).toHaveAttribute("href", "https://jira.example.com/browse/CEG-1010");
     expect(issueLink).toHaveAttribute("target", "_blank");
     expect(issueLink).toHaveAttribute("rel", "noopener noreferrer");
-    expect(issueLink.parentElement).toBe(completedBullet);
+    expect(issueLink.parentElement).toHaveClass("tb-exec-completed-key");
+    expect(issueLink.closest("li")).toBe(completedBullet);
     expect(completedBullet).toHaveTextContent(/^Automated executive dashboard summary workflow \(CEG-1010\)$/);
     expect(within(scopedCompletedWork.getAllByRole("listitem")[2]).getByRole("link", { name: "CEG-2012" })).toBeInTheDocument();
 
@@ -223,8 +224,8 @@ describe("TeamReportScreen", () => {
       expect(epicBlock.querySelector("h5")?.textContent).toBe("Executive reporting automation (CEG-EPIC-12)");
       expect(epicBlock.querySelectorAll("li")).toHaveLength(2);
       expect(epicBlock.querySelectorAll('a[href="https://jira.example.com/browse/CEG-EPIC-12"]')).toHaveLength(1);
-      expect(issue.parentElement?.tagName).toBe("LI");
-      expect(issue.parentElement?.textContent).toBe("Automated executive dashboard summary workflow (CEG-1010)");
+      expect(issue.parentElement?.className).toBe("completed-key");
+      expect(issue.closest("li")?.textContent).toBe("Automated executive dashboard summary workflow (CEG-1010)");
       const exportedMix = [...report.querySelectorAll("h2")].find((heading) => heading.textContent === "Work Mix by Work Stream and Type")!.closest("section")!;
       expect(exportedMix.querySelector("table")).toBeNull();
       expect(exportedMix.querySelectorAll('[role="img"]')).toHaveLength(2);

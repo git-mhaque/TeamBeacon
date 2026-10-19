@@ -17,6 +17,11 @@ export type CompletedWorkSummaryGroup = {
   bullets: CompletedWorkBullet[];
 };
 
+// Use sentence case for ordinary words while retaining acronyms and names like DevOps.
+export function completedWorkHeading(name: string): string {
+  return name.replace(/\b[A-Z][a-z]+\b/g, (word, offset: number) => offset === 0 ? word : word.toLowerCase());
+}
+
 // Preserve synced titles and source metadata without model-generated text.
 export function groupCompletedWork(sources: CompletedWorkSource[]): CompletedWorkSummaryGroup[] {
   const groups = new Map<string, CompletedWorkBullet[]>();
