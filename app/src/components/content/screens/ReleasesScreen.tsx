@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as ChartModule from "chart.js/auto";
-import type { Chart as ChartInstance, ChartConfiguration } from "chart.js";
+import type { Chart as ChartInstance, ChartConfiguration, Plugin } from "chart.js";
 import {
   fetchReleaseInsights,
   ReleaseInsightRow,
@@ -11,8 +11,8 @@ import { getPreference, getPreferenceSync, setPreference } from "../../../lib/pe
 
 type ChartConstructor = new (
   item: HTMLCanvasElement,
-  config: ChartConfiguration<"line">,
-) => ChartInstance<"line">;
+  config: ChartConfiguration<"bar" | "line">,
+) => ChartInstance<"bar" | "line">;
 
 const EMPTY_INSIGHTS: ReleaseInsightsResponse = {
   source: "local",
@@ -111,8 +111,8 @@ function releaseMixLabel(release: ReleaseInsightRow): string {
   return release.issueTypeMix.slice(0, 3).map((slice) => `${slice.label} ${formatPercent(slice.percent)}`).join(", ");
 }
 
-function compactReleaseLabel(index: number): string {
-  return `R${index + 1}`;
+function compactReleaseLabel(name: string): string {
+  return name.match(/(?:^|\s)(v?\d+(?:\.\d+)+(?:[-+][\w.-]+)?)$/)?.[1] ?? name;
 }
 
 function average(values: number[]): number | null {
@@ -178,45 +178,41 @@ function readPersistedReleaseSelection(): string[] {
   return parsePersistedReleaseSelection(getPreferenceSync(RELEASE_TREND_SELECTION_KEY));
 }
 
-type ReleaseCycleLineChartProps = {
+type ReleaseCycleBarChartProps = {
   releases: ReleaseInsightRow[];
-  averageCycleTime: number | null;
   maxCycleTime: number;
 };
 
-function ReleaseCycleLineChart({
+function ReleaseCycleBarChart({
   releases,
-  averageCycleTime,
   maxCycleTime,
-}: ReleaseCycleLineChartProps) {
+}: ReleaseCycleBarChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const config = useMemo(() => {
-    const labels = releases.map((_release, index) => compactReleaseLabel(index));
+    const labels = releases.map((release) => compactReleaseLabel(release.name));
     const measuredValues = releases.map((release) => measuredCycleTime(release));
     const missingValues = releases.map((release) => (missingCycleReason(release) ? 0 : null));
     const suggestedMax = Math.max(4, Math.ceil(maxCycleTime * 1.2));
 
     return {
-      type: "line" as const,
+      type: "bar" as const,
       data: {
         labels,
         datasets: [
           {
             label: "Cycle time",
             data: measuredValues,
-            borderColor: "#287491",
-            backgroundColor: "rgba(40, 116, 145, 0.12)",
-            borderWidth: 2,
-            pointBackgroundColor: "#ffffff",
-            pointBorderColor: "#1c607a",
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 5,
-            tension: 0.28,
-            spanGaps: false,
+            backgroundColor: "#287491",
+            hoverBackgroundColor: "#184e65",
+            borderRadius: 3,
+            maxBarThickness: 42,
+            categoryPercentage: 0.8,
+            barPercentage: 0.8,
+            order: 2,
           },
           {
+            type: "line",
             label: "Missing value",
             data: missingValues,
             borderColor: "transparent",
@@ -229,20 +225,25 @@ function ReleaseCycleLineChart({
             pointStyle: "triangle",
             showLine: false,
           },
-          ...(averageCycleTime !== null
-            ? [{
-              label: "Average",
-              data: releases.map(() => averageCycleTime),
-              borderColor: "#9a6a18",
-              borderDash: [6, 4],
-              borderWidth: 1.4,
-              pointRadius: 0,
-              pointHoverRadius: 0,
-              tension: 0,
-            }]
-            : []),
+
         ] as any[],
       },
+      plugins: [{
+        id: "releaseCycleLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.font = "600 11px system-ui, sans-serif";
+          ctx.fillStyle = "#302c28";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          chart.getDatasetMeta(0).data.forEach((bar, index) => {
+            const value = measuredValues[index];
+            if (value !== null) ctx.fillText(formatDays(value), bar.x, bar.y - 6);
+          });
+          ctx.restore();
+        },
+      } satisfies Plugin<"bar" | "line">],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -273,9 +274,6 @@ function ReleaseCycleLineChart({
                 if (item.datasetIndex === 1) {
                   return `${missingCycleReason(release) ?? "Missing value"} | ${formatDate(release.startDate)} to ${formatDate(release.releaseDate)}`;
                 }
-                if (item.datasetIndex === 2) {
-                  return `Average: ${formatDays(averageCycleTime)}`;
-                }
                 return `${formatDays(measuredCycleTime(release))} | ${formatDate(release.startDate)} to ${formatDate(release.releaseDate)}`;
               },
             },
@@ -294,7 +292,7 @@ function ReleaseCycleLineChart({
                 size: 11,
                 weight: "700",
               },
-              maxRotation: 0,
+              maxRotation: 45,
               minRotation: 0,
             },
             border: {
@@ -327,7 +325,7 @@ function ReleaseCycleLineChart({
         },
       },
     };
-  }, [averageCycleTime, maxCycleTime, releases]);
+  }, [maxCycleTime, releases]);
 
   useEffect(() => {
     if (!canvasRef.current) return undefined;
@@ -338,16 +336,18 @@ function ReleaseCycleLineChart({
   }, [config]);
 
   return (
-    <div className="tb-release-cycle-chart">
-      <canvas
-        ref={canvasRef}
-        className="tb-release-cycle-chart-canvas"
-        role="img"
-        aria-label="Release cycle time line chart"
-        data-testid="release-cycle-time-chart"
-      >
-        Release cycle time line chart
-      </canvas>
+    <div className="tb-release-cycle-chart-scroll" tabIndex={0} role="region" aria-label="Release cycle time chart, scroll horizontally for more releases">
+      <div className="tb-release-cycle-chart" style={{ minWidth: Math.max(320, releases.length * 76) }}>
+        <canvas
+          ref={canvasRef}
+          className="tb-release-cycle-chart-canvas"
+          role="img"
+          aria-label="Release cycle time bar chart"
+          data-testid="release-cycle-time-chart"
+        >
+          Release cycle time bar chart
+        </canvas>
+      </div>
     </div>
   );
 }
@@ -613,7 +613,7 @@ export function ReleasesScreen() {
         <header className="tb-panel-header">
           <div>
             <h3>Release Cycle Time Trend</h3>
-            <p className="tb-muted-note">Selected completed releases from start date to release date.</p>
+            <p className="tb-muted-note">Selected completed releases from start date to release date. Lower is faster.</p>
           </div>
           <div className="tb-panel-header-actions tb-release-cycle-actions">
             <span className="tb-chip">{selectedTrendReleases.length} shown</span>
@@ -650,16 +650,15 @@ export function ReleasesScreen() {
             </div>
 
             <div className="tb-release-cycle-chart-frame" data-testid="release-cycle-time-trend">
-              <ReleaseCycleLineChart
+              <ReleaseCycleBarChart
                 releases={chartReleases}
-                averageCycleTime={selectedAverageCycleTime}
                 maxCycleTime={maxSelectedCycleTime}
               />
-              <div className="tb-release-cycle-legend" aria-label="Release cycle chart legend">
-                <span><i className="tb-release-cycle-line-swatch" />Cycle time</span>
-                <span><i className="tb-release-cycle-average-swatch" />Average</span>
-                <span><i className="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
-              </div>
+              {releasesWithMissingCycleTime.length > 0 ? (
+                <div className="tb-release-cycle-legend" aria-label="Release cycle chart legend">
+                  <span><i className="tb-release-cycle-missing-swatch" />Missing end date / cycle value</span>
+                </div>
+              ) : null}
               <p className="tb-trend-x-axis-label">Oldest to newest among selected releases</p>
             </div>
 
@@ -673,11 +672,10 @@ export function ReleasesScreen() {
               </div>
             ) : null}
 
-            <div className="tb-release-cycle-key" role="list" aria-label="Line chart release labels">
-              {chartReleases.map((release, index) => (
+            <div className="tb-visually-hidden" role="list" aria-label="Release cycle time values">
+              {chartReleases.map((release) => (
                 <span key={release.versionId} role="listitem">
-                  <strong>{compactReleaseLabel(index)}</strong>
-                  {release.name}
+                  {release.name}: {cycleTimeStatusLabel(release)}
                 </span>
               ))}
             </div>

@@ -207,7 +207,7 @@ Use this structure:
 - **Team Report:** executive narrative first, followed by wins, risks, initiative movement, and work mix. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
-- **Release Insights:** separate release readiness from historical cycle-time analysis.
+- **Release Insights:** separate release readiness from historical cycle-time analysis. Show completed-release durations as teal bars with day labels, short version labels and full release/date hover details. Keep the average in the summary card without a chart overlay. Preserve chronological selection order and show missing-value markers only when needed; use local horizontal scrolling for dense selections.
 - **Global system status:** expose connection health, JIRA sync actions/history, and diagnostics from a compact header control. Use one accessible side sheet with internal views, keyboard focus containment, Escape dismissal, and trigger-focus restoration.
 - **Settings:** provide Initiative Metadata and Work Stream Epic Mapping tabs, with saved mapping statistics, searchable/filterable assignments for synced project epics excluding Triad labels, page-scoped selection, persistent drafts and atomic bulk save; operational integration state belongs to the global system-status sheet.
 - **Security and Operations:** use one reusable coming-soon state until real workflows exist.

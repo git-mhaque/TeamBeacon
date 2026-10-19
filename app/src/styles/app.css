@@ -4752,6 +4752,10 @@ body {
   padding: 0.62rem 0.72rem 0.58rem;
 }
 
+.tb-release-cycle-chart-scroll {
+  overflow-x: auto;
+}
+
 .tb-release-cycle-chart {
   height: 16.2rem;
   max-width: 100%;
@@ -4794,11 +4798,7 @@ body {
   background: #1f67c1;
 }
 
-.tb-release-cycle-average-swatch {
-  width: 1.55rem;
-  height: 0;
-  border-top: 2px dashed #8d6b20;
-}
+
 
 .tb-release-cycle-missing-swatch {
   width: 0;
@@ -4825,32 +4825,7 @@ body {
   padding: 0.25rem 0.46rem;
 }
 
-.tb-release-cycle-key {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
-  gap: 0.36rem 0.58rem;
-}
 
-.tb-release-cycle-key span {
-  display: flex;
-  align-items: center;
-  gap: 0.38rem;
-  min-width: 0;
-  color: #314b70;
-  font-size: 0.72rem;
-  line-height: 1.25;
-}
-
-.tb-release-cycle-key strong {
-  flex: 0 0 auto;
-  border: 1px solid #b9cbe6;
-  border-radius: 0.35rem;
-  background: #fff;
-  color: #194c91;
-  font-size: 0.68rem;
-  line-height: 1;
-  padding: 0.16rem 0.26rem;
-}
 
 .tb-release-recent-table {
   min-width: 1120px;

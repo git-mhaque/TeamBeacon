@@ -333,28 +333,36 @@ describe("ReleasesScreen", () => {
     expect(cycleTrend).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select Releases" })).toBeInTheDocument();
     expect(screen.getByText("2 shown")).toBeInTheDocument();
-    expect(screen.getByTestId("release-cycle-time-chart")).toHaveAttribute("aria-label", "Release cycle time line chart");
-    const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
+    expect(screen.getByTestId("release-cycle-time-chart")).toHaveAttribute("aria-label", "Release cycle time bar chart");
+    const releaseKey = screen.getByRole("list", { name: "Release cycle time values" });
     const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
     expect(releaseKeyItems).toHaveLength(2);
-    expect(releaseKeyItems[0]).toHaveTextContent("R1");
     expect(releaseKeyItems[0]).toHaveTextContent("Search 26.3");
-    expect(releaseKeyItems[1]).toHaveTextContent("R2");
     expect(releaseKeyItems[1]).toHaveTextContent("Search 26.4");
-    const chartCall = await findLatestChartCall("Release cycle time line chart");
-    expect(chartCall.config.data.labels).toEqual(["R1", "R2"]);
+    const chartCall = await findLatestChartCall("Release cycle time bar chart");
+    expect(chartCall.config.type).toBe("bar");
+    expect(chartCall.config.data.labels).toEqual(["26.3", "26.4"]);
+    expect(screen.queryByLabelText("Release cycle chart legend")).not.toBeInTheDocument();
+    expect(screen.getByText(/Lower is faster/)).toBeInTheDocument();
     expect(chartCall.config.data.datasets[0].data).toEqual([30, 20]);
     expect(chartCall.config.data.datasets[1].data).toEqual([null, null]);
-    expect(chartCall.config.data.datasets[2].data).toEqual([25, 25]);
+    expect(chartCall.config.data.datasets.map((dataset: any) => dataset.label)).toEqual(["Cycle time", "Missing value"]);
     expect(chartCall.config.options.plugins.tooltip.callbacks.title([{ dataIndex: 1 }])).toBe("Search 26.4");
     expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 1, datasetIndex: 0 })).toBe(
       "20 d | 01-Apr-2026 to 21-Apr-2026"
     );
-    expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 0, datasetIndex: 2 })).toBe(
-      "Average: 25 d"
-    );
     expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 99, datasetIndex: 0 })).toBe("");
     expect(chartCall.config.options.scales.y.ticks.callback(20)).toBe("20 d");
+    const ctx = { save: vi.fn(), restore: vi.fn(), fillText: vi.fn() };
+    chartCall.config.plugins[0].afterDatasetsDraw({
+      ctx,
+      getDatasetMeta: () => ({ data: [{ x: 80, y: 100 }, { x: 160, y: 150 }] }),
+    });
+    expect(ctx.fillText.mock.calls).toEqual([
+      ["30 d", 80, 94], ["20 d", 160, 144],
+    ]);
+    expect(ctx.restore).toHaveBeenCalledOnce();
+
 
     const recentTable = screen.getByRole("table", { name: "Recent completed releases" });
     const recentRows = within(recentTable).getAllByRole("row");
@@ -386,13 +394,13 @@ describe("ReleasesScreen", () => {
 
     render(<ReleasesScreen />);
 
-    const releaseKey = await screen.findByRole("list", { name: "Line chart release labels" });
+    const releaseKey = await screen.findByRole("list", { name: "Release cycle time values" });
     const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
     expect(releaseKeyItems).toHaveLength(12);
     expect(releaseKeyItems[0]).toHaveTextContent("Release 03");
     expect(releaseKeyItems[11]).toHaveTextContent("Release 14");
     expect(within(releaseKey).queryByText("Release 02")).not.toBeInTheDocument();
-    const chartCall = await findLatestChartCall("Release cycle time line chart");
+    const chartCall = await findLatestChartCall("Release cycle time bar chart");
     expect(chartCall.config.data.datasets[0].data).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 
     const recentTable = screen.getByRole("table", { name: "Recent completed releases" });
@@ -466,19 +474,17 @@ describe("ReleasesScreen", () => {
     });
     expect(screen.getByText("2 shown")).toBeInTheDocument();
 
-    const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
+    const releaseKey = screen.getByRole("list", { name: "Release cycle time values" });
     const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
     expect(releaseKeyItems).toHaveLength(2);
-    expect(releaseKeyItems[0]).toHaveTextContent("R1");
     expect(releaseKeyItems[0]).toHaveTextContent("Release 02");
-    expect(releaseKeyItems[1]).toHaveTextContent("R2");
     expect(releaseKeyItems[1]).toHaveTextContent("Release 05");
 
     await waitFor(() => {
-      const chartCall = getLatestChartCall("Release cycle time line chart");
-      expect(chartCall.config.data.labels).toEqual(["R1", "R2"]);
+      const chartCall = getLatestChartCall("Release cycle time bar chart");
+      expect(chartCall.config.data.labels).toEqual(["Release 02", "Release 05"]);
       expect(chartCall.config.data.datasets[0].data).toEqual([2, 5]);
-      expect(chartCall.config.data.datasets[2].data).toEqual([3.5, 3.5]);
+      expect(chartCall.config.data.datasets).toHaveLength(2);
     });
     expect(JSON.parse(preferenceStore.get(RELEASE_TREND_SELECTION_KEY) ?? "[]")).toEqual([
       "release-05",
@@ -509,14 +515,14 @@ describe("ReleasesScreen", () => {
     render(<ReleasesScreen />);
 
     expect(await screen.findByText("2 shown")).toBeInTheDocument();
-    const releaseKey = screen.getByRole("list", { name: "Line chart release labels" });
+    const releaseKey = screen.getByRole("list", { name: "Release cycle time values" });
     const releaseKeyItems = within(releaseKey).getAllByRole("listitem");
     expect(releaseKeyItems).toHaveLength(2);
     expect(releaseKeyItems[0]).toHaveTextContent("Release 02");
     expect(releaseKeyItems[1]).toHaveTextContent("Release 05");
 
     await waitFor(() => {
-      const chartCall = getLatestChartCall("Release cycle time line chart");
+      const chartCall = getLatestChartCall("Release cycle time bar chart");
       expect(chartCall.config.data.datasets[0].data).toEqual([2, 5]);
     });
 
@@ -557,9 +563,18 @@ describe("ReleasesScreen", () => {
 
     const missingValues = await screen.findByRole("list", { name: "Release cycle missing values" });
     expect(within(missingValues).getByText("Release Missing End: Missing end date")).toBeInTheDocument();
-    const chartCall = await findLatestChartCall("Release cycle time line chart");
+    const chartCall = await findLatestChartCall("Release cycle time bar chart");
     expect(chartCall.config.data.datasets[0].data).toEqual([null, 2]);
     expect(chartCall.config.data.datasets[1].data).toEqual([0, null]);
+    expect(screen.getByLabelText("Release cycle chart legend")).toHaveTextContent("Missing end date / cycle value");
+    const ctx = { save: vi.fn(), restore: vi.fn(), fillText: vi.fn() };
+    chartCall.config.plugins[0].afterDatasetsDraw({
+      ctx,
+      getDatasetMeta: () => ({ data: [{ x: 80, y: 200 }, { x: 160, y: 150 }] }),
+    });
+    expect(ctx.fillText).not.toHaveBeenCalledWith(expect.anything(), 80, expect.anything());
+    expect(ctx.fillText).toHaveBeenCalledWith("2 d", 160, 144);
+
     expect(chartCall.config.options.plugins.tooltip.callbacks.label({ dataIndex: 0, datasetIndex: 1 })).toBe(
       "Missing end date | 01-Apr-2026 to -"
     );
