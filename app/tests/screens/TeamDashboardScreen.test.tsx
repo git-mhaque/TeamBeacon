@@ -186,9 +186,10 @@ describe("TeamDashboardScreen", () => {
     expect(wip).toHaveAttribute("title", "Cards currently in progress, regardless of the selected period.");
     expect(screen.getByText("−3")).toHaveAttribute("title", "Backlog shrunk by 3 cards");
     expect(screen.getByText("+3")).toHaveAttribute("title", "Backlog grew by 3 cards");
-    expect(screen.getByRole("button", { name: /Sort by Share of completions/ })).toHaveAttribute(
-      "title", "Percentage of all cards completed during the selected period that belong to this work stream.",
+    expect(screen.getByRole("button", { name: /Sort by Work distribution/ })).toHaveAttribute(
+      "title", "Where the team’s completed work is distributed across streams during the selected period. Each completed card counts equally.",
     );
+    expect(within(screen.getByRole("columnheader", { name: /Work distribution/ })).getByText("By completed cards")).toBeInTheDocument();
   });
 
   it("shows source freshness relative to now with the exact timestamp on hover", async () => {
@@ -263,7 +264,7 @@ describe("TeamDashboardScreen", () => {
     expect(screen.getAllByText("Unavailable")).toHaveLength(2);
     expect(screen.getByText("No epics")).toBeInTheDocument();
     expect(screen.queryByRole("meter", { name: "Platform Delivery epic completion" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic progress/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Stream epic progress/ }));
     const rows = document.querySelectorAll(".tb-dashboard-work-stream-table tbody tr");
     expect(rows[0]).toHaveTextContent("Customer Operations");
     fireEvent.click(screen.getByRole("button", { name: "View 0 completed JIRA epics for Customer Operations" }));
@@ -298,7 +299,7 @@ describe("TeamDashboardScreen", () => {
 
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Platform Delivery" })).toBeInTheDocument();
-    expect(screen.getByRole("meter", { name: "Platform Delivery share of completions" })).toBeInTheDocument();
+    expect(screen.getByRole("meter", { name: "Platform Delivery work distribution" })).toBeInTheDocument();
   });
 
   it("focuses on work-stream insights and supports dashboard drilldowns", async () => {
@@ -319,7 +320,7 @@ describe("TeamDashboardScreen", () => {
       expect(screen.queryByText(label)).not.toBeInTheDocument();
     }
 
-    const progress = screen.getByRole("meter", { name: "Platform Delivery share of completions" });
+    const progress = screen.getByRole("meter", { name: "Platform Delivery work distribution" });
     expect(progress).toHaveAttribute("aria-valuenow", "78.9");
     const comparisonRegion = screen.getByRole("region", { name: "Work stream comparison" });
     const comparisonTable = within(comparisonRegion).getByRole("table");
@@ -333,12 +334,13 @@ describe("TeamDashboardScreen", () => {
     );
     expect(within(comparisonTable).getAllByRole("columnheader")).toHaveLength(7);
     expect(Array.from(comparisonTable.querySelectorAll("thead th")).map((header) => header.querySelector(".tb-table-sort > span")?.textContent)).toEqual([
-      "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Epic progress", "Share of completions",
+      "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Stream epic progress", "Work distribution",
     ]);
     for (const row of comparisonTable.querySelectorAll("tbody tr, tfoot tr")) {
       expect(Array.from(row.children).map((cell) => cell.getAttribute("data-label"))).toEqual([
-        "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Epic progress", "Share of completions",
+        "Work Streams", "Cards Created", "Cards Completed", "Net backlog change", "WIP today", "Stream epic progress", "Work distribution",
       ]);
+      expect(row.querySelector('[data-label="Work distribution"]')).toHaveAttribute("data-subtitle", "By completed cards");
     }
     expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Created/ })).toBeInTheDocument();
     expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Completed/ })).toBeInTheDocument();
@@ -359,7 +361,7 @@ describe("TeamDashboardScreen", () => {
     expect(totalsRow).not.toBeNull();
     expect(within(totalsRow as HTMLElement).getByText("0")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("100%")).toBeInTheDocument();
-    for (const label of ["Work Streams", "Epic progress", "Cards Created", "Net backlog change", "WIP today", "Share of completions"]) {
+    for (const label of ["Work Streams", "Stream epic progress", "Cards Created", "Net backlog change", "WIP today", "Work distribution"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
@@ -512,13 +514,13 @@ describe("TeamDashboardScreen", () => {
       ["View 15 completed JIRA cards for Platform Delivery", "Completed cards"],
       ["View JIRA cards contributing to the 3 reduced net backlog change for Platform Delivery", "Net backlog change cards"],
       ["View 4 current WIP JIRA cards for Platform Delivery", "Current WIP cards"],
-      ["View 15 completed JIRA cards contributing to Platform Delivery completion share", "Completion share cards"],
+      ["View 15 completed JIRA cards contributing to Platform Delivery work distribution", "Work distribution"],
       ["View 4 configured JIRA epics for all work streams", "Configured epics"],
       ["View 19 created JIRA cards for all work streams", "Created cards"],
       ["View 19 completed JIRA cards for all work streams", "Completed cards"],
       ["View JIRA cards contributing to the Balanced net backlog change for all work streams", "Net backlog change cards"],
       ["View 6 current WIP JIRA cards for all work streams", "Current WIP cards"],
-      ["View 19 completed JIRA cards contributing to All work streams completion share", "Completion share cards"],
+      ["View 19 completed JIRA cards contributing to All work streams work distribution", "Work distribution"],
     ] as const;
 
     for (const [buttonName, dialogName] of drilldowns) {
@@ -609,8 +611,8 @@ describe("TeamDashboardScreen", () => {
           groupIds: [5],
           value: 1,
         },
-        title: "Completion share cards",
-        description: "1 card completed in the last week; these cards contribute to the completion share.",
+        title: "Work distribution",
+        description: "1 card completed in the last week; these cards contribute to the work distribution.",
         activity: "Completed",
       },
     ];
@@ -753,7 +755,7 @@ describe("TeamDashboardScreen", () => {
     });
     render(<TeamDashboardScreen />);
 
-    await screen.findByRole("meter", { name: "Platform Delivery share of completions" });
+    await screen.findByRole("meter", { name: "Platform Delivery work distribution" });
     fireEvent.click(screen.getByRole("button", { name: /^Flow period:/ }));
     expect(screen.getByRole("combobox", { name: /Flow period/ })).toHaveValue("4");
     fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "12" } });
@@ -762,7 +764,7 @@ describe("TeamDashboardScreen", () => {
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => new URL(String(input)).searchParams.get("flowWeeks") === "12")).toBe(true);
     });
-    await waitFor(() => expect(screen.getByRole("meter", { name: "Platform Delivery share of completions" })).toHaveAttribute("aria-valuenow", "75"));
+    await waitFor(() => expect(screen.getByRole("meter", { name: "Platform Delivery work distribution" })).toHaveAttribute("aria-valuenow", "75"));
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowWeeks", "12");
   });
 
@@ -813,7 +815,7 @@ describe("TeamDashboardScreen", () => {
   });
 });
 
-it("shows no completion share for zero completions and includes Unmapped drilldowns", async () => {
+it("shows no work distribution for zero completions and includes Unmapped drilldowns", async () => {
   const onOpenSettings = vi.fn();
   const empty = {
     ...dashboardPayload,
@@ -826,9 +828,9 @@ it("shows no completion share for zero completions and includes Unmapped drilldo
   render(<TeamDashboardScreen onOpenSettings={onOpenSettings} />);
   fireEvent.click(await screen.findByRole("button", { name: "Unmapped" }));
   expect(onOpenSettings).toHaveBeenCalledOnce();
-  expect(screen.queryByRole("meter", { name: "Unmapped share of completions" })).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Unmapped completion share unavailable")).toHaveTextContent("—");
-  expect(screen.getByLabelText("All work streams completion share unavailable")).toHaveTextContent("—");
+  expect(screen.queryByRole("meter", { name: "Unmapped work distribution" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Unmapped work distribution unavailable")).toHaveTextContent("—");
+  expect(screen.getByLabelText("All work streams work distribution unavailable")).toHaveTextContent("—");
   fireEvent.click(screen.getByRole("button", { name: "View 0 completed JIRA cards for Unmapped" }));
   expect(await screen.findByRole("dialog", { name: "Completed cards" })).toBeInTheDocument();
   await waitFor(() => {
@@ -850,7 +852,7 @@ it("sorts completion-share details with missing estimates and dates", async () =
     })),
   } });
   render(<TeamDashboardIssueOverlay selection={{ metric: "completionShare", scopeName: "Unmapped", groupIds: [0], value: 4 }} flowWeeks={4} onClose={vi.fn()} />);
-  const dialog = await screen.findByRole("dialog", { name: "Completion share cards" });
+  const dialog = await screen.findByRole("dialog", { name: "Work distribution" });
   await within(dialog).findByText("TB-4");
   const issueKeys = () => [...dialog.querySelectorAll("tbody tr")].map((row) => row.querySelector("td")?.textContent);
   fireEvent.click(within(dialog).getByRole("button", { name: /Sort by Story points/ }));

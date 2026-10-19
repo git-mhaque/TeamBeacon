@@ -69,7 +69,7 @@ function metricTitle(metric: TeamDashboardIssueMetric): string {
   if (metric === "completed") return "Completed cards";
   if (metric === "flowGap") return "Net backlog change cards";
   if (metric === "currentWip") return "Current WIP cards";
-  return "Completion share cards";
+  return "Work distribution";
 }
 
 function metricActivity(metric: TeamDashboardIssueMetric): InitiativeDeepDiveActivity {
@@ -185,7 +185,7 @@ function description(
     return `${sign}${selection.value} net backlog change. ${cardCount} unique card${cardCount === 1 ? " was" : "s were"} created or completed in ${period}; a card can contribute to both.`;
   }
   if (selection.metric === "completionShare") {
-    return `${selection.value} card${selection.value === 1 ? "" : "s"} completed in ${period}; these cards contribute to the completion share.`;
+    return `${selection.value} card${selection.value === 1 ? "" : "s"} completed in ${period}; these cards contribute to the work distribution.`;
   }
   if (selection.metric === "completedEpics") {
     return `${selection.value} configured epic${selection.value === 1 ? " is" : "s are"} complete as of the latest sync, based on epic status. Independent of the Flow period.`;

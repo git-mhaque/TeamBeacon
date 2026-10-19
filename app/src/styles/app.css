@@ -6365,6 +6365,17 @@ body {
 
 .tb-dashboard-work-stream-table th.is-progress {
   width: 22%;
+  text-align: right;
+}
+
+.tb-dashboard-metric-subtitle {
+  display: block;
+  margin-top: 0.15rem;
+  color: #66758a;
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .tb-dashboard-work-stream-table th.is-progress .tb-table-sort { justify-content: flex-end; }
@@ -6822,7 +6833,13 @@ body {
     text-align: right;
   }
 
-  .tb-dashboard-delivery-cell::before { display: block; }
+  .tb-dashboard-work-stream-table .tb-dashboard-delivery-cell::before {
+    display: block;
+    content: attr(data-label) "\a" attr(data-subtitle);
+    white-space: pre-line;
+    text-align: left;
+    text-transform: none;
+  }
   .tb-dashboard-delivery-cell > button,
   .tb-dashboard-delivery-cell > span { grid-column: 2; justify-self: end; }
   .tb-dashboard-delivery-cell > .tb-dashboard-progress { grid-column: 1 / -1; width: 100%; }

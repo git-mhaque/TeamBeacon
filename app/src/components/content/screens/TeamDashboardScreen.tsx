@@ -46,7 +46,7 @@ const METRIC_DESCRIPTIONS: Record<WorkStreamSortField, string> = {
   completedCount: "Cards completed during the selected period.",
   netFlow: "Created minus completed during the selected period. Positive means backlog grew; negative means it shrank.",
   currentWipCount: "Cards currently in progress, regardless of the selected period.",
-  completionSharePercent: "Percentage of all cards completed during the selected period that belong to this work stream.",
+  completionSharePercent: "Where the team’s completed work is distributed across streams during the selected period. Each completed card counts equally.",
 };
 
 type SortDirection = "asc" | "desc";
@@ -54,6 +54,7 @@ type SortDirection = "asc" | "desc";
 type SortableHeaderProps = {
   field: WorkStreamSortField;
   label: string;
+  subtitle?: string;
   activeField: WorkStreamSortField;
   direction: SortDirection;
   rowSpan?: number;
@@ -88,6 +89,7 @@ function compareWorkStreams(
 function SortableHeader({
   field,
   label,
+  subtitle,
   activeField,
   direction,
   rowSpan,
@@ -115,6 +117,7 @@ function SortableHeader({
         <span>{label}</span>
         <span className="tb-table-sort-indicator" aria-hidden="true">{indicator}</span>
       </button>
+      {subtitle ? <small className="tb-dashboard-metric-subtitle">{subtitle}</small> : null}
     </th>
   );
 }
@@ -146,12 +149,12 @@ function MetricDrilldownButton({
 }
 
 function CompletionShare({ count, total, name, onClick }: { count: number; total: number; name: string; onClick: () => void }) {
-  if (total === 0) return <span aria-label={`${name} completion share unavailable`}>—</span>;
+  if (total === 0) return <span aria-label={`${name} work distribution unavailable`}>—</span>;
   const share = Math.max(0, Math.min(100, count / total * 100));
   const label = `${Number(share.toFixed(1))}%`;
   return <>
-    <MetricDrilldownButton label={`View ${count} completed JIRA cards contributing to ${name} completion share`} onClick={onClick}>{label}</MetricDrilldownButton>
-    <div className="tb-dashboard-progress tb-dashboard-completion-share" role="meter" aria-label={`${name} share of completions`}
+    <MetricDrilldownButton label={`View ${count} completed JIRA cards contributing to ${name} work distribution`} onClick={onClick}>{label}</MetricDrilldownButton>
+    <div className="tb-dashboard-progress tb-dashboard-completion-share" role="meter" aria-label={`${name} work distribution`}
       aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(share.toFixed(1))}>
       <span style={{ width: `${share}%` }} />
     </div>
@@ -233,8 +236,8 @@ function WorkStreamTableSkeleton() {
             <th scope="col" className="is-number">Cards Completed</th>
             <th scope="col" className="is-flow-gap">Net backlog change</th>
             <th scope="col" className="is-number">WIP today</th>
-            <th scope="col" className="is-number is-epic-progress">Epic progress</th>
-            <th scope="col" className="is-progress">Share of completions</th>
+            <th scope="col" className="is-number is-epic-progress">Stream epic progress</th>
+            <th scope="col" className="is-progress">Work distribution<small className="tb-dashboard-metric-subtitle">By completed cards</small></th>
           </tr>
         </thead>
         <tbody>
@@ -245,8 +248,8 @@ function WorkStreamTableSkeleton() {
               <td data-label="Cards Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Net backlog change" className="is-flow-gap"><span className="tb-dashboard-skeleton is-table-pill" /></td>
               <td data-label="WIP today" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Epic progress" className="is-number is-epic-progress"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+              <td data-label="Stream epic progress" className="is-number is-epic-progress"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Work distribution" data-subtitle="By completed cards" className="tb-dashboard-delivery-cell">
                 <span className="tb-dashboard-skeleton is-table-progress-copy" />
                 <span className="tb-dashboard-skeleton is-table-progress" />
               </td>
@@ -457,7 +460,7 @@ export function TeamDashboardScreen({
           <div className="tb-dashboard-work-stream-table-wrap" role="region" aria-label="Work stream comparison" tabIndex={0}>
             <table className="tb-data-table tb-dashboard-work-stream-table">
               <caption className="tb-visually-hidden">
-                Work streams compared by card flow and share of completions in the selected period, plus current work in progress.
+                Work streams compared by card flow and work distribution in the selected period, plus current work in progress.
               </caption>
               <thead>
                 <tr>
@@ -502,7 +505,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="epicProgress"
-                    label="Epic progress"
+                    label="Stream epic progress"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-number is-epic-progress"
@@ -510,7 +513,8 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="completionSharePercent"
-                    label="Share of completions"
+                    label="Work distribution"
+                    subtitle="By completed cards"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-progress"
@@ -560,12 +564,12 @@ export function TeamDashboardScreen({
                           {workStream.currentWipCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Epic progress" className="is-number is-epic-progress">
+                      <td data-label="Stream epic progress" className="is-number is-epic-progress">
                         <EpicProgress total={workStream.epicCount} completed={workStream.completedEpicCount} name={workStream.name}
                           onAll={() => openIssueOverlay("epics", workStream.name, [workStream.id], workStream.epicCount)}
                           onCompleted={() => openIssueOverlay("completedEpics", workStream.name, [workStream.id], workStream.completedEpicCount ?? 0)} />
                       </td>
-                      <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                      <td data-label="Work distribution" data-subtitle="By completed cards" className="tb-dashboard-delivery-cell">
                         <CompletionShare count={workStream.completedCount} total={workStreamTotals.completedCount} name={workStream.name}
                           onClick={() => openIssueOverlay("completionShare", workStream.name, [workStream.id], workStream.completedCount)} />
                       </td>
@@ -610,12 +614,12 @@ export function TeamDashboardScreen({
                       {workStreamTotals.currentWipCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Epic progress" className="is-number is-epic-progress">
+                  <td data-label="Stream epic progress" className="is-number is-epic-progress">
                     <EpicProgress total={workStreamTotals.epicCount} completed={completedEpicTotal} name="all work streams"
                       onAll={() => openIssueOverlay("epics", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.epicCount)}
                       onCompleted={() => openIssueOverlay("completedEpics", "All work streams", sortedWorkStreams.map(({ id }) => id), completedEpicTotal ?? 0)} />
                   </td>
-                  <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                  <td data-label="Work distribution" data-subtitle="By completed cards" className="tb-dashboard-delivery-cell">
                     <CompletionShare count={workStreamTotals.completedCount} total={workStreamTotals.completedCount} name="All work streams"
                       onClick={() => openIssueOverlay("completionShare", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)} />
                   </td>
