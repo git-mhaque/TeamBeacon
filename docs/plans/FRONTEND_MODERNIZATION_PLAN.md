@@ -132,10 +132,10 @@ The current visual hierarchy is clear enough to operate, but navigation descript
 The current navigation order, including approved post-parity additions, is:
 
 1. Team Dashboard.
-2. Initiative Insights.
-3. Initiative Deep Dive.
-4. Sprint Insights.
-5. Team Insights.
+2. Initiative Deep Dive.
+3. Initiative Insights.
+4. Team Insights.
+5. Sprint Insights.
 6. Security Insights.
 7. Operations Insights.
 8. Release Insights.

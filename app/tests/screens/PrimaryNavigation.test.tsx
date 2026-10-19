@@ -11,7 +11,7 @@ describe("PrimaryNavigation", () => {
     const nav = screen.getByRole("navigation", { name: "Primary navigation" });
     const buttons = within(nav).getAllByRole("button");
     expect(buttons.map(button => button.querySelector(".tb-nav-short-label")?.textContent)).toEqual([
-      "Dashboard", "Initiatives", "Deep dive", "Sprints", "Team", "Security", "Operations", "Releases", "Report", "Settings",
+      "Dashboard", "Deep dive", "Initiatives", "Team", "Sprints", "Security", "Operations", "Releases", "Report", "Settings",
     ]);
     expect(buttons[0]).toHaveAttribute("aria-current", "page");
     expect(buttons.filter(button => button.hasAttribute("aria-current"))).toHaveLength(1);
@@ -19,6 +19,9 @@ describe("PrimaryNavigation", () => {
     fireEvent.click(deepDive);
     expect(onNavigate).toHaveBeenCalledWith("initiative-deep-dive");
     rerender(<PrimaryNavigation active="initiative-deep-dive" isExpanded onNavigate={onNavigate} />);
+    expect(within(nav).getAllByRole("button").map(button => button.querySelector(".tb-nav-short-label")?.textContent)).toEqual([
+      "Dashboard", "Deep dive", "Initiatives", "Team", "Sprints", "Security", "Operations", "Releases", "Report", "Settings",
+    ]);
     expect(deepDive).toHaveAttribute("aria-current", "page");
     expect(buttons[0]).not.toHaveAttribute("aria-current");
     const settings = within(nav).getByRole("button", { name: /Settings: Work streams & configuration/ });
