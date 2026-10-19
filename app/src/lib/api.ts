@@ -324,6 +324,7 @@ export type InitiativeView = {
 
 export type ConfiguredEpicSummaryResponse = {
   epics: InitiativeEpicSummary[];
+  jiraBaseUrl?: string | null;
   generatedAt?: string | null;
   dataAsOf?: string | null;
   reportingPeriod?: EpicSummaryReportingPeriod;

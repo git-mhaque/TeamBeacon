@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from services.api.metadata import epic_config as metadata
 
@@ -125,3 +127,45 @@ class EpicMetadataBoundaryTests(unittest.TestCase):
             self.assertEqual(result["successCriteria"], [])
             self.assertEqual(result["completedCards"], 1)
             self.assertEqual(result["completedInPeriod"], 0)
+
+
+class EpicSummaryDatabasePerformanceTests(unittest.TestCase):
+    def test_bulk_metrics_preserve_direct_parent_and_subtask_membership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            db = str(Path(directory) / "report.db")
+            for key in ["E-1", "E-2", "E-3", "S-1"]:
+                metadata.upsert_epic_metadata(epic_key=key, success_criteria=[], group_ids=[], work_type_ids=[], db_path=db)
+            with sqlite3.connect(db) as conn:
+                conn.executemany(
+                    "INSERT INTO issues(issue_key,issue_id,summary,issue_type,epic_key,parent_issue_key,status_name,status_category,resolved_at_source) VALUES(?,?,'Fixture',?,?,?,?,?,?)",
+                    [
+                        ("E-1", "e1", "Epic", None, None, "Done", "Done", "2026-03-10T00:00:00Z"),
+                        ("E-2", "e2", "Epic", None, None, "Done", "Done", "2026-03-10T00:00:00Z"),
+                        ("S-1", "s1", "Story", "E-1", "E-1", "Done", "Done", "2026-03-10T00:00:00Z"),
+                        ("S-2", "s2", "Sub-task", "E-2", "S-1", "Closed", None, "2026-03-10T00:00:00Z"),
+                        ("S-3", "s3", "Sub-task", None, "S-1", "Done", "Done", "2026-02-28T23:30:00Z"),
+                        ("S-4", "s4", "Story", None, "E-2", "In progress", "In Progress", None),
+                        ("X-1", "x1", "Story", None, None, "Done", "Done", "2026-03-10T00:00:00Z"),
+                    ],
+                )
+            queries: list[str] = []
+            original_connect = metadata._connect
+
+            def traced_connect(path: str) -> sqlite3.Connection:
+                connection = original_connect(path)
+                connection.set_trace_callback(queries.append)
+                return connection
+
+            with patch.object(metadata, "_connect", side_effect=traced_connect), patch.dict(os.environ, {"JIRA_BASE_URL": "https://jira.example.com/", "JIRA_PAT": ""}):
+                payload = metadata.get_configured_epic_summary(limit=None, period_start="2026-03-01", period_end="2026-03-31", timezone_name="Australia/Melbourne", db_path=db)
+            metrics = {row["epicKey"]: (row["totalCards"], row["completedCards"], row["completedInPeriod"]) for row in payload["epics"]}
+            self.assertEqual(metrics, {"E-1": (3, 3, 3), "E-2": (2, 1, 1), "E-3": (0, 0, 0), "S-1": (2, 2, 2)})
+            self.assertEqual(payload["jiraBaseUrl"], "https://jira.example.com")
+            scans = [query for query in queries if "p.epic_key AS parent_epic_key" in query]
+            self.assertEqual(len(scans), 1)
+
+    def test_empty_report_works_without_jira_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"JIRA_BASE_URL": "", "JIRA_PAT": ""}):
+            payload = metadata.get_configured_epic_summary(limit=None, db_path=str(Path(directory) / "empty.db"))
+            self.assertEqual(payload["epics"], [])
+            self.assertIsNone(payload["jiraBaseUrl"])

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
 import json
+import os
 import sqlite3
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -1053,54 +1054,49 @@ def get_epic_metadata(
 
 def _read_epic_completion_metrics(
     conn: sqlite3.Connection,
-    epic_key: str,
+    epic_keys: set[str],
     *,
     period_start_date: date,
     period_end_date: date,
     reporting_timezone: ZoneInfo,
-) -> tuple[int, int, int]:
+) -> dict[str, tuple[int, int, int]]:
+    # Read the current issue scope once instead of rescanning it for every epic.
+    counts = {key: [0, 0, 0] for key in epic_keys}
+    if not epic_keys:
+        return {}
     current_scope_clause, current_scope_params = _current_full_sync_issue_clause(conn, "i")
     rows = conn.execute(
         f"""
-        SELECT
-          i.status_name,
-          i.status_category,
-          i.resolved_at_source,
-          i.updated_at_source,
-          i.synced_at
+        SELECT i.issue_key, i.epic_key, i.parent_issue_key,
+               p.epic_key AS parent_epic_key,
+               i.status_name, i.status_category,
+               i.resolved_at_source, i.updated_at_source, i.synced_at
         FROM issues i
-        WHERE i.issue_key <> ?
-          AND LOWER(COALESCE(i.issue_type, '')) <> 'epic'
-          AND (
-            i.epic_key = ?
-            OR i.parent_issue_key = ?
-            OR EXISTS (
-              SELECT 1
-              FROM issues p
-              WHERE p.issue_key = i.parent_issue_key
-                AND p.epic_key = ?
-            )
-          )
+        LEFT JOIN issues p ON p.issue_key = i.parent_issue_key
+        WHERE LOWER(COALESCE(i.issue_type, '')) <> 'epic'
           {current_scope_clause}
         """,
-        [epic_key, epic_key, epic_key, epic_key, *current_scope_params],
-    ).fetchall()
-    total_cards = len(rows)
-    completed_cards = 0
-    completed_in_period = 0
+        current_scope_params,
+    )
     for row in rows:
-        if not _is_done_issue(row):
+        # Preserve membership in every matching epic, including parent/subtask scope,
+        # without double-counting a card with multiple links to the same epic.
+        matches = {row["epic_key"], row["parent_issue_key"], row["parent_epic_key"]} & epic_keys
+        matches.discard(row["issue_key"])
+        if not matches:
             continue
-        completed_cards += 1
-        if _is_completed_in_period(
+        done = _is_done_issue(row)
+        in_period = done and _is_completed_in_period(
             row,
             period_start_date=period_start_date,
             period_end_date=period_end_date,
             reporting_timezone=reporting_timezone,
-        ):
-            completed_in_period += 1
-
-    return (total_cards, completed_cards, completed_in_period)
+        )
+        for key in matches:
+            counts[key][0] += 1
+            counts[key][1] += int(done)
+            counts[key][2] += int(in_period)
+    return {key: (values[0], values[1], values[2]) for key, values in counts.items()}
 
 
 def _fetch_configured_epic_rows(
@@ -1177,6 +1173,13 @@ def get_configured_epic_summary(
     try:
         _ensure_metadata_schema(conn)
         rows, view = _fetch_configured_epic_rows(conn, limit=safe_limit, view_id=view_id)
+        completion_metrics = _read_epic_completion_metrics(
+            conn,
+            {str(row["epic_key"]) for row in rows},
+            period_start_date=period_start_date,
+            period_end_date=period_end_date,
+            reporting_timezone=resolved_timezone,
+        )
 
         epics: list[dict[str, Any]] = []
         for row in rows:
@@ -1186,13 +1189,7 @@ def get_configured_epic_summary(
             if metadata_entry and metadata_entry.get("epicTitle"):
                 epic_name_raw = metadata_entry.get("epicTitle")
             epic_name = str(epic_name_raw).strip() if epic_name_raw is not None else ""
-            total_cards, completed_cards, completed_in_period = _read_epic_completion_metrics(
-                conn,
-                epic_key,
-                period_start_date=period_start_date,
-                period_end_date=period_end_date,
-                reporting_timezone=resolved_timezone,
-            )
+            total_cards, completed_cards, completed_in_period = completion_metrics[epic_key]
             completion_percent = round((completed_cards / total_cards) * 100, 1) if total_cards > 0 else 0.0
             delta_percent = round((completed_in_period / total_cards) * 100, 1) if total_cards > 0 else 0.0
             success_criteria = (
@@ -1239,6 +1236,7 @@ def get_configured_epic_summary(
         conn.close()
     return {
         "epics": epics,
+        "jiraBaseUrl": os.getenv("JIRA_BASE_URL", "").strip().rstrip("/") or None,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "reportingPeriod": {
             "startDate": period_start_date.isoformat(),

@@ -4,7 +4,6 @@ import {
   type ConfiguredEpicsCompletedCardsResponse,
   fetchConfiguredEpicsCompletedCards,
   fetchConfiguredEpicSummary,
-  fetchJiraIntegrationStatus,
   InitiativeEpicSummary,
 } from "../../../lib/api";
 import { completedWorkHeading, groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSummaryGroup, type CompletedWorkSource } from "../../../lib/reportCompletedWork";
@@ -1022,15 +1021,6 @@ export function TeamReportScreen() {
     return promise;
   }, []);
 
-  // Link configuration must not hold up local report data or depend on AI health.
-  useEffect(() => {
-    let active = true;
-    void fetchJiraIntegrationStatus().then((status) => {
-      if (active) setJiraBaseUrl(status.config.baseUrl?.replace(/\/$/, "") || null);
-    }).catch(() => { if (active) setJiraBaseUrl(null); });
-    return () => { active = false; };
-  }, []);
-
   const persistInitiativeSelection = useCallback((keys: string[], mode: ReportSelectionMode) => {
     void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify({ mode, keys }));
   }, []);
@@ -1049,6 +1039,7 @@ export function TeamReportScreen() {
         timezone: browserTimezone,
       });
       if (reportRequestSequence.current !== requestId) return;
+      setJiraBaseUrl(summaryPayload.jiraBaseUrl?.replace(/\/$/, "") || null);
       const summaryRows = summaryPayload.epics ?? [];
       setResolvedReportingPeriod(summaryPayload.reportingPeriod ?? null);
 

@@ -40,6 +40,7 @@ describe("TeamReportScreen", () => {
 
       if (url.includes("/api/metadata/epics/summary")) {
         return jsonResponse({
+          jiraBaseUrl: "https://jira.example.com",
           epics: [
             {
               epicKey: "CEG-EPIC-12",
@@ -78,23 +79,6 @@ describe("TeamReportScreen", () => {
             days: 7,
             timezone: "UTC",
           },
-        });
-      }
-
-      if (url.includes("/api/integrations/jira/status")) {
-        return jsonResponse({
-          source: "jira",
-          connected: true,
-          checkedAt: "2026-03-30T09:15:00Z",
-          config: {
-            baseUrl: "https://jira.example.com",
-            projectKey: "CEG",
-            boardId: 42,
-          },
-          checks: [
-            { name: "auth", ok: true, detail: "reachable" },
-            { name: "project", ok: true, detail: "resolved" },
-          ],
         });
       }
 
@@ -284,7 +268,7 @@ describe("TeamReportScreen", () => {
       expect(within(chart).getByText("28.6%")).toBeInTheDocument();
     }
 
-    expect(fetchSpy.mock.calls.some(([url]) => /\/api\/(ai\/chat|integrations\/ai\/status)/.test(String(url)))).toBe(false);
+    expect(fetchSpy.mock.calls.some(([url]) => /\/api\/(ai\/chat|integrations\/)/.test(String(url)))).toBe(false);
     const completedCalls = () => fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured")).length;
     const initialCompletedCallCount = completedCalls();
     fireEvent.click(screen.getByRole("button", { name: "Refresh Completed Work Summary" }));
@@ -360,23 +344,23 @@ const completedCardPayload = (summary = "Delivered deterministic report") => ({
   }],
 });
 
-it("starts report and card requests together and renders without waiting for JIRA health", async () => {
+it("loads database data and source links without making any integration requests", async () => {
   let finishSummary!: (response: Response) => void;
   const summaryPromise = new Promise<Response>((resolve) => { finishSummary = resolve; });
   const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
     const url = String(input);
-    if (url.includes("/integrations/jira/status")) return new Promise<Response>(() => undefined);
     if (url.includes("/metadata/epics/summary")) return summaryPromise;
     if (url.includes("/completed-cards/configured")) return jsonResponse(completedCardPayload());
     return Promise.reject(new Error(`Unexpected request: ${url}`));
   });
   render(<TeamReportScreen />);
   await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured"))).toHaveLength(1));
-  await act(async () => { finishSummary(await jsonResponse({ epics: [fastReportEpic] })); });
+  await act(async () => { finishSummary(await jsonResponse({ epics: [fastReportEpic], jiraBaseUrl: "https://jira.example.com/" })); });
   expect(await screen.findByText("Delivered deterministic report")).toBeInTheDocument();
   expect(screen.getByText("Source: synced JIRA issues")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeEnabled();
-  expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/ai/"))).toBe(false);
+  expect(fetchSpy.mock.calls.some(([url]) => /\/(ai|integrations)\//.test(String(url)))).toBe(false);
+  expect(screen.getByRole("link", { name: "PERF-2" })).toHaveAttribute("href", "https://jira.example.com/browse/PERF-2");
   expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured"))).toHaveLength(1);
 });
 
