@@ -476,7 +476,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                         {
                             "name": "periodEnd", "in": "query",
                             "schema": {"type": "string", "format": "date"},
-                            "description": "Inclusive custom end; must be today or earlier in the selected timezone.",
+                            "description": "Inclusive custom end; future dates are allowed within the 366-day range limit.",
                         },
                         {
                             "name": "recentLimit",
@@ -606,7 +606,7 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "name": "chartEnd",
                             "in": "query",
                             "schema": {"type": "string", "format": "date"},
-                            "description": "Inclusive custom reporting-period end; requires chartStart and cannot be after today.",
+                            "description": "Inclusive custom reporting-period end; requires chartStart. Future dates are allowed for primary work-stream scope (dashboard drilldowns).",
                         },
                         {
                             "name": "tableWindowWeeks",

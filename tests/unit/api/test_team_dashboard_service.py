@@ -10,11 +10,18 @@ from services.api.issues.team_dashboard import get_team_dashboard
 class TeamDashboardServiceUnitTests(unittest.TestCase):
     def test_custom_period_validation(self) -> None:
         for start, end in [("bad", "2026-08-01"), ("2026-08-01", None),
-                           ("2026-08-02", "2026-08-01"), ("2026-01-01", "2027-01-01"),
+                           ("2026-08-02", "2026-08-01"), ("2026-01-01", "2027-01-02"),
                            ("2024-01-01", "2026-01-01")]:
             with self.subTest(start=start, end=end), self.assertRaises(ValueError):
                 get_team_dashboard(period_start=start, period_end=end,
                                    now=datetime(2026, 8, 11, tzinfo=timezone.utc))
+
+    @patch("services.api.issues.team_dashboard._safe_call", return_value={})
+    def test_accepts_future_custom_end_date(self, safe_call) -> None:
+        result = get_team_dashboard(period_start="2026-09-01", period_end="2026-11-30",
+                                    now=datetime(2026, 10, 19, tzinfo=timezone.utc))
+        self.assertEqual(result["flowPeriod"]["startDate"], "2026-09-01")
+        self.assertEqual(result["flowPeriod"]["endDate"], "2026-11-30")
 
     @patch("services.api.issues.team_dashboard._safe_call")
     def test_custom_period_is_forwarded_and_returned_without_work_streams(self, safe_call) -> None:

@@ -149,6 +149,7 @@ def _resolve_chart_range(
     chart_start: str | None,
     chart_end: str | None,
     local_today: date,
+    allow_future_end: bool = False,
 ) -> tuple[date, date]:
     normalized_start = _normalize_chart_date(chart_start, field_name="chartStart")
     normalized_end = _normalize_chart_date(chart_end, field_name="chartEnd")
@@ -159,7 +160,7 @@ def _resolve_chart_range(
         return _week_start(local_today) - timedelta(weeks=normalized_chart_weeks - 1), local_today
     if normalized_start > normalized_end:
         raise ValueError("chartStart cannot be after chartEnd.")
-    if normalized_end > local_today:
+    if normalized_end > local_today and not allow_future_end:
         raise ValueError("chartEnd cannot be after today in the selected timezone.")
     range_days = (normalized_end - normalized_start).days + 1
     if range_days > _MAX_REPORTING_PERIOD_DAYS:
@@ -598,6 +599,7 @@ def get_initiative_deep_dive(
         chart_start=chart_start,
         chart_end=chart_end,
         local_today=local_today,
+        allow_future_end=primary_only,
     )
     if normalized_table_window is None:
         table_start_date = chart_start_date

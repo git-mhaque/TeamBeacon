@@ -433,6 +433,21 @@ class InitiativeDeepDiveServiceUnitTests(unittest.TestCase):
             self.assertEqual(set(issue_keys), {"TB-1", "TB-2", "TB-7", "TB-9"})
             self.assertEqual(len(issue_keys), len(set(issue_keys)))
 
+    def test_dashboard_drilldown_accepts_future_end_and_empty_future_buckets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "teambeacon.db")
+            platform_id, _ = self._seed_database(db_path)
+            payload = get_initiative_deep_dive(
+                group_id=platform_id, work_stream_scope="primary",
+                chart_start="2026-08-01", chart_end="2026-11-30",
+                db_path=db_path, now=datetime(2026, 8, 10, 12, tzinfo=timezone.utc),
+            )
+            self.assertEqual(payload["chartRange"]["endDate"], "2026-11-30")
+            self.assertEqual(payload["selectedPeriod"]["endDate"], "2026-11-30")
+            self.assertEqual(payload["weekly"][-1]["newCount"], 0)
+            self.assertEqual(payload["weekly"][-1]["completedCount"], 0)
+            self.assertGreater(payload["count"], 0)
+
     def test_rejects_invalid_scope_and_query_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             db_path = str(Path(tmp_dir) / "teambeacon.db")

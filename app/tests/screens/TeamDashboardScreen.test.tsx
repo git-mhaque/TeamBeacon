@@ -119,9 +119,6 @@ describe("TeamDashboardScreen", () => {
     fireEvent.input(end, { target: { value: "2026-08-01" } });
     fireEvent.click(save);
     expect(screen.getByRole("alert")).toHaveTextContent("after end");
-    fireEvent.input(end, { target: { value: "2099-08-01" } });
-    fireEvent.click(save);
-    expect(screen.getByRole("alert")).toHaveTextContent("after today");
     fireEvent.input(start, { target: { value: "2020-08-01" } });
     fireEvent.input(end, { target: { value: "2026-08-01" } });
     fireEvent.click(save);
@@ -147,6 +144,23 @@ describe("TeamDashboardScreen", () => {
     await waitFor(() => expect(select).not.toBeDisabled());
     expect(select).toHaveValue("12");
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowRange", "null");
+  });
+
+  it("saves a future end date and uses it for card drilldowns", async () => {
+    const fetchMock = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+    render(<TeamDashboardScreen />);
+    const select = screen.getByRole("combobox", { name: /Flow period/ });
+    await waitFor(() => expect(select).not.toBeDisabled());
+    fireEvent.change(select, { target: { value: "custom" } });
+    fireEvent.input(screen.getByLabelText("Start"), { target: { value: "2099-09-01" } });
+    fireEvent.input(screen.getByLabelText("End"), { target: { value: "2099-11-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(select).not.toBeDisabled());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(select).toHaveValue("custom");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("periodEnd=2099-11-30"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "View 12 created JIRA cards for Platform Delivery" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("chartEnd=2099-11-30"))).toBe(true));
   });
 
   it.each(["broken", JSON.stringify({ startDate: "bad", endDate: "bad" }), JSON.stringify({ startDate: "2026-08-01", endDate: "2026-08-02" })])("restores only valid custom date preferences: %s", async (stored) => {

@@ -686,13 +686,11 @@ export function TeamDashboardScreen({
           <div className="tb-modal-backdrop" onClick={() => setIsFlowConfigOpen(false)} />
           <div className="tb-modal tb-modal-reporting">
             <header className="tb-modal-head">
-              <div><h3>Configure Flow Period</h3><p className="tb-muted-note">Set the date range for work stream flow. Choose up to 366 days, ending today or earlier.</p></div>
+              <div><h3>Configure Flow Period</h3><p className="tb-muted-note">Set the date range for work stream flow. Choose up to 366 days, including future dates.</p></div>
               <div className="tb-action-row">
                 <button ref={flowCancelRef} type="button" className="tb-btn tb-btn-sm" onClick={() => setIsFlowConfigOpen(false)}>Cancel</button>
                 <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={() => {
                   let validationError = validateDateRange(flowDraft);
-                  const today = new Date().toLocaleDateString("en-CA");
-                  if (!validationError && flowDraft.endDate > today) validationError = "End date cannot be after today.";
                   if (!validationError && (Date.parse(flowDraft.endDate) - Date.parse(flowDraft.startDate)) / 86400000 >= 366) validationError = "Flow period cannot exceed 366 days.";
                   setFlowValidationError(validationError);
                   if (validationError) return;

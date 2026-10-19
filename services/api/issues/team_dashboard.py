@@ -135,6 +135,7 @@ def get_team_dashboard(
             chart_start=period_start,
             chart_end=period_end,
             local_today=generated_at.astimezone(reporting_timezone).date(),
+            allow_future_end=True,
         )
         custom_range = {"chart_start": start.isoformat(), "chart_end": end.isoformat()}
     recent_cutoff = generated_at - timedelta(days=_RECENT_COMPLETION_DAYS)
