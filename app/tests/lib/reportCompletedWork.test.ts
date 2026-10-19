@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { groupCompletedWorkByEpic, groupCompletedWork, reportJiraIssueUrl, type CompletedWorkSource } from "../../src/lib/reportCompletedWork";
 
 const sources: CompletedWorkSource[] = [
-  { cardId: "card-1", group: "Platform", epicKey: "P-1", epicName: "Search", issueKey: "P-2", issueTitle: "Fix timeout", fallbackText: "Fixed timeout" },
-  { cardId: "card-2", group: "Security", epicKey: "P-3", epicName: "Security", issueKey: "P-4", issueTitle: "Patch dependency", fallbackText: "Patched dependency" },
-  { cardId: "card-3", group: "Platform", epicKey: "P-1", epicName: "Search", issueKey: "P-5", issueTitle: "Add index", fallbackText: "Added index" },
+  { cardId: "card-1", group: "Platform", epicKey: "P-1", epicName: "Search", issueKey: "P-2", issueTitle: "Fix timeout" },
+  { cardId: "card-2", group: "Security", epicKey: "P-3", epicName: "Security", issueKey: "P-4", issueTitle: "Patch dependency" },
+  { cardId: "card-3", group: "Platform", epicKey: "P-1", epicName: "Search", issueKey: "P-5", issueTitle: "Add index" },
 ];
 
 describe("completed work sources", () => {
   it("groups interleaved bullets by epic key, preserving epic and issue order", () => {
-    const bullets = sources.map((source) => ({ text: source.fallbackText, source }));
+    const bullets = sources.map((source) => ({ text: source.issueTitle, source }));
     const sameNameDifferentEpic = { text: "Separate epic", source: { ...sources[0], epicKey: "P-99" } };
     expect(groupCompletedWorkByEpic([...bullets, sameNameDifferentEpic])).toEqual([
       { epicKey: "P-1", epicName: "Search", bullets: [bullets[0], bullets[2]] },
@@ -24,29 +24,19 @@ describe("completed work sources", () => {
     expect(groupCompletedWorkByEpic([])).toEqual([]);
   });
 
-  it("matches reordered AI bullets by ID and groups using the source work stream", () => {
-    const result = groupCompletedWork(sources, [
-      { cardId: "card-3", text: "Improved indexing" },
-      { cardId: "card-1", text: "Improved reliability" },
-      { cardId: "card-2", text: "Strengthened security" },
-    ]);
+  it("groups original titles by source work stream without rewriting or clipping", () => {
+    const result = groupCompletedWork(sources);
     expect(result).toEqual([
-      { group: "Platform", bullets: [{ text: "Improved reliability", source: sources[0] }, { text: "Improved indexing", source: sources[2] }] },
-      { group: "Security", bullets: [{ text: "Strengthened security", source: sources[1] }] },
+      { group: "Platform", bullets: [{ text: "Fix timeout", source: sources[0] }, { text: "Add index", source: sources[2] }] },
+      { group: "Security", bullets: [{ text: "Patch dependency", source: sources[1] }] },
     ]);
   });
 
-  it("ignores missing, invented, duplicate and empty AI references and falls back to the source outcome", () => {
-    const result = groupCompletedWork(sources, [
-      { cardId: undefined, text: "Untraceable" },
-      { cardId: "invented", text: "Unknown" },
-      { cardId: "card-1", text: "First outcome" },
-      { cardId: "card-1", text: "Duplicate" },
-      { cardId: "card-2", text: "  " },
-    ]);
-    expect(result[0].bullets).toEqual([{ text: "First outcome", source: sources[0] }, { text: "Added index", source: sources[2] }]);
-    expect(result[1].bullets).toEqual([{ text: "Patched dependency", source: sources[1] }]);
-    expect(groupCompletedWork([], [])).toEqual([]);
+  it("handles empty input and missing titles deterministically", () => {
+    expect(groupCompletedWork([])).toEqual([]);
+    expect(groupCompletedWork([{ ...sources[0], issueTitle: "  " }])[0].bullets[0].text).toBe("No summary provided.");
+    const title = "Keep the complete issue title including P-123 and its details " .repeat(5).trim();
+    expect(groupCompletedWork([{ ...sources[0], issueTitle: title }])[0].bullets[0].text).toBe(title);
   });
 
   it("constructs encoded issue links only for valid HTTP(S) configurations", () => {

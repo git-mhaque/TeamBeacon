@@ -8539,15 +8539,10 @@ body {
   line-height: 1.5;
 }
 
-.tb-exec-completed-source {
-  margin-top: 0.2rem;
-  color: #625a54;
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
 
-.tb-exec-completed-epic .tb-exec-narrative-list li + li {
-  margin-top: 0.65rem;
+.tb-exec-completed-epic .tb-exec-narrative-list {
+  gap: 0.2rem;
+  line-height: 1.4;
 }
 
 .tb-exec-workmix-grid {

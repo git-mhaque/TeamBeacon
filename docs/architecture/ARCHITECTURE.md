@@ -50,7 +50,7 @@ TeamBeacon is a self-hosted web analytics system:
 3. API normalizes and stores data.
 4. Metrics engine computes initiative/team/release KPIs (including initiative creation/completion flow, current WIP, sprint trend, release cycle-time, and readiness metrics).
 5. UI reads snapshots and renders dashboards.
-6. Reporting module compares current state with last report baseline and can generate AI-assisted narrative drafts.
+6. Reporting module compares current state with the report baseline and generates completed-work summaries directly from synced JIRA issues.
 
 ## 6. RAG Determination (Initiatives)
 Composite score from configurable rules:
@@ -125,9 +125,9 @@ Initiative RAG requires an enabled timeline and valid target completion date. Un
 
 Team Report stores initiative selection as a browser preference containing manual/automatic mode and ordered epic keys. Legacy key arrays parse as manual selections. The UI resolves automatic membership from existing reporting-period completion counts, retains valid custom order and preserves empty selections; no API/schema change is needed. Draft modal edits become active only on Save.
 
-Team Report displays panels in this order on screen and in HTML exports: Report Signals, Work Mix by Work Stream and Type, Progress for Key Initiatives, Completed Work Summary. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; only Completed Work Summary generates an AI narrative.
+Team Report displays panels in this order on screen and in HTML exports: Report Signals, Work Mix by Work Stream and Type, Progress for Key Initiatives, Completed Work Summary. Executive Summary and Wins and Risks are removed from the screen and exports, including their AI requests and refresh controls; Completed Work Summary is generated programmatically from synced issue titles without AI requests.
 
-Completed Work Summary is grouped by work stream, then epic. Each linked epic title appears once above its outcome bullets; each bullet shows its linked issue key and original issue title on a smaller, muted second line. Screen and HTML exports use the same layout and open JIRA links in new tabs. Source metadata comes from synced records; AI bullets are matched by card ID, with original-outcome fallbacks for missing or invalid references. Without a valid JIRA URL, source details remain visible as plain text.
+Completed Work Summary is grouped by work stream, then epic. Each epic heading appears once as the title followed by its linked epic key in parentheses above its completed issue titles; each bullet shows the original issue title followed by its linked JIRA issue key in parentheses on the same line. Screen and HTML exports use the same layout and open JIRA links in new tabs. Titles and source metadata come directly from synced records without rewriting or clipping. Report and completed-card requests start together, completed cards are reused for selection changes within the same period, and Refresh reloads them. JIRA link configuration loads independently and does not block report data. Without a valid JIRA URL, source details remain visible as plain text.
 
 Team Report work mix uses two equal donut-chart panels (Work Stream Mix and Work Type Mix), side by side on wide screens and stacked on narrow screens. Tables are removed; legends retain category names and percentages beside the original-style donuts, with no total or category counts and an explicit No data state for zero completions. HTML exports use the same chart layout.
 

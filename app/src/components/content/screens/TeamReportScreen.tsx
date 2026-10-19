@@ -1,8 +1,7 @@
 import { useCallback, useId, useEffect, useMemo, useRef, useState } from "react";
 import {
-  chatWithOciGenAi,
   EpicSummaryReportingPeriod,
-  fetchAiIntegrationStatus,
+  type ConfiguredEpicsCompletedCardsResponse,
   fetchConfiguredEpicsCompletedCards,
   fetchConfiguredEpicSummary,
   fetchJiraIntegrationStatus,
@@ -366,9 +365,9 @@ function buildTeamReportExportHtml(params: {
           <h4>${escapeHtml(entry.group)}</h4>
           ${groupCompletedWorkByEpic(entry.bullets).map((epic) => `
             <div class="completed-epic">
-              ${epic.epicKey ? `<h5>${sourceLink(epic.epicKey, epic.epicName)}</h5>` : ""}
+              ${epic.epicKey ? `<h5><span>${escapeHtml(epic.epicName)}</span> (${sourceLink(epic.epicKey, epic.epicKey)})</h5>` : ""}
               <ul>
-                ${epic.bullets.map((bullet) => `<li><div>${escapeHtml(bullet.text)}</div>${bullet.source ? `<div class="completed-source">${sourceLink(bullet.source.issueKey, bullet.source.issueKey)} · ${escapeHtml(bullet.source.issueTitle)}</div>` : ""}</li>`).join("")}
+                ${epic.bullets.map((bullet) => `<li><span>${escapeHtml(bullet.text)}</span>${bullet.source ? ` (${sourceLink(bullet.source.issueKey, bullet.source.issueKey)})` : ""}</li>`).join("")}
               </ul>
             </div>
           `).join("")}
@@ -570,8 +569,8 @@ function buildTeamReportExportHtml(params: {
       }
       .completed-epic { margin-top: 14px; overflow-wrap: anywhere; }
       .completed-epic h5 { margin: 0; font-size: 13px; font-weight: 600; }
-      .completed-epic li { margin-bottom: 10px; }
-      .completed-source { margin-top: 3px; font-size: 12px; color: #625a54; line-height: 1.45; }
+      .completed-epic ul { display: grid; gap: 3px; }
+      .completed-epic li { margin: 0; line-height: 1.4; }
       .section-block:first-child {
         border-top: none;
         padding-top: 0;
@@ -902,202 +901,11 @@ function buildSimplifiedInitiativeName(raw: string | null | undefined, fallbackA
   return words.slice(0, 4).join(" ");
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function applyTextReplacements(text: string, replacements: Map<string, string>): string {
-  const sortedPairs = [...replacements.entries()]
-    .map(([from, to]) => [from.trim(), to.trim()] as const)
-    .filter(([from, to]) => from.length > 0 && to.length > 0)
-    .sort((left, right) => right[0].length - left[0].length);
-
-  let next = text;
-  for (const [from, to] of sortedPairs) {
-    next = next.replace(new RegExp(escapeRegExp(from), "gi"), to);
-  }
-  return next;
-}
-
-function stripIsoTimestamps(text: string): string {
-  return text
-    .replace(
-      /\b(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g,
-      "$1",
-    )
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-function formatCompletedDateForPrompt(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "n/a";
-
-  const candidate = stripIsoTimestamps(trimmed);
-  const datePart = candidate.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
-  if (!datePart) return candidate;
-
-  const parsedUtcDay = parseIsoDateToUtcDay(datePart);
-  if (parsedUtcDay === null) return datePart;
-
-  return new Date(parsedUtcDay).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function sanitizeNarrativeText(text: string, replacements?: Map<string, string>): string {
-  let next = text
-    .trim()
-    .replace(/\s+/g, " ")
-    .replace(/\b[A-Z][A-Z0-9]+-\d+\b/g, "")
-    .replace(/\bSP\s*\d+\b/gi, "")
-    .replace(/\bstory\s*points?\b/gi, "");
-
-  if (replacements && replacements.size > 0) {
-    next = applyTextReplacements(next, replacements);
-  }
-
-  return next
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+([,.;:])/g, "$1")
-    .replace(/^[,.;:\-\s]+/, "")
-    .trim();
-}
-
-function clipWords(text: string, maxWords: number): string {
-  const words = text.trim().split(/\s+/).filter((word) => word.length > 0);
-  if (words.length <= maxWords) return text.trim();
-  return `${words.slice(0, maxWords).join(" ")}...`;
-}
-
-function buildCompletedCardFallbackBullet(outcome: string, replacements?: Map<string, string>): string {
-  const sanitized = sanitizeNarrativeText(stripIsoTimestamps(outcome), replacements);
-  if (!sanitized) {
-    return "Completed delivery outcome captured for this reporting period.";
-  }
-  return clipWords(sanitized, 22);
-}
-
-function buildCompletedWorkSummaryPrompt(params: {
-  reportingPeriodLabel: string;
-  reportingPeriodDays: number;
-  timezone: string;
-  selectedInitiatives: number;
-  completedCardsCount: number;
-  groupCounts: Array<{ name: string; count: number }>;
-  maxCards?: number;
-  cards: Array<{ cardId: string; group: string; initiativeAlias: string; status: string; completedAt: string; outcome: string }>;
-}): string {
-  const promptCards = params.cards.slice(0, params.maxCards ?? 220);
-  const cardLines = promptCards.map((card, index) => (
-    `${index + 1}. Card ID: ${card.cardId} | Work stream: ${card.group}` +
-    ` | Initiative: ${card.initiativeAlias}` +
-    ` | Status: ${card.status}` +
-    ` | Completed: ${formatCompletedDateForPrompt(card.completedAt)}` +
-    ` | Outcome: ${card.outcome}`
-  ));
-  const groupLines = params.groupCounts
-    .slice(0, 30)
-    .map((entry, index) => `${index + 1}. ${entry.name}: ${entry.count} completed cards`);
-  const truncationNote = params.cards.length > promptCards.length
-    ? `Only the first ${promptCards.length} completed cards are listed in this prompt.`
-    : "";
-
-  return [
-    "Draft a completed-work summary grouped by work stream for engineering leaders.",
-    "Return JSON only with this schema:",
-    "{\"items\":[{\"cardId\":\"card-1\",\"bullet\":\"...\"}]}",
-    "Rules:",
-    `- Return exactly ${promptCards.length} items, one bullet per listed completed card.`,
-    "- Copy the exact Card ID for each item. Do not merge cards or invent IDs.",
-    "- Each bullet must describe a delivered outcome for that completed card and be <= 22 words.",
-    "- Use only provided data. Do not invent metrics, dependencies, or blockers.",
-    "- Do not reference issue keys, ticket IDs, or story points (SP).",
-    "- Do not use full initiative names literally; keep references generic or by initiative alias.",
-    "- Don't need to include any date or timestamp information in the bullet; the completedAt field is for context only.",
-    "",
-    `Reporting period: ${params.reportingPeriodLabel} (${params.reportingPeriodDays} days, ${params.timezone})`,
-    `Selected initiatives in scope: ${params.selectedInitiatives}`,
-    `Completed cards in scope: ${params.completedCardsCount}`,
-    truncationNote,
-    "",
-    "Completed-card distribution by work stream:",
-    ...groupLines,
-    "",
-    "Completed card outcomes by work stream:",
-    ...cardLines,
-  ]
-    .filter((line) => line.trim().length > 0)
-    .join("\n");
-}
-
-function parseCompletedWorkSummaryDraft(
-  text: string,
-  options: {
-    fallbackCards: CompletedWorkSource[];
-    replacements?: Map<string, string>;
-  },
-): CompletedWorkSummaryGroup[] {
-  const trimmed = text.trim();
-  const unwrapped = trimmed
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-
-  const candidates: string[] = [unwrapped];
-  const firstBrace = unwrapped.indexOf("{");
-  const lastBrace = unwrapped.lastIndexOf("}");
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    candidates.push(unwrapped.slice(firstBrace, lastBrace + 1));
-  }
-
-  let parsed: Record<string, unknown> | null = null;
-  for (const candidate of candidates) {
-    try {
-      const next = JSON.parse(candidate);
-      if (next && typeof next === "object") {
-        parsed = next as Record<string, unknown>;
-        break;
-      }
-    } catch {
-      // Try next parse candidate.
-    }
-  }
-
-  if (!parsed) {
-    throw new Error("AI provider did not return valid JSON for completed work summary.");
-  }
-
-  const normalizedItems: Array<{ cardId: unknown; text: string }> = [];
-  if (Array.isArray(parsed.items)) {
-    for (const entry of parsed.items) {
-      if (!entry || typeof entry !== "object") continue;
-      const record = entry as { cardId?: unknown; bullet?: unknown };
-      if (typeof record.bullet !== "string") continue;
-      const text = clipWords(sanitizeNarrativeText(stripIsoTimestamps(record.bullet), options.replacements), 22);
-      normalizedItems.push({ cardId: record.cardId, text });
-    }
-  }
-  return groupCompletedWork(options.fallbackCards, normalizedItems);
-}
-
 function ragToneClass(value: RagLabel): string {
   if (value === "Not assessed") return "is-neutral";
   if (value === "Green") return "is-good";
   if (value === "Amber") return "is-warn";
   return "is-risk";
-}
-
-function formatAiProviderName(value: string | null | undefined): string {
-  const normalized = (value ?? "").trim().toLowerCase();
-  if (normalized === "oci" || normalized === "oci-genai" || normalized === "oci_genai") return "OCI";
-  if (normalized === "ollama") return "Ollama";
-  if (normalized === "openai") return "OpenAI";
-  return "AI";
 }
 
 function ReportWorkMixChart({ title, label, slices, total, loading }: {
@@ -1157,7 +965,6 @@ export function TeamReportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string | null>(null);
-  const [aiProviderName, setAiProviderName] = useState("AI");
   const [resolvedReportingPeriod, setResolvedReportingPeriod] = useState<EpicSummaryReportingPeriod | null>(null);
 
   const initialInitiativeSelection = useMemo(() => readReportInitiativeSelection(getPreferenceSync(INITIATIVE_SECTION_SELECTION_KEY)), []);
@@ -1179,41 +986,64 @@ export function TeamReportScreen() {
   const [reportingValidationError, setReportingValidationError] = useState<string | null>(null);
   const [isReportingConfigOpen, setIsReportingConfigOpen] = useState(false);
 
-  const [completedWorkDraft, setCompletedWorkDraft] = useState<CompletedWorkSummaryGroup[]>([]);
+  const [completedWorkSummary, setCompletedWorkSummary] = useState<CompletedWorkSummaryGroup[]>([]);
   const [completedWorkLoading, setCompletedWorkLoading] = useState(true);
   const [completedWorkError, setCompletedWorkError] = useState<string | null>(null);
-  const [completedWorkModelId, setCompletedWorkModelId] = useState<string | null>(null);
   const [completedWorkGeneratedAt, setCompletedWorkGeneratedAt] = useState<string | null>(null);
   const [completedWorkRefreshNonce, setCompletedWorkRefreshNonce] = useState(0);
 
   const hasInitializedInitiativeSelection = useRef(false);
   const hasHydratedReportingSelectionFromStore = useRef(false);
   const completedWorkRequestSequence = useRef(0);
+  const reportRequestSequence = useRef(0);
+  const completedCardsCache = useRef<{ key: string; promise: Promise<ConfiguredEpicsCompletedCardsResponse> } | null>(null);
+
+  const loadCompletedCards = useCallback((range: ReportingRange, timezone: string) => {
+    const key = JSON.stringify([range.startDate, range.endDate, timezone]);
+    if (completedCardsCache.current?.key === key) return completedCardsCache.current.promise;
+    const promise = (async () => {
+      const options = { periodStart: range.startDate, periodEnd: range.endDate, timezone };
+      let payload = await fetchConfiguredEpicsCompletedCards({ ...options, limit: 2000 });
+      if (payload.truncated && payload.count > payload.completedCards.length) {
+        payload = await fetchConfiguredEpicsCompletedCards({ ...options, limit: Math.max(2000, payload.count) });
+      }
+      if (payload.truncated) throw new Error("Completed card data is incomplete. Refresh to try again.");
+      return payload;
+    })();
+    completedCardsCache.current = { key, promise };
+    void promise.catch(() => {
+      if (completedCardsCache.current?.promise === promise) completedCardsCache.current = null;
+    });
+    return promise;
+  }, []);
+
+  // Link configuration must not hold up local report data or depend on AI health.
+  useEffect(() => {
+    let active = true;
+    void fetchJiraIntegrationStatus().then((status) => {
+      if (active) setJiraBaseUrl(status.config.baseUrl?.replace(/\/$/, "") || null);
+    }).catch(() => { if (active) setJiraBaseUrl(null); });
+    return () => { active = false; };
+  }, []);
 
   const persistInitiativeSelection = useCallback((keys: string[], mode: ReportSelectionMode) => {
     void setPreference(INITIATIVE_SECTION_SELECTION_KEY, JSON.stringify({ mode, keys }));
   }, []);
 
   const loadExecutiveData = useCallback(async (range: ReportingRange) => {
+    const requestId = ++reportRequestSequence.current;
     setLoading(true);
     setError(null);
 
     try {
-      const [summaryResult, jiraStatusResult, aiStatusResult] = await Promise.allSettled([
-        fetchConfiguredEpicSummary("all", {
-          periodStart: range.startDate,
-          periodEnd: range.endDate,
-          timezone: browserTimezone,
-        }),
-        fetchJiraIntegrationStatus(),
-        fetchAiIntegrationStatus(),
-      ]);
-
-      if (summaryResult.status === "rejected") {
-        throw summaryResult.reason;
-      }
-
-      const summaryPayload = summaryResult.value;
+      // Start both local data requests together; selection changes reuse completed cards.
+      void loadCompletedCards(range, browserTimezone).catch(() => undefined);
+      const summaryPayload = await fetchConfiguredEpicSummary("all", {
+        periodStart: range.startDate,
+        periodEnd: range.endDate,
+        timezone: browserTimezone,
+      });
+      if (reportRequestSequence.current !== requestId) return;
       const summaryRows = summaryPayload.epics ?? [];
       setResolvedReportingPeriod(summaryPayload.reportingPeriod ?? null);
 
@@ -1260,42 +1090,22 @@ export function TeamReportScreen() {
       });
 
       setRows(mappedRows);
-
-      if (jiraStatusResult.status === "fulfilled") {
-        setJiraBaseUrl(
-          jiraStatusResult.value.config.baseUrl
-            ? jiraStatusResult.value.config.baseUrl.replace(/\/$/, "")
-            : null,
-        );
-      } else {
-        setJiraBaseUrl(null);
-      }
-
-      if (aiStatusResult.status === "fulfilled") {
-        setAiProviderName(
-          formatAiProviderName(
-            aiStatusResult.value.provider ?? aiStatusResult.value.configuredProvider ?? aiStatusResult.value.source,
-          ),
-        );
-      } else {
-        setAiProviderName("AI");
-      }
     } catch (err) {
+      if (reportRequestSequence.current !== requestId) return;
       const message = err instanceof Error ? err.message : "Unknown executive report load failure.";
       setError(message);
       setRows([]);
-      setJiraBaseUrl(null);
-      setAiProviderName("AI");
       setResolvedReportingPeriod(null);
     } finally {
-      setLoading(false);
+      if (reportRequestSequence.current === requestId) setLoading(false);
     }
-  }, [browserTimezone]);
+  }, [browserTimezone, loadCompletedCards]);
 
   useEffect(() => {
     loadExecutiveData(reportingRange).catch(() => {
       // loadExecutiveData already updates local state.
     });
+    return () => { reportRequestSequence.current += 1; };
   }, [loadExecutiveData, reportingRange]);
 
   useEffect(() => {
@@ -1493,23 +1303,6 @@ export function TeamReportScreen() {
     return orderedRows;
   }, [initiativeRows, selectedInitiativeEpicKeys]);
 
-  const initiativeAliasByEpicKey = useMemo(
-    () => new Map(visibleInitiativeRows.map((row, index) => [row.epicKey, buildInitiativeAlias(index)])),
-    [visibleInitiativeRows],
-  );
-
-  const completedWorkReplacements = useMemo(() => {
-    const map = new Map<string, string>();
-    visibleInitiativeRows.forEach((row, index) => {
-      const alias = buildInitiativeAlias(index);
-      map.set(alias, "this initiative");
-      if (row.epicName?.trim()) {
-        map.set(row.epicName.trim(), "this initiative");
-      }
-    });
-    return map;
-  }, [visibleInitiativeRows]);
-
   const visibleInitiativeSignals = useMemo(() => {
     const totalEpics = visibleInitiativeRows.length;
     const totalCompletedInPeriod = visibleInitiativeRows.reduce((sum, row) => sum + row.completedInPeriodValue, 0);
@@ -1576,6 +1369,7 @@ export function TeamReportScreen() {
   );
 
   const refreshCompletedWorkSummary = useCallback(() => {
+    completedCardsCache.current = null;
     setCompletedWorkRefreshNonce((previous) => previous + 1);
   }, []);
 
@@ -1600,7 +1394,7 @@ export function TeamReportScreen() {
       reportingPeriodLabel,
       reportingPeriodDays,
       timezone: effectivePeriodTimezone,
-      completedWork: completedWorkDraft,
+      completedWork: completedWorkSummary,
       jiraBaseUrl,
       totalInitiatives: visibleInitiativeSignals.totalEpics,
       totalCompletedInPeriod: visibleInitiativeSignals.totalCompletedInPeriod,
@@ -1617,7 +1411,7 @@ export function TeamReportScreen() {
     const fileName = `team-report-export-${safeFileDate || "latest"}.html`;
     await saveHtmlWithDialogOrDownload(html, fileName);
   }, [
-    completedWorkDraft,
+    completedWorkSummary,
     jiraBaseUrl,
     effectivePeriodEnd,
     effectivePeriodTimezone,
@@ -1645,6 +1439,7 @@ export function TeamReportScreen() {
   }, [exportTeamReportHtml]);
 
   useEffect(() => {
+    const requestId = ++completedWorkRequestSequence.current;
     if (loading) {
       setCompletedWorkLoading(true);
       setCompletedWorkError(null);
@@ -1654,13 +1449,12 @@ export function TeamReportScreen() {
     if (error) {
       setCompletedWorkLoading(false);
       setCompletedWorkError(null);
-      setCompletedWorkDraft([
+      setCompletedWorkSummary([
         {
           group: "Unavailable",
           bullets: [{ text: "Unable to generate completed work summary because initiative data failed to load." }],
         },
       ]);
-      setCompletedWorkModelId(null);
       setCompletedWorkGeneratedAt(null);
       return;
     }
@@ -1669,175 +1463,103 @@ export function TeamReportScreen() {
       setCompletedWorkLoading(false);
       setCompletedWorkError(null);
       if (initiativeRows.length > 0) {
-        setCompletedWorkDraft([
+        setCompletedWorkSummary([
           {
             group: "No Selection",
             bullets: [{ text: "No initiatives are selected in Progress for Key Initiatives." }],
           },
         ]);
       } else {
-        setCompletedWorkDraft([
+        setCompletedWorkSummary([
           {
             group: "No Data",
             bullets: [{ text: "No configured epic data available to summarize completed work." }],
           },
         ]);
       }
-      setCompletedWorkModelId(null);
       setCompletedWorkGeneratedAt(null);
       return;
     }
 
     const selectedByEpicKey = new Map(visibleInitiativeRows.map((row) => [row.epicKey, row]));
-    const requestId = completedWorkRequestSequence.current + 1;
-    completedWorkRequestSequence.current = requestId;
     setCompletedWorkLoading(true);
     setCompletedWorkError(null);
-    setCompletedWorkDraft([]);
+    setCompletedWorkSummary([]);
 
     void (async () => {
       try {
-        let payload = await fetchConfiguredEpicsCompletedCards({
-          limit: 2000,
-          periodStart: effectivePeriodStart,
-          periodEnd: effectivePeriodEnd,
-          timezone: effectivePeriodTimezone,
-        });
-        if (payload.truncated && payload.count > payload.completedCards.length) {
-          payload = await fetchConfiguredEpicsCompletedCards({
-            limit: Math.max(2000, payload.count),
-            periodStart: effectivePeriodStart,
-            periodEnd: effectivePeriodEnd,
-            timezone: effectivePeriodTimezone,
-          });
-        }
+        const payload = await loadCompletedCards({ startDate: effectivePeriodStart, endDate: effectivePeriodEnd }, effectivePeriodTimezone);
 
         if (completedWorkRequestSequence.current !== requestId) return;
 
-        const scopedCards: Array<CompletedWorkSource & {
-          initiativeAlias: string;
-          status: string;
-          completedAt: string;
-          outcome: string;
-        }> = [];
-
-        const groupCounts = new Map<string, number>();
+        const scopedCards: CompletedWorkSource[] = [];
         for (const card of payload.completedCards) {
           const epicKey = card.epicKey?.trim();
           if (!epicKey) continue;
 
           const row = selectedByEpicKey.get(epicKey);
-          const initiativeAlias = initiativeAliasByEpicKey.get(epicKey);
-          if (!row || !initiativeAlias) continue;
+          if (!row) continue;
 
           const groupName = row.groups[0]?.name?.trim() || "Unassigned";
-          const status = card.status?.trim() || "Done";
-          const completedAt = formatCompletedDateForPrompt(card.completedAt?.trim() || "n/a");
-          const outcome = stripIsoTimestamps(card.summary?.trim() || "No summary provided.");
-
           scopedCards.push({
             cardId: `card-${scopedCards.length + 1}`,
             epicKey,
             epicName: row.epicName || card.epicName || epicKey,
             issueKey: card.issueKey,
             issueTitle: card.summary?.trim() || "No summary provided.",
-            fallbackText: buildCompletedCardFallbackBullet(outcome, completedWorkReplacements),
             group: groupName,
-            initiativeAlias,
-            status,
-            completedAt,
-            outcome,
           });
-          groupCounts.set(groupName, (groupCounts.get(groupName) ?? 0) + 1);
         }
 
         if (scopedCards.length === 0) {
-          setCompletedWorkDraft([
+          setCompletedWorkSummary([
             {
               group: "No Completed Cards",
               bullets: [{ text: "No completed cards were found for selected initiatives in this reporting period." }],
             },
           ]);
-          setCompletedWorkModelId(null);
           setCompletedWorkGeneratedAt(null);
           return;
         }
 
-        const sortedGroupCounts = [...groupCounts.entries()]
-          .map(([name, count]) => ({ name, count }))
-          .sort((left, right) => right.count - left.count);
-
-        const prompt = buildCompletedWorkSummaryPrompt({
-          reportingPeriodLabel,
-          reportingPeriodDays,
-          timezone: effectivePeriodTimezone,
-          selectedInitiatives: visibleInitiativeRows.length,
-          completedCardsCount: scopedCards.length,
-          groupCounts: sortedGroupCounts,
-          maxCards: aiProviderName === "Ollama" ? 90 : 220,
-          cards: scopedCards,
-        });
-
-        const response = await chatWithOciGenAi({
-          message: prompt,
-          maxTokens: aiProviderName === "Ollama" ? 700 : 1500,
-          temperature: 0.15,
-          topP: 0.8,
-          topK: 0,
-          frequencyPenalty: 0,
-        });
-
-        if (completedWorkRequestSequence.current !== requestId) return;
-
-        const parsed = parseCompletedWorkSummaryDraft(response.response.text ?? "", {
-          fallbackCards: scopedCards,
-          replacements: completedWorkReplacements,
-        });
-        setCompletedWorkDraft(parsed);
-        setCompletedWorkModelId(response.modelId ?? null);
-        setAiProviderName(formatAiProviderName(response.provider ?? response.configuredProvider ?? response.source));
+        setCompletedWorkSummary(groupCompletedWork(scopedCards));
         setCompletedWorkGeneratedAt(new Date().toISOString());
       } catch (err) {
         if (completedWorkRequestSequence.current !== requestId) return;
-        const message = err instanceof Error ? err.message : "Unknown AI completed-work summary failure.";
+        const message = err instanceof Error ? err.message : "Unable to load completed work.";
         setCompletedWorkError(message);
-        setCompletedWorkDraft([
+        setCompletedWorkSummary([
           {
             group: "Summary Unavailable",
-            bullets: [{ text: "Unable to generate completed work summary draft from AI provider." }],
+            bullets: [{ text: "Unable to load completed cards for this reporting period." }],
           },
         ]);
-        setCompletedWorkModelId(null);
         setCompletedWorkGeneratedAt(null);
       } finally {
-        if (completedWorkRequestSequence.current !== requestId) return;
-        setCompletedWorkLoading(false);
+        if (completedWorkRequestSequence.current === requestId) setCompletedWorkLoading(false);
       }
     })();
+    return () => { completedWorkRequestSequence.current += 1; };
   }, [
     completedWorkRefreshNonce,
     effectivePeriodEnd,
     effectivePeriodStart,
     effectivePeriodTimezone,
     error,
-    initiativeAliasByEpicKey,
     initiativeRows.length,
     loading,
-    reportingPeriodDays,
-    reportingPeriodLabel,
-    aiProviderName,
-    completedWorkReplacements,
+    loadCompletedCards,
     visibleInitiativeRows,
   ]);
 
   const completedWorkWordCount = useMemo(() => {
-    const text = completedWorkDraft
+    const text = completedWorkSummary
       .flatMap((entry) => entry.bullets.map((bullet) => bullet.text))
       .join(" ")
       .trim();
     if (!text) return 0;
     return text.split(/\s+/).length;
-  }, [completedWorkDraft]);
+  }, [completedWorkSummary]);
 
   const initiativeConfigRows = useMemo(() => {
     const query = initiativeConfigQuery.trim().toLowerCase();
@@ -2062,28 +1784,31 @@ export function TeamReportScreen() {
           </div>
         </header>
 
-        {completedWorkError ? <p className="tb-error-note">Completed work summary draft error: {completedWorkError}</p> : null}
+        {completedWorkError ? <p className="tb-error-note">Completed work summary error: {completedWorkError}</p> : null}
 
         <div className="tb-exec-completed-summary">
-          {completedWorkDraft.map((entry) => (
+          {completedWorkSummary.map((entry) => (
             <div key={entry.group}>
               <h4 className="tb-exec-list-title">{entry.group}</h4>
               {groupCompletedWorkByEpic(entry.bullets).map((epic) => (
                 <div className="tb-exec-completed-epic" key={epic.epicKey ?? "notice"}>
                   {epic.epicKey ? (
                     <h5 className="tb-exec-completed-epic-title">
-                      <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={epic.epicKey}>{epic.epicName}</ReportJiraLink>
+                      <span>{epic.epicName}</span>{" ("}
+                      <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={epic.epicKey}>{epic.epicKey}</ReportJiraLink>
+                      {")"}
                     </h5>
                   ) : null}
                   <ul className="tb-list tb-exec-narrative-list">
                     {epic.bullets.map((item) => (
                       <li key={item.source?.cardId ?? `${entry.group}:${item.text}`}>
-                        <div>{item.text}</div>
+                        <span>{item.text}</span>
                         {item.source ? (
-                          <div className="tb-exec-completed-source">
+                          <>
+                            {" ("}
                             <ReportJiraLink baseUrl={jiraBaseUrl} issueKey={item.source.issueKey}>{item.source.issueKey}</ReportJiraLink>
-                            {" · "}{item.source.issueTitle}
-                          </div>
+                            {")"}
+                          </>
                         ) : null}
                       </li>
                     ))}
@@ -2092,15 +1817,14 @@ export function TeamReportScreen() {
               ))}
             </div>
           ))}
-          {completedWorkLoading ? <p className="tb-muted-note">Generating completed work summary with {aiProviderName}...</p> : null}
-          {!completedWorkLoading && completedWorkDraft.length === 0 ? (
+          {completedWorkLoading ? <p className="tb-muted-note">Loading completed work from synced issues...</p> : null}
+          {!completedWorkLoading && completedWorkSummary.length === 0 ? (
             <p className="tb-muted-note">Completed work summary will appear once selected initiatives have completed cards.</p>
           ) : null}
         </div>
         <hr className="tb-section-divider" />
         <div className="tb-exec-summary-meta">
-          <span>Generated with {aiProviderName}</span>
-          <span>Model: {completedWorkModelId ?? "default"}</span>
+          <span>Source: synced JIRA issues</span>
           <span>Updated: {formatDraftTimestamp(completedWorkGeneratedAt)}</span>
           <span>{completedWorkWordCount} words</span>
         </div>

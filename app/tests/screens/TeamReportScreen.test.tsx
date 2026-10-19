@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { beforeEach, vi } from "vitest";
 import * as persistence from "../../src/lib/persistence";
@@ -29,8 +29,8 @@ function jsonResponse(payload: unknown, status = 200): Promise<Response> {
 }
 
 describe("TeamReportScreen", () => {
-  it("loads report data, drafts only completed work, and supports initiative selection", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+  it("builds completed work from synced issues and supports initiative selection", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
           ? input
@@ -98,24 +98,6 @@ describe("TeamReportScreen", () => {
         });
       }
 
-      if (url.includes("/api/integrations/ai/status")) {
-        return jsonResponse({
-          source: "ollama",
-          provider: "ollama",
-          configuredProvider: "ollama",
-          connected: true,
-          checkedAt: "2026-03-30T09:15:00Z",
-          config: {
-            baseUrl: "http://127.0.0.1:11434",
-            modelId: "gemma4:e2b",
-          },
-          checks: [
-            { name: "ollama_api", ok: true, detail: "reachable" },
-            { name: "configured_model", ok: true, detail: "loaded" },
-          ],
-        });
-      }
-
       if (url.includes("/api/metadata/epics/completed-cards/configured")) {
         return jsonResponse({
           source: "local",
@@ -165,28 +147,6 @@ describe("TeamReportScreen", () => {
         });
       }
 
-      if (url.includes("/api/ai/chat")) {
-        const bodyText = typeof init?.body === "string" ? init.body : "";
-        if (bodyText.includes("Draft a completed-work summary grouped by work stream for engineering leaders.")) {
-          return jsonResponse({
-            source: "ollama",
-            provider: "ollama",
-            configuredProvider: "ollama",
-            modelId: "gemma4:e2b",
-            response: {
-              text: JSON.stringify({
-                items: [
-                  { cardId: "card-3", bullet: "Completed validation enhancements improved reliability of risk insights used in dashboard decision reviews." },
-                  { cardId: "card-1", bullet: "Completed workflow automation now assembles leadership-ready dashboard narratives for the selected period." },
-                  { cardId: "card-2", bullet: "Delivery strengthened reporting consistency and reduced manual summary preparation overhead." },
-                ],
-              }),
-            },
-          });
-        }
-
-        return Promise.reject(new Error("Unexpected AI request outside completed-work summary"));
-      }
 
       return Promise.reject(new Error(`Unhandled fetch request in test: ${url}`));
     });
@@ -205,7 +165,7 @@ describe("TeamReportScreen", () => {
     expect(screen.queryByRole("heading", { name: "Wins and Risks" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh Summary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh Wins and Risks" })).not.toBeInTheDocument();
-    await screen.findByText(/assembles leadership-ready dashboard narratives/i);
+    await screen.findByText("Automated executive dashboard summary workflow");
     const selectedInitiativesCard = screen.getByRole("heading", { name: "Selected Initiatives" }).closest("article")!;
     expect(within(selectedInitiativesCard).getByText("Initiatives included in this report.")).toBeInTheDocument();
     expect(within(selectedInitiativesCard).getByText("2")).toBeInTheDocument();
@@ -219,23 +179,23 @@ describe("TeamReportScreen", () => {
     const scopedCompletedWork = within(completedWorkPanel);
     expect(await scopedCompletedWork.findByText("Core Platform")).toBeInTheDocument();
     expect(await scopedCompletedWork.findByText("Operations")).toBeInTheDocument();
-    expect(await scopedCompletedWork.findByText(/assembles leadership-ready dashboard narratives/i)).toBeInTheDocument();
-    expect(await scopedCompletedWork.findByText(/improved reliability of risk insights/i)).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText("Automated executive dashboard summary workflow")).toBeInTheDocument();
+    expect(await scopedCompletedWork.findByText("Improved risk signal validation against release cadence")).toBeInTheDocument();
     expect(scopedCompletedWork.getAllByRole("listitem")).toHaveLength(3);
     const completedBullet = scopedCompletedWork.getAllByRole("listitem")[0];
-    expect(within(completedBullet).getByText(/assembles leadership-ready dashboard narratives/)).toBeInTheDocument();
-    const epicHeading = scopedCompletedWork.getByRole("heading", { level: 5, name: "Executive reporting automation" });
+    expect(within(completedBullet).getByText("Automated executive dashboard summary workflow")).toBeInTheDocument();
+    const epicHeading = scopedCompletedWork.getByRole("heading", { level: 5, name: "Executive reporting automation (CEG-EPIC-12)" });
     expect(within(epicHeading).getByRole("link")).toHaveAttribute("href", "https://jira.example.com/browse/CEG-EPIC-12");
     expect(within(epicHeading).getByRole("link")).toHaveAttribute("target", "_blank");
-    expect(scopedCompletedWork.getAllByRole("link", { name: "Executive reporting automation" })).toHaveLength(1);
+    expect(scopedCompletedWork.getAllByRole("link", { name: "CEG-EPIC-12" })).toHaveLength(1);
     expect(within(epicHeading.parentElement!).getAllByRole("listitem")).toHaveLength(2);
     expect(within(completedBullet).queryByRole("link", { name: "Executive reporting automation" })).not.toBeInTheDocument();
     const issueLink = within(completedBullet).getByRole("link", { name: "CEG-1010" });
     expect(issueLink).toHaveAttribute("href", "https://jira.example.com/browse/CEG-1010");
     expect(issueLink).toHaveAttribute("target", "_blank");
     expect(issueLink).toHaveAttribute("rel", "noopener noreferrer");
-    expect(issueLink.parentElement).toHaveClass("tb-exec-completed-source");
-    expect(issueLink.parentElement).toHaveTextContent("CEG-1010 · Automated executive dashboard summary workflow");
+    expect(issueLink.parentElement).toBe(completedBullet);
+    expect(completedBullet).toHaveTextContent(/^Automated executive dashboard summary workflow \(CEG-1010\)$/);
     expect(within(scopedCompletedWork.getAllByRole("listitem")[2]).getByRole("link", { name: "CEG-2012" })).toBeInTheDocument();
 
     const write = vi.fn().mockResolvedValue(undefined);
@@ -259,10 +219,12 @@ describe("TeamReportScreen", () => {
       expect(issue.getAttribute("target")).toBe("_blank");
       expect(issue.closest("li")?.textContent).toContain("Automated executive dashboard summary workflow");
       const epicBlock = issue.closest(".completed-epic")!;
-      expect(epicBlock.querySelector('h5 a[href="https://jira.example.com/browse/CEG-EPIC-12"]')?.textContent).toBe("Executive reporting automation");
+      expect(epicBlock.querySelector('h5 a[href="https://jira.example.com/browse/CEG-EPIC-12"]')?.textContent).toBe("CEG-EPIC-12");
+      expect(epicBlock.querySelector("h5")?.textContent).toBe("Executive reporting automation (CEG-EPIC-12)");
       expect(epicBlock.querySelectorAll("li")).toHaveLength(2);
       expect(epicBlock.querySelectorAll('a[href="https://jira.example.com/browse/CEG-EPIC-12"]')).toHaveLength(1);
-      expect(issue.parentElement?.className).toBe("completed-source");
+      expect(issue.parentElement?.tagName).toBe("LI");
+      expect(issue.parentElement?.textContent).toBe("Automated executive dashboard summary workflow (CEG-1010)");
       const exportedMix = [...report.querySelectorAll("h2")].find((heading) => heading.textContent === "Work Mix by Work Stream and Type")!.closest("section")!;
       expect(exportedMix.querySelector("table")).toBeNull();
       expect(exportedMix.querySelectorAll('[role="img"]')).toHaveLength(2);
@@ -321,12 +283,13 @@ describe("TeamReportScreen", () => {
       expect(within(chart).getByText("28.6%")).toBeInTheDocument();
     }
 
-    const aiCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("/api/ai/chat"));
-    expect(aiCalls.length).toBeGreaterThan(0);
-    for (const [, init] of aiCalls) expect(String(init?.body)).toContain("Draft a completed-work summary grouped by work stream for engineering leaders.");
-    const initialAiCallCount = aiCalls.length;
+    expect(fetchSpy.mock.calls.some(([url]) => /\/api\/(ai\/chat|integrations\/ai\/status)/.test(String(url)))).toBe(false);
+    const completedCalls = () => fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured")).length;
+    const initialCompletedCallCount = completedCalls();
     fireEvent.click(screen.getByRole("button", { name: "Refresh Completed Work Summary" }));
-    await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/api/ai/chat")).length).toBe(initialAiCallCount + 1));
+    await waitFor(() => expect(completedCalls()).toBe(initialCompletedCallCount + 1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeEnabled());
+    const beforeSelectionChange = completedCalls();
 
     window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_INITIATIVE_CONFIG_EVENT));
     const dialog = await screen.findByRole("dialog", { name: "Configure Initiative Epics" });
@@ -342,6 +305,7 @@ describe("TeamReportScreen", () => {
     await waitFor(() => {
       expect(screen.queryByText("Executive reporting automation")).not.toBeInTheDocument();
     });
+    expect(completedCalls()).toBe(beforeSelectionChange);
     expect(JSON.parse(persistence.getPreferenceSync(INITIATIVE_SELECTION_KEY)!)).toEqual({ mode: "manual", keys: ["CEG-EPIC-34"] });
 
     window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT));
@@ -381,4 +345,127 @@ it("keeps report loading failures visible without requesting removed narratives"
   expect(screen.queryByRole("heading", { name: "Executive Summary" })).not.toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Wins and Risks" })).not.toBeInTheDocument();
   expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/api/ai/chat"))).toBe(false);
+});
+
+
+const fastReportEpic = {
+  epicKey: "PERF-1", epicName: "Fast report initiative", groups: [{ id: 1, name: "Platform" }], workTypes: [],
+  successCriteria: [], completedCards: 1, totalCards: 1, completionPercent: 100, completedInPeriod: 1,
+  timelineEnabled: false,
+};
+const completedCardPayload = (summary = "Delivered deterministic report") => ({
+  count: 1, truncated: false, completedCards: [{
+    issueKey: "PERF-2", epicKey: "PERF-1", summary,
+  }],
+});
+
+it("starts report and card requests together and renders without waiting for JIRA health", async () => {
+  let finishSummary!: (response: Response) => void;
+  const summaryPromise = new Promise<Response>((resolve) => { finishSummary = resolve; });
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/integrations/jira/status")) return new Promise<Response>(() => undefined);
+    if (url.includes("/metadata/epics/summary")) return summaryPromise;
+    if (url.includes("/completed-cards/configured")) return jsonResponse(completedCardPayload());
+    return Promise.reject(new Error(`Unexpected request: ${url}`));
+  });
+  render(<TeamReportScreen />);
+  await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured"))).toHaveLength(1));
+  await act(async () => { finishSummary(await jsonResponse({ epics: [fastReportEpic] })); });
+  expect(await screen.findByText("Delivered deterministic report")).toBeInTheDocument();
+  expect(screen.getByText("Source: synced JIRA issues")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Refresh Completed Work Summary" })).toBeEnabled();
+  expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/ai/"))).toBe(false);
+  expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured"))).toHaveLength(1);
+});
+
+it("loads truncated card results fully and lets failed refreshes recover", async () => {
+  let cardCalls = 0;
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/metadata/epics/summary")) return jsonResponse({ epics: [fastReportEpic] });
+    if (url.includes("/completed-cards/configured")) {
+      cardCalls += 1;
+      if (cardCalls === 1) return jsonResponse({ ...completedCardPayload(), truncated: true, count: 2001 });
+      if (cardCalls === 3) return jsonResponse({ error: "Card store unavailable" }, 500);
+      return jsonResponse(completedCardPayload(cardCalls > 3 ? "Recovered completed work" : "All completed work"));
+    }
+    return jsonResponse({ config: {} });
+  });
+  render(<TeamReportScreen />);
+  expect(await screen.findByText("All completed work")).toBeInTheDocument();
+  const requests = fetchSpy.mock.calls.filter(([url]) => String(url).includes("/completed-cards/configured"));
+  expect(requests).toHaveLength(2);
+  expect(String(requests[1][0])).toContain("limit=2001");
+  fireEvent.click(screen.getByRole("button", { name: "Refresh Completed Work Summary" }));
+  expect(await screen.findByText(/Completed work summary error:/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh Completed Work Summary" }));
+  expect(await screen.findByText("Recovered completed work")).toBeInTheDocument();
+  expect(screen.queryByText(/Completed work summary error:/)).not.toBeInTheDocument();
+});
+
+it("ignores a late completed-card response from the previous reporting period", async () => {
+  let finishOldCards!: (response: Response) => void;
+  const oldCards = new Promise<Response>((resolve) => { finishOldCards = resolve; });
+  let cardCalls = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/metadata/epics/summary")) return jsonResponse({ epics: [fastReportEpic] });
+    if (url.includes("/completed-cards/configured")) {
+      cardCalls += 1;
+      return cardCalls === 1 ? oldCards : jsonResponse(completedCardPayload("New period delivery"));
+    }
+    return jsonResponse({ config: {} });
+  });
+  render(<TeamReportScreen />);
+  await screen.findByText("Fast report initiative");
+  act(() => { window.dispatchEvent(new CustomEvent(OPEN_TEAM_REPORT_REPORTING_PERIOD_EVENT)); });
+  const dialog = screen.getByRole("dialog", { name: "Configure Reporting Period" });
+  fireEvent.change(within(dialog).getByRole("combobox", { name: "Reporting Period" }), { target: { value: "last_14_days" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("New period delivery")).toBeInTheDocument();
+  await act(async () => { finishOldCards(await jsonResponse(completedCardPayload("Stale period delivery"))); });
+  expect(screen.queryByText("Stale period delivery")).not.toBeInTheDocument();
+  expect(screen.getByText("New period delivery")).toBeInTheDocument();
+  expect(cardCalls).toBe(2);
+});
+
+
+it("keeps incomplete completed-card data visible as an error rather than a partial summary", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/metadata/epics/summary")) return jsonResponse({ epics: [fastReportEpic] });
+    if (url.includes("/completed-cards/configured")) return jsonResponse({ ...completedCardPayload(), truncated: true });
+    return Promise.reject(new Error("JIRA health unavailable"));
+  });
+  render(<TeamReportScreen />);
+  expect(await screen.findByText(/Completed card data is incomplete/)).toBeInTheDocument();
+  expect(screen.queryByText("Delivered deterministic report")).not.toBeInTheDocument();
+});
+
+it("preserves timeline health while rendering an empty completed-work period", async () => {
+  const date = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const timelines = [
+    { name: "Complete", completion: 100, target: 50, start: -50, rag: "Green" },
+    { name: "On track", completion: 60, target: 50, start: -50, rag: "Green" },
+    { name: "Slightly behind", completion: 35, target: 50, start: -50, rag: "Amber" },
+    { name: "Behind plan", completion: 0, target: 50, start: -50, rag: "Red" },
+    { name: "Low completion", completion: 10, target: 50, start: null, rag: "Red" },
+    { name: "Mid completion", completion: 50, target: 50, start: null, rag: "Amber" },
+    { name: "High completion", completion: 80, target: 50, start: null, rag: "Green" },
+  ];
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/metadata/epics/summary")) return jsonResponse({ epics: timelines.map((entry, index) => ({
+      ...fastReportEpic, epicKey: `RAG-${index}`, epicName: entry.name, completionPercent: entry.completion,
+      timelineEnabled: true, targetCompletionDate: date(entry.target), timelineStartDate: entry.start === null ? null : date(entry.start),
+    })) });
+    if (url.includes("/completed-cards/configured")) return jsonResponse({ count: 0, truncated: false, completedCards: [] });
+    return jsonResponse({ config: {} });
+  });
+  render(<TeamReportScreen />);
+  expect(await screen.findByText("No completed cards were found for selected initiatives in this reporting period.")).toBeInTheDocument();
+  for (const entry of timelines) {
+    expect(within(screen.getByText(entry.name).closest("tr")!).getByText(entry.rag)).toBeInTheDocument();
+  }
 });

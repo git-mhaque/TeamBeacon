@@ -5,7 +5,6 @@ export type CompletedWorkSource = {
   epicName: string;
   issueKey: string;
   issueTitle: string;
-  fallbackText: string;
 };
 
 export type CompletedWorkBullet = {
@@ -18,21 +17,12 @@ export type CompletedWorkSummaryGroup = {
   bullets: CompletedWorkBullet[];
 };
 
-// Resolve model output by source ID, never by output order or model-supplied metadata.
-export function groupCompletedWork(
-  sources: CompletedWorkSource[],
-  items: Array<{ cardId: unknown; text: string }>,
-): CompletedWorkSummaryGroup[] {
-  const validIds = new Set(sources.map((source) => source.cardId));
-  const textById = new Map<string, string>();
-  for (const item of items) {
-    if (typeof item.cardId !== "string" || !validIds.has(item.cardId) || textById.has(item.cardId) || !item.text.trim()) continue;
-    textById.set(item.cardId, item.text);
-  }
+// Preserve synced titles and source metadata without model-generated text.
+export function groupCompletedWork(sources: CompletedWorkSource[]): CompletedWorkSummaryGroup[] {
   const groups = new Map<string, CompletedWorkBullet[]>();
   for (const source of sources) {
     const bullets = groups.get(source.group) ?? [];
-    bullets.push({ text: textById.get(source.cardId) ?? source.fallbackText, source });
+    bullets.push({ text: source.issueTitle.trim() || "No summary provided.", source });
     groups.set(source.group, bullets);
   }
   return [...groups].map(([group, bullets]) => ({ group, bullets }));
