@@ -1,3 +1,4 @@
+import { type DateRange } from "../DateRangeFields";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import {
@@ -26,6 +27,7 @@ export type TeamDashboardIssueSelection = {
 type Props = {
   selection: TeamDashboardIssueSelection;
   flowWeeks: TeamDashboardFlowWeeks;
+  flowRange?: DateRange | null;
   onClose: () => void;
 };
 
@@ -172,8 +174,9 @@ function description(
   selection: TeamDashboardIssueSelection,
   payload: InitiativeDeepDiveResponse | null,
   flowWeeks: TeamDashboardFlowWeeks,
+  flowRange?: DateRange | null,
 ): string {
-  const period = flowWeeks === 1 ? "the last week" : `the last ${flowWeeks} weeks`;
+  const period = flowRange ? `${flowRange.startDate} – ${flowRange.endDate}` : flowWeeks === 1 ? "the last week" : `the last ${flowWeeks} weeks`;
   if (selection.metric === "flowGap") {
     const sign = selection.value > 0 ? "+" : "";
     const cardCount = payload?.count ?? 0;
@@ -191,7 +194,7 @@ function description(
   return `${selection.value} card${selection.value === 1 ? "" : "s"} ${selection.metric === "created" ? "created" : "completed"} in ${period}.`;
 }
 
-export function TeamDashboardIssueOverlay({ selection, flowWeeks, onClose }: Props) {
+export function TeamDashboardIssueOverlay({ selection, flowWeeks, flowRange, onClose }: Props) {
   const [payload, setPayload] = useState<InitiativeDeepDiveResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -218,7 +221,9 @@ export function TeamDashboardIssueOverlay({ selection, flowWeeks, onClose }: Pro
       groupIds: selection.groupIds,
       workStreamScope: "primary",
       chartWeeks: flowWeeks,
-      tableWindowWeeks: flowWeeks,
+      tableWindowWeeks: flowRange ? undefined : flowWeeks,
+      chartStart: flowRange?.startDate,
+      chartEnd: flowRange?.endDate,
       activity: metricActivity(selection.metric),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
       limit: 1000,
@@ -232,7 +237,7 @@ export function TeamDashboardIssueOverlay({ selection, flowWeeks, onClose }: Pro
     return () => {
       active = false;
     };
-  }, [flowWeeks, retryCount, selection.groupIds, selection.metric]);
+  }, [flowWeeks, flowRange, retryCount, selection.groupIds, selection.metric]);
 
   const rows = useMemo(() => payload ? buildRows(payload, selection.metric) : [], [payload, selection.metric]);
   const sortedRows = useMemo(
@@ -258,7 +263,7 @@ export function TeamDashboardIssueOverlay({ selection, flowWeeks, onClose }: Pro
           <div>
             <p className="tb-eyebrow">{selection.scopeName}</p>
             <h3 id={titleId}>{metricTitle(selection.metric)}</h3>
-            <p className="tb-dashboard-issue-summary">{description(selection, payload, flowWeeks)}</p>
+            <p className="tb-dashboard-issue-summary">{description(selection, payload, flowWeeks, flowRange)}</p>
           </div>
           <button ref={closeButtonRef} type="button" className="tb-icon-btn" aria-label="Close JIRA cards" onClick={onClose}>
             <X size={18} aria-hidden="true" />

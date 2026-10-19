@@ -469,6 +469,16 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                             "description": "Reporting window for work-stream creation and completion flow.",
                         },
                         {
+                            "name": "periodStart", "in": "query",
+                            "schema": {"type": "string", "format": "date"},
+                            "description": "Inclusive custom start; requires periodEnd and overrides flowWeeks (maximum 366 days).",
+                        },
+                        {
+                            "name": "periodEnd", "in": "query",
+                            "schema": {"type": "string", "format": "date"},
+                            "description": "Inclusive custom end; must be today or earlier in the selected timezone.",
+                        },
+                        {
                             "name": "recentLimit",
                             "in": "query",
                             "schema": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
@@ -1196,6 +1206,11 @@ def build_handler(
                 cycle_time_status_mode = query.get("cycleTimeStatusMode", ["default"])[0]
                 cycle_time_status_keys = query.get("cycleTimeStatus", []) if cycle_time_status_mode == "custom" else None
                 force_refresh = query.get("refresh", ["false"])[0].lower() == "true"
+                custom_period = {
+                    key: query[param][0]
+                    for key, param in (("period_start", "periodStart"), ("period_end", "periodEnd"))
+                    if param in query
+                }
                 try:
                     payload = cache_payload(
                         "dashboard:" + json.dumps({
@@ -1203,9 +1218,11 @@ def build_handler(
                             "recentLimit": query.get("recentLimit", ["5"])[0],
                             "timezone": query.get("timezone", [None])[0],
                             "cycleTimeStatus": cycle_time_status_keys,
+                            **custom_period,
                         }, sort_keys=True),
                         force_refresh=force_refresh,
                         loader=lambda: team_dashboard_provider(
+                            **custom_period,
                             flow_weeks=query.get("flowWeeks", ["4"])[0],
                             recent_limit=query.get("recentLimit", ["5"])[0],
                             timezone_name=query.get("timezone", [None])[0],

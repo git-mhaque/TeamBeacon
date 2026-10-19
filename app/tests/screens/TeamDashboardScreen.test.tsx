@@ -102,6 +102,62 @@ describe("TeamDashboardScreen", () => {
     vi.spyOn(persistence, "setPreference").mockResolvedValue();
   });
 
+  it("validates, saves, edits, and clears a custom flow period with matching drilldowns", async () => {
+    const fetchMock = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+    render(<TeamDashboardScreen />);
+    const select = await screen.findByRole("combobox", { name: /Flow period/ });
+    await waitFor(() => expect(select).not.toBeDisabled());
+    fireEvent.change(select, { target: { value: "custom" } });
+    const dialog = screen.getByRole("dialog", { name: "Configure Flow Period" });
+    const start = within(dialog).getByLabelText("Start");
+    const end = within(dialog).getByLabelText("End");
+    const save = within(dialog).getByRole("button", { name: "Save" });
+    fireEvent.input(start, { target: { value: "" } });
+    fireEvent.click(save);
+    expect(screen.getByRole("alert")).toHaveTextContent("required");
+    fireEvent.input(start, { target: { value: "2026-08-10" } });
+    fireEvent.input(end, { target: { value: "2026-08-01" } });
+    fireEvent.click(save);
+    expect(screen.getByRole("alert")).toHaveTextContent("after end");
+    fireEvent.input(end, { target: { value: "2099-08-01" } });
+    fireEvent.click(save);
+    expect(screen.getByRole("alert")).toHaveTextContent("after today");
+    fireEvent.input(start, { target: { value: "2020-08-01" } });
+    fireEvent.input(end, { target: { value: "2026-08-01" } });
+    fireEvent.click(save);
+    expect(screen.getByRole("alert")).toHaveTextContent("366 days");
+    fireEvent.input(start, { target: { value: "2026-08-01" } });
+    fireEvent.click(save);
+    await waitFor(() => expect(select).not.toBeDisabled());
+    expect(select).toHaveValue("custom");
+    expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowRange", JSON.stringify({ startDate: "2026-08-01", endDate: "2026-08-01" }));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("periodStart=2026-08-01") && String(url).includes("periodEnd=2026-08-01"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "View 12 created JIRA cards for Platform Delivery" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("chartStart=2026-08-01") && !String(url).includes("tableWindowWeeks"))).toBe(true));
+    expect(screen.getByText(/created in 2026-08-01/)).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit flow period" }));
+    expect(screen.getByLabelText("Start")).toHaveValue("2026-08-01");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit flow period" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    fireEvent.change(select, { target: { value: "custom" } });
+    fireEvent.click(document.querySelector(".tb-modal-backdrop")!);
+    fireEvent.change(select, { target: { value: "12" } });
+    await waitFor(() => expect(select).not.toBeDisabled());
+    expect(select).toHaveValue("12");
+    expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowRange", "null");
+  });
+
+  it.each(["broken", JSON.stringify({ startDate: "bad", endDate: "bad" }), JSON.stringify({ startDate: "2026-08-01", endDate: "2026-08-02" })])("restores only valid custom date preferences: %s", async (stored) => {
+    vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => key === "teambeacon.teamDashboard.flowRange" ? stored : null);
+    setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+    render(<TeamDashboardScreen />);
+    const select = screen.getByRole("combobox", { name: /Flow period/ });
+    await waitFor(() => expect(select).not.toBeDisabled());
+    expect(select).toHaveValue(stored.includes("2026") ? "custom" : "4");
+  });
+
   it("uses layout-preserving skeletons during the initial load", () => {
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => undefined));
 

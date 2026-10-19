@@ -6379,6 +6379,12 @@ body {
   padding: 0.85rem 1rem;
 }
 
+.tb-dashboard-flow-controls {
+  display: grid;
+  justify-items: end;
+  gap: 0.5rem;
+}
+
 .tb-dashboard-range {
   display: grid;
   grid-template-columns: auto auto;

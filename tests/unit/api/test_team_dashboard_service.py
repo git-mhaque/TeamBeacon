@@ -8,6 +8,29 @@ from services.api.issues.team_dashboard import get_team_dashboard
 
 
 class TeamDashboardServiceUnitTests(unittest.TestCase):
+    def test_custom_period_validation(self) -> None:
+        for start, end in [("bad", "2026-08-01"), ("2026-08-01", None),
+                           ("2026-08-02", "2026-08-01"), ("2026-01-01", "2027-01-01"),
+                           ("2024-01-01", "2026-01-01")]:
+            with self.subTest(start=start, end=end), self.assertRaises(ValueError):
+                get_team_dashboard(period_start=start, period_end=end,
+                                   now=datetime(2026, 8, 11, tzinfo=timezone.utc))
+
+    @patch("services.api.issues.team_dashboard._safe_call")
+    def test_custom_period_is_forwarded_and_returned_without_work_streams(self, safe_call) -> None:
+        safe_call.return_value = {}
+        result = get_team_dashboard(period_start="2026-08-01", period_end="2026-08-01",
+                                    now=datetime(2026, 8, 11, tzinfo=timezone.utc))
+        self.assertEqual(result["flowPeriod"]["startDate"], "2026-08-01")
+        self.assertEqual(result["flowPeriod"]["endDate"], "2026-08-01")
+        safe_call.side_effect = lambda section, *args, **kwargs: ({"groups": [{"id": 1, "name": "Platform"}]}
+                                                               if section == "workStreams" else {})
+        get_team_dashboard(period_start="2026-08-01", period_end="2026-08-02",
+                           now=datetime(2026, 8, 11, tzinfo=timezone.utc))
+        flow_call = next(call for call in safe_call.call_args_list if call.args[0] == "workStreams.1")
+        self.assertEqual(flow_call.kwargs["chart_start"], "2026-08-01")
+        self.assertEqual(flow_call.kwargs["chart_end"], "2026-08-02")
+
     @patch("services.api.issues.team_dashboard.get_current_sprint_changes")
     @patch("services.api.issues.team_dashboard.get_team_insights")
     @patch("services.api.issues.team_dashboard.get_release_insights")

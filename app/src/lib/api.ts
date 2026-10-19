@@ -1330,9 +1330,14 @@ export async function fetchTeamDashboard(
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
   cycleTimeStatusKeys?: string[] | null,
   forceRefresh = false,
+  flowRange?: { startDate: string; endDate: string } | null,
 ): Promise<TeamDashboardResponse> {
   const params = new URLSearchParams();
   params.set("flowWeeks", String(flowWeeks));
+  if (flowRange) {
+    params.set("periodStart", flowRange.startDate);
+    params.set("periodEnd", flowRange.endDate);
+  }
   params.set("recentLimit", String(recentLimit));
   params.set("timezone", timezone);
   if (cycleTimeStatusKeys !== undefined && cycleTimeStatusKeys !== null) {

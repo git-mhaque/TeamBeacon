@@ -1,4 +1,5 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { DateRangeFields, validateDateRange, type DateRange } from "../DateRangeFields";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowDownRight,
@@ -25,6 +26,7 @@ import {
 } from "./TeamDashboardIssueOverlay";
 
 const TEAM_DASHBOARD_FLOW_WEEKS_KEY = "teambeacon.teamDashboard.flowWeeks";
+const FLOW_RANGE_KEY = "teambeacon.teamDashboard.flowRange";
 const FLOW_WEEK_OPTIONS: TeamDashboardFlowWeeks[] = [1, 4, 12];
 
 type Props = {
@@ -161,6 +163,15 @@ function readFlowWeeks(): TeamDashboardFlowWeeks {
   return FLOW_WEEK_OPTIONS.includes(value as TeamDashboardFlowWeeks) ? value as TeamDashboardFlowWeeks : 4;
 }
 
+function readFlowRange(): DateRange | null {
+  try {
+    const range = JSON.parse(getPreferenceSync(FLOW_RANGE_KEY) ?? "null") as DateRange | null;
+    return range && !validateDateRange(range) ? range : null;
+  } catch {
+    return null;
+  }
+}
+
 function formatDate(value?: string | null): string {
   if (!value) return "Not available";
   const parsed = new Date(value);
@@ -248,6 +259,10 @@ export function TeamDashboardScreen({
   onOpenSettings,
 }: Props) {
   const [flowWeeks, setFlowWeeks] = useState<TeamDashboardFlowWeeks>(readFlowWeeks);
+  const [flowRange, setFlowRange] = useState<DateRange | null>(readFlowRange);
+  const [flowDraft, setFlowDraft] = useState<DateRange>({ startDate: "", endDate: "" });
+  const [isFlowConfigOpen, setIsFlowConfigOpen] = useState(false);
+  const [flowValidationError, setFlowValidationError] = useState<string | null>(null);
   const [cycleTimeStatusKeys] = useState(readTeamInsightsCycleTimeStatusKeys);
   const [payload, setPayload] = useState<TeamDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -256,6 +271,7 @@ export function TeamDashboardScreen({
   const [workStreamSortField, setWorkStreamSortField] = useState<WorkStreamSortField>("netFlow");
   const [workStreamSortDirection, setWorkStreamSortDirection] = useState<SortDirection>("desc");
   const [issueSelection, setIssueSelection] = useState<TeamDashboardIssueSelection | null>(null);
+  const flowCancelRef = useRef<HTMLButtonElement>(null);
   const initialLoading = loading && payload == null;
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
@@ -268,6 +284,7 @@ export function TeamDashboardScreen({
         Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
         cycleTimeStatusKeys,
         forceRefresh,
+        flowRange,
       );
       setPayload(response);
     } catch (loadError) {
@@ -276,11 +293,15 @@ export function TeamDashboardScreen({
     } finally {
       setLoading(false);
     }
-  }, [cycleTimeStatusKeys, flowWeeks]);
+  }, [cycleTimeStatusKeys, flowWeeks, flowRange]);
 
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (isFlowConfigOpen) flowCancelRef.current?.focus();
+  }, [isFlowConfigOpen]);
 
   useLayoutEffect(() => {
     setTopbarActionsTarget(document.querySelector<HTMLElement>(".tb-main-dashboard > .tb-topbar"));
@@ -289,7 +310,7 @@ export function TeamDashboardScreen({
   const sectionErrorCount = useMemo(() => Object.keys(payload?.errors ?? {}).length, [payload?.errors]);
   const flowPeriodText = payload?.flowPeriod.startDate && payload.flowPeriod.endDate
     ? `${formatDate(payload.flowPeriod.startDate)} – ${formatDate(payload.flowPeriod.endDate)}`
-    : flowRangeLabel(flowWeeks);
+    : flowRange ? `${formatDate(flowRange.startDate)} – ${formatDate(flowRange.endDate)}` : flowRangeLabel(flowWeeks);
   const sortedWorkStreams = useMemo(() => (
     [...(payload?.workStreams ?? [])].sort((left, right) => compareWorkStreams(
       left,
@@ -316,6 +337,8 @@ export function TeamDashboardScreen({
   }, [payload?.workStreams]);
 
   const updateFlowWeeks = (value: TeamDashboardFlowWeeks) => {
+    setFlowRange(null);
+    void setPreference(FLOW_RANGE_KEY, "null");
     setFlowWeeks(value);
     void setPreference(TEAM_DASHBOARD_FLOW_WEEKS_KEY, String(value));
   };
@@ -439,20 +462,36 @@ export function TeamDashboardScreen({
             <p className="tb-eyebrow">Work stream insights</p>
             <h3>Intake, throughput, and work mix</h3>
             <p className="tb-muted-note">
-              Created, completed, and completion share use {flowRangeLabel(flowWeeks).toLowerCase()}. Net backlog change is created minus completed; Current WIP is a current snapshot. Each card is counted once under its primary work stream, including Unmapped.
+              Created, completed, and completion share use {flowRange ? "the custom period" : flowRangeLabel(flowWeeks).toLowerCase()}. Net backlog change is created minus completed; Current WIP is a current snapshot. Each card is counted once under its primary work stream, including Unmapped.
             </p>
           </div>
+          <div className="tb-dashboard-flow-controls">
           <label className="tb-dashboard-range">
             <span>Flow period</span>
             <select
-              value={flowWeeks}
+              value={flowRange ? "custom" : flowWeeks}
               disabled={loading}
-              onChange={(event) => updateFlowWeeks(Number(event.currentTarget.value) as TeamDashboardFlowWeeks)}
+              onChange={(event) => {
+                if (event.currentTarget.value !== "custom") {
+                  updateFlowWeeks(Number(event.currentTarget.value) as TeamDashboardFlowWeeks);
+                  return;
+                }
+                setFlowDraft(flowRange ?? { startDate: payload?.flowPeriod.startDate ?? "", endDate: payload?.flowPeriod.endDate ?? "" });
+                setFlowValidationError(null);
+                setIsFlowConfigOpen(true);
+              }}
             >
               {FLOW_WEEK_OPTIONS.map((weeks) => <option key={weeks} value={weeks}>{flowRangeLabel(weeks)}</option>)}
+              <option value="custom">Custom</option>
             </select>
             <small>{flowPeriodText}</small>
           </label>
+          {flowRange ? <button type="button" className="tb-btn tb-btn-sm" disabled={loading} onClick={() => {
+            setFlowDraft(flowRange);
+            setFlowValidationError(null);
+            setIsFlowConfigOpen(true);
+          }}>Edit flow period</button> : null}
+          </div>
         </header>
 
         {initialLoading ? <WorkStreamTableSkeleton /> : null}
@@ -641,10 +680,44 @@ export function TeamDashboardScreen({
         ) : null}
       </section>
 
+      {isFlowConfigOpen ? (
+        <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Flow Period"
+          onKeyDown={(event) => { if (event.key === "Escape") setIsFlowConfigOpen(false); }}>
+          <div className="tb-modal-backdrop" onClick={() => setIsFlowConfigOpen(false)} />
+          <div className="tb-modal tb-modal-reporting">
+            <header className="tb-modal-head">
+              <div><h3>Configure Flow Period</h3><p className="tb-muted-note">Set the date range for work stream flow. Choose up to 366 days, ending today or earlier.</p></div>
+              <div className="tb-action-row">
+                <button ref={flowCancelRef} type="button" className="tb-btn tb-btn-sm" onClick={() => setIsFlowConfigOpen(false)}>Cancel</button>
+                <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={() => {
+                  let validationError = validateDateRange(flowDraft);
+                  const today = new Date().toLocaleDateString("en-CA");
+                  if (!validationError && flowDraft.endDate > today) validationError = "End date cannot be after today.";
+                  if (!validationError && (Date.parse(flowDraft.endDate) - Date.parse(flowDraft.startDate)) / 86400000 >= 366) validationError = "Flow period cannot exceed 366 days.";
+                  setFlowValidationError(validationError);
+                  if (validationError) return;
+                  setFlowRange(flowDraft);
+                  void setPreference(FLOW_RANGE_KEY, JSON.stringify(flowDraft));
+                  setIssueSelection(null);
+                  setIsFlowConfigOpen(false);
+                }}>Save</button>
+              </div>
+            </header>
+            <div className="tb-exec-period-toolbar"><div className="tb-exec-period-row is-custom">
+              <DateRangeFields startDate={flowDraft.startDate} endDate={flowDraft.endDate}
+                onStartChange={(startDate) => setFlowDraft((range) => ({ ...range, startDate }))}
+                onEndChange={(endDate) => setFlowDraft((range) => ({ ...range, endDate }))} />
+            </div></div>
+            {flowValidationError ? <p className="tb-error-note" role="alert">{flowValidationError}</p> : null}
+          </div>
+        </div>
+      ) : null}
+
       {issueSelection ? (
         <TeamDashboardIssueOverlay
           selection={issueSelection}
           flowWeeks={flowWeeks}
+          flowRange={flowRange}
           onClose={closeIssueOverlay}
         />
       ) : null}

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from services.api.issues.current_sprint_changes import get_current_sprint_changes
-from services.api.issues.initiative_deep_dive import get_initiative_deep_dive
+from services.api.issues.initiative_deep_dive import get_initiative_deep_dive, _normalize_timezone, _resolve_chart_range
 from services.api.issues.release_insights import get_release_insights
 from services.api.issues.team_insights import get_team_insights
 from services.api.metadata.epic_config import get_configured_epic_summary, get_epic_lookup_config
@@ -117,6 +117,8 @@ def get_team_dashboard(
     *,
     flow_weeks: int | str = 4,
     recent_limit: int | str = 5,
+    period_start: str | None = None,
+    period_end: str | None = None,
     timezone_name: str | None = None,
     cycle_time_status_keys: list[str] | None = None,
     db_path: str | None = None,
@@ -125,6 +127,16 @@ def get_team_dashboard(
     normalized_flow_weeks = _normalize_flow_weeks(flow_weeks)
     normalized_recent_limit = _normalize_recent_limit(recent_limit)
     generated_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    custom_range: dict[str, str] = {}
+    if period_start is not None or period_end is not None:
+        _, reporting_timezone = _normalize_timezone(timezone_name)
+        start, end = _resolve_chart_range(
+            chart_weeks=normalized_flow_weeks,
+            chart_start=period_start,
+            chart_end=period_end,
+            local_today=generated_at.astimezone(reporting_timezone).date(),
+        )
+        custom_range = {"chart_start": start.isoformat(), "chart_end": end.isoformat()}
     recent_cutoff = generated_at - timedelta(days=_RECENT_COMPLETION_DAYS)
     errors: dict[str, str] = {}
 
@@ -164,8 +176,8 @@ def get_team_dashboard(
     recent_cards_by_key: dict[str, dict[str, Any]] = {}
     flow_period: dict[str, Any] = {
         "weeks": normalized_flow_weeks,
-        "startDate": None,
-        "endDate": None,
+        "startDate": custom_range.get("chart_start"),
+        "endDate": custom_range.get("chart_end"),
     }
     for work_stream in work_streams:
         if not isinstance(work_stream, dict) or not isinstance(work_stream.get("id"), int):
@@ -178,6 +190,7 @@ def get_team_dashboard(
             get_initiative_deep_dive,
             group_ids=[group_id],
             chart_weeks=normalized_flow_weeks,
+            **custom_range,
             activity="all",
             work_stream_scope="primary",
             timezone_name=timezone_name,

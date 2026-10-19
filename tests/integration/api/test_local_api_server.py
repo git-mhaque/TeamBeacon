@@ -1571,6 +1571,15 @@ class LocalApiServerIntegrationTests(unittest.TestCase):
         self.assertEqual(body["trend"][0]["avgCycleTimeDays"], 3.6)
         self.assertEqual(self.team_insights_calls[-1], (6, None))
 
+    def test_team_dashboard_custom_period_has_separate_cache_entries(self) -> None:
+        for end in ("2026-08-02", "2026-08-03"):
+            url = f"{self.base_url}/api/team/dashboard?periodStart=2026-08-01&periodEnd={end}"
+            with urlopen(url, timeout=5) as response:
+                self.assertEqual(response.status, 200)
+            self.assertEqual(self.team_dashboard_calls[-1]["period_start"], "2026-08-01")
+            self.assertEqual(self.team_dashboard_calls[-1]["period_end"], end)
+        self.assertEqual(len(self.team_dashboard_calls), 2)
+
     def test_team_dashboard_endpoint_supports_snapshot_controls(self) -> None:
         url = (
             f"{self.base_url}/api/team/dashboard?flowWeeks=12&recentLimit=8&timezone=Australia%2FMelbourne"

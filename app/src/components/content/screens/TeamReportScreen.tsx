@@ -1,3 +1,4 @@
+import { DateRangeFields, validateDateRange } from "../DateRangeFields";
 import { useCallback, useId, useEffect, useMemo, useRef, useState } from "react";
 import {
   EpicSummaryReportingPeriod,
@@ -1176,19 +1177,9 @@ export function TeamReportScreen() {
   }, [effectivePeriodEnd, effectivePeriodStart, resolvedReportingPeriod?.days]);
 
   const applyCustomReportingRange = useCallback((): boolean => {
-    if (!reportingStartDraft || !reportingEndDraft) {
-      setReportingValidationError("Start and end date are required.");
-      return false;
-    }
-
-    const startUtc = parseIsoDateToUtcDay(reportingStartDraft);
-    const endUtc = parseIsoDateToUtcDay(reportingEndDraft);
-    if (startUtc === null || endUtc === null) {
-      setReportingValidationError("Invalid reporting period date format.");
-      return false;
-    }
-    if (startUtc > endUtc) {
-      setReportingValidationError("Start date cannot be after end date.");
+    const validationError = validateDateRange({ startDate: reportingStartDraft, endDate: reportingEndDraft });
+    if (validationError) {
+      setReportingValidationError(validationError);
       return false;
     }
 
@@ -1860,24 +1851,12 @@ export function TeamReportScreen() {
                 </label>
 
                 {reportingPreset === "custom" ? (
-                  <>
-                    <label className="tb-exec-period-field">
-                      <span>Start</span>
-                      <input
-                        type="date"
-                        value={reportingStartDraft}
-                        onInput={(event) => setReportingStartDraft((event.currentTarget as HTMLInputElement).value)}
-                      />
-                    </label>
-                    <label className="tb-exec-period-field">
-                      <span>End</span>
-                      <input
-                        type="date"
-                        value={reportingEndDraft}
-                        onInput={(event) => setReportingEndDraft((event.currentTarget as HTMLInputElement).value)}
-                      />
-                    </label>
-                  </>
+                  <DateRangeFields
+                    startDate={reportingStartDraft}
+                    endDate={reportingEndDraft}
+                    onStartChange={setReportingStartDraft}
+                    onEndChange={setReportingEndDraft}
+                  />
                 ) : null}
               </div>
             </div>
