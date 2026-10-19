@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDisplayTimestamp } from "../../src/lib/dateTime";
+import { formatDisplayTimestamp, formatRelativeTimestamp } from "../../src/lib/dateTime";
 
 describe("formatDisplayTimestamp", () => {
   it("uses the shared day-month-year timestamp format without seconds", () => {
@@ -9,5 +9,17 @@ describe("formatDisplayTimestamp", () => {
   it("returns the caller fallback for missing or invalid timestamps", () => {
     expect(formatDisplayTimestamp(null, "Not generated yet")).toBe("Not generated yet");
     expect(formatDisplayTimestamp("not-a-date", "Not generated yet")).toBe("Not generated yet");
+  });
+});
+
+describe("formatRelativeTimestamp", () => {
+  const now = Date.parse("2026-10-19T12:00:00Z");
+  it.each([
+    [undefined, "time unavailable"], ["bad", "time unavailable"],
+    ["2026-10-19T12:00:00Z", "just now"], ["2026-10-20T12:00:00Z", "just now"],
+    ["2026-10-19T11:58:00Z", "2 minutes ago"], ["2026-10-19T10:00:00Z", "2 hours ago"],
+    ["2026-10-17T12:00:00Z", "2 days ago"],
+  ])("formats %s", (value, expected) => {
+    expect(formatRelativeTimestamp(value, now)).toBe(expected);
   });
 });

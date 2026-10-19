@@ -18,8 +18,8 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Team Dashboard:
   - Open as the default startup screen and summarize the most actionable delivery signals.
   - Show one card per work stream with selectable 1/4/12-week created-versus-completed flow, current WIP, and all-scope completion progress.
-  - Show the latest completed release and cycle time, latest completed-sprint average cycle time compared with the previous completed sprint, current-sprint blockers, and cards completed in the last seven days.
-  - Link summary cards to the relevant detailed insight screen.
+  - Focus the web dashboard on work-stream insights; omit the release, sprint cycle-time, and blocker summary cards.
+  - Link work streams and metrics to their detailed views.
 - Initiative insights (epic-centric):
   - Search/select epics via JQL.
   - Configure initiative success criteria (target completion, due date, blockers, scope change thresholds).
@@ -252,4 +252,6 @@ Team Report initiative progress uses work-stream group headings and four columns
 
 Team Dashboard work-stream insights show Intake, throughput, and work mix. Share of completions is the stream’s completed cards divided by all completed cards in the selected flow period, shown with a neutral bar; totals show 100%, or a dash when no cards completed. Created/completed/share use the flow period; Current WIP is a snapshot and Net backlog change is created minus completed. Dashboard aggregation and drilldowns count each epic under its primary assignment (lowest group ID for legacy multi-assignments), with synthetic group ID 0 for Unmapped configured epics. Canonical issue ownership prevents double counting across legacy parent/epic links. The deep-dive API adds opt-in workStreamScope=primary; existing all-membership behavior and lifetime completion fields remain available for compatibility.
 
-Team Dashboard Flow period supports Last week, Last 4 weeks, Last 12 weeks, and a saved Custom date range. Custom reuses the Team Report Start/End fields with Save/Cancel and date-order validation. The dashboard API accepts optional inclusive `periodStart` and `periodEnd` dates (both required, at most 366 days, with future end dates allowed), includes them in its cache key, and reuses deep-dive date filtering for totals and card drilldowns. Switching to a preset clears the saved custom period.
+Team Dashboard Flow period supports Last week, Last 4 weeks, Last 12 weeks, and a saved Custom date range. A single date-range button opens presets and Custom in one dialog; Save applies the selection and Cancel preserves the active period. Custom reuses the Team Report Start/End fields with date-order validation. The dashboard API accepts optional inclusive `periodStart` and `periodEnd` dates (both required, at most 366 days, with future end dates allowed), includes them in its cache key, and reuses deep-dive date filtering for totals and card drilldowns. Switching to a preset clears the saved custom period.
+
+The web dashboard distinguishes period-based flow from `WIP today`, labels card counts as `Cards Created` and `Cards Completed`, uses neutral card counts and signed backlog changes with explanations, and places counting rules under About these metrics. Count and backlog-change headers and values align centrally; inactive sort arrows appear on hover or keyboard focus. Source freshness is relative with the exact timestamp on hover. `Refresh view` reloads synced data without starting ingestion.

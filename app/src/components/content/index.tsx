@@ -89,10 +89,6 @@ function renderScreen(id: ScreenId, navigate: (screen: ScreenId) => void) {
             void persistInitiativeDeepDiveScope([workStreamId]);
             navigate("initiative-deep-dive");
           }}
-          onOpenReleaseInsights={() => navigate("releases")}
-          onOpenTeamInsights={() => navigate("team")}
-          onOpenSprintInsights={() => navigate("sprint")}
-          onOpenDeepDive={() => navigate("initiative-deep-dive")}
           onOpenSettings={() => navigate("integrations")}
         />
       );

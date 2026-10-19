@@ -15,3 +15,14 @@ export function formatDisplayTimestamp(value: string | null | undefined, fallbac
 
   return `${byType.get("day")}-${byType.get("month")}-${byType.get("year")}, ${byType.get("hour")}:${byType.get("minute")} ${byType.get("dayPeriod")}`;
 }
+
+export function formatRelativeTimestamp(value: string | null | undefined, now = Date.now()): string {
+  const timestamp = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(timestamp)) return "time unavailable";
+  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (minutes === 0) return "just now";
+  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always" });
+  if (minutes < 60) return formatter.format(-minutes, "minute");
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? formatter.format(-hours, "hour") : formatter.format(-Math.floor(hours / 24), "day");
+}

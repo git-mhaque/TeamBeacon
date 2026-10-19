@@ -29,7 +29,7 @@ Exit criteria:
 - Last-sync watermark works for incremental updates.
 
 ## Phase 2 (Weeks 4-5): Insights MVP
-- Team Dashboard startup snapshot with work-stream flow/progress, release and sprint-cycle highlights, current blockers, recent completions, and detail-screen drill-downs.
+- Team Dashboard startup view focused on work-stream flow/progress and metric drilldowns; release, sprint cycle-time, and blocker summary cards are removed from the web dashboard.
 - Initiative insights with configurable success criteria.
 - Initiative Deep Dive with default-all and multi-group/epic cascading scope, weekly created/completed flow, selectable periods, current WIP, and card activity detail.
 - Team metrics: committed/completed points, cycle time trends.
@@ -112,4 +112,6 @@ Team Report initiative progress uses work-stream group headings and four columns
 
 Team Dashboard work-stream insights show Intake, throughput, and work mix. Share of completions is the stream’s completed cards divided by all completed cards in the selected flow period, shown with a neutral bar; totals show 100%, or a dash when no cards completed. Created/completed/share use the flow period; Current WIP is a snapshot and Net backlog change is created minus completed. Dashboard aggregation and drilldowns count each epic under its primary assignment (lowest group ID for legacy multi-assignments), with synthetic group ID 0 for Unmapped configured epics. Canonical issue ownership prevents double counting across legacy parent/epic links. The deep-dive API adds opt-in workStreamScope=primary; existing all-membership behavior and lifetime completion fields remain available for compatibility.
 
-Team Dashboard Flow period supports Last week, Last 4 weeks, Last 12 weeks, and a saved Custom date range. Custom reuses the Team Report Start/End fields with Save/Cancel and date-order validation. The dashboard API accepts optional inclusive `periodStart` and `periodEnd` dates (both required, at most 366 days, with future end dates allowed), includes them in its cache key, and reuses deep-dive date filtering for totals and card drilldowns. Switching to a preset clears the saved custom period.
+Team Dashboard Flow period supports Last week, Last 4 weeks, Last 12 weeks, and a saved Custom date range. A single date-range button opens presets and Custom in one dialog; Save applies the selection and Cancel preserves the active period. Custom reuses the Team Report Start/End fields with date-order validation. The dashboard API accepts optional inclusive `periodStart` and `periodEnd` dates (both required, at most 366 days, with future end dates allowed), includes them in its cache key, and reuses deep-dive date filtering for totals and card drilldowns. Switching to a preset clears the saved custom period.
+
+The web dashboard distinguishes period-based flow from `WIP today`, labels card counts as `Cards Created` and `Cards Completed`, uses neutral card counts and signed backlog changes with explanations, and places counting rules under About these metrics. Count and backlog-change headers and values align centrally; inactive sort arrows appear on hover or keyboard focus. Source freshness is relative with the exact timestamp on hover. `Refresh view` reloads synced data without starting ingestion.

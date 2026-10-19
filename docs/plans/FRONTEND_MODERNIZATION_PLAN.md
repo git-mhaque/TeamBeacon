@@ -202,7 +202,7 @@ Use this structure:
 
 ### 4.6 Other Screen Patterns
 
-- **Team Dashboard:** provide an operational startup snapshot with one work-stream flow/progress card per configured work stream, latest completed-release health, completed-sprint cycle-time comparison, current blockers, recent completions, and clear drill-downs to detailed screens. Persist the 1/4/12-week work-stream flow window locally.
+- **Team Dashboard:** focus the startup view on the work-stream flow table and metric drilldowns. Omit the release, sprint cycle-time, and blocker summary cards. Persist preset and custom work-stream flow periods locally. Use one date-range button for period selection, distinguish WIP today from historical flow, show metric definitions on demand, and use relative source freshness with a Refresh view action.
 - **Initiative Deep Dive:** default to all work streams with checkbox-based multi-work-stream selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
 - **Team Report:** report signals, work mix, initiative progress, then a deterministic completed-work summary from synced issue titles. Load report and completed-card data concurrently, use the locally configured link URL included in the database summary without requesting integration health, and reuse completed cards for selection changes. Completed-work typography uses 12px semibold sentence-case work-stream headings, 15px semibold epic titles, 14px regular issue titles, and 12px regular muted-teal linked keys in parentheses. Preserve compact bullets with greater separation between epics and apply the same hierarchy in HTML exports. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
@@ -560,7 +560,7 @@ The Initiative and Team Report screens are the largest uncertainty because they 
 
 ### MCP dashboard density
 
-The chat dashboard focuses on work-stream rows with inline progress and flow metrics, a compact header, filters, and source freshness. Rows reflow at 640px and 380px. The metric strip, blocker/recent-completion lists, cycle-time status text, and issue-list truncation notices are omitted from this view. Relevant availability warnings remain visible; the MCP data tools and full web dashboard still expose the detailed insights.
+The chat dashboard focuses on work-stream rows with inline progress and flow metrics, a compact header, filters, and source freshness. Rows reflow at 640px and 380px. The metric strip, blocker/recent-completion lists, cycle-time status text, and issue-list truncation notices are omitted from this view. Relevant availability warnings remain visible; the MCP data tools retain the detailed insights, while the web dashboard focuses on work-stream insights.
 
 Configured-epic summary consumers (Initiative Insights and Team Report) request complete selected-view datasets rather than a fixed 200-row subset. Team Dashboard aggregates the same complete set; summaries and visible epic counts must match the full view membership.
 

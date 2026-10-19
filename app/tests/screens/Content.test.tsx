@@ -204,8 +204,8 @@ describe("Content", () => {
     expect(await screen.findByRole("heading", { name: "Team Dashboard" })).toBeInTheDocument();
     const dashboardTopbar = document.querySelector(".tb-main-dashboard > .tb-topbar");
     expect(dashboardTopbar).not.toBeNull();
-    expect(within(dashboardTopbar as HTMLElement).getByText("Data as of")).toBeInTheDocument();
-    expect(within(dashboardTopbar as HTMLElement).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    expect(within(dashboardTopbar as HTMLElement).getByText(/Updated/)).toBeInTheDocument();
+    expect(within(dashboardTopbar as HTMLElement).getByRole("button", { name: "Refresh view" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "What needs attention today" })).not.toBeInTheDocument();
     const appHeader = document.querySelector(".tb-app-header");
     expect(appHeader).not.toBeNull();

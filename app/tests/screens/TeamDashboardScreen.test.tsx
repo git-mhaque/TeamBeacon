@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { vi } from "vitest";
 import * as persistence from "../../src/lib/persistence";
 import { TeamDashboardScreen } from "../../src/components/content/screens/TeamDashboardScreen";
@@ -105,9 +105,10 @@ describe("TeamDashboardScreen", () => {
   it("validates, saves, edits, and clears a custom flow period with matching drilldowns", async () => {
     const fetchMock = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
     render(<TeamDashboardScreen />);
-    const select = await screen.findByRole("combobox", { name: /Flow period/ });
-    await waitFor(() => expect(select).not.toBeDisabled());
-    fireEvent.change(select, { target: { value: "custom" } });
+    const periodButton = screen.getByRole("button", { name: /^Flow period:/ });
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
+    fireEvent.click(periodButton);
+    fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "custom" } });
     const dialog = screen.getByRole("dialog", { name: "Configure Flow Period" });
     const start = within(dialog).getByLabelText("Start");
     const end = within(dialog).getByLabelText("End");
@@ -125,51 +126,99 @@ describe("TeamDashboardScreen", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("366 days");
     fireEvent.input(start, { target: { value: "2026-08-01" } });
     fireEvent.click(save);
-    await waitFor(() => expect(select).not.toBeDisabled());
-    expect(select).toHaveValue("custom");
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
+    expect(periodButton).toHaveTextContent("1 Aug 2026");
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowRange", JSON.stringify({ startDate: "2026-08-01", endDate: "2026-08-01" }));
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("periodStart=2026-08-01") && String(url).includes("periodEnd=2026-08-01"))).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "View 12 created JIRA cards for Platform Delivery" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("chartStart=2026-08-01") && !String(url).includes("tableWindowWeeks"))).toBe(true));
     expect(screen.getByText(/created in 2026-08-01/)).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
-    fireEvent.click(screen.getByRole("button", { name: "Edit flow period" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Flow period:/ }));
     expect(screen.getByLabelText("Start")).toHaveValue("2026-08-01");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit flow period" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Flow period:/ }));
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    fireEvent.change(select, { target: { value: "custom" } });
+    fireEvent.click(periodButton);
     fireEvent.click(document.querySelector(".tb-modal-backdrop")!);
-    fireEvent.change(select, { target: { value: "12" } });
-    await waitFor(() => expect(select).not.toBeDisabled());
-    expect(select).toHaveValue("12");
+    fireEvent.click(periodButton);
+    fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "12" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
     expect(persistence.setPreference).toHaveBeenCalledWith("teambeacon.teamDashboard.flowRange", "null");
   });
 
   it("saves a future end date and uses it for card drilldowns", async () => {
     const fetchMock = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
     render(<TeamDashboardScreen />);
-    const select = screen.getByRole("combobox", { name: /Flow period/ });
-    await waitFor(() => expect(select).not.toBeDisabled());
-    fireEvent.change(select, { target: { value: "custom" } });
+    const periodButton = screen.getByRole("button", { name: /^Flow period:/ });
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
+    fireEvent.click(periodButton);
+    fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "custom" } });
     fireEvent.input(screen.getByLabelText("Start"), { target: { value: "2099-09-01" } });
     fireEvent.input(screen.getByLabelText("End"), { target: { value: "2099-11-30" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(select).not.toBeDisabled());
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(select).toHaveValue("custom");
+    expect(periodButton).toHaveTextContent("30 Nov 2099");
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("periodEnd=2099-11-30"))).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "View 12 created JIRA cards for Platform Delivery" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("chartEnd=2099-11-30"))).toBe(true));
+  });
+
+  it("cancels period edits without changing the active data and explains metric scopes", async () => {
+    const fetchMock = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
+    render(<TeamDashboardScreen />);
+    await screen.findByRole("button", { name: "Platform Delivery" });
+    const periodButton = screen.getByRole("button", { name: /^Flow period:/ });
+    fireEvent.click(periodButton);
+    fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "12" } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(periodButton).toHaveFocus();
+    fireEvent.click(periodButton);
+    expect(screen.getByRole("combobox", { name: /Flow period/ })).toHaveValue("4");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.getByText("Created and completed during the selected period. WIP reflects today.")).toBeInTheDocument();
+    const wip = screen.getByRole("button", { name: /Sort by WIP today/ });
+    expect(wip).toHaveAttribute("title", "Cards currently in progress, regardless of the selected period.");
+    expect(screen.getByText("−3")).toHaveAttribute("title", "Backlog shrunk by 3 cards");
+    expect(screen.getByText("+3")).toHaveAttribute("title", "Backlog grew by 3 cards");
+    expect(screen.getByRole("button", { name: /Sort by Completion share/ })).toBeInTheDocument();
+  });
+
+  it("shows source freshness relative to now with the exact timestamp on hover", async () => {
+    const now = Date.now();
+    setupFetchMock({ "/api/team/dashboard": { ...dashboardPayload, dataAsOf: new Date(now - 2 * 3600000).toISOString() } });
+    render(<TeamDashboardScreen />);
+    const synced = await screen.findByText("Synced 2 hours ago");
+    expect(synced.parentElement).toHaveAttribute("title");
+    expect(synced.parentElement?.getAttribute("title")).not.toBe("Not available");
+  });
+
+  it("updates relative freshness while the dashboard stays open", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-10-19T12:02:00Z"));
+      setupFetchMock({ "/api/team/dashboard": { ...dashboardPayload, dataAsOf: "2026-10-19T12:00:00Z" } });
+      render(<TeamDashboardScreen />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText("Synced 2 minutes ago")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.getByText("Synced 3 minutes ago")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(["broken", JSON.stringify({ startDate: "bad", endDate: "bad" }), JSON.stringify({ startDate: "2026-08-01", endDate: "2026-08-02" })])("restores only valid custom date preferences: %s", async (stored) => {
     vi.mocked(persistence.getPreferenceSync).mockImplementation((key) => key === "teambeacon.teamDashboard.flowRange" ? stored : null);
     setupFetchMock({ "/api/team/dashboard": dashboardPayload });
     render(<TeamDashboardScreen />);
-    const select = screen.getByRole("combobox", { name: /Flow period/ });
-    await waitFor(() => expect(select).not.toBeDisabled());
-    expect(select).toHaveValue(stored.includes("2026") ? "custom" : "4");
+    const periodButton = screen.getByRole("button", { name: /^Flow period:/ });
+    await waitFor(() => expect(periodButton).not.toBeDisabled());
+    fireEvent.click(periodButton);
+    expect(screen.getByRole("combobox", { name: /Flow period/ })).toHaveValue(stored.includes("2026") ? "custom" : "4");
   });
 
   it("uses layout-preserving skeletons during the initial load", () => {
@@ -179,9 +228,9 @@ describe("TeamDashboardScreen", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading work-stream insights");
     expect(document.querySelectorAll(".tb-dashboard-skeleton-row")).toHaveLength(6);
-    expect(document.querySelectorAll(".tb-dashboard-kpi .tb-dashboard-skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("region", { name: "Team delivery highlights" })).not.toBeInTheDocument();
     expect(screen.queryByText("Loading work-stream flow…")).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /Flow period/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Flow period:/ })).toBeDisabled();
   });
 
   it("keeps the current dashboard visible while refreshing", async () => {
@@ -194,39 +243,31 @@ describe("TeamDashboardScreen", () => {
 
     render(<TeamDashboardScreen />);
 
-    expect(await screen.findByText("TeamBeacon 2.4")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("button", { name: "Platform Delivery" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh view" }));
 
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
-    expect(screen.getByText("TeamBeacon 2.4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Platform Delivery" })).toBeInTheDocument();
     expect(screen.getByRole("meter", { name: "Platform Delivery share of completions" })).toBeInTheDocument();
   });
 
-  it("summarizes delivery health and supports dashboard drill-downs", async () => {
+  it("focuses on work-stream insights and supports dashboard drilldowns", async () => {
     const callbacks = {
       onOpenWorkStream: vi.fn(),
-      onOpenReleaseInsights: vi.fn(),
-      onOpenTeamInsights: vi.fn(),
-      onOpenSprintInsights: vi.fn(),
       onOpenSettings: vi.fn(),
     };
     const fetchSpy = setupFetchMock({ "/api/team/dashboard": dashboardPayload });
 
     render(<TeamDashboardScreen {...callbacks} />);
 
-    expect(await screen.findByText("TeamBeacon 2.4")).toBeInTheDocument();
-    expect(screen.getByText("3.4 days")).toBeInTheDocument();
-    expect(screen.getByText("0.8 days faster")).toBeInTheDocument();
-    expect(screen.getByText("Sprint 43 · 5 SP")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Platform Delivery" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Blocked items" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recently completed" })).not.toBeInTheDocument();
 
-    const highlights = screen.getByRole("region", { name: "Team delivery highlights" });
-    expect(Array.from(highlights.querySelectorAll(".tb-dashboard-kpi-heading span")).map((title) => title.textContent)).toEqual([
-      "Latest completed release",
-      "Latest sprint cycle time",
-      "Current sprint blockers",
-    ]);
+    expect(screen.queryByRole("region", { name: "Team delivery highlights" })).not.toBeInTheDocument();
+    for (const label of ["Latest completed release", "Latest sprint cycle time", "Current sprint blockers"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
 
     const progress = screen.getByRole("meter", { name: "Platform Delivery share of completions" });
     expect(progress).toHaveAttribute("aria-valuenow", "78.9");
@@ -241,37 +282,32 @@ describe("TeamDashboardScreen", () => {
       "descending",
     );
     expect(within(comparisonTable).getAllByRole("columnheader")).toHaveLength(7);
+    expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Created/ })).toBeInTheDocument();
+    expect(within(comparisonTable).getByRole("columnheader", { name: /Cards Completed/ })).toBeInTheDocument();
     expect(within(comparisonTable).queryByRole("columnheader", { name: "Recent flow · Last 4 weeks" })).not.toBeInTheDocument();
 
     const platformRow = screen.getByRole("button", { name: "Platform Delivery" }).closest("tr");
     expect(platformRow).not.toBeNull();
-    expect(within(platformRow as HTMLElement).getByText("3 reduced")).toHaveClass("is-good");
+    expect(within(platformRow as HTMLElement).getByText("−3")).toHaveClass("is-good");
     expect(within(platformRow as HTMLElement).getByText("78.9%")).toBeInTheDocument();
     expect(screen.getByText("Flow data unavailable")).toBeInTheDocument();
 
-    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Completed (descending)" }));
+    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Cards Completed (descending)" }));
     expect(streamOrder()).toEqual(["Platform Delivery", "Customer Operations"]);
-    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Completed (descending)" }));
+    fireEvent.click(within(comparisonTable).getByRole("button", { name: "Sort by Cards Completed (descending)" }));
     expect(streamOrder()).toEqual(["Customer Operations", "Platform Delivery"]);
 
     const totalsRow = within(comparisonTable).getByRole("rowheader", { name: "All work streams" }).closest("tr");
     expect(totalsRow).not.toBeNull();
-    expect(within(totalsRow as HTMLElement).getByText("Balanced")).toBeInTheDocument();
+    expect(within(totalsRow as HTMLElement).getByText("0")).toBeInTheDocument();
     expect(within(totalsRow as HTMLElement).getByText("100%")).toBeInTheDocument();
-    for (const label of ["Work Streams", "Epics", "Created", "Net backlog change", "Current WIP", "Share of completions"]) {
+    for (const label of ["Work Streams", "Epics", "Cards Created", "Net backlog change", "WIP today", "Completion share"]) {
       fireEvent.click(within(comparisonTable).getByRole("button", { name: new RegExp(`Sort by ${label}`) }));
     }
 
     fireEvent.click(screen.getByRole("button", { name: "Platform Delivery" }));
     expect(callbacks.onOpenWorkStream).toHaveBeenCalledWith(5);
-    fireEvent.click(screen.getByRole("button", { name: "View Release Insights" }));
-    fireEvent.click(screen.getByRole("button", { name: "View Team Insights" }));
-    fireEvent.click(screen.getAllByRole("button", { name: /View.*Sprint Insights/ })[0]);
-    expect(callbacks.onOpenReleaseInsights).toHaveBeenCalledOnce();
-    expect(callbacks.onOpenTeamInsights).toHaveBeenCalledOnce();
-    expect(callbacks.onOpenSprintInsights).toHaveBeenCalledOnce();
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh view" }));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
 
   });
@@ -659,9 +695,11 @@ describe("TeamDashboardScreen", () => {
     });
     render(<TeamDashboardScreen />);
 
-    expect(await screen.findByRole("combobox", { name: /Flow period/ })).toHaveValue("4");
     await screen.findByRole("meter", { name: "Platform Delivery share of completions" });
+    fireEvent.click(screen.getByRole("button", { name: /^Flow period:/ }));
+    expect(screen.getByRole("combobox", { name: /Flow period/ })).toHaveValue("4");
     fireEvent.change(screen.getByRole("combobox", { name: /Flow period/ }), { target: { value: "12" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(fetchSpy.mock.calls.some(([input]) => new URL(String(input)).searchParams.get("flowWeeks") === "12")).toBe(true);
@@ -682,28 +720,10 @@ describe("TeamDashboardScreen", () => {
 
     render(<TeamDashboardScreen />);
 
-    await screen.findByText("3.4 days");
+    await screen.findByRole("button", { name: "Platform Delivery" });
     const requestUrl = new URL(String(fetchSpy.mock.calls[0][0]));
     expect(requestUrl.searchParams.get("cycleTimeStatusMode")).toBe("custom");
     expect(requestUrl.searchParams.getAll("cycleTimeStatus")).toEqual(["in progress", "code review"]);
-  });
-
-  it("calls out a slower sprint cycle-time trend", async () => {
-    setupFetchMock({
-      "/api/team/dashboard": {
-        ...dashboardPayload,
-        sprintCycleTime: {
-          ...dashboardPayload.sprintCycleTime,
-          latestAverageDays: 5.1,
-          deltaDays: 0.9,
-          direction: "up",
-        },
-      },
-    });
-
-    render(<TeamDashboardScreen />);
-
-    expect(await screen.findByText("0.9 days slower")).toHaveClass("is-warning");
   });
 
   it("shows recoverable full and partial failure states", async () => {
@@ -729,8 +749,6 @@ describe("TeamDashboardScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Some dashboard sections could not be refreshed.")).toBeInTheDocument();
     expect(screen.getByText("No work streams configured")).toBeInTheDocument();
-    expect(screen.getByText("No completed release")).toBeInTheDocument();
-    expect(screen.getByText("No completed sprint data")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledTimes(2);

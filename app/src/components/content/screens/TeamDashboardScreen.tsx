@@ -2,21 +2,17 @@ import { DateRangeFields, validateDateRange, type DateRange } from "../DateRange
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   CircleAlert,
-  CircleCheckBig,
-  Minus,
+  ChevronDown,
   RefreshCw,
 } from "lucide-react";
 import {
   fetchTeamDashboard,
   type TeamDashboardFlowWeeks,
   type TeamDashboardResponse,
-  type TeamDashboardSprintCycleTime,
   type TeamDashboardWorkStream,
 } from "../../../lib/api";
-import { formatDisplayTimestamp } from "../../../lib/dateTime";
+import { formatDisplayTimestamp, formatRelativeTimestamp } from "../../../lib/dateTime";
 import { getPreferenceSync, setPreference } from "../../../lib/persistence";
 import { readTeamInsightsCycleTimeStatusKeys } from "../../../lib/teamInsightsSettings";
 import {
@@ -31,10 +27,6 @@ const FLOW_WEEK_OPTIONS: TeamDashboardFlowWeeks[] = [1, 4, 12];
 
 type Props = {
   onOpenWorkStream?: (workStreamId: number) => void;
-  onOpenReleaseInsights?: () => void;
-  onOpenTeamInsights?: () => void;
-  onOpenSprintInsights?: () => void;
-  onOpenDeepDive?: () => void;
   onOpenSettings?: () => void;
 };
 
@@ -46,6 +38,16 @@ type WorkStreamSortField =
   | "netFlow"
   | "currentWipCount"
   | "completionSharePercent";
+
+const METRIC_DESCRIPTIONS: Record<WorkStreamSortField, string> = {
+  name: "Each card is counted once under its primary work stream, including Unmapped.",
+  epicCount: "Configured epics assigned to this work stream. This count is independent of the flow period.",
+  newCount: "Cards created during the selected period.",
+  completedCount: "Cards completed during the selected period.",
+  netFlow: "Created minus completed during the selected period. Positive means backlog grew; negative means it shrank.",
+  currentWipCount: "Cards currently in progress, regardless of the selected period.",
+  completionSharePercent: "This stream’s completed cards divided by all completed cards in the selected period.",
+};
 
 type SortDirection = "asc" | "desc";
 
@@ -100,6 +102,8 @@ function SortableHeader({
       <button
         type="button"
         className={`tb-table-sort${isActive ? " is-active" : ""}`}
+        title={METRIC_DESCRIPTIONS[field]}
+        aria-description={METRIC_DESCRIPTIONS[field]}
         aria-label={`Sort by ${label} (${announcedDirection === "asc" ? "ascending" : "descending"})`}
         onClick={() => onSort(field)}
       >
@@ -114,11 +118,13 @@ function MetricDrilldownButton({
   label,
   className,
   children,
+  title,
   onClick,
 }: {
   label: string;
   className?: string;
   children: ReactNode;
+  title?: string;
   onClick: () => void;
 }) {
   return (
@@ -126,6 +132,7 @@ function MetricDrilldownButton({
       type="button"
       className={`tb-dashboard-metric-link${className ? ` ${className}` : ""}`}
       aria-label={label}
+      title={title}
       onClick={onClick}
     >
       {children}
@@ -152,6 +159,14 @@ function flowGapLabel(value: number): string {
   return "Balanced";
 }
 
+function flowGapValue(value: number): string {
+  return value > 0 ? `+${value}` : String(value).replace("-", "−");
+}
+
+function flowGapDescription(value: number): string {
+  return value === 0 ? "Backlog unchanged" : `Backlog ${value > 0 ? "grew" : "shrunk"} by ${Math.abs(value)} cards`;
+}
+
 function flowGapTone(value: number): string {
   if (value > 0) return "is-warning";
   if (value < 0) return "is-good";
@@ -176,42 +191,15 @@ function formatDate(value?: string | null): string {
   if (!value) return "Not available";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not available";
-  return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric" }).format(parsed);
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(parsed);
 }
 
 function formatTimestamp(value?: string | null): string {
   return formatDisplayTimestamp(value);
 }
 
-function formatDays(value?: number | null): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "Not available";
-  return `${value.toFixed(value % 1 === 0 ? 0 : 1)} days`;
-}
-
 function flowRangeLabel(weeks: TeamDashboardFlowWeeks): string {
   return weeks === 1 ? "Last week" : `Last ${weeks} weeks`;
-}
-
-function CycleDelta({ cycleTime }: { cycleTime: TeamDashboardSprintCycleTime }) {
-  const delta = cycleTime.deltaDays;
-  if (typeof delta !== "number") {
-    return <span className="tb-dashboard-delta is-neutral"><Minus size={15} aria-hidden="true" />No previous sprint</span>;
-  }
-  if (cycleTime.direction === "down") {
-    return (
-      <span className="tb-dashboard-delta is-good">
-        <ArrowDownRight size={16} aria-hidden="true" />{Math.abs(delta).toFixed(1)} days faster
-      </span>
-    );
-  }
-  if (cycleTime.direction === "up") {
-    return (
-      <span className="tb-dashboard-delta is-warning">
-        <ArrowUpRight size={16} aria-hidden="true" />{Math.abs(delta).toFixed(1)} days slower
-      </span>
-    );
-  }
-  return <span className="tb-dashboard-delta is-neutral"><Minus size={15} aria-hidden="true" />No change</span>;
 }
 
 function WorkStreamTableSkeleton() {
@@ -223,11 +211,11 @@ function WorkStreamTableSkeleton() {
           <tr>
             <th scope="col">Work Streams</th>
             <th scope="col" className="is-number">Epics</th>
-            <th scope="col" className="is-number">Created</th>
-            <th scope="col" className="is-number">Completed</th>
+            <th scope="col" className="is-number">Cards Created</th>
+            <th scope="col" className="is-number">Cards Completed</th>
             <th scope="col" className="is-flow-gap">Net backlog change</th>
-            <th scope="col" className="is-number">Current WIP</th>
-            <th scope="col" className="is-progress">Share of completions</th>
+            <th scope="col" className="is-number">WIP today</th>
+            <th scope="col" className="is-progress">Completion share</th>
           </tr>
         </thead>
         <tbody>
@@ -235,11 +223,11 @@ function WorkStreamTableSkeleton() {
             <tr key={index} className="tb-dashboard-skeleton-row">
               <td data-label="Work Streams"><span className="tb-dashboard-skeleton is-table-name" /></td>
               <td data-label="Epics" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Cards Created" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Cards Completed" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
               <td data-label="Net backlog change"><span className="tb-dashboard-skeleton is-table-pill" /></td>
-              <td data-label="Current WIP" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
-              <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+              <td data-label="WIP today" className="is-number"><span className="tb-dashboard-skeleton is-table-number" /></td>
+              <td data-label="Completion share" className="tb-dashboard-delivery-cell">
                 <span className="tb-dashboard-skeleton is-table-progress-copy" />
                 <span className="tb-dashboard-skeleton is-table-progress" />
               </td>
@@ -253,13 +241,12 @@ function WorkStreamTableSkeleton() {
 
 export function TeamDashboardScreen({
   onOpenWorkStream,
-  onOpenReleaseInsights,
-  onOpenTeamInsights,
-  onOpenSprintInsights,
   onOpenSettings,
 }: Props) {
   const [flowWeeks, setFlowWeeks] = useState<TeamDashboardFlowWeeks>(readFlowWeeks);
   const [flowRange, setFlowRange] = useState<DateRange | null>(readFlowRange);
+  const [flowPresetDraft, setFlowPresetDraft] = useState<TeamDashboardFlowWeeks | "custom">(4);
+  const [now, setNow] = useState(Date.now);
   const [flowDraft, setFlowDraft] = useState<DateRange>({ startDate: "", endDate: "" });
   const [isFlowConfigOpen, setIsFlowConfigOpen] = useState(false);
   const [flowValidationError, setFlowValidationError] = useState<string | null>(null);
@@ -271,6 +258,7 @@ export function TeamDashboardScreen({
   const [workStreamSortField, setWorkStreamSortField] = useState<WorkStreamSortField>("netFlow");
   const [workStreamSortDirection, setWorkStreamSortDirection] = useState<SortDirection>("desc");
   const [issueSelection, setIssueSelection] = useState<TeamDashboardIssueSelection | null>(null);
+  const flowButtonRef = useRef<HTMLButtonElement>(null);
   const flowCancelRef = useRef<HTMLButtonElement>(null);
   const initialLoading = loading && payload == null;
 
@@ -303,14 +291,20 @@ export function TeamDashboardScreen({
     if (isFlowConfigOpen) flowCancelRef.current?.focus();
   }, [isFlowConfigOpen]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   useLayoutEffect(() => {
     setTopbarActionsTarget(document.querySelector<HTMLElement>(".tb-main-dashboard > .tb-topbar"));
   }, []);
 
   const sectionErrorCount = useMemo(() => Object.keys(payload?.errors ?? {}).length, [payload?.errors]);
-  const flowPeriodText = payload?.flowPeriod.startDate && payload.flowPeriod.endDate
-    ? `${formatDate(payload.flowPeriod.startDate)} – ${formatDate(payload.flowPeriod.endDate)}`
-    : flowRange ? `${formatDate(flowRange.startDate)} – ${formatDate(flowRange.endDate)}` : flowRangeLabel(flowWeeks);
+  const activeFlowRange = flowRange ?? payload?.flowPeriod;
+  const flowPeriodText = activeFlowRange?.startDate && activeFlowRange.endDate
+    ? `${formatDate(activeFlowRange.startDate)} – ${formatDate(activeFlowRange.endDate)}`
+    : flowRangeLabel(flowWeeks);
   const sortedWorkStreams = useMemo(() => (
     [...(payload?.workStreams ?? [])].sort((left, right) => compareWorkStreams(
       left,
@@ -343,6 +337,17 @@ export function TeamDashboardScreen({
     void setPreference(TEAM_DASHBOARD_FLOW_WEEKS_KEY, String(value));
   };
 
+  const openFlowConfig = () => {
+    setFlowPresetDraft(flowRange ? "custom" : flowWeeks);
+    setFlowDraft(flowRange ?? { startDate: payload?.flowPeriod.startDate ?? "", endDate: payload?.flowPeriod.endDate ?? "" });
+    setFlowValidationError(null);
+    setIsFlowConfigOpen(true);
+  };
+  const closeFlowConfig = () => {
+    setIsFlowConfigOpen(false);
+    flowButtonRef.current?.focus();
+  };
+
   const updateWorkStreamSort = (field: WorkStreamSortField) => {
     if (field === workStreamSortField) {
       setWorkStreamSortDirection((current) => current === "asc" ? "desc" : "asc");
@@ -362,14 +367,14 @@ export function TeamDashboardScreen({
   };
   const closeIssueOverlay = useCallback(() => setIssueSelection(null), []);
 
+  const freshnessTimestamp = payload?.dataAsOf ?? payload?.generatedAt;
   const freshnessActions = (
     <div className="tb-dashboard-freshness">
-      <span className="tb-dashboard-freshness-copy">
-        <span>Data as of</span>
-        <strong>{loading ? payload ? "Refreshing…" : "Loading…" : formatTimestamp(payload?.dataAsOf ?? payload?.generatedAt)}</strong>
+      <span className="tb-dashboard-freshness-copy" title={formatTimestamp(freshnessTimestamp)}>
+        <strong>{loading ? payload ? "Refreshing…" : "Loading…" : `${payload?.dataAsOf ? "Synced" : "Updated"} ${formatRelativeTimestamp(freshnessTimestamp, now)}`}</strong>
       </span>
       <button type="button" className="tb-btn tb-btn-sm" onClick={() => void loadDashboard(true)} disabled={loading}>
-        <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh
+        <RefreshCw className={loading ? "is-spinning" : undefined} size={15} aria-hidden="true" /> Refresh view
       </button>
     </div>
   );
@@ -394,103 +399,26 @@ export function TeamDashboardScreen({
         </p>
       ) : null}
 
-      <section className="tb-dashboard-kpi-grid" aria-label="Team delivery highlights">
-        <article className="tb-dashboard-kpi">
-          <div className="tb-dashboard-kpi-heading"><span>Latest completed release</span></div>
-          <strong className="tb-dashboard-kpi-name">
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-value is-wide" aria-hidden="true" />
-              : payload?.latestRelease?.name ?? "No completed release"}
-          </strong>
-          <p>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
-              : payload?.latestRelease
-                ? `${formatDate(payload.latestRelease.releaseDate)} · ${formatDays(payload.latestRelease.cycleTimeDays)}`
-                : "Release data is not available."}
-          </p>
-          <button type="button" onClick={onOpenReleaseInsights}>View Release Insights</button>
-        </article>
-
-        <article className="tb-dashboard-kpi">
-          <div className="tb-dashboard-kpi-heading"><span>Latest sprint cycle time</span></div>
-          <strong>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-value" aria-hidden="true" />
-              : formatDays(payload?.sprintCycleTime?.latestAverageDays)}
-          </strong>
-          <p>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
-              : payload?.sprintCycleTime?.latestSprintName ?? "No completed sprint data"}
-          </p>
-          {payload?.sprintCycleTime ? <CycleDelta cycleTime={payload.sprintCycleTime} /> : null}
-          <button type="button" onClick={onOpenTeamInsights}>View Team Insights</button>
-        </article>
-
-        <article className={`tb-dashboard-kpi${initialLoading ? "" : (payload?.blockedItems.count ?? 0) > 0 ? " is-attention" : " is-positive"}`}>
-          <div className="tb-dashboard-kpi-heading">
-            <span>Current sprint blockers</span>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-icon" aria-hidden="true" />
-              : (payload?.blockedItems.count ?? 0) > 0
-                ? <CircleAlert size={19} aria-hidden="true" />
-                : <CircleCheckBig size={19} aria-hidden="true" />}
-          </div>
-          <strong>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-value is-compact" aria-hidden="true" />
-              : payload?.blockedItems.count ?? 0}
-          </strong>
-          <p>
-            {initialLoading
-              ? <span className="tb-dashboard-skeleton is-kpi-detail" aria-hidden="true" />
-              : (
-                <>
-                  {payload?.blockedItems.sprintName ?? "No active sprint"}
-                  {payload?.blockedItems.storyPointsTotal ? ` · ${payload.blockedItems.storyPointsTotal} SP` : ""}
-                </>
-              )}
-          </p>
-          <button type="button" onClick={onOpenSprintInsights}>View Sprint Insights</button>
-        </article>
-      </section>
-
       <section className="tb-panel tb-dashboard-work-streams">
         <header className="tb-panel-header">
           <div>
             <p className="tb-eyebrow">Work stream insights</p>
             <h3>Intake, throughput, and work mix</h3>
-            <p className="tb-muted-note">
-              Created, completed, and completion share use {flowRange ? "the custom period" : flowRangeLabel(flowWeeks).toLowerCase()}. Net backlog change is created minus completed; Current WIP is a current snapshot. Each card is counted once under its primary work stream, including Unmapped.
-            </p>
+            <p className="tb-muted-note">Created and completed during the selected period. WIP reflects today.</p>
+            <details className="tb-dashboard-metric-help">
+              <summary>About these metrics</summary>
+              <div>
+                {Object.entries(METRIC_DESCRIPTIONS).map(([key, description]) => <p key={key}>{description}</p>)}
+              </div>
+            </details>
           </div>
           <div className="tb-dashboard-flow-controls">
-          <label className="tb-dashboard-range">
-            <span>Flow period</span>
-            <select
-              value={flowRange ? "custom" : flowWeeks}
-              disabled={loading}
-              onChange={(event) => {
-                if (event.currentTarget.value !== "custom") {
-                  updateFlowWeeks(Number(event.currentTarget.value) as TeamDashboardFlowWeeks);
-                  return;
-                }
-                setFlowDraft(flowRange ?? { startDate: payload?.flowPeriod.startDate ?? "", endDate: payload?.flowPeriod.endDate ?? "" });
-                setFlowValidationError(null);
-                setIsFlowConfigOpen(true);
-              }}
-            >
-              {FLOW_WEEK_OPTIONS.map((weeks) => <option key={weeks} value={weeks}>{flowRangeLabel(weeks)}</option>)}
-              <option value="custom">Custom</option>
-            </select>
-            <small>{flowPeriodText}</small>
-          </label>
-          {flowRange ? <button type="button" className="tb-btn tb-btn-sm" disabled={loading} onClick={() => {
-            setFlowDraft(flowRange);
-            setFlowValidationError(null);
-            setIsFlowConfigOpen(true);
-          }}>Edit flow period</button> : null}
+            <span className="tb-dashboard-period-label">Flow period</span>
+            <button ref={flowButtonRef} type="button" className="tb-btn tb-dashboard-period-button"
+              aria-label={`Flow period: ${flowPeriodText}`} aria-haspopup="dialog" aria-expanded={isFlowConfigOpen}
+              disabled={loading} onClick={openFlowConfig}>
+              {flowPeriodText}<ChevronDown size={16} aria-hidden="true" />
+            </button>
           </div>
         </header>
 
@@ -528,7 +456,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="newCount"
-                    label="Created"
+                    label="Cards Created"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-number is-new"
@@ -536,7 +464,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="completedCount"
-                    label="Completed"
+                    label="Cards Completed"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-number is-completed"
@@ -552,7 +480,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="currentWipCount"
-                    label="Current WIP"
+                    label="WIP today"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-number"
@@ -560,7 +488,7 @@ export function TeamDashboardScreen({
                   />
                   <SortableHeader
                     field="completionSharePercent"
-                    label="Share of completions"
+                    label="Completion share"
                     activeField={workStreamSortField}
                     direction={workStreamSortDirection}
                     className="is-progress"
@@ -584,7 +512,7 @@ export function TeamDashboardScreen({
                           {workStream.epicCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Created" className="is-number is-new">
+                      <td data-label="Cards Created" className="is-number is-new">
                         <MetricDrilldownButton
                           label={`View ${workStream.newCount} created JIRA cards for ${workStream.name}`}
                           onClick={() => openIssueOverlay("created", workStream.name, [workStream.id], workStream.newCount)}
@@ -592,7 +520,7 @@ export function TeamDashboardScreen({
                           {workStream.newCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Completed" className="is-number is-completed">
+                      <td data-label="Cards Completed" className="is-number is-completed">
                         <MetricDrilldownButton
                           label={`View ${workStream.completedCount} completed JIRA cards for ${workStream.name}`}
                           onClick={() => openIssueOverlay("completed", workStream.name, [workStream.id], workStream.completedCount)}
@@ -602,14 +530,15 @@ export function TeamDashboardScreen({
                       </td>
                       <td data-label="Net backlog change">
                         <MetricDrilldownButton
+                          title={flowGapDescription(workStream.netFlow)}
                           className={`tb-dashboard-flow-gap ${flowGapTone(workStream.netFlow)}`}
                           label={`View JIRA cards contributing to the ${flowGapLabel(workStream.netFlow)} net backlog change for ${workStream.name}`}
                           onClick={() => openIssueOverlay("flowGap", workStream.name, [workStream.id], workStream.netFlow)}
                         >
-                          {flowGapLabel(workStream.netFlow)}
+                          {flowGapValue(workStream.netFlow)}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Current WIP" className="is-number">
+                      <td data-label="WIP today" className="is-number">
                         <MetricDrilldownButton
                           label={`View ${workStream.currentWipCount} current WIP JIRA cards for ${workStream.name}`}
                           onClick={() => openIssueOverlay("currentWip", workStream.name, [workStream.id], workStream.currentWipCount)}
@@ -617,7 +546,7 @@ export function TeamDashboardScreen({
                           {workStream.currentWipCount}
                         </MetricDrilldownButton>
                       </td>
-                      <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                      <td data-label="Completion share" className="tb-dashboard-delivery-cell">
                         <CompletionShare count={workStream.completedCount} total={workStreamTotals.completedCount} name={workStream.name}
                           onClick={() => openIssueOverlay("completionShare", workStream.name, [workStream.id], workStream.completedCount)} />
                       </td>
@@ -636,7 +565,7 @@ export function TeamDashboardScreen({
                       {workStreamTotals.epicCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Created" className="is-number is-new">
+                  <td data-label="Cards Created" className="is-number is-new">
                     <MetricDrilldownButton
                       label={`View ${workStreamTotals.newCount} created JIRA cards for all work streams`}
                       onClick={() => openIssueOverlay("created", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.newCount)}
@@ -644,7 +573,7 @@ export function TeamDashboardScreen({
                       {workStreamTotals.newCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Completed" className="is-number is-completed">
+                  <td data-label="Cards Completed" className="is-number is-completed">
                     <MetricDrilldownButton
                       label={`View ${workStreamTotals.completedCount} completed JIRA cards for all work streams`}
                       onClick={() => openIssueOverlay("completed", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)}
@@ -654,14 +583,15 @@ export function TeamDashboardScreen({
                   </td>
                   <td data-label="Net backlog change">
                     <MetricDrilldownButton
+                      title={flowGapDescription(workStreamTotals.netFlow)}
                       className={`tb-dashboard-flow-gap ${flowGapTone(workStreamTotals.netFlow)}`}
                       label={`View JIRA cards contributing to the ${flowGapLabel(workStreamTotals.netFlow)} net backlog change for all work streams`}
                       onClick={() => openIssueOverlay("flowGap", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.netFlow)}
                     >
-                      {flowGapLabel(workStreamTotals.netFlow)}
+                      {flowGapValue(workStreamTotals.netFlow)}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Current WIP" className="is-number">
+                  <td data-label="WIP today" className="is-number">
                     <MetricDrilldownButton
                       label={`View ${workStreamTotals.currentWipCount} current WIP JIRA cards for all work streams`}
                       onClick={() => openIssueOverlay("currentWip", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.currentWipCount)}
@@ -669,7 +599,7 @@ export function TeamDashboardScreen({
                       {workStreamTotals.currentWipCount}
                     </MetricDrilldownButton>
                   </td>
-                  <td data-label="Share of completions" className="tb-dashboard-delivery-cell">
+                  <td data-label="Completion share" className="tb-dashboard-delivery-cell">
                     <CompletionShare count={workStreamTotals.completedCount} total={workStreamTotals.completedCount} name="All work streams"
                       onClick={() => openIssueOverlay("completionShare", "All work streams", sortedWorkStreams.map(({ id }) => id), workStreamTotals.completedCount)} />
                   </td>
@@ -682,14 +612,20 @@ export function TeamDashboardScreen({
 
       {isFlowConfigOpen ? (
         <div className="tb-modal-layer" role="dialog" aria-modal="true" aria-label="Configure Flow Period"
-          onKeyDown={(event) => { if (event.key === "Escape") setIsFlowConfigOpen(false); }}>
-          <div className="tb-modal-backdrop" onClick={() => setIsFlowConfigOpen(false)} />
+          onKeyDown={(event) => { if (event.key === "Escape") closeFlowConfig(); }}>
+          <div className="tb-modal-backdrop" onClick={closeFlowConfig} />
           <div className="tb-modal tb-modal-reporting">
             <header className="tb-modal-head">
               <div><h3>Configure Flow Period</h3><p className="tb-muted-note">Set the date range for work stream flow. Choose up to 366 days, including future dates.</p></div>
               <div className="tb-action-row">
-                <button ref={flowCancelRef} type="button" className="tb-btn tb-btn-sm" onClick={() => setIsFlowConfigOpen(false)}>Cancel</button>
+                <button ref={flowCancelRef} type="button" className="tb-btn tb-btn-sm" onClick={closeFlowConfig}>Cancel</button>
                 <button type="button" className="tb-btn tb-btn-sm tb-btn-primary" onClick={() => {
+                  if (flowPresetDraft !== "custom") {
+                    updateFlowWeeks(flowPresetDraft);
+                    setIssueSelection(null);
+                    closeFlowConfig();
+                    return;
+                  }
                   let validationError = validateDateRange(flowDraft);
                   if (!validationError && (Date.parse(flowDraft.endDate) - Date.parse(flowDraft.startDate)) / 86400000 >= 366) validationError = "Flow period cannot exceed 366 days.";
                   setFlowValidationError(validationError);
@@ -697,14 +633,23 @@ export function TeamDashboardScreen({
                   setFlowRange(flowDraft);
                   void setPreference(FLOW_RANGE_KEY, JSON.stringify(flowDraft));
                   setIssueSelection(null);
-                  setIsFlowConfigOpen(false);
+                  closeFlowConfig();
                 }}>Save</button>
               </div>
             </header>
             <div className="tb-exec-period-toolbar"><div className="tb-exec-period-row is-custom">
-              <DateRangeFields startDate={flowDraft.startDate} endDate={flowDraft.endDate}
+              <label className="tb-exec-period-field"><span>Flow period</span>
+                <select value={flowPresetDraft} onChange={(event) => {
+                  setFlowPresetDraft(event.currentTarget.value === "custom" ? "custom" : Number(event.currentTarget.value) as TeamDashboardFlowWeeks);
+                  setFlowValidationError(null);
+                }}>
+                  {FLOW_WEEK_OPTIONS.map((weeks) => <option key={weeks} value={weeks}>{flowRangeLabel(weeks)}</option>)}
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              {flowPresetDraft === "custom" ? <DateRangeFields startDate={flowDraft.startDate} endDate={flowDraft.endDate}
                 onStartChange={(startDate) => setFlowDraft((range) => ({ ...range, startDate }))}
-                onEndChange={(endDate) => setFlowDraft((range) => ({ ...range, endDate }))} />
+                onEndChange={(endDate) => setFlowDraft((range) => ({ ...range, endDate }))} /> : null}
             </div></div>
             {flowValidationError ? <p className="tb-error-note" role="alert">{flowValidationError}</p> : null}
           </div>
