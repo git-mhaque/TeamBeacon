@@ -2,6 +2,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+// JSDOM does not implement native dialog visibility; browser focus containment
+// and background inertness are provided by showModal in the application.
+Object.defineProperties(HTMLDialogElement.prototype, {
+  showModal: { configurable: true, value() { this.setAttribute("open", ""); } },
+  close: { configurable: true, value() { this.removeAttribute("open"); } },
+});
+
 Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   configurable: true,
   value: vi.fn(() => ({

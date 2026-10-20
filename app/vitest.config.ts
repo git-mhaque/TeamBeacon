@@ -20,6 +20,15 @@ export default defineConfig({
         "src/components/content/screens/PlannerScreen.tsx": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },
+        "src/components/content/screens/PlannerEpicPicker.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/PlannerEpicDetails.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/PlannerDateRangeField.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/components/content/screens/PlannerTimeline.tsx": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },

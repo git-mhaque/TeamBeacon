@@ -1,6 +1,11 @@
 # TeamBeacon Delivery Plan
 
 ## Planner first version
+
+- Epic addition now uses the Initiative View two-panel modal pattern, with search, visible selections, existing-plan markers, and cancellation before changes reach the plan draft.
+- Timeline rows open compact epic details overlays on double-click or Enter/Space; single-click keeps selection and dependency highlighting without expanding content below the timeline.
+- Dependency options use clickable chips with JIRA keys, epic names, and a visible selected state.
+- Epic dates use a single two-month range calendar with range highlighting, inclusive duration, keyboard selection, and Apply/Cancel/Clear actions.
 - Implemented local multi-plan creation/editing and Draft/Active/Completed/Archived lifecycle.
 - Added configurable tracks, configured-epic placement, local dates/notes, and finish-to-start dependencies with cycle validation.
 - Added a date-scaled timeline, source progress, plan progress, baseline overlays, and schedule warnings.

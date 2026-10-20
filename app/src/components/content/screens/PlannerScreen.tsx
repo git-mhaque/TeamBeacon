@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchPlanner, savePlan } from "../../../lib/api";
 import { formatDisplayTimestamp } from "../../../lib/dateTime";
-import { jiraEpicUrl, newPlan, planDraft, progressLabel, type DeliveryPlan, type PlanDraft, type PlanEpic, type PlannerInventory, type PlanStatus } from "../../../lib/planner";
+import { newPlan, planDraft, progressLabel, type DeliveryPlan, type PlanDraft, type PlanEpic, type PlannerInventory, type PlanStatus } from "../../../lib/planner";
 import { PlannerTimeline } from "./PlannerTimeline";
+import { PlannerEpicPicker } from "./PlannerEpicPicker";
+import { PlannerEpicDetails } from "./PlannerEpicDetails";
 import "../../../styles/planner.css";
 
 export function PlannerScreen() {
   const [inventory, setInventory] = useState<PlannerInventory | null>(null);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [toAdd, setToAdd] = useState<string[]>([]);
+  const [editingEpic, setEditingEpic] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export function PlannerScreen() {
   const dirty = Boolean(draft && (!current || JSON.stringify(draft) !== JSON.stringify(planDraft(current))));
   const choose = (plan: DeliveryPlan | null) => {
     setDraft(plan ? planDraft(plan) : newPlan());
-    setSelected(null); setToAdd([]); setQuery(""); setError(""); setMessage("");
+    setSelected(null); setEditingEpic(null); setPickerOpen(false); setError(""); setMessage("");
   };
   const canLeave = () => !saving && (!dirty || window.confirm("Discard unsaved plan changes?"));
   const load = async (preferredId?: number) => {
@@ -73,11 +75,7 @@ export function PlannerScreen() {
     } catch (err) { if (mounted.current) setError(err instanceof Error ? err.message : "Unable to save the plan."); }
     finally { if (mounted.current) setSaving(false); }
   };
-  const epic = draft?.epics.find(item => item.epicKey === selected);
-  const source = inventory?.epics.find(item => item.epicKey === selected);
-  const sourceUrl = source ? jiraEpicUrl(inventory!.jiraBaseUrl, source.epicKey) : undefined;
-  const candidates = inventory?.epics.filter(item => !draft?.epics.some(placement => placement.epicKey === item.epicKey)
-    && `${item.epicKey} ${item.title}`.toLowerCase().includes(query.toLowerCase())) ?? [];
+  const epic = draft?.epics.find(item => item.epicKey === editingEpic);
 
   return <section className="tb-planner" aria-label="Delivery planner">
     <div className="tb-planner-toolbar">
@@ -144,44 +142,16 @@ export function PlannerScreen() {
                   const id = crypto.randomUUID(); change({ tracks: [...draft.tracks, { id, name: `Track ${draft.tracks.length + 1}` }] });
                 }}>Add track</button>
               </details>
-              <details className="tb-planner-section">
-                <summary>Add configured epics · {draft.epics.length} in this plan</summary>
-                <label>Search configured epics<input value={query} onChange={event => setQuery(event.target.value)} /></label>
-                <div className="tb-planner-candidates">
-                  {candidates.map(item => <label key={item.epicKey}><input type="checkbox" checked={toAdd.includes(item.epicKey)} onChange={event => setToAdd(previous => event.target.checked ? [...previous, item.epicKey] : previous.filter(key => key !== item.epicKey))} /><span>{item.epicKey} · {item.title}</span></label>)}
-                  {!candidates.length && <p>No matching epics. Configure epics in Initiatives or Settings to make them available here.</p>}
-                </div>
-                <button type="button" disabled={!toAdd.length || draft.epics.length + toAdd.length > 200} onClick={() => {
-                  const added = inventory.epics.filter(item => toAdd.includes(item.epicKey)).map(item => ({
-                    epicKey: item.epicKey, trackId: draft.tracks[0].id, startDate: item.startDate, endDate: item.endDate, dependsOn: [], notes: "",
-                  }));
-                  change({ epics: [...draft.epics, ...added] }); setSelected(added[0].epicKey); setToAdd([]);
-                }}>Add selected epics ({toAdd.length})</button>
-                <p className="tb-planner-muted">Up to 200 epics per plan. Existing initiative dates are copied when an epic is added.</p>
-              </details>
+              <div className="tb-planner-section tb-planner-epics-toolbar">
+                <span>{draft.epics.length} epics in this plan</span>
+                <button type="button" onClick={() => setPickerOpen(true)}>Add configured epics</button>
+              </div>
               <div className="tb-planner-section">
                 <h2>Delivery timeline</h2>
-                <PlannerTimeline plan={draft} epics={inventory.epics} selected={selected} onSelect={setSelected} baseline={current?.baseline?.document ?? null} />
+                <PlannerTimeline plan={draft} epics={inventory.epics} selected={selected} onSelect={setSelected}
+                  onEdit={key => { if (!saving) { setSelected(key); setEditingEpic(key); } }} baseline={current?.baseline?.document ?? null} />
                 {!draft.epics.length && <p>Add configured epics to begin scheduling.</p>}
               </div>
-              {epic && <section className="tb-planner-epic-editor" aria-label={`Epic details ${epic.epicKey}`}>
-                <h2>{epic.epicKey} · {source?.title ?? "Source unavailable"}</h2>
-                {sourceUrl && <a href={sourceUrl} target="_blank" rel="noopener noreferrer">Open {epic.epicKey} in JIRA</a>}
-                {source && <p>{progressLabel(source)} scope complete · Epic status: {source.status}{source.isCompleted ? " (completed)" : ""}</p>}
-                <div className="tb-planner-fields">
-                  <label>Epic track<select value={epic.trackId} onChange={event => updateEpic(epic.epicKey, { trackId: event.target.value })}>{draft.tracks.map(track => <option key={track.id} value={track.id}>{track.name}</option>)}</select></label>
-                  <label>Planned start<input type="date" value={epic.startDate ?? ""} onChange={event => updateEpic(epic.epicKey, { startDate: event.target.value || null })} /></label>
-                  <label>Planned finish<input type="date" min={epic.startDate ?? undefined} value={epic.endDate ?? ""} onChange={event => updateEpic(epic.epicKey, { endDate: event.target.value || null })} /></label>
-                </div>
-                <fieldset className="tb-planner-dependencies"><legend>Must start after these epics finish</legend>
-                  {draft.epics.filter(item => item.epicKey !== epic.epicKey).map(item => <label key={item.epicKey}><input type="checkbox" checked={epic.dependsOn.includes(item.epicKey)} onChange={event => updateEpic(epic.epicKey, { dependsOn: event.target.checked ? [...epic.dependsOn, item.epicKey] : epic.dependsOn.filter(key => key !== item.epicKey) })} />{item.epicKey}</label>)}
-                  {draft.epics.length === 1 && <p>Add another epic to define a dependency.</p>}
-                </fieldset>
-                <label>Planning notes<textarea rows={2} maxLength={4000} value={epic.notes} onChange={event => updateEpic(epic.epicKey, { notes: event.target.value })} /></label>
-                <button type="button" onClick={() => {
-                  change({ epics: draft.epics.filter(item => item.epicKey !== epic.epicKey).map(item => ({ ...item, dependsOn: item.dependsOn.filter(key => key !== epic.epicKey) })) }); setSelected(null);
-                }}>Remove epic from plan</button>
-              </section>}
               {current && !dirty && current.warnings.length > 0 && <section className="tb-planner-warnings" aria-label="Planning warnings"><h2>Planning warnings</h2><ul>{current.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></section>}
               {dirty && <p className="tb-planner-muted">Save to check dependencies and update planning warnings. Dates use inclusive calendar days.</p>}
               {current?.baseline && <details className="tb-planner-section">
@@ -201,5 +171,19 @@ export function PlannerScreen() {
           </form>}
       </div>
     </div>}
+    {epic && draft && inventory && <PlannerEpicDetails epic={epic} plan={draft} sources={inventory.epics} jiraBaseUrl={inventory.jiraBaseUrl}
+      onClose={() => setEditingEpic(null)} onChange={patch => updateEpic(epic.epicKey, patch)}
+      onRemove={() => {
+        change({ epics: draft.epics.filter(item => item.epicKey !== epic.epicKey).map(item => ({ ...item, dependsOn: item.dependsOn.filter(key => key !== epic.epicKey) })) });
+        setSelected(null); setEditingEpic(null);
+      }} />}
+    {pickerOpen && draft && inventory && <PlannerEpicPicker epics={inventory.epics}
+      includedKeys={draft.epics.map(item => item.epicKey)} onClose={() => setPickerOpen(false)}
+      onAdd={items => {
+        const added = items.map(item => ({
+          epicKey: item.epicKey, trackId: draft.tracks[0].id, startDate: item.startDate, endDate: item.endDate, dependsOn: [], notes: "",
+        }));
+        change({ epics: [...draft.epics, ...added] }); setSelected(added[0].epicKey); setPickerOpen(false);
+      }} />}
   </section>;
 }

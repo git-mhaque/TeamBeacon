@@ -5,11 +5,12 @@ const DAY = 86400000;
 const day = (value: string) => Date.parse(`${value}T00:00:00Z`) / DAY;
 const label = (value: number) => new Date(value * DAY).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-export function PlannerTimeline({ plan, epics, selected, onSelect, baseline }: {
+export function PlannerTimeline({ plan, epics, selected, onSelect, onEdit, baseline }: {
   plan: PlanDraft; epics: PlannerEpic[]; selected: string | null;
-  onSelect: (key: string) => void; baseline: PlanDraft | null;
+  onSelect: (key: string) => void; onEdit: (key: string) => void; baseline: PlanDraft | null;
 }) {
   const marker = useId().replace(/:/g, "");
+  const instructions = useId();
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1120);
   useEffect(() => {
@@ -45,6 +46,7 @@ export function PlannerTimeline({ plan, epics, selected, onSelect, baseline }: {
   const positions = new Map(rows.flatMap(row => row.items.map(item => [item.epic.epicKey, item] as const)));
   const height = cursor + 16;
   return <div className="tb-planner-timeline-wrap">
+    <p id={instructions} className="tb-planner-muted">Double-click a row to edit epic details. Keyboard: focus a row and press Enter or Space.</p>
     <div className="tb-planner-legend"><span>Solid: planned dates</span><span>Dashed: activation baseline</span><span>Arrows: finish → start</span></div>
     <div ref={host} className="tb-planner-timeline-scroll" tabIndex={0} aria-label="Delivery timeline, scroll horizontally to explore">
       <svg className="tb-planner-timeline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Plan timeline">
@@ -65,7 +67,10 @@ export function PlannerTimeline({ plan, epics, selected, onSelect, baseline }: {
             const scheduled = epic.startDate && epic.endDate && epic.startDate <= epic.endDate;
             return <g key={epic.epicKey} className={`tb-planner-node${selected === epic.epicKey ? " is-selected" : ""}`}
               role="button" tabIndex={0} aria-label={`Edit ${epic.epicKey}${source ? `: ${source.title}` : ""}`}
-              onClick={() => onSelect(epic.epicKey)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(epic.epicKey); } }}>
+              aria-haspopup="dialog" aria-describedby={instructions} aria-pressed={selected === epic.epicKey}
+              onClick={() => onSelect(epic.epicKey)}
+              onDoubleClick={event => { event.currentTarget.focus(); onEdit(epic.epicKey); }}
+              onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(epic.epicKey); } }}>
               <title>{source?.title ?? epic.epicKey} · {epic.startDate ?? "No start"} → {epic.endDate ?? "No finish"}</title>
               <rect x={6} y={y - 4} width={width - 12} height={rowHeight - 4} rx={6} className="tb-planner-row-hit" />
               <text x={16} y={y + 17} className="tb-planner-epic-key">{epic.epicKey} · {source ? progressLabel(source) : "Unavailable"}</text>
