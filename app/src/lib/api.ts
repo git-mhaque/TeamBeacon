@@ -1439,6 +1439,30 @@ export async function fetchReleaseInsights(releaseLimit = 12, projectKey?: strin
 }
 
 export type EpicMapping = { epicKey: string; title: string; status: string; workStreamId: number | null };
+export type UnmappedCard = {
+  issueKey: string;
+  summary: string;
+  issueType: string | null;
+  status: string;
+  createdBy: string | null;
+  parentIssueKey: string | null;
+  parentMissing: boolean;
+  createdAt: string | null;
+};
+export type UnmappedCardsInventory = {
+  cards: UnmappedCard[];
+  count: number;
+  projectKey: string | null;
+  lastSyncedAt: string | null;
+  jiraBaseUrl: string | null;
+};
+
+export async function fetchUnmappedCards(): Promise<UnmappedCardsInventory> {
+  const response = await fetch(`${API_BASE}/api/metadata/unmapped-cards`);
+  if (!response.ok) throw await parseError(response, "Failed to load unmapped cards");
+  return response.json() as Promise<UnmappedCardsInventory>;
+}
+
 export type EpicMappingInventory = { epics: EpicMapping[]; lastSyncedAt: string | null };
 export type EpicMappingChange = { epicKey: string; workStreamId: number | null; expectedWorkStreamId: number | null };
 

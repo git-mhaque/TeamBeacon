@@ -10,7 +10,7 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 
 ## ✨ Core Capabilities
 - Team Dashboard: default startup view with work-stream flow and delivery progress, latest completed-release health, sprint cycle-time movement, current blockers, and recently completed cards.
-- Settings: source connectivity checks, sync controls, metadata configuration, and AI Model Connection status (provider + model).
+- Settings: initiative metadata, work-stream epic mapping, and an Unmapped cards inventory with JIRA links for assigning epics. Source connectivity and sync controls are available in the system-status menu.
 - Initiative Insights: progress matrix, filters, and RAG visibility.
 - Initiative Deep Dive: default-all and multi-work-stream/epic-scoped weekly intake and completion flow with one persisted preset/custom reporting period shared by the chart and activity table, quick-range shortcuts, and a distinct current-WIP snapshot.
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
@@ -132,19 +132,20 @@ python3 -m unittest discover -s tests/integration/api -p "test_*.py" -v
 ```
 
 CI also enforces at least 90% combined statement/branch coverage **for each** of
-`services/api/server.py`, `services/api/integrations/jira_sync.py`, `services/api/metadata/epic_mapping.py`, `packages/connectors/epic_scope.py`, `services/api/metadata/epic_config.py`, and `services/api/issues/team_dashboard.py`. In an activated
+`services/api/server.py`, `services/api/integrations/jira_sync.py`, `services/api/metadata/epic_mapping.py`, `packages/connectors/epic_scope.py`, `services/api/metadata/epic_config.py`, `services/api/issues/team_dashboard.py`, and `services/api/issues/unmapped_cards.py`. In an activated
 Python 3.11 virtual environment (the optional `.venv-mcp` environment also works):
 
 ```bash
 python -m pip install coverage==7.16.2
-python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard -m unittest discover -s tests/unit -p "test_*.py" -v
-python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard -m unittest discover -s tests/integration/api -p "test_*.py" -v
+python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards -m unittest discover -s tests/unit -p "test_*.py" -v
+python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards -m unittest discover -s tests/integration/api -p "test_*.py" -v
 python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/metadata/epic_mapping.py --precision=2 --fail-under=90
 python -m coverage report --include=packages/connectors/epic_scope.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/metadata/epic_config.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/issues/team_dashboard.py --precision=2 --fail-under=90
+python -m coverage report --include=services/api/issues/unmapped_cards.py --precision=2 --fail-under=90
 ```
 
 Run the two backend suites before the reports; a fresh `coverage run` replaces
@@ -162,7 +163,7 @@ npm run lint
 npm run test:coverage
 ```
 
-The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, and Team Report initiative-selection state and completed-work source matching, and Team Dashboard with its issue drilldowns.
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, Unmapped cards, and Team Report initiative-selection state and completed-work source matching, and Team Dashboard with its issue drilldowns.
 
 ## Codex dashboard integration
 

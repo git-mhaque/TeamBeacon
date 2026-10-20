@@ -8411,7 +8411,7 @@ body {
 }
 
 /* Bulk epic work stream mapping */
-.tb-settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--tb-border, #ddd); }
+.tb-settings-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--tb-border, #ddd); }
 .tb-settings-tabs button { padding: 12px 18px; background: transparent; border: 0; border-bottom: 3px solid transparent; color: inherit; cursor: pointer; }
 .tb-settings-tabs button[aria-selected="true"] { border-bottom-color: #aa4436; font-weight: 700; }
 .tb-mapping-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
@@ -8428,6 +8428,16 @@ body {
 .tb-mapping-table th, .tb-mapping-table td { padding: 10px; border-bottom: 1px solid #e7dfd6; }
 .tb-mapping-table th { background: #faf8f5; }
 .tb-mapping-table .is-edited { background: #fff6e3; }
+.tb-unmapped-cards { min-width: 0; }
+.tb-unmapped-cards .tb-panel-header { align-items: flex-start; }
+.tb-unmapped-cards .tb-panel-header > .tb-btn { flex-shrink: 0; }
+.tb-unmapped-cards select { border: 1px solid #d4cac0; border-radius: 6px; padding: 8px; background: white; color: #302b28; max-width: 100%; }
+.tb-unmapped-cards .tb-mapping-filters input { flex: 1 1 18rem; min-width: 0; }
+.tb-unmapped-cards .tb-mapping-table td { vertical-align: top; }
+.tb-unmapped-cards .tb-mapping-table td:nth-child(2) { min-width: 15rem; overflow-wrap: anywhere; }
+.tb-unmapped-cards .tb-mapping-table th:last-child,
+.tb-unmapped-cards .tb-mapping-table td:last-child { white-space: nowrap; }
+.tb-unmapped-jira-link { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
 .tb-mapping-save { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px; background: #faf8f5; border-top: 1px solid #ddd5cc; margin: 16px 0; z-index: 1; }
 .tb-mapping-save > span:first-child { margin-right: auto; }
 @media (max-width: 700px) { .tb-mapping-stats { grid-template-columns: repeat(2, 1fr); } .tb-mapping-distribution > div { grid-template-columns: 1fr; gap: 4px; } }

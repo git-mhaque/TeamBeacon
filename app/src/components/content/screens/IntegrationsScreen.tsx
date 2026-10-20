@@ -1,4 +1,5 @@
 import { EpicMappingTab } from "./EpicMappingTab";
+import { UnmappedCardsTab } from "./UnmappedCardsTab";
 import { useCallback, useEffect, useState } from "react";
 import {
   addEpicGroup,
@@ -17,9 +18,12 @@ type PendingLookupDelete = {
   name: string;
 } | null;
 
+const SETTINGS_TABS = [['metadata', 'Initiative Metadata'], ['mapping', 'Work Stream Epic Mapping'], ['unmapped', 'Unmapped cards']] as const;
+
 export function IntegrationsScreen() {
   const [tab, setTab] = useState("metadata");
   const [mappingOpened, setMappingOpened] = useState(false);
+  const [unmappedOpened, setUnmappedOpened] = useState(false);
   const [epicLookup, setEpicLookup] = useState<EpicLookupConfig>({ groups: [], workTypes: [] });
   const [groupDraft, setGroupDraft] = useState("");
   const [workTypeDraft, setWorkTypeDraft] = useState("");
@@ -164,16 +168,18 @@ export function IntegrationsScreen() {
   return (
     <div className="tb-screen-grid">
       <div role="tablist" aria-label="Settings tabs" className="tb-settings-tabs">
-        {[['metadata', 'Initiative Metadata'], ['mapping', 'Work Stream Epic Mapping']].map(([id, label]) => <button key={id} id={`settings-${id}-tab`} role="tab" aria-selected={tab === id} aria-controls={`settings-${id}-panel`} tabIndex={tab === id ? 0 : -1} onKeyDown={(event) => {
+        {SETTINGS_TABS.map(([id, label], index) => <button key={id} id={`settings-${id}-tab`} role="tab" aria-selected={tab === id} aria-controls={`settings-${id}-panel`} tabIndex={tab === id ? 0 : -1} onKeyDown={(event) => {
           if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
             event.preventDefault();
-            const next = event.key === 'Home' ? 'metadata' : event.key === 'End' ? 'mapping' : tab === 'metadata' ? 'mapping' : 'metadata';
-            setTab(next); if (next === 'mapping') setMappingOpened(true);
+            const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? SETTINGS_TABS.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+            const next = SETTINGS_TABS[nextIndex][0];
+            setTab(next); if (next === 'mapping') setMappingOpened(true); if (next === 'unmapped') setUnmappedOpened(true);
             document.getElementById(`settings-${next}-tab`)?.focus();
           }
-        }} onClick={() => { setTab(id); if (id === 'mapping') setMappingOpened(true); }}>{label}</button>)}
+        }} onClick={() => { setTab(id); if (id === 'mapping') setMappingOpened(true); if (id === 'unmapped') setUnmappedOpened(true); }}>{label}</button>)}
       </div>
       <div id="settings-mapping-panel" className="tb-settings-panel" role="tabpanel" aria-labelledby="settings-mapping-tab" hidden={tab !== 'mapping'}>{mappingOpened && <EpicMappingTab lookup={epicLookup} />}</div>
+      <div id="settings-unmapped-panel" className="tb-settings-panel" role="tabpanel" aria-labelledby="settings-unmapped-tab" hidden={tab !== 'unmapped'}>{unmappedOpened && <UnmappedCardsTab />}</div>
       <div id="settings-metadata-panel" className="tb-settings-panel" role="tabpanel" aria-labelledby="settings-metadata-tab" hidden={tab !== 'metadata'}>
       <section className="tb-panel">
         <header className="tb-panel-header">

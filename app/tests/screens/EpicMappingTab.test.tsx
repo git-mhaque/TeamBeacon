@@ -13,6 +13,7 @@ function mockInventory(rows: EpicMapping[] = epics, failSave = false) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     if (String(input).endsWith("/integrations/jira/status")) return new Response(JSON.stringify({ config: { baseUrl: "https://jira.example.com/" } }));
     if (String(input).endsWith("/lookup")) return new Response(JSON.stringify(lookup));
+    if (String(input).endsWith("/unmapped-cards")) return new Response(JSON.stringify({ cards: [], count: 0, lastSyncedAt: null, jiraBaseUrl: null, projectKey: "P" }));
     if (init?.method === "POST") return new Response(JSON.stringify(failSave ? { detail: "P-1 changed. Reload inventory." } : { savedCount: 1 }), { status: failSave ? 409 : 200 });
     return new Response(JSON.stringify({ epics: rows, lastSyncedAt: "2026-10-14T10:00:00Z" }));
   });
@@ -85,7 +86,7 @@ describe("Epic mapping", () => {
     await screen.findByRole("alert");
     expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
     confirm.mockReturnValue(true);
-    expect(window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))).toBe(true);
+    await waitFor(() => expect(window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))).toBe(true));
     fireEvent.click(screen.getByRole("button", { name: "Reload inventory" }));
     await waitFor(() => expect(screen.getByLabelText("Work stream for P-1")).toHaveValue("unmapped"));
     fireEvent.click(screen.getByRole("button", { name: "Reload inventory" }));
@@ -110,8 +111,16 @@ describe("Epic mapping", () => {
   });
   it("keeps drafts while switching settings tabs and supports keyboard tab navigation", async () => {
     mockInventory(); render(<IntegrationsScreen />);
-    fireEvent.keyDown(screen.getByRole("tab", { name: "Initiative Metadata" }), { key: "End" });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Initiative Metadata" }), { key: "ArrowRight" });
     await screen.findByLabelText("Work stream for P-1"); edit();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Work Stream Epic Mapping" }), { key: "End" });
+    await screen.findByText("No unmapped cards found in synced data.");
+    expect(screen.getByRole("tab", { name: "Unmapped cards" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Unmapped cards" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Initiative Metadata" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Initiative Metadata" }), { key: "ArrowLeft" });
+    expect(screen.getByRole("tab", { name: "Unmapped cards" })).toHaveFocus();
+    fireEvent.click(screen.getByRole("tab", { name: "Work Stream Epic Mapping" }));
     fireEvent.keyDown(screen.getByRole("tab", { name: "Work Stream Epic Mapping" }), { key: "Home" });
     fireEvent.click(screen.getByRole("tab", { name: "Work Stream Epic Mapping" }));
     expect(screen.getByText("1 unsaved changes")).toBeVisible();

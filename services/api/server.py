@@ -17,6 +17,7 @@ from services.api.issues.query import search_synced_issues
 from services.api.issues.release_insights import get_release_insights
 from services.api.issues.team_dashboard import get_team_dashboard
 from services.api.issues.team_insights import get_team_insights
+from services.api.issues.unmapped_cards import get_unmapped_cards
 from services.api.integrations.confluence_status import get_confluence_status
 from services.api.integrations.jira_status import get_jira_status
 from services.api.integrations.jira_sync import (
@@ -742,6 +743,14 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                     "responses": {"200": {"description": "Work type deleted", "content": json_payload}, "400": error_payload},
                 }
             },
+            "/api/metadata/unmapped-cards": {
+                "get": {
+                    "tags": ["metadata"],
+                    "summary": "List all synced project cards without a direct or inherited epic link",
+                    "description": "All statuses, with no date filter or result cap. Missing parents are flagged for verification in JIRA.",
+                    "responses": {"200": {"description": "Cards, count, project, JIRA base URL and last successful sync", "content": json_payload}, "500": error_payload},
+                }
+            },
             "/api/metadata/epic-mappings": {
                 "get": {"summary": "List all synced epics and saved work stream assignments", "responses": {"200": {"description": "Inventory with last successful JIRA sync timestamp", "content": json_payload}}},
                 "post": {
@@ -957,6 +966,7 @@ def build_handler(
     release_insights_provider: ReleaseInsightsProvider = get_release_insights,
     initiative_deep_dive_provider: InitiativeDeepDiveProvider = get_initiative_deep_dive,
     metadata_mapping_inventory_provider: Callable[[], dict[str, Any]] = get_epic_mapping_inventory,
+    unmapped_cards_provider: Callable[[], dict[str, Any]] = get_unmapped_cards,
     metadata_mapping_save_provider: Callable[[Any], dict[str, Any]] = save_epic_mappings,
     metadata_lookup_provider: MetadataLookupProvider = get_epic_lookup_config,
     metadata_add_group_provider: MetadataCreateProvider = add_epic_group,
@@ -1277,6 +1287,17 @@ def build_handler(
                 except ValueError as exc:
                     self._set_json_headers(400)
                     self.wfile.write(_json_bytes({"error": "bad_request", "detail": str(exc)}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
+
+            if path == "/api/metadata/unmapped-cards":
+                try:
+                    payload = unmapped_cards_provider()
+                except Exception:  # noqa: BLE001 - return a safe error for unavailable local data
+                    self._set_json_headers(500)
+                    self.wfile.write(_json_bytes({"error": "inventory_unavailable", "detail": "Unable to load unmapped cards. Try again."}))
                     return
                 self._set_json_headers(200)
                 self.wfile.write(_json_bytes(payload))

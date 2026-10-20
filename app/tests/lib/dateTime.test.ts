@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { formatDisplayTimestamp, formatRelativeTimestamp } from "../../src/lib/dateTime";
+import { formatDisplayDate, formatDisplayTimestamp, formatRelativeTimestamp } from "../../src/lib/dateTime";
+
+describe("formatDisplayDate", () => {
+  it("formats creation dates with a padded day and abbreviated month", () => {
+    expect(formatDisplayDate("2026-09-04T16:40:39")).toBe("04-Sep-2026");
+  });
+  it("uses the fallback for missing or invalid dates", () => {
+    expect(formatDisplayDate(null)).toBe("Not available");
+    expect(formatDisplayDate("invalid", "—")).toBe("—");
+  });
+});
 
 describe("formatDisplayTimestamp", () => {
   it("uses the shared day-month-year timestamp format without seconds", () => {
