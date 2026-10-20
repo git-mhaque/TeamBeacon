@@ -2,6 +2,8 @@
 
 ## Planner first version
 
+- Condensed the plan workspace header and summary, removed the repeated Planner title, and moved plan fields and tracks into an on-demand settings dialog so the timeline appears near the top. The timeline flows with page scrolling and the bottom save/discard actions stay visible. New plans open settings immediately; draft protection, validation, and keyboard focus are preserved.
+
 - Split Planner into a portfolio overview and full-width plan workspace. Added lifecycle/attention summary filters, searchable/sortable plan statistics, archived-plan filtering, direct plan links, and browser Back/Forward support. Return navigation preserves the table context and offers Save/Discard/Keep editing for drafts; failed saves keep the workspace open.
 
 - Epic addition now uses the Initiative View two-panel modal pattern, with search, visible selections, existing-plan markers, and cancellation before changes reach the plan draft.

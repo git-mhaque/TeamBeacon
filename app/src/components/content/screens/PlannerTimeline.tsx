@@ -46,8 +46,10 @@ export function PlannerTimeline({ plan, epics, selected, onSelect, onEdit, basel
   const positions = new Map(rows.flatMap(row => row.items.map(item => [item.epic.epicKey, item] as const)));
   const height = cursor + 16;
   return <div className="tb-planner-timeline-wrap">
-    <p id={instructions} className="tb-planner-muted">Double-click a row to edit epic details. Keyboard: focus a row and press Enter or Space.</p>
-    <div className="tb-planner-legend"><span>Solid: planned dates</span><span>Dashed: activation baseline</span><span>Arrows: finish → start</span></div>
+    <div className="tb-planner-timeline-help">
+      <p id={instructions} className="tb-planner-muted">Edit an epic: double-click a row, or focus it and press Enter / Space.</p>
+      <div className="tb-planner-legend"><span>Solid: planned dates</span><span>Dashed: activation baseline</span><span>Arrows: finish → start</span></div>
+    </div>
     <div ref={host} className="tb-planner-timeline-scroll" tabIndex={0} aria-label="Delivery timeline, scroll horizontally to explore">
       <svg className="tb-planner-timeline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Plan timeline">
         <defs><marker id={marker} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" className="tb-planner-arrowhead" /></marker></defs>

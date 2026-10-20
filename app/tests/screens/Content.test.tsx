@@ -369,6 +369,7 @@ it("opens Planner deep links and returns to the overview from the main navigatio
   await screen.findByRole("link", { name: "Release plan" });
   fireEvent.click(screen.getByRole("button", { name: "New plan" }));
   fireEvent.change(screen.getByLabelText("Plan name"), { target: { value: "Draft release" } });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
   fireEvent.click(screen.getByRole("button", { name: "Planner: Delivery plans & dependencies" }));
   await screen.findByRole("dialog", { name: "Save your changes before returning?" });
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
