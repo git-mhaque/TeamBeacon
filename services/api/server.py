@@ -55,6 +55,7 @@ from services.api.metadata.epic_config import (
 )
 from services.api.metadata.epic_mapping import MappingConflict, get_epic_mapping_inventory, save_epic_mappings
 from services.api.response_cache import ResponseCache
+from services.api.planner import PlanConflict, get_planner, save_plan
 
 
 StatusProvider = Callable[[], dict[str, Any]]
@@ -202,6 +203,52 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
             {"name": "docs", "description": "OpenAPI and Swagger UI docs endpoints."},
         ],
         "paths": {
+            "/api/planner": {
+                "get": {
+                    "tags": ["planner"],
+                    "summary": "List delivery plans, configured epics and live progress",
+                    "description": "Progress counts unique non-epic, non-subtask cards. Dates and dependencies belong to each plan.",
+                    "responses": {"200": {"description": "Planner inventory", "content": json_payload}, "503": {"description": "Local data unavailable"}},
+                }
+            },
+            "/api/planner/save": {
+                "post": {
+                    "tags": ["planner"],
+                    "summary": "Create or atomically replace a delivery plan",
+                    "description": "Existing plans require id and version; stale versions return 409. First activation captures an immutable schedule and scope baseline. Dependencies are finish-to-start with inclusive calendar dates. No JIRA writes.",
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                        "type": "object", "required": ["name"],
+                        "properties": {
+                            "id": {"type": "integer", "minimum": 1},
+                            "version": {"type": "integer", "minimum": 1},
+                            "name": {"type": "string", "maxLength": 160},
+                            "objective": {"type": "string", "maxLength": 4000},
+                            "owner": {"type": "string", "maxLength": 160},
+                            "status": {"type": "string", "enum": ["draft", "active", "completed", "archived"]},
+                            "targetDate": {"type": "string", "format": "date", "nullable": True},
+                            "tracks": {"type": "array", "minItems": 1, "maxItems": 50, "items": {
+                                "type": "object", "required": ["id", "name"],
+                                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                            }},
+                            "epics": {"type": "array", "maxItems": 200, "items": {
+                                "type": "object", "required": ["epicKey"],
+                                "properties": {
+                                    "epicKey": {"type": "string"}, "trackId": {"type": "string"},
+                                    "startDate": {"type": "string", "format": "date", "nullable": True},
+                                    "endDate": {"type": "string", "format": "date", "nullable": True},
+                                    "dependsOn": {"type": "array", "items": {"type": "string"}},
+                                    "notes": {"type": "string", "maxLength": 4000},
+                                },
+                            }},
+                        },
+                    }}}},
+                    "responses": {
+                        "200": {"description": "Saved plan with progress, warnings and baseline", "content": json_payload},
+                        "400": error_payload, "409": {"description": "Plan version conflict", "content": json_payload},
+                        "503": {"description": "Local data unavailable"},
+                    },
+                }
+            },
             "/health": {
                 "get": {
                     "tags": ["health"],
@@ -995,6 +1042,8 @@ def build_handler(
     release_refresh_start_provider: ReleaseRefreshStartProvider = start_release_refresh,
     web_dir: str | Path | None = None,
     jira_data_as_of_provider: Callable[[], str | None] = get_jira_data_as_of,
+    planner_provider: Callable[[], dict[str, Any]] = get_planner,
+    planner_save_provider: Callable[[Any], dict[str, Any]] = save_plan,
 ) -> type[BaseHTTPRequestHandler]:
     web_root = Path(web_dir).expanduser().resolve() if web_dir is not None else None
     analytics_cache = ResponseCache()
@@ -1066,6 +1115,17 @@ def build_handler(
         def do_GET(self) -> None:  # noqa: N802
             parsed = urlparse(self.path)
             path = parsed.path
+
+            if path == "/api/planner":
+                try:
+                    payload = planner_provider()
+                except Exception:  # noqa: BLE001 - preserve the UI with a safe local-storage error
+                    self._set_json_headers(503)
+                    self.wfile.write(_json_bytes({"detail": "Planner data is temporarily unavailable."}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
 
             if path in {"/openapi.json", "/api/openapi.json"}:
                 payload = _build_openapi_spec(server_url=self._public_server_url())
@@ -1492,6 +1552,21 @@ def build_handler(
             # Clearing broadly keeps derived analytics correct without coupling cache
             # invalidation to every individual write handler.
             self._invalidate_analytics_cache()
+
+            if path == "/api/planner/save":
+                try:
+                    payload = planner_save_provider(body_payload)
+                except ValueError as exc:
+                    self._set_json_headers(409 if isinstance(exc, PlanConflict) else 400)
+                    self.wfile.write(_json_bytes({"detail": str(exc)}))
+                    return
+                except Exception:  # noqa: BLE001 - do not expose local storage internals
+                    self._set_json_headers(503)
+                    self.wfile.write(_json_bytes({"detail": "Unable to save the plan. Your draft has been preserved."}))
+                    return
+                self._set_json_headers(200)
+                self.wfile.write(_json_bytes(payload))
+                return
 
             if path == "/api/integrations/jira/sync/start":
                 mode = None

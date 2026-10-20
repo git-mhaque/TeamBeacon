@@ -6,6 +6,7 @@ import { setupFetchMock } from "../utils/fetchMock";
 describe("Content", () => {
   it("renders construction markers only for static screens in sidebar", async () => {
     setupFetchMock({
+      "/api/planner": { plans: [], epics: [], lastSyncedAt: null, jiraBaseUrl: null },
       "/api/team/dashboard": {
         source: "local",
         generatedAt: "2026-04-10T09:00:00Z",
@@ -222,6 +223,7 @@ describe("Content", () => {
       "Team Dashboard",
       "Initiative Deep Dive",
       "Initiative Insights",
+      "Planner",
       "Team Insights",
       "Sprint Insights",
       "Security Insights",
@@ -230,8 +232,8 @@ describe("Content", () => {
       "Team Report",
       "Settings",
     ]);
-    expect(within(nav).getAllByRole("button")).toHaveLength(10);
-    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(10);
+    expect(within(nav).getAllByRole("button")).toHaveLength(11);
+    expect(nav.querySelectorAll(".tb-nav-icon")).toHaveLength(11);
     const navigationToggle = screen.getByRole("button", { name: "Expand navigation" });
     expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(navigationToggle);
@@ -298,6 +300,9 @@ describe("Content", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Configure Epic Metadata" })).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Planner: Delivery plans & dependencies" }));
+    expect(await screen.findByRole("heading", { name: "Planner" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "New plan" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: /Team Insights/ }));
     expect(await screen.findByRole("heading", { name: "Team Insights" })).toBeInTheDocument();
     const trendWindowSelect = screen.getByRole("combobox", { name: "Trend Window" });

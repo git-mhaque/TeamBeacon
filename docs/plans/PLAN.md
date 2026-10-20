@@ -1,5 +1,13 @@
 # TeamBeacon Delivery Plan
 
+## Planner first version
+- Implemented local multi-plan creation/editing and Draft/Active/Completed/Archived lifecycle.
+- Added configurable tracks, configured-epic placement, local dates/notes, and finish-to-start dependencies with cycle validation.
+- Added a date-scaled timeline, source progress, plan progress, baseline overlays, and schedule warnings.
+- First activation preserves schedule and scope. Later source scope changes are visible as added/removed cards.
+- Added optimistic concurrency, draft protection, source freshness, API integration tests, and 90% module coverage gates for the Planner service and UI.
+- Next increments: evidence-based forecasting, delivery duration/cycle-time metrics, shared-capacity modelling, external/cross-plan dependencies, and what-if comparisons.
+
 ## 1. Delivery Strategy
 Deliver in thin vertical slices: integrate data first, then insights, then executive reporting. Each phase ends with a usable demo and acceptance criteria.
 

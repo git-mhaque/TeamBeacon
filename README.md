@@ -1,5 +1,7 @@
 # TeamBeacon
 
+Planner is available immediately after Initiatives. Create a delivery plan, add configured epics, define tracks and dates, and connect finish-to-start dependencies. Save as Active to preserve the original schedule and scope. Plan edits stay local; JIRA and initiative dates are unchanged. The additive Planner schema initializes automatically on first use. See [Planner scope and metric definitions](SPEC.md#51-planner--first-version) and the [architecture](docs/architecture/ARCHITECTURE.md#planner). Forecasting and capacity modelling are planned follow-ups.
+
 TeamBeacon is a self-hosted engineering intelligence web app that sits on top of existing delivery data sources and helps Engineering Managers operate with clearer signals, lower cognitive load, and better delivery outcomes.
 
 ## 🎯 Overview
@@ -137,8 +139,8 @@ Python 3.11 virtual environment (the optional `.venv-mcp` environment also works
 
 ```bash
 python -m pip install coverage==7.16.2
-python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards -m unittest discover -s tests/unit -p "test_*.py" -v
-python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards -m unittest discover -s tests/integration/api -p "test_*.py" -v
+python -m coverage run --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards,services.api.planner -m unittest discover -s tests/unit -p "test_*.py" -v
+python -m coverage run --append --branch --source=services.api.server,services.api.integrations.jira_sync,services.api.metadata.epic_mapping,packages.connectors.epic_scope,services.api.metadata.epic_config,services.api.issues.team_dashboard,services.api.issues.unmapped_cards,services.api.planner -m unittest discover -s tests/integration/api -p "test_*.py" -v
 python -m coverage report --include=services/api/server.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/integrations/jira_sync.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/metadata/epic_mapping.py --precision=2 --fail-under=90
@@ -146,6 +148,7 @@ python -m coverage report --include=packages/connectors/epic_scope.py --precisio
 python -m coverage report --include=services/api/metadata/epic_config.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/issues/team_dashboard.py --precision=2 --fail-under=90
 python -m coverage report --include=services/api/issues/unmapped_cards.py --precision=2 --fail-under=90
+python -m coverage report --include=services/api/planner.py --precision=2 --fail-under=90
 ```
 
 Run the two backend suites before the reports; a fresh `coverage run` replaces
@@ -163,7 +166,7 @@ npm run lint
 npm run test:coverage
 ```
 
-The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Initiative Metadata settings, Work Stream Epic Mapping, Unmapped cards, and Team Report initiative-selection state and completed-work source matching, and Team Dashboard with its issue drilldowns.
+The coverage command enforces at least 90% statements, branches, functions, and lines for the application shell, primary navigation, Planner screen/timeline/contracts, shared API client, Initiative Metadata settings, Work Stream Epic Mapping, Unmapped cards, and Team Report initiative-selection state and completed-work source matching, and Team Dashboard with its issue drilldowns.
 
 ## Codex dashboard integration
 

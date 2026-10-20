@@ -6,6 +6,14 @@ TeamBeacon is a self-hosted web analytics system:
 - Containerized API service for ingestion, normalization, metrics, reporting, and static frontend delivery.
 - SQLite as the source of truth for synced and computed data.
 
+### Planner
+- `services/api/planner.py` owns plan validation, dependency cycle detection, current-scope aggregation, planning warnings, and immutable activation baselines.
+- `delivery_plans` stores a validated schedule document, version, baseline snapshot, and timestamps. Migration `0002_planner.sql` is additive and idempotent; it is applied automatically when Planner is first accessed, following the existing lazy-schema pattern. Tracks, placements, and dependency edges are contained in the document so a complete edit is saved atomically.
+- `GET /api/planner` returns plans, configured epic options with current progress, JIRA base URL, and source freshness in a consistent SQLite read transaction. `POST /api/planner/save` creates or replaces a plan; updates require the observed version and return 409 on conflicts.
+- Writes validate under `BEGIN IMMEDIATE`. First activation freezes both schedule and unique scope keys; the client cannot overwrite the baseline. Shared epic metadata and JIRA records are never updated by Planner.
+- Progress excludes epics and subtasks, deduplicates cards, follows parent lineage with cycle protection, prefers explicit epic links, and respects the existing current full-sync scope guard. This rule is documented separately from existing Initiative Insights progress.
+- The React `PlannerScreen` owns draft interactions and navigation guards; `PlannerTimeline` renders the date-scaled timeline and dependency arrows. Calculations and validation remain in the API. No additional runtime dependencies are required.
+
 ## 2. High-Level Components
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.

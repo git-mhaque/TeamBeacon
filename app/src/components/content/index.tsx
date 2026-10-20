@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { PrimaryNavigation, type ScreenId } from "./PrimaryNavigation";
+import { PlannerScreen } from "./screens/PlannerScreen";
 import { InitiativeDeepDiveScreen, persistInitiativeDeepDiveScope } from "./screens/InitiativeDeepDiveScreen";
 import {
   INITIATIVES_VIEW_STATE_EVENT,
@@ -69,6 +70,7 @@ function screenTitle(id: ScreenId): string {
     dashboard: "Team Dashboard",
     integrations: "Settings",
     initiatives: "Initiative Insights",
+    planner: "Planner",
     "initiative-deep-dive": "Initiative Deep Dive",
     team: "Team Insights",
     sprint: "Sprint Insights",
@@ -96,6 +98,8 @@ function renderScreen(id: ScreenId, navigate: (screen: ScreenId) => void) {
       return <IntegrationsScreen />;
     case "initiatives":
       return <InitiativesScreen />;
+    case "planner":
+      return <PlannerScreen />;
     case "initiative-deep-dive":
       return <InitiativeDeepDiveScreen />;
     case "team":

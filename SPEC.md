@@ -59,6 +59,21 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - HR/performance evaluation workflows.
 - Real-time push updates (poll/scheduled sync only).
 
+## 5.1 Planner — First Version
+- Planner appears immediately after Initiatives in navigation.
+- Managers create and edit multiple local delivery plans with a name, objective, owner, optional target date, and Draft/Active/Completed/Archived status.
+- Each plan starts with one Default track. Tracks can be renamed, reordered, added, and removed; removing a track moves its epics to the first remaining track. Tracks are independent of work streams and do not imply separate team capacity.
+- Add up to 200 configured epics per plan, once per plan. The same epic can appear in multiple plans. Its source status and progress are shared; dates, track, notes, and dependencies belong to each plan. Initiative dates are copied on addition only.
+- Inclusive calendar dates support optional start/finish, with incomplete schedules remaining visible. Finish-before-start dates are rejected.
+- Finish-to-start dependencies reference other epics in the same plan. Duplicate, self, missing, and circular dependencies are rejected atomically. A successor must start on a later calendar day than its predecessor's finish; overlaps, missing dependency dates, unavailable epics, and finishes beyond the plan target produce warnings without moving dates.
+- The timeline shows tracks, planned spans, selected dependency chains, today/target markers, source status, per-epic progress, and original baseline spans. Editing uses accessible date fields and controls; drag scheduling is not included.
+- Planner scope progress counts unique non-epic, non-subtask cards using current status and current synced scope. Explicit epic links take precedence over inherited parent links. Overall progress is the ratio of completed unique cards to all unique cards, not an average of epic percentages. No cards displays `No cards`; missing source epics display `Unavailable`. Epic status is independent of child completion. Existing Initiative Insights metrics are unchanged.
+- First save as Active requires at least one epic and captures an immutable snapshot of the plan document and unique card keys. Later saves and reactivation preserve it. Baseline dates and counts, plus current added/removed card counts, remain inspectable.
+- Plans remain editable if a source epic or its metadata disappears; missing sources are flagged. New additions require configured epics.
+- All writes use optimistic version checks and atomic transactions. Failed saves retain the draft. Navigation/reload warns about unsaved changes and is blocked during a save.
+- Source freshness is shown. Refresh reloads saved plans and current local JIRA data without initiating a sync.
+- Forecasting, capacity modelling, automatic rescheduling, cross-plan dependencies, cycle-time analytics, and JIRA writeback are subsequent increments.
+
 ## 6. Functional Requirements
 1. Securely store and use JIRA/Confluence PAT tokens.
 2. Allow source configuration (base URLs, projects, boards, query presets).

@@ -1,3 +1,5 @@
+import type { DeliveryPlan, PlanDraft, PlannerInventory } from "./planner";
+
 export type IntegrationCheck = {
   name: string;
   ok: boolean;
@@ -813,6 +815,20 @@ async function parseError(response: Response, fallback: string): Promise<Error> 
     // Best-effort parsing; fallback below.
   }
   return new Error(fallback);
+}
+
+export async function fetchPlanner(): Promise<PlannerInventory> {
+  const response = await fetch(`${API_BASE}/api/planner`);
+  if (!response.ok) throw await parseError(response, "Unable to load Planner.");
+  return response.json() as Promise<PlannerInventory>;
+}
+
+export async function savePlan(plan: PlanDraft): Promise<DeliveryPlan> {
+  const response = await fetch(`${API_BASE}/api/planner/save`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(plan),
+  });
+  if (!response.ok) throw await parseError(response, "Unable to save the plan.");
+  return response.json() as Promise<DeliveryPlan>;
 }
 
 export async function fetchJiraIntegrationStatus(): Promise<JiraIntegrationStatus> {

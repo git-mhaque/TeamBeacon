@@ -14,6 +14,18 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       thresholds: {
+        "src/lib/api.ts": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/PlannerScreen.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/PlannerTimeline.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/lib/planner.ts": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/components/content/screens/UnmappedCardsTab.tsx": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },

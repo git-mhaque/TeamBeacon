@@ -6,6 +6,7 @@ import {
   FileChartColumn,
   LayoutDashboard,
   ListChecks,
+  CalendarRange,
   Rocket,
   Settings,
   ShieldCheck,
@@ -19,6 +20,7 @@ export type ScreenId =
   | "dashboard"
   | "integrations"
   | "initiatives"
+  | "planner"
   | "initiative-deep-dive"
   | "team"
   | "sprint"
@@ -40,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Team Dashboard", shortLabel: "Dashboard", blurb: "Delivery overview", icon: LayoutDashboard },
   { id: "initiative-deep-dive", label: "Initiative Deep Dive", shortLabel: "Deep dive", blurb: "New, active & completed work", icon: ChartNoAxesCombined },
   { id: "initiatives", label: "Initiative Insights", shortLabel: "Initiatives", blurb: "Epic progress & RAG", icon: Target },
+  { id: "planner", label: "Planner", shortLabel: "Planner", blurb: "Delivery plans & dependencies", icon: CalendarRange },
   { id: "team", label: "Team Insights", shortLabel: "Team", blurb: "Trends & cycle time", icon: UsersRound },
   { id: "sprint", label: "Sprint Insights", shortLabel: "Sprints", blurb: "Progress, scope & blockers", icon: ListChecks },
   { id: "security", label: "Security Insights", shortLabel: "Security", blurb: "Vulnerability posture", construction: true, icon: ShieldCheck },

@@ -1,5 +1,46 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+describe("shared API request contracts", () => {
+  afterEach(() => vi.resetModules());
+  it("preserves server validation details across read and write requests", async () => {
+    const api = await import("../../src/lib/api");
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => jsonResponse({ detail: "Service unavailable" }, 503));
+    const requests = [
+      () => api.fetchJiraIntegrationStatus(), () => api.fetchOciGenAiIntegrationStatus(),
+      () => api.fetchAiIntegrationStatus("ollama"), () => api.fetchConfluenceIntegrationStatus(),
+      () => api.chatWithOciGenAi({ message: "Summarize" }), () => api.fetchEpicCompletedCards("P-1"),
+      () => api.fetchConfiguredEpicsCompletedCards(), () => api.fetchInitiativeViews(),
+      () => api.createInitiativeView({ name: "Launch", epicKeys: [] }),
+      () => api.updateInitiativeView({ id: 1, name: "Launch", epicKeys: [] }),
+      () => api.deleteInitiativeView(1), () => api.fetchEpicLookupConfig(), () => api.deleteEpicGroup(1),
+      () => api.fetchEpicCandidates("  Portal  "), () => api.upsertEpicMetadata({ epicKey: "P-1", successCriteria: [], groupIds: [], workTypeIds: [] }),
+      () => api.deleteEpicMetadata("P-1"), () => api.fetchCurrentSprint(), () => api.fetchCurrentSprintWork(),
+      () => api.fetchCurrentSprintChanges(), () => api.fetchTeamInsights(),
+      () => api.startReleaseRefresh({ sources: [] }), () => api.fetchReleaseRefreshStatus(), () => api.fetchReleaseRefreshResult(),
+    ];
+    for (const request of requests) await expect(request()).rejects.toThrow("Service unavailable");
+    await expect(api.fetchEpicCompletedCards("  ")).rejects.toThrow("epicKey is required.");
+  });
+
+  it("round-trips optional services and uses their documented request paths", async () => {
+    const api = await import("../../src/lib/api");
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => jsonResponse({ result: "ok" }));
+    for (const [path, request] of [
+      ["/api/integrations/oci-genai/status", () => api.fetchOciGenAiIntegrationStatus()],
+      ["/api/metadata/epics/delete", () => api.deleteEpicMetadata("P-1")],
+      ["/api/releases/refresh/start", () => api.startReleaseRefresh({ sources: [], overallPrompt: "Review" })],
+      ["/api/releases/refresh/status", () => api.fetchReleaseRefreshStatus()],
+      ["/api/releases/refresh/result", () => api.fetchReleaseRefreshResult()],
+    ] as const) {
+      await expect(request()).resolves.toEqual({ result: "ok" });
+      expect(String(fetch.mock.lastCall![0]).endsWith(path)).toBe(true);
+    }
+    const deletion = fetch.mock.calls.find(([url]) => String(url).endsWith("/epics/delete"));
+    expect(JSON.parse(String(deletion![1]!.body))).toEqual({ epicKey: "P-1" });
+    expect(await api.fetchEpicCandidates("  ")).toEqual([]);
+  });
+});
+
 function jsonResponse(payload: unknown, status = 200): Promise<Response> {
   return Promise.resolve(
     new Response(JSON.stringify(payload), {
