@@ -50,6 +50,8 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 
 Planner is a subsequent product addition after Initiatives. It uses the current React/Vite stack, application styles, and Python/SQLite API without a new chart library. Its first version includes plan editing, tracks, epic scheduling, dependency visualization, activation baselines, and explicit draft protection. Forecasts, capacity modelling, and automatic scheduling remain later work. `npm run test:coverage` enforces 90% coverage for its screen, timeline, and shared presentation contracts.
 
+Planner now opens a portfolio overview with summary cards and a searchable, sortable plans table. Selecting or creating a plan opens a full-width workspace. Planner-only hash navigation supports direct plan links and browser Back/Forward; the shell's other screens retain component-state navigation. A native return-confirmation dialog protects unsaved drafts, and the overview retains its filters, sort, scroll and focus. The existing Planner API and database schema are unchanged.
+
 Initiative Deep Dive and Team Dashboard are explicitly approved product additions after the parity migration. Team Dashboard is the first navigation destination and startup screen, backed by `/api/team/dashboard`; Initiative Deep Dive remains backed by `/api/initiative-deep-dive` without changing Initiative Insights behavior.
 - The Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
 - Additional target libraries in this plan should still be introduced only when a component needs them and parity tests justify the change.

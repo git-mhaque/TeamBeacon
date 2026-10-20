@@ -60,7 +60,9 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 - Real-time push updates (poll/scheduled sync only).
 
 ## 5.1 Planner — First Version
-- Planner appears immediately after Initiatives in navigation.
+- Planner appears immediately after Initiatives in navigation and opens an overview without automatically selecting a plan.
+- The overview provides Refresh plans and New plan, summary cards for Active plans, Draft plans, and Needs attention (active plans with planning warnings), plus a searchable, sortable plans table. Rows show name/owner, lifecycle status, scope progress and card counts, epic/track counts, target, warnings, and last update. Archived plans are available through a status filter; the default excludes them. Summary counts cover all plans and each card filters the table. Shared epics are not aggregated into a portfolio completion percentage.
+- A single click on a plan row or its keyboard-accessible link opens a full-width workspace. New plan opens the same workspace with setup fields expanded. All plans and browser Back return to the overview, retaining search, filters, sorting, scroll position, and focus. Unsaved return navigation offers Save and return, Discard and return, or Keep editing; save failures retain the draft. Reload and cross-screen navigation retain draft guards. Planner hash links support direct access to saved plans, with a missing-plan state instead of selecting a different plan.
 - Managers create and edit multiple local delivery plans with a name, objective, owner, optional target date, and Draft/Active/Completed/Archived status.
 - Each plan starts with one Default track. Tracks can be renamed, reordered, added, and removed; removing a track moves its epics to the first remaining track. Tracks are independent of work streams and do not imply separate team capacity.
 - Add up to 200 configured epics per plan, once per plan. The same epic can appear in multiple plans. Its source status and progress are shared; dates, track, notes, and dependencies belong to each plan. Initiative dates are copied on addition only.

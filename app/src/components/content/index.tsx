@@ -478,13 +478,23 @@ function InitiativeViewDropdown({ views, activeViewId, onChange }: InitiativeVie
 }
 
 export function Content({ appName }: Props) {
-  const [active, setActive] = useState<ScreenId>("dashboard");
+  const [active, setActive] = useState<ScreenId>(() => /^#planner(?:\/|$)/.test(window.location.hash) ? "planner" : "dashboard");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [teamTrendWindowSelection, setTeamTrendWindowSelection] = useState<number>(12);
   const [initiativeTopbarState, setInitiativeTopbarState] = useState<InitiativeTopbarState>(
     DEFAULT_INITIATIVE_TOPBAR_STATE,
   );
   const heading = useMemo(() => screenTitle(active), [active]);
+
+  useEffect(() => {
+    const openPlanner = () => {
+      if (!/^#planner(?:\/|$)/.test(window.location.hash) || active === "planner") return;
+      if (window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))) setActive("planner");
+      else window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("popstate", openPlanner);
+    return () => window.removeEventListener("popstate", openPlanner);
+  }, [active]);
 
   const updateTeamTrendWindowSelection = (nextValue: number) => {
     setTeamTrendWindowSelection(nextValue);
@@ -587,7 +597,16 @@ export function Content({ appName }: Props) {
         </div>
       </header>
 
-      <PrimaryNavigation active={active} isExpanded={isSidebarExpanded} onNavigate={(screen) => { if (screen === active || window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))) setActive(screen); }} />
+      <PrimaryNavigation active={active} isExpanded={isSidebarExpanded} onNavigate={(screen) => {
+        if (screen === active) {
+          if (screen === "planner") window.dispatchEvent(new Event("tb-planner-home"));
+          return;
+        }
+        if (!window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))) return;
+        if (screen === "planner") window.history.replaceState(null, "", "#planner");
+        else if (active === "planner") window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        setActive(screen);
+      }} />
 
       <main className={`tb-main tb-main-${active}`}>
         <header className="tb-topbar">

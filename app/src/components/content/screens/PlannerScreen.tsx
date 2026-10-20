@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchPlanner, savePlan } from "../../../lib/api";
 import { formatDisplayTimestamp } from "../../../lib/dateTime";
-import { newPlan, planDraft, progressLabel, type DeliveryPlan, type PlanDraft, type PlanEpic, type PlannerInventory, type PlanStatus } from "../../../lib/planner";
+import { newPlan, planDate, planDraft, progressLabel, type DeliveryPlan, type PlanDraft, type PlanEpic, type PlannerInventory, type PlanStatus } from "../../../lib/planner";
+import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
+import { usePlannerNavigation } from "../../../lib/plannerNavigation";
+import { PlannerOverview } from "./PlannerOverview";
+import { PlannerLeaveDialog } from "./PlannerLeaveDialog";
 import { PlannerTimeline } from "./PlannerTimeline";
 import { PlannerEpicPicker } from "./PlannerEpicPicker";
 import { PlannerEpicDetails } from "./PlannerEpicDetails";
@@ -18,22 +22,26 @@ export function PlannerScreen() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const mounted = useRef(false);
+  const form = useRef<HTMLFormElement>(null);
+  const workspaceTitle = useRef<HTMLHeadingElement>(null);
+  const newPlanButton = useRef<HTMLButtonElement>(null);
+  const overviewPosition = useRef({ scroll: 0, opener: null as HTMLElement | null });
   const current = inventory?.plans.find(plan => plan.id === draft?.id);
   const dirty = Boolean(draft && (!current || JSON.stringify(draft) !== JSON.stringify(planDraft(current))));
+  const navigation = usePlannerNavigation(dirty, saving);
+  const inWorkspace = navigation.route !== "home";
+  const hasDraft = Boolean(draft);
   const choose = (plan: DeliveryPlan | null) => {
     setDraft(plan ? planDraft(plan) : newPlan());
-    setSelected(null); setEditingEpic(null); setPickerOpen(false); setError(""); setMessage("");
+    setSelected(null); setEditingEpic(null); setPickerOpen(false);
   };
   const canLeave = () => !saving && (!dirty || window.confirm("Discard unsaved plan changes?"));
-  const load = async (preferredId?: number) => {
+  const load = async () => {
     setLoading(true); setError("");
     try {
       const data = await fetchPlanner();
       if (!mounted.current) return;
       setInventory(data);
-      const plan = data.plans.find(item => item.id === preferredId) ?? data.plans.find(item => item.status === "active") ?? data.plans[0];
-      if (plan) choose(plan);
-      else setDraft(null);
     } catch (err) { if (mounted.current) setError(err instanceof Error ? err.message : "Unable to load Planner."); }
     finally { if (mounted.current) setLoading(false); }
   };
@@ -42,8 +50,30 @@ export function PlannerScreen() {
     void load();
     return () => { mounted.current = false; };
     // Loading is triggered by mounting and by the explicit refresh action.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (!inventory) return;
+    const plan = inventory.plans.find(item => item.id === navigation.route);
+    if (navigation.route === "new") choose(null);
+    else if (plan) choose(plan);
+    else { setDraft(null); setError(""); setSelected(null); setEditingEpic(null); setPickerOpen(false); }
+    // Reset the workspace only when its route or saved inventory changes.
+  }, [navigation.route, inventory]);
+  useLayoutEffect(() => {
+    if (inWorkspace) {
+      workspaceTitle.current?.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    } else {
+      const opener = overviewPosition.current.opener;
+      (opener?.isConnected ? opener : newPlanButton.current)?.focus({ preventScroll: true });
+      window.scrollTo(0, overviewPosition.current.scroll);
+    }
+  }, [inWorkspace, draft?.id, hasDraft]);
+  const openPlan = (plan: DeliveryPlan | null) => {
+    overviewPosition.current = { scroll: window.scrollY, opener: document.activeElement as HTMLElement };
+    setError(""); setMessage("");
+    navigation.open(plan?.id ?? "new");
+  };
   useEffect(() => {
     if (!dirty && !saving) return;
     const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
@@ -63,8 +93,15 @@ export function PlannerScreen() {
   const updateEpic = (key: string, patch: Partial<PlanEpic>) => {
     if (draft) change({ epics: draft.epics.map(epic => epic.epicKey === key ? { ...epic, ...patch } : epic) });
   };
-  const save = async () => {
+  const save = async (afterSave?: () => void) => {
     if (!draft) return;
+    const invalid = form.current!.querySelector<HTMLInputElement>("input:invalid, select:invalid, textarea:invalid");
+    if (invalid) {
+      const details = invalid.closest("details");
+      if (details) details.open = true;
+      form.current!.reportValidity();
+      return;
+    }
     setSaving(true); setError(""); setMessage("");
     try {
       const result = await savePlan(draft);
@@ -72,6 +109,8 @@ export function PlannerScreen() {
       setInventory(previous => previous && ({ ...previous, plans: [result, ...previous.plans.filter(plan => plan.id !== result.id)] }));
       setDraft(planDraft(result));
       setMessage("Plan saved.");
+      navigation.replace(result.id);
+      afterSave?.();
     } catch (err) { if (mounted.current) setError(err instanceof Error ? err.message : "Unable to save the plan."); }
     finally { if (mounted.current) setSaving(false); }
   };
@@ -79,30 +118,34 @@ export function PlannerScreen() {
 
   return <section className="tb-planner" aria-label="Delivery planner">
     <div className="tb-planner-toolbar">
-      <p>Plan delivery across epics. Track commitments, scope and dependencies.</p>
-      <button type="button" disabled={loading || saving} onClick={() => { if (canLeave()) void load(draft?.id); }}>Refresh plans</button>
-      <button type="button" className="tb-planner-primary" disabled={loading || saving || !inventory} onClick={() => { if (canLeave()) choose(null); }}>New plan</button>
+      {inWorkspace ? <button type="button" className="tb-planner-back" disabled={saving} onClick={navigation.back}><ArrowLeft size={17} aria-hidden="true" />All plans</button>
+        : <p>Plan delivery across epics. Track commitments, scope and dependencies.</p>}
+      <div className="tb-planner-toolbar-actions">
+        <button type="button" disabled={loading || saving} onClick={() => { if (canLeave()) void load(); }}><RefreshCw size={15} aria-hidden="true" />{inWorkspace ? "Refresh plan" : "Refresh plans"}</button>
+        {!inWorkspace && <button ref={newPlanButton} type="button" className="tb-planner-primary" disabled={loading || !inventory} onClick={event => { event.currentTarget.focus(); openPlan(null); }}><Plus size={17} aria-hidden="true" />New plan</button>}
+      </div>
     </div>
-    {error && <div role="alert" className="tb-planner-error">{error} <button type="button" disabled={loading || saving} onClick={() => { if (canLeave()) void load(draft?.id); }}>Reload saved plans</button></div>}
+    {error && <div role="alert" className="tb-planner-error">{error} <button type="button" disabled={loading || saving} onClick={() => { if (canLeave()) void load(); }}>Reload saved plans</button></div>}
     {loading && <p role="status">Loading Planner…</p>}
     {message && <p role="status">{message}</p>}
     {inventory && <p className="tb-planner-muted">Last successful JIRA sync: {inventory.lastSyncedAt ? formatDisplayTimestamp(inventory.lastSyncedAt) : "Not available"} · Progress counts work items once; epics and subtasks are excluded.</p>}
-    {inventory && !loading && <div className="tb-planner-layout">
-      <aside className="tb-planner-plans" aria-label="Delivery plans">
-        <h2>Plans <span>{inventory.plans.length}</span></h2>
-        {!inventory.plans.length && <p>No saved plans yet. Create your first delivery plan.</p>}
-        {inventory.plans.map(plan => <button type="button" key={plan.id} className={`tb-planner-plan${plan.id === draft?.id ? " is-selected" : ""}`}
-          aria-pressed={plan.id === draft?.id} disabled={saving} onClick={() => { if (canLeave()) choose(plan); }}>
-          <strong>{plan.name}</strong><span>{plan.status} · {plan.epics.length} epics</span>
-          <span>{progressLabel(plan.metrics)} · Target {plan.targetDate ?? "not set"}</span>
-          {plan.warnings.length > 0 && <span>{plan.warnings.length} planning warnings</span>}
-        </button>)}
-      </aside>
-      <div className="tb-planner-workspace">
-        {!draft ? <div className="tb-planner-empty"><h2>A delivery plan starts with your epics</h2><p>Create a plan, add configured epics, and arrange their dates and dependencies.</p></div> :
-          <form onSubmit={event => { event.preventDefault(); void save(); }}>
-            <fieldset disabled={saving}>
-              <legend className="tb-planner-title">{draft.id ? draft.name : "New delivery plan"}</legend>
+    {inventory && <div hidden={inWorkspace}><PlannerOverview plans={inventory.plans} onOpen={openPlan} /></div>}
+    {inventory && typeof navigation.route === "number" && !inventory.plans.some(plan => plan.id === navigation.route) && !loading && <div className="tb-planner-empty" role="status"><h2>Plan not found</h2><p>This plan is no longer available. Return to all plans to choose another.</p></div>}
+    {inventory && inWorkspace && draft && <div className="tb-planner-workspace">
+          <header className="tb-planner-workspace-heading">
+            <div><h2 ref={workspaceTitle} tabIndex={-1}>{draft.name || "New delivery plan"}</h2><p>{draft.owner || "No owner assigned"} · Target {planDate(draft.targetDate)}</p></div>
+            <span className={`tb-planner-status is-${draft.status}`}>{draft.status}</span>
+          </header>
+          <form ref={form} aria-label="Delivery plan" onSubmit={event => { event.preventDefault(); void save(); }}>
+            <fieldset disabled={saving || loading}>
+              <legend className="tb-visually-hidden">Plan configuration</legend>
+              {current && <div className="tb-planner-summary" aria-label="Saved plan summary">
+                <span><strong>{progressLabel(current.metrics)}</strong> scope complete · {current.metrics.completedCards}/{current.metrics.totalCards} cards</span>
+                <span>{current.epics.length} epics · {current.tracks.length} tracks</span>
+                <span>Target {current.targetDate ?? "not set"}</span>
+                {dirty && <span>Summary reflects the last save</span>}
+              </div>}
+              <div className="tb-planner-workspace-settings">
               <details key={draft.id ?? "new"} open={!draft.id} className="tb-planner-plan-details">
                 <summary>Plan details</summary>
               <div className="tb-planner-fields">
@@ -116,12 +159,6 @@ export function PlannerScreen() {
               </div>
               {!current?.baseline && <p className="tb-planner-muted">The first save as Active captures your schedule and current scope as a permanent baseline.</p>}
               </details>
-              {current && <div className="tb-planner-summary" aria-label="Saved plan summary">
-                <span><strong>{progressLabel(current.metrics)}</strong> scope complete · {current.metrics.completedCards}/{current.metrics.totalCards} cards</span>
-                <span>{current.epics.length} epics · {current.tracks.length} tracks</span>
-                <span>Target {current.targetDate ?? "not set"}</span>
-                {dirty && <span>Summary reflects the last save</span>}
-              </div>}
               <details className="tb-planner-section">
                 <summary>Tracks · {draft.tracks.length}</summary>
                 {draft.tracks.map((track, index) => <div className="tb-planner-track-editor" key={track.id}>
@@ -142,14 +179,14 @@ export function PlannerScreen() {
                   const id = crypto.randomUUID(); change({ tracks: [...draft.tracks, { id, name: `Track ${draft.tracks.length + 1}` }] });
                 }}>Add track</button>
               </details>
-              <div className="tb-planner-section tb-planner-epics-toolbar">
-                <span>{draft.epics.length} epics in this plan</span>
-                <button type="button" onClick={() => setPickerOpen(true)}>Add configured epics</button>
               </div>
               <div className="tb-planner-section">
-                <h2>Delivery timeline</h2>
+                <div className="tb-planner-epics-toolbar">
+                  <div><h2>Delivery timeline</h2><span className="tb-planner-muted">{draft.epics.length} epics in this plan</span></div>
+                  <button type="button" onClick={() => setPickerOpen(true)}>Add configured epics</button>
+                </div>
                 <PlannerTimeline plan={draft} epics={inventory.epics} selected={selected} onSelect={setSelected}
-                  onEdit={key => { if (!saving) { setSelected(key); setEditingEpic(key); } }} baseline={current?.baseline?.document ?? null} />
+                  onEdit={key => { if (!saving && !loading) { setSelected(key); setEditingEpic(key); } }} baseline={current?.baseline?.document ?? null} />
                 {!draft.epics.length && <p>Add configured epics to begin scheduling.</p>}
               </div>
               {current && !dirty && current.warnings.length > 0 && <section className="tb-planner-warnings" aria-label="Planning warnings"><h2>Planning warnings</h2><ul>{current.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></section>}
@@ -165,12 +202,14 @@ export function PlannerScreen() {
             </fieldset>
             <div className="tb-planner-savebar">
               <span>{saving ? "Saving…" : dirty ? "Unsaved plan changes" : "All changes saved"}</span>
-              <button type="button" disabled={saving || !dirty} onClick={() => { if (canLeave()) { if (current) choose(current); else setDraft(null); } }}>Discard changes</button>
+              <button type="button" disabled={saving || !dirty} onClick={() => { if (canLeave()) { if (current) choose(current); else navigation.replace("home"); } }}>Discard changes</button>
               <button type="submit" className="tb-planner-primary" disabled={saving || !dirty}>Save plan</button>
             </div>
-          </form>}
-      </div>
+          </form>
     </div>}
+    {navigation.pendingReturn && <PlannerLeaveDialog onStay={navigation.clearPendingReturn}
+      onDiscard={navigation.finishReturn}
+      onSave={() => { const finish = navigation.finishReturn; navigation.clearPendingReturn(); void save(finish); }} />}
     {epic && draft && inventory && <PlannerEpicDetails epic={epic} plan={draft} sources={inventory.epics} jiraBaseUrl={inventory.jiraBaseUrl}
       onClose={() => setEditingEpic(null)} onChange={patch => updateEpic(epic.epicKey, patch)}
       onRemove={() => {

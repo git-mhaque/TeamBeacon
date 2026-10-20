@@ -1,7 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/dom";
 import { Content } from "../../src/components/content";
 import { setupFetchMock } from "../utils/fetchMock";
+import { newPlan } from "../../src/lib/planner";
+
+beforeEach(() => {
+  window.history.replaceState(null, "", "/");
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+});
 
 describe("Content", () => {
   it("renders construction markers only for static screens in sidebar", async () => {
@@ -348,4 +354,46 @@ it("blocks navigation when the active settings editor cancels leaving", async ()
   expect(screen.getByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Settings: Work streams & configuration" }));
   window.removeEventListener("tb-before-navigation", guard);
+});
+
+it("opens Planner deep links and returns to the overview from the main navigation", async () => {
+  setupFetchMock({ "/api/planner": {
+    plans: [{ ...newPlan(), id: 42, version: 1, name: "Release plan", createdAt: "2026-10-01", updatedAt: "2026-10-01",
+      metrics: { available: true, totalCards: 0, completedCards: 0, completionPercent: null }, warnings: [], baseline: null, scopeChange: null }],
+    epics: [], lastSyncedAt: null, jiraBaseUrl: null,
+  } });
+  window.history.replaceState(null, "", "#planner/42");
+  render(<Content appName="TeamBeacon" />);
+  await screen.findByRole("heading", { name: "Release plan" });
+  fireEvent.click(screen.getByRole("button", { name: "Planner: Delivery plans & dependencies" }));
+  await screen.findByRole("link", { name: "Release plan" });
+  fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+  fireEvent.change(screen.getByLabelText("Plan name"), { target: { value: "Draft release" } });
+  fireEvent.click(screen.getByRole("button", { name: "Planner: Delivery plans & dependencies" }));
+  await screen.findByRole("dialog", { name: "Save your changes before returning?" });
+  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: /Security Insights:/ }));
+  expect(window.location.hash).toBe("");
+  fireEvent.click(screen.getByRole("button", { name: "Planner: Delivery plans & dependencies" }));
+  await screen.findByRole("link", { name: "Release plan" });
+  expect(screen.queryByLabelText("Plan name")).not.toBeInTheDocument();
+});
+
+it("handles history entry into Planner while respecting other editors' navigation guards", async () => {
+  setupFetchMock({ "/api/planner": { plans: [], epics: [], lastSyncedAt: null, jiraBaseUrl: null } });
+  render(<Content appName="TeamBeacon" />);
+  fireEvent.click(screen.getByRole("button", { name: /Security Insights:/ }));
+  act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+  expect(screen.getByRole("heading", { name: "Security Insights" })).toBeInTheDocument();
+  const guard = (event: Event) => event.preventDefault();
+  window.addEventListener("tb-before-navigation", guard);
+  act(() => { window.history.pushState(null, "", "#planner"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(screen.getByRole("heading", { name: "Security Insights" })).toBeInTheDocument();
+  expect(window.location.hash).toBe("");
+  window.removeEventListener("tb-before-navigation", guard);
+  act(() => { window.history.pushState(null, "", "#planner"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  await screen.findByRole("heading", { name: /Delivery plans/ });
+  act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+  expect(screen.getByRole("heading", { name: /Delivery plans/ })).toBeInTheDocument();
 });

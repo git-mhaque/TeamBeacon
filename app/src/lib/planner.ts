@@ -44,3 +44,7 @@ export function jiraEpicUrl(base: string | null, key: string): string | undefine
   if (!base || !/^https?:\/\//i.test(base)) return undefined;
   return `${base.replace(/\/+$/, "")}/browse/${encodeURIComponent(key)}`;
 }
+
+export const planDate = (value: string | null) => value
+  ? new Date(`${value}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+  : "Not set";

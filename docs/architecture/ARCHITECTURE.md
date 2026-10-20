@@ -7,6 +7,7 @@ TeamBeacon is a self-hosted web analytics system:
 - SQLite as the source of truth for synced and computed data.
 
 ### Planner
+- `PlannerOverview` presents a portfolio table and lifecycle/warning counts using the existing inventory payload. Its filter and sort state stays mounted while `PlannerScreen` renders a full-width workspace, preserving the return context. `usePlannerNavigation` manages Planner-only hash/history entries (`#planner`, `#planner/<id>`, `#planner/new`), restores interrupted history traversal before draft confirmation, and keeps browser Back/Forward aligned with the workspace. The shell resolves direct Planner links and returns the active Planner navigation item to the overview. No API or schema changes are required.
 - `services/api/planner.py` owns plan validation, dependency cycle detection, current-scope aggregation, planning warnings, and immutable activation baselines.
 - `delivery_plans` stores a validated schedule document, version, baseline snapshot, and timestamps. Migration `0002_planner.sql` is additive and idempotent; it is applied automatically when Planner is first accessed, following the existing lazy-schema pattern. Tracks, placements, and dependency edges are contained in the document so a complete edit is saved atomically.
 - `GET /api/planner` returns plans, configured epic options with current progress, JIRA base URL, and source freshness in a consistent SQLite read transaction. `POST /api/planner/save` creates or replaces a plan; updates require the observed version and return 409 on conflicts.

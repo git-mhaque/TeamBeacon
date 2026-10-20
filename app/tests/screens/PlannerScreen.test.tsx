@@ -34,9 +34,15 @@ const editEpic = (name: string | RegExp) => fireEvent.doubleClick(screen.getByRo
 async function open(initial = data([saved()])) {
   const fetch = mock(initial);
   render(<PlannerScreen />);
-  await screen.findByRole("heading", { name: /Plans/ });
+  await screen.findByRole("heading", { name: /Delivery plans/ });
+  if (initial.plans.length) fireEvent.click(screen.getByRole("link", { name: initial.plans[0].name }));
   return fetch;
 }
+
+beforeEach(() => {
+  window.history.replaceState(null, "", "/");
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+});
 
 describe("Planner", () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-20T12:00:00Z")); });
@@ -67,7 +73,7 @@ describe("Planner", () => {
     expect(payload).toMatchObject({ name: "Customer launch", owner: "Manager", objective: "Ship the customer portal", status: "active", targetDate: "2026-11-01" });
     expect(payload.epics[1]).toMatchObject({ epicKey: "P-2", startDate: "2026-10-11", endDate: "2026-10-30", dependsOn: ["P-1"] });
     expect(screen.getByRole("button", { name: "Save plan" })).toBeDisabled();
-    click("Refresh plans");
+    click("Refresh plan");
     await waitFor(() => expect(screen.getByLabelText("Plan name")).toHaveValue("Customer launch"));
   });
 
@@ -88,10 +94,13 @@ describe("Planner", () => {
     expect(screen.getByText("Add another epic to define a dependency.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open P-2 in JIRA" })).toHaveAttribute("rel", "noopener noreferrer");
     click("Done");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    click(/Otherarchived/); expect(screen.getByLabelText("Plan name")).toHaveValue("Launch");
-    confirm.mockReturnValue(true);
-    click(/Otherarchived/); expect(screen.getByLabelText("Plan name")).toHaveValue("Other");
+    click("All plans"); click("Keep editing");
+    expect(screen.getByLabelText("Plan name")).toHaveValue("Launch");
+    click("All plans"); click("Discard and return");
+    await screen.findByRole("heading", { name: /Delivery plans/ });
+    change("Plan status", "archived");
+    fireEvent.click(screen.getByRole("link", { name: "Other" }));
+    expect(screen.getByLabelText("Plan name")).toHaveValue("Other");
     change("Status", "completed"); click("Save plan");
     await screen.findByText("Plan saved.");
   });
@@ -103,12 +112,13 @@ describe("Planner", () => {
     expect(window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))).toBe(false);
     const unload = new Event("beforeunload", { cancelable: true });
     expect(window.dispatchEvent(unload)).toBe(false);
-    click("New plan"); click("Discard changes"); click("Refresh plans");
+    click("Discard changes"); click("Refresh plan");
     expect(screen.getByLabelText("Plan name")).toHaveValue("Unsaved");
     expect(fetch).toHaveBeenCalledTimes(1);
     confirm.mockReturnValue(true);
     expect(window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))).toBe(true);
     click("Discard changes"); expect(screen.getByLabelText("Plan name")).toHaveValue("Launch");
+    click("All plans"); await screen.findByRole("button", { name: "New plan" });
     click("New plan"); change("Plan name", "Abandoned"); click("Discard changes");
     expect(screen.queryByLabelText("Plan name")).not.toBeInTheDocument();
   });
@@ -119,6 +129,7 @@ describe("Planner", () => {
     await screen.findByText("Unable to load Planner.");
     fetch.mockResolvedValue(new Response(JSON.stringify(data([saved()]))));
     click("Reload saved plans");
+    fireEvent.click(await screen.findByRole("link", { name: "Launch" }));
     await screen.findByLabelText("Plan name");
     change("Owner", "Draft owner");
     fetch.mockResolvedValueOnce(new Response(JSON.stringify({ detail: "This plan changed. Reload it." }), { status: 409 }));
@@ -240,13 +251,14 @@ describe("Planner", () => {
     let finish!: (response: Response) => void;
     const fetch = mock(data([saved()]));
     const view = render(<PlannerScreen />);
+    fireEvent.click(await screen.findByRole("link", { name: "Launch" }));
     await screen.findByLabelText("Plan name");
     change("Plan name", "Saving");
     fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     click("Save plan");
     expect(screen.getByLabelText("Plan name")).toBeDisabled();
     expect(window.dispatchEvent(new Event("tb-before-navigation", { cancelable: true }))).toBe(false);
-    expect(screen.getByRole("button", { name: "New plan" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "All plans" })).toBeDisabled();
     editEpic(/Edit P-1/);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     view.unmount();
@@ -328,6 +340,129 @@ describe("Planner", () => {
     await screen.findByText("Plan saved.");
     const payload = JSON.parse(String(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body));
     expect(payload.epics[0].dependsOn).toEqual(["P-2"]);
+  });
+});
+
+describe("Planner overview navigation", () => {
+  async function landing(plans = [saved()]) {
+    const fetch = mock(data(plans));
+    render(<PlannerScreen />);
+    await screen.findByRole("heading", { name: /Delivery plans/ });
+    return fetch;
+  }
+  const openLaunch = () => fireEvent.click(screen.getByRole("link", { name: "Launch" }));
+
+  it("starts with the portfolio and opens a full workspace, preserving filters, sort, focus and scroll on return", async () => {
+    await landing([saved(), saved({ id: 2, name: "Archived", status: "archived" })]);
+    expect(screen.queryByRole("form", { name: "Delivery plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Archived" })).not.toBeInTheDocument();
+    change("Search plans", "launch"); change("Plan status", "draft"); click("Plan");
+    const link = screen.getByRole("link", { name: "Launch" });
+    link.focus(); vi.spyOn(window, "scrollY", "get").mockReturnValue(420);
+    openLaunch();
+    expect(screen.getByRole("heading", { name: "Launch" })).toHaveFocus();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Plan timeline" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#planner/1");
+    click("All plans");
+    await screen.findByRole("table");
+    expect(window.location.hash).toBe("#planner");
+    expect(screen.getByLabelText("Search plans")).toHaveValue("launch");
+    expect(screen.getByLabelText("Plan status")).toHaveValue("draft");
+    expect(screen.getByRole("columnheader", { name: "Plan" })).toHaveAttribute("aria-sort", "ascending");
+    expect(link).toHaveFocus();
+    expect(window.scrollTo).toHaveBeenLastCalledWith(0, 420);
+    click("Refresh plans");
+    await waitFor(() => expect(screen.queryByText("Loading Planner…")).not.toBeInTheDocument());
+    expect(screen.queryByLabelText("Plan name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search plans")).toHaveValue("launch");
+  });
+
+  it("supports Back and Forward, and cancels or discards a browser Back without losing the draft", async () => {
+    await landing(); openLaunch(); change("Owner", "Unfinished owner");
+    act(() => window.history.back());
+    await screen.findByRole("dialog", { name: "Save your changes before returning?" });
+    expect(window.location.hash).toBe("#planner/1");
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
+    expect(screen.getByLabelText("Owner")).toHaveValue("Unfinished owner");
+    act(() => window.history.back());
+    await screen.findByRole("button", { name: "Discard and return" });
+    click("Discard and return"); await screen.findByRole("table");
+    act(() => window.history.forward());
+    await screen.findByRole("form", { name: "Delivery plan" });
+    expect(screen.getByLabelText("Owner")).toHaveValue("");
+    act(() => window.history.back()); await screen.findByRole("table");
+  });
+
+  it("saves and returns with updated stats, while a failed return save preserves the draft", async () => {
+    const fetch = await landing(); openLaunch(); change("Plan name", "Ready to launch");
+    click("All plans");
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Plan changed elsewhere" }), { status: 409 }));
+    click("Save and return"); await screen.findByText("Plan changed elsewhere");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Plan name")).toHaveValue("Ready to launch");
+    expect(window.location.hash).toBe("#planner/1");
+    click("All plans"); click("Save and return");
+    await screen.findByRole("link", { name: "Ready to launch" });
+    expect(screen.getByRole("button", { name: "New plan" })).toBeInTheDocument();
+    expect(screen.queryByText("Plan changed elsewhere")).not.toBeInTheDocument();
+  });
+
+  it("validates an unsaved new plan before returning and keeps new plan creation in the workspace", async () => {
+    const fetch = await landing([]); click("New plan");
+    expect(window.location.hash).toBe("#planner/new");
+    expect(screen.getByRole("heading", { name: "New delivery plan" })).toHaveFocus();
+    click("All plans"); click("Save and return");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Plan name")).toBeInvalid();
+    change("Plan name", "New delivery"); click("Save plan");
+    await screen.findByText("Plan saved.");
+    expect(window.location.hash).toBe("#planner/3");
+    expect(screen.getByRole("form", { name: "Delivery plan" })).toBeInTheDocument();
+    click("All plans"); await screen.findByRole("link", { name: "New delivery" });
+    expect(screen.getByRole("button", { name: "New plan" })).toHaveFocus();
+  });
+
+  it("opens direct plan links and handles missing plans without auto-selecting a different plan", async () => {
+    window.history.replaceState(null, "", "#planner/1");
+    mock(data([saved()])); const view = render(<PlannerScreen />);
+    await screen.findByLabelText("Plan name");
+    click("All plans"); await screen.findByRole("table");
+    view.unmount();
+    window.history.replaceState(null, "", "#planner/999");
+    render(<PlannerScreen />);
+    await screen.findByRole("heading", { name: "Plan not found" });
+    expect(screen.queryByLabelText("Plan name")).not.toBeInTheDocument();
+    click("All plans"); await screen.findByRole("link", { name: "Launch" });
+  });
+
+  it("blocks browser Back during a save and returns via the Planner navigation action", async () => {
+    const fetch = await landing(); openLaunch(); change("Owner", "Saved owner");
+    let finish!: (response: Response) => void;
+    fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    click("Save plan");
+    act(() => window.dispatchEvent(new Event("tb-planner-home")));
+    const historyGo = vi.spyOn(window.history, "go");
+    act(() => window.history.back());
+    await waitFor(() => expect(historyGo).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(window.location.hash).toBe("#planner/1"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(async () => finish(new Response(JSON.stringify(saved({ owner: "Saved owner" })))));
+    act(() => window.dispatchEvent(new Event("tb-planner-home")));
+    await screen.findByRole("table");
+    act(() => window.dispatchEvent(new Event("tb-planner-home")));
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
+  it("protects a draft when a history entry without a navigation index is requested", async () => {
+    window.history.replaceState(null, "", "#planner/new");
+    mock(data()); render(<PlannerScreen />);
+    await screen.findByLabelText("Plan name"); change("Plan name", "Unsaved new plan");
+    act(() => { window.history.replaceState(null, "", "#planner"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    expect(window.location.hash).toBe("#planner/new");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    click("Discard and return"); await screen.findByRole("heading", { name: /Delivery plans/ });
+    expect(window.location.hash).toBe("#planner");
   });
 });
 

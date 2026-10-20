@@ -2,6 +2,8 @@
 
 ## Planner first version
 
+- Split Planner into a portfolio overview and full-width plan workspace. Added lifecycle/attention summary filters, searchable/sortable plan statistics, archived-plan filtering, direct plan links, and browser Back/Forward support. Return navigation preserves the table context and offers Save/Discard/Keep editing for drafts; failed saves keep the workspace open.
+
 - Epic addition now uses the Initiative View two-panel modal pattern, with search, visible selections, existing-plan markers, and cancellation before changes reach the plan draft.
 - Timeline rows open compact epic details overlays on double-click or Enter/Space; single-click keeps selection and dependency highlighting without expanding content below the timeline.
 - Dependency options use clickable chips with JIRA keys, epic names, and a visible selected state.

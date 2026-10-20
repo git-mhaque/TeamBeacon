@@ -17,6 +17,15 @@ export default defineConfig({
         "src/lib/api.ts": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },
+        "src/components/content/screens/PlannerOverview.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/components/content/screens/PlannerLeaveDialog.tsx": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
+        "src/lib/plannerNavigation.ts": {
+          statements: 90, branches: 90, functions: 90, lines: 90,
+        },
         "src/components/content/screens/PlannerScreen.tsx": {
           statements: 90, branches: 90, functions: 90, lines: 90,
         },
