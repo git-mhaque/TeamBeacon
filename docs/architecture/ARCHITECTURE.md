@@ -9,7 +9,7 @@ TeamBeacon is a self-hosted web analytics system:
 ## 2. High-Level Components
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
-- Screens: Team Dashboard, Initiative Deep Dive, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Report, Settings.
+- Screens: Team Dashboard, Workstream Deep Dive, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Report, Settings.
 - The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata, with Initiative Metadata and Work Stream Epic Mapping tabs. The mapping inventory reads synced epics from the configured project with optional metadata, excluding Triad labels; a dedicated assignment-only batch endpoint validates expected assignments under a SQLite write transaction and preserves other metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
@@ -81,7 +81,7 @@ Default thresholds:
 - Primary navigation:
   - Team Dashboard
   - Initiative Insights
-  - Initiative Deep Dive
+  - Workstream Deep Dive
   - Sprint Insights
   - Team Insights
   - Security
@@ -93,11 +93,11 @@ Default thresholds:
   - `PrimaryNavigation` renders an 88-pixel left rail with icons and short labels, with hamburger-controlled expansion to a 288-pixel sidebar showing full names and descriptions. Settings remains at the bottom while the other destinations scroll on short screens; full-name tooltips support hover, focus and Escape dismissal.
   - Main pane for KPI cards, trend widgets, and narrative insights.
   - Team Dashboard is the startup destination and displays work-stream flow/progress through `GET /api/team/dashboard`. The web dashboard omits the release, sprint cycle-time, and blocker summary cards; the API retains these fields for compatibility.
-  - Initiative Deep Dive defaults to all work streams, supports checkbox-based multi-work-stream selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
+  - Workstream Deep Dive defaults to all work streams, supports checkbox-based multi-work-stream selection, cascades the combined scope into an all-or-multi-epic selector, and applies one persisted preset-or-custom reporting period to its created/completed trend and activity table. The 1/2/4/12/26/52-week cards act as shared-period shortcuts.
   - Team Insights trend window is selectable (`1 sprint`, `Last 2/3/4/6/8/10/12 sprints`) and renders recent sprint first.
   - Release Insights renders release analytics: selectable cycle-time trend, ongoing readiness, overdue/due-soon counts, and risk signals.
 
-## 10. Initiative Deep Dive Query Model
+## 10. Workstream Deep Dive Query Model
 - `GET /api/initiative-deep-dive` owns the complete aggregation contract so weekly bars, period tiles, WIP counts, and table rows share one scope and timezone.
 - Repeated `groupId` query parameters form a union of configured work-stream epics; shared epics and their cards are de-duplicated before metrics are calculated.
 - The shared reporting period accepts either `chartWeeks` or an inclusive `chartStart`/`chartEnd` pair and drives both weekly buckets and activity rows. Custom boundaries remain exact and may yield partial first/last weekly buckets. The deprecated `tableWindowWeeks` parameter remains only as a compatibility override.
@@ -111,7 +111,7 @@ Default thresholds:
 ## 11. Team Dashboard Composition
 - `GET /api/team/dashboard` is a read-only composite endpoint over existing local insight services; it does not introduce a second metric definition.
 - The compact MCP widget displays work-stream progress, flow, filters, and freshness only; detailed highlights and issue lists remain available through the data tools and full web UI.
-- Work-stream flow uses the same weekly created/completed semantics as Initiative Deep Dive, while progress uses completed cards divided by all currently scoped cards.
+- Work-stream flow uses the same weekly created/completed semantics as Workstream Deep Dive, while progress uses completed cards divided by all currently scoped cards.
 - Section failures are isolated and returned in an `errors` map so healthy dashboard regions remain usable.
 - The frontend persists only the selected 1/4/12-week flow window; source data remains authoritative in SQLite.
 

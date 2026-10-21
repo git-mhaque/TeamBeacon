@@ -220,7 +220,7 @@ describe("Content", () => {
       .map((button) => button.querySelector(".tb-nav-title")?.textContent?.trim() ?? "");
     expect(orderedTitles).toEqual([
       "Team Dashboard",
-      "Initiative Deep Dive",
+      "Workstream Deep Dive",
       "Initiative Insights",
       "Team Insights",
       "Sprint Insights",

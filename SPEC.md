@@ -28,7 +28,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
     - one work stream
     - one work type
   - Generate RAG status and explanation.
-- Initiative Deep Dive:
+- Workstream Deep Dive:
   - Start with all work streams selected, or select one or more work streams, then choose all or one or more configured epics across those work streams.
   - Compare new and completed card counts in weekly buckets over one persisted preset or custom reporting period, defaulting to 12 weeks.
   - Select a 1/2/4/12/26/52-week shortcut to apply that reporting period to both the chart and work-item activity table.
@@ -167,7 +167,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
   - Track per-status dwell time across completed cards in the selected sprint window.
   - Surface per-status aggregate metrics (`avg`, `median`, `p85`, `max`, total share).
 
-## 6.4 Initiative Deep Dive Semantics
+## 6.4 Workstream Deep Dive Semantics
 - Scope:
   - At least one `groupId` is required; repeated `groupId` values combine groups and shared epics are de-duplicated.
   - Omitting `epicKey` means all configured epics across the selected work streams; repeated `epicKey` values select a subset.
@@ -229,7 +229,7 @@ TeamBeacon/
   - Team Dashboard
   - Settings (epic metadata)
   - Initiative insights
-  - Initiative Deep Dive
+  - Workstream Deep Dive
   - Team insights
   - Sprint Insights
   - Security / Incident response / Releases

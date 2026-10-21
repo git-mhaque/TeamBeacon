@@ -15,7 +15,7 @@ describe("PrimaryNavigation", () => {
     ]);
     expect(buttons[0]).toHaveAttribute("aria-current", "page");
     expect(buttons.filter(button => button.hasAttribute("aria-current"))).toHaveLength(1);
-    const deepDive = within(nav).getByRole("button", { name: /Initiative Deep Dive: New, active & completed work/ });
+    const deepDive = within(nav).getByRole("button", { name: /Workstream Deep Dive: New, active & completed work/ });
     fireEvent.click(deepDive);
     expect(onNavigate).toHaveBeenCalledWith("initiative-deep-dive");
     rerender(<PrimaryNavigation active="initiative-deep-dive" isExpanded onNavigate={onNavigate} />);
@@ -65,7 +65,7 @@ describe("PrimaryNavigation", () => {
   it("allows the pointer to move onto a tooltip before closing it on leave", () => {
     vi.useFakeTimers();
     render(<PrimaryNavigation active="dashboard" isExpanded={false} onNavigate={vi.fn()} />);
-    const button = screen.getByRole("button", { name: /Initiative Deep Dive/ });
+    const button = screen.getByRole("button", { name: /Workstream Deep Dive/ });
     fireEvent.pointerEnter(button);
     expect(screen.getByRole("tooltip")).toHaveTextContent("New, active & completed work");
     fireEvent.pointerLeave(button);

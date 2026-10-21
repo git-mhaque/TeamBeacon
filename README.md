@@ -12,7 +12,7 @@ TeamBeacon is a self-hosted engineering intelligence web app that sits on top of
 - Team Dashboard: default startup view with work-stream flow and delivery progress, latest completed-release health, sprint cycle-time movement, current blockers, and recently completed cards.
 - Settings: initiative metadata, work-stream epic mapping, and an Unmapped cards inventory with JIRA links for assigning epics. Source connectivity and sync controls are available in the system-status menu.
 - Initiative Insights: progress matrix, filters, and RAG visibility.
-- Initiative Deep Dive: default-all and multi-work-stream/epic-scoped weekly intake and completion flow with one persisted preset/custom reporting period shared by the chart and activity table, quick-range shortcuts, and a distinct current-WIP snapshot.
+- Workstream Deep Dive: default-all and multi-work-stream/epic-scoped weekly intake and completion flow with one persisted preset/custom reporting period shared by the chart and activity table, quick-range shortcuts, and a distinct current-WIP snapshot.
 - Team Insights: sprint trend window controls (1/2/3/4/6/8/10/12), completed story points, and cycle-time trend metrics.
 - Sprint Insights: state breakdown, work mix, scope-change and blocker visibility.
 - Release Insights: release overview, selectable cycle-time trend, overdue readiness, and completed-release quality signals.

@@ -69,7 +69,7 @@ function screenTitle(id: ScreenId): string {
     dashboard: "Team Dashboard",
     integrations: "Settings",
     initiatives: "Initiative Insights",
-    "initiative-deep-dive": "Initiative Deep Dive",
+    "initiative-deep-dive": "Workstream Deep Dive",
     team: "Team Insights",
     sprint: "Sprint Insights",
     security: "Security Insights",

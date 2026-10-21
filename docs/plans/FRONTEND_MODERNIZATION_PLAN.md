@@ -48,7 +48,7 @@ The functional-parity screen migration is complete on `codex/frontend-shell-init
 
 ### 1.3 Approved Post-Parity Feature
 
-Initiative Deep Dive and Team Dashboard are explicitly approved product additions after the parity migration. Team Dashboard is the first navigation destination and startup screen, backed by `/api/team/dashboard`; Initiative Deep Dive remains backed by `/api/initiative-deep-dive` without changing Initiative Insights behavior.
+Workstream Deep Dive and Team Dashboard are explicitly approved product additions after the parity migration. Team Dashboard is the first navigation destination and startup screen, backed by `/api/team/dashboard`; Workstream Deep Dive remains backed by `/api/initiative-deep-dive` without changing Initiative Insights behavior.
 - The Python API, `/api/*` contract, development ports, Docker flow, and `app/web` artifact remain unchanged.
 - Additional target libraries in this plan should still be introduced only when a component needs them and parity tests justify the change.
 
@@ -132,7 +132,7 @@ The current visual hierarchy is clear enough to operate, but navigation descript
 The current navigation order, including approved post-parity additions, is:
 
 1. Team Dashboard.
-2. Initiative Deep Dive.
+2. Workstream Deep Dive.
 3. Initiative Insights.
 4. Team Insights.
 5. Sprint Insights.
@@ -205,7 +205,7 @@ Use this structure:
 - **Settings:** offer Initiative Metadata, Work Stream Epic Mapping and Unmapped cards as keyboard-accessible tabs. Lazy-load inventories while preserving tab state and mapping drafts. Unmapped cards reuses table/filter styling and offers full-inventory search, status/type filters, sorting, pagination and JIRA card/parent links. Show sync freshness and clarify that assignments are made in JIRA.
 
 - **Team Dashboard:** focus the startup view on the work-stream flow table and metric drilldowns. Omit the release, sprint cycle-time, and blocker summary cards. Persist preset and custom work-stream flow periods locally. Show completed/total epic progress based on epic status, independent of the selected period. Use one date-range button for period selection, distinguish WIP today from historical flow, show metric definitions on demand, and use relative source freshness with a Refresh view action.
-- **Initiative Deep Dive:** default to all work streams with checkbox-based multi-work-stream selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
+- **Workstream Deep Dive:** default to all work streams with checkbox-based multi-work-stream selection, cascade their combined scope into an all-or-multi-epic selector, apply one persisted preset-or-custom reporting period to the created/completed chart and horizontally contained activity table, use 1/2/4/12/26/52-week cards as shared-period shortcuts, and expose Current WIP as a distinct all-age snapshot.
 - **Team Report:** report signals, work mix, initiative progress, then a deterministic completed-work summary from synced issue titles. Load report and completed-card data concurrently, use the locally configured link URL included in the database summary without requesting integration health, and reuse completed cards for selection changes. Completed-work typography uses 12px semibold sentence-case work-stream headings, 15px semibold epic titles, 14px regular issue titles, and 12px regular muted-teal linked keys in parentheses. Preserve compact bullets with greater separation between epics and apply the same hierarchy in HTML exports. Preserve a dedicated print/export stylesheet.
 - **Sprint Insights:** show the current sprint state and exceptions before detailed work lists.
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
