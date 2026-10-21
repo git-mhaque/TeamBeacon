@@ -37,17 +37,17 @@ describe("Unmapped cards", () => {
     expect(fetch.mock.calls.filter(([url]) => String(url).endsWith("/unmapped-cards"))).toHaveLength(1);
   });
 
-  it("searches the complete inventory, filters, sorts and paginates without truncation", async () => {
+  it("shows the complete inventory without pagination and preserves search, filters and sorting", async () => {
     mock(inventory([...Array.from({ length: 101 }, (_, index) => card(index)), { ...card(999), issueType: null, status: "Done", createdBy: null, createdAt: "2026-10-21T00:00:00Z" }]));
     render(<UnmappedCardsTab />);
     await screen.findByText("102 of 102 unmapped cards");
-    expect(screen.getAllByRole("row")).toHaveLength(101);
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getAllByRole("row")).toHaveLength(103);
+    expect(screen.getByText("P-0")).toBeInTheDocument();
+    expect(screen.getByText("P-100")).toBeInTheDocument();
+    expect(screen.getByText("P-999")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Unmapped cards pages" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     for (const label of ["Card", "Summary", "Type", "Status", "Created by", "Created on"]) {
       const sort = screen.getByRole("button", { name: `Sort by ${label}` });
       fireEvent.click(sort);
@@ -60,10 +60,13 @@ describe("Unmapped cards", () => {
     fireEvent.change(screen.getByLabelText("Card status"), { target: { value: "Done" } });
     expect(screen.getByText("No cards match these filters.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getAllByRole("row")).toHaveLength(103);
     fireEvent.change(screen.getByLabelText("Card type"), { target: { value: "Story" } });
     expect(screen.getByText("101 of 102 unmapped cards")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(102);
     fireEvent.change(screen.getByLabelText("Search unmapped cards"), { target: { value: "Alice" } });
     expect(screen.getByText("101 of 102 unmapped cards")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(102);
   });
 
   it("keeps useful empty states and recovers from request failures", async () => {
