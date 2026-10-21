@@ -10,7 +10,7 @@ TeamBeacon is a self-hosted web analytics system:
 1. UI (`app/`)
 - React 19 single-page frontend built with Vite and served by the API runtime in production.
 - Screens: Team Dashboard, Workstream Deep Dive, Initiative Insights, Team Insights, Sprint Insights, Security, Incident Response, Releases, Team Report, Settings.
-- The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata, with Initiative Metadata and Work Stream Epic Mapping tabs. The mapping inventory reads synced epics from the configured project with optional metadata, excluding Triad labels; a dedicated assignment-only batch endpoint validates expected assignments under a SQLite write transaction and preserves other metadata.
+- The persistent application header owns source-connection health, JIRA sync controls/history, and diagnostics in an accessible side sheet; Settings remains focused on editable product metadata, with Initiative Metadata and Work Stream Epic Mapping tabs. The mapping inventory reads synced epics from the configured project with optional metadata, including Triad-labelled epics; a dedicated assignment-only batch endpoint validates expected assignments under a SQLite write transaction and preserves other metadata.
 - Styling: Tailwind CSS foundation plus TeamBeacon component styles and Lucide icons.
 - The production artifact remains `app/web`, preserving the container and Python static-serving contract.
 
@@ -116,10 +116,12 @@ Default thresholds:
 - The frontend persists only the selected 1/4/12-week flow window; source data remains authoritative in SQLite.
 
 ### Project epic reconciliation
-Each sync mode pages the eligible project epic search independently of the board issue API. Missing epics are backfilled regardless of the cursor; full sync refreshes every eligible epic, while incremental sync refreshes source changes. A shared connector scope rule excludes Triad labels and is also applied to the Settings mapping inventory. The existing board issue and child-issue sync paths continue to operate. No schema migration is required.
+Each sync mode pages the eligible project epic search independently of the board issue API. Missing epics are backfilled regardless of the cursor; full sync refreshes every eligible epic, while incremental sync refreshes source changes. Project epic reconciliation excludes Triad labels. Settings mapping independently includes all locally synced project epics regardless of labels, including Triad, and permits their assignment. The existing board issue and child-issue sync paths continue to operate. No schema migration is required.
 
 ### Complete configured-epic analytics
 Initiative Insights and Team Report explicitly request `limit=all` summaries; the API maps that to an unbounded configured-view query. Team Dashboard uses the same complete summary internally for work-stream epic counts and delivery progress. Explicit numeric API limits remain bounded for backward compatibility. Summary cache keys include the requested limit and selected view.
+
+Initiative Insights filters epic status locally using the summary `status` field, exposing the same synced JIRA status names as Settings epic mapping. Missing status displays Unknown on both screens. Filter options are derived from statuses in the selected view. The Epic Status main filter supports multiple selections and defaults to All statuses for each screen session. It composes with search and other matrix filters while preserving saved-view membership and selected-view summary totals. The API determines completion from the JIRA status category, with terminal-name fallback when the category is absent; child-card completion is independent. The sortable Epic Status column uses the same labels and persisted Columns preferences; it is visible by default when no column preferences are saved. The Configured Epics card displays two lines for the complete selected view: Closed count, then Not Closed count with the individual remaining status counts in parentheses (including Unknown). Closed matches the JIRA status name, independent of child progress. Matrix filters do not affect these counts; empty views omit the breakdown.
 
 Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.
 

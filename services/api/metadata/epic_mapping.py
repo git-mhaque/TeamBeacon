@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
-from packages.connectors.epic_scope import is_eligible_epic
 from packages.connectors.jira_config import load_env_files
 from services.api.metadata.epic_config import (
     _connect,
@@ -30,7 +28,7 @@ def get_epic_mapping_inventory(
         rows = conn.execute(
             """
             SELECT i.issue_key AS epicKey, i.summary AS title,
-                   i.status_name AS status, g.group_id AS workStreamId, i.labels_json
+                   i.status_name AS status, g.group_id AS workStreamId
             FROM issues i
             LEFT JOIN epic_metadata em ON em.epic_key = i.issue_key
             LEFT JOIN epic_metadata_groups g ON g.epic_metadata_id = em.id
@@ -40,12 +38,7 @@ def get_epic_mapping_inventory(
         """,
             (project_key, project_key),
         ).fetchall()
-        epics = []
-        for row in rows:
-            if is_eligible_epic("Epic", json.loads(row["labels_json"])):
-                epic = dict(row)
-                del epic["labels_json"]
-                epics.append(epic)
+        epics = [dict(row) for row in rows]
         sync = conn.execute("""
             SELECT MAX(finished_at) FROM sync_run_history
             WHERE source_type = 'jira' AND status = 'completed'
@@ -79,11 +72,11 @@ def save_epic_mappings(changes: Any, db_path: str | None = None) -> dict[str, An
         for change in changes:
             key, target = change["epicKey"], change["workStreamId"]
             issue = conn.execute(
-                "SELECT issue_type, labels_json FROM issues WHERE issue_key = ?",
+                "SELECT issue_type FROM issues WHERE issue_key = ?",
                 (key,),
             ).fetchone()
-            if issue is None or not is_eligible_epic(issue[0], json.loads(issue[1])):
-                raise ValueError(f"{key}: eligible synced epic no longer exists.")
+            if issue is None or (issue[0] or "").casefold() != "epic":
+                raise ValueError(f"{key}: synced epic no longer exists.")
             if (
                 target is not None
                 and not conn.execute(

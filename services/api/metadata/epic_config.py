@@ -1220,6 +1220,7 @@ def get_configured_epic_summary(
                 {
                     "epicKey": epic_key,
                     "epicName": epic_name,
+                    "status": row["status_name"],
                     "isCompleted": is_completed_epic(row["status_category"], row["status_name"]),
                     "completedCards": completed_cards,
                     "totalCards": total_cards,

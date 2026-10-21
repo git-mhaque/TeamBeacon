@@ -36,6 +36,7 @@ import {
 type RagLabel = "Red" | "Amber" | "Green" | "Not assessed";
 
 type SummaryRow = InitiativeEpicSummary & {
+  statusLabel: string;
   groupText: string;
   typeText: string;
   completedInPeriodValue: number;
@@ -49,7 +50,7 @@ type CompletedSummaryContext =
   | { scope: "epic"; epicKey: string; epicName: string }
   | { scope: "configured"; viewName: string; isAllConfigured: boolean };
 
-type OptionalColumnId = "group" | "type" | "progress" | "completed" | "delta" | "rag" | "criteria";
+type OptionalColumnId = "status" | "group" | "type" | "progress" | "completed" | "delta" | "rag" | "criteria";
 
 type SortField = "epic" | OptionalColumnId;
 
@@ -80,6 +81,7 @@ type InitiativeSummarySnapshot = {
 type ViewEditorMode = "create" | "edit";
 
 const OPTIONAL_COLUMN_DEFINITIONS: Array<{ id: OptionalColumnId; label: string }> = [
+  { id: "status", label: "Epic Status" },
   { id: "group", label: "Work Stream" },
   { id: "type", label: "Type" },
   { id: "progress", label: "Progress" },
@@ -648,6 +650,7 @@ function buildSummaryRow(entry: InitiativeEpicSummary): SummaryRow {
   const ragEvaluation = evaluateInitiativeRag(entry);
   return {
     ...entry,
+    statusLabel: entry.status || "Unknown",
     groupText: entry.groups.length > 0 ? entry.groups.map((group) => group.name).join(", ") : "-",
     typeText: entry.workTypes.length > 0 ? entry.workTypes.map((type) => type.name).join(", ") : "-",
     completedInPeriodValue,
@@ -738,6 +741,7 @@ export function InitiativesScreen() {
   const [ragFilters, setRagFilters] = useState<RagLabel[]>([]);
   const [positiveDeltaOnly, setPositiveDeltaOnly] = useState(false);
   const [timeBoundOnly, setTimeBoundOnly] = useState(false);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(readPersistedVisibleOptionalColumns);
   const [sortField, setSortField] = useState<SortField>("epic");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -1257,12 +1261,34 @@ export function InitiativesScreen() {
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  const statusOptions = useMemo(() => {
+    return [...new Set(rows.map((row) => row.statusLabel))].sort();
+  }, [rows]);
+
+  const statusBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      counts.set(row.statusLabel, (counts.get(row.statusLabel) ?? 0) + 1);
+    }
+    const closed = [...counts].reduce((total, [status, count]) => status.toLowerCase() === "closed" ? total + count : total, 0);
+    const remaining = [...counts].filter(([status]) => status.toLowerCase() !== "closed");
+    remaining.sort(([left], [right]) => left.localeCompare(right));
+    return {
+      closed,
+      notClosed: rows.length - closed,
+      detail: remaining.map(([status, count]) => `${status} ${count}`).join(" "),
+    };
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const selectedGroups = new Set(groupFilters);
     const selectedTypes = new Set(typeFilters);
     const selectedRags = new Set<RagLabel>(ragFilters);
     return rows.filter((row) => {
+      if (statusFilters.length > 0 && !statusFilters.includes(row.statusLabel)) {
+        return false;
+      }
       if (selectedGroups.size > 0 && !row.groups.some((group) => selectedGroups.has(group.name))) {
         return false;
       }
@@ -1290,7 +1316,7 @@ export function InitiativesScreen() {
         || criteriaText.includes(query)
       );
     });
-  }, [groupFilters, positiveDeltaOnly, ragFilters, rows, searchQuery, timeBoundOnly, typeFilters]);
+  }, [groupFilters, positiveDeltaOnly, ragFilters, rows, searchQuery, statusFilters, timeBoundOnly, typeFilters]);
 
   const visibleColumnSet = useMemo(() => new Set(visibleOptionalColumns), [visibleOptionalColumns]);
 
@@ -1310,6 +1336,9 @@ export function InitiativesScreen() {
       switch (sortField) {
         case "epic":
           comparison = compareText(epicDisplaySortText(left), epicDisplaySortText(right));
+          break;
+        case "status":
+          comparison = compareText(left.statusLabel, right.statusLabel);
           break;
         case "group":
           comparison = compareText(left.groupText, right.groupText);
@@ -1986,6 +2015,15 @@ export function InitiativesScreen() {
           <article className="tb-metric-card">
             <h4>Configured Epics</h4>
             <strong className="tb-value">{totalConfigured}</strong>
+            {rows.length > 0 ? (
+              <div className="tb-initiative-status-breakdown" aria-label="Configured epic status breakdown">
+                <div>Closed <b>{statusBreakdown.closed}</b></div>
+                <div>
+                  Not Closed <b>{statusBreakdown.notClosed}</b>
+                  {statusBreakdown.detail ? <span> ({statusBreakdown.detail})</span> : null}
+                </div>
+              </div>
+            ) : null}
             <p>{activeView.id === "all" ? "Epics with metadata configured in TeamBeacon." : `Epics in ${activeView.name}.`}</p>
           </article>
           <article className="tb-metric-card">
@@ -2078,6 +2116,15 @@ export function InitiativesScreen() {
             onChange={(values) => setRagFilters(values.filter(isRagLabel))}
           />
 
+          <MultiSelectFilter
+            id="initiative-status-filter"
+            label="Epic Status"
+            allLabel="All statuses"
+            options={statusOptions.map((status) => ({ value: status, label: status }))}
+            selectedValues={statusFilters}
+            onChange={setStatusFilters}
+          />
+
           <div className="tb-initiative-filter tb-initiative-filter-quick">
             <span>Quick Filters</span>
             <div className="tb-initiative-quick-filters" role="group" aria-label="Quick filters">
@@ -2118,6 +2165,21 @@ export function InitiativesScreen() {
                     </span>
                   </button>
                 </th>
+                {visibleColumnSet.has("status") ? (
+                  <th>
+                    <button
+                      type="button"
+                      className={`tb-table-sort${sortField === "status" ? " is-active" : ""}`}
+                      onClick={() => handleSortHeaderClick("status")}
+                      aria-label={`Sort by Epic Status (${sortField === "status" && sortDirection === "asc" ? "ascending" : "descending"})`}
+                    >
+                      <span>Epic Status</span>
+                      <span className="tb-table-sort-indicator" aria-hidden="true">
+                        {sortField === "status" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                ) : null}
                 {visibleColumnSet.has("group") ? (
                   <th>
                     <button
@@ -2257,6 +2319,7 @@ export function InitiativesScreen() {
                             <p className="tb-initiative-epic-name">{row.epicName || "(Untitled epic)"}</p>
                           </div>
                         </td>
+                        {visibleColumnSet.has("status") ? <td><span className="tb-chip">{row.statusLabel}</span></td> : null}
                         {visibleColumnSet.has("group") ? <td>{row.groupText}</td> : null}
                         {visibleColumnSet.has("type") ? <td>{row.typeText}</td> : null}
                         {visibleColumnSet.has("progress") ? (

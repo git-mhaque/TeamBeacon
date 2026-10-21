@@ -158,11 +158,14 @@ class EpicMappingTests(unittest.TestCase):
             )
         self.assertEqual(get_epic_metadata(db_path=self.db)["epics"], [])
 
-    def test_inventory_excludes_triad_and_other_projects_and_rejects_excluded_mapping(self):
+    def test_inventory_includes_triad_and_allows_mapping_but_excludes_other_projects(self):
         with sqlite3.connect(self.db) as conn:
             conn.execute("UPDATE issues SET labels_json='[\"Triad\"]' WHERE issue_key='P-1'")
             conn.execute("INSERT INTO issues(issue_key,issue_id,project_key,issue_type,summary,status_name) VALUES('Q-1','9','Q','Epic','Other','Open')")
         inventory = get_epic_mapping_inventory(self.db, project_key="P")
-        self.assertEqual([row["epicKey"] for row in inventory["epics"]], ["P-2"])
-        with self.assertRaisesRegex(ValueError, "eligible"):
-            save_epic_mappings([self.change(target=self.group)], self.db)
+        self.assertEqual([row["epicKey"] for row in inventory["epics"]], ["P-1", "P-2"])
+        result = save_epic_mappings([self.change(target=self.group)], self.db)
+        self.assertEqual(result["savedCount"], 1)
+        saved = get_epic_mapping_inventory(self.db, project_key="P")["epics"]
+        self.assertEqual(saved[0]["workStreamId"], self.group)
+        self.assertEqual(saved[0]["status"], "Open")

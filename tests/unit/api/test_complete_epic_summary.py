@@ -62,6 +62,17 @@ class CompleteEpicSummaryTests(unittest.TestCase):
             conn.execute("UPDATE issues SET status_name='Done',status_category='Done' WHERE issue_key=?", (self.keys[-1],))
             conn.execute("DELETE FROM issues WHERE epic_key=?", (self.keys[-1],))
         summary = get_configured_epic_summary(limit=None, db_path=self.db)
+        statuses = {epic["epicKey"]: epic["status"] for epic in summary["epics"]}
+        self.assertEqual(statuses[self.keys[0]], "Released")
+        self.assertEqual(statuses[self.keys[1]], "Closed")
+        self.assertEqual(statuses[self.keys[2]], "Closed")
+        self.assertIsNone(statuses[self.keys[3]])
+        from services.api.metadata.epic_mapping import get_epic_mapping_inventory
+        with patch("services.api.metadata.epic_mapping.os.getenv", return_value=None):
+            inventory = get_epic_mapping_inventory(db_path=self.db)
+        self.assertEqual(len(inventory["epics"]), len(self.keys) - 1)
+        for epic in inventory["epics"]:
+            self.assertEqual(statuses[epic["epicKey"]], epic["status"])
         completed = {epic["epicKey"] for epic in summary["epics"] if epic["isCompleted"]}
         self.assertEqual(completed, {self.keys[0], self.keys[1], self.keys[-1]})
         view = create_initiative_view(name="Status view", epic_keys=self.keys[:4], db_path=self.db)

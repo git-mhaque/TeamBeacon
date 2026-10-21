@@ -27,7 +27,10 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
   const pending = Object.keys(draft).length;
   const load = async () => {
     setError("");
-    try { setInventory(await fetchEpicMappingInventory()); }
+    try {
+      const loaded = await fetchEpicMappingInventory();
+      setInventory({ ...loaded, epics: loaded.epics.map((epic) => ({ ...epic, status: epic.status || "Unknown" })) });
+    }
     catch (err) { setError((err as Error).message); }
   };
   useEffect(() => { void load(); }, []);
@@ -108,7 +111,7 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
   };
   return <section className="tb-panel tb-epic-mapping">
     <header className="tb-panel-header"><div><h3>Work Stream Epic Mapping</h3>
-      <p className="tb-muted-note">Assign work streams to synced epics in the configured JIRA project. Epics labelled Triad are excluded. Changes are saved together.</p>
+      <p className="tb-muted-note">Assign work streams to synced epics in the configured JIRA project. All labels, including Triad, are included. Changes are saved together.</p>
       <p className="tb-muted-note">Last successful JIRA sync: {formatDisplayTimestamp(inventory?.lastSyncedAt)}</p>
     </div></header>
     {error && <p role="alert" className="tb-error-note">{error}</p>}

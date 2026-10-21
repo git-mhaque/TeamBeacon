@@ -90,10 +90,11 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 ### Eligible project epic sync
 - Added paginated project epic reconciliation to full, since-last, and since-date syncs, preserving the Test/Triad scope exclusions.
 - Backfills old missing epics and preserves metadata and source watermarks; repeated incremental runs skip unchanged epics.
-- Settings mapping inventory follows configured project and Triad exclusions.
+- Settings mapping inventory includes all locally synced epics in the configured project regardless of labels, including Triad, and permits their assignment.
 
 ### Complete configured-epic summaries
 - Removed implicit 200-row truncation from Initiative Insights, Team Dashboard delivery progress and Team Report by explicitly requesting complete configured views.
+- Added a main Epic Status multi-select filter to Initiative Insights with synced JIRA status names matching Settings, Unknown for missing status, and All statuses by default. It uses the summary `status` field, composes with other matrix filters and leaves selected-view summary totals unchanged. The sortable Epic Status column uses the same labels and persisted Columns preferences; it is visible by default when no column preferences are saved. The Configured Epics card displays two lines for the complete selected view: Closed count, then Not Closed count with the individual remaining status counts in parentheses (including Unknown). Closed matches the JIRA status name, independent of child progress. Matrix filters do not affect these counts; empty views omit the breakdown.
 - Preserved bounded numeric API requests and added >200-epic regression fixtures covering default/named views, completion metrics and work-stream totals.
 
 Initiative RAG requires an enabled timeline and valid target completion date. Unconfigured/incomplete timelines show neutral Not assessed, are excluded from color totals, and retain that status in Team Report exports and AI context. The start date remains optional.

@@ -8,6 +8,7 @@ import {
   SET_INITIATIVES_ACTIVE_VIEW_EVENT,
 } from "../../src/components/content/screens/InitiativesScreen";
 import { setupFetchMock } from "../utils/fetchMock";
+import * as persistence from "../../src/lib/persistence";
 
 const DEFAULT_EPICS = [
   {
@@ -238,13 +239,58 @@ describe("InitiativesScreen", () => {
     const initiativeRow = screen.getByText("CEG-101").closest("tr");
     expect(initiativeRow).not.toBeNull();
     const rowCells = within(initiativeRow as HTMLElement).getAllByRole("cell");
-    expect(within(rowCells[3]).getByText("70% (7/10)")).toBeInTheDocument();
-    expect(within(rowCells[4]).getByText("7 / 10")).toBeInTheDocument();
-    expect(within(rowCells[4]).getByText("Period:")).toBeInTheDocument();
-    expect(within(rowCells[4]).getByText("5%")).toBeInTheDocument();
-    expect(rowCells[5]).toHaveClass("tb-initiative-delta-cell");
-    expect(within(rowCells[5]).getByRole("button", { name: /Summarize completed cards for CEG-101/i })).toHaveTextContent("2");
+    expect(within(rowCells[1]).getByText("Unknown")).toBeInTheDocument();
+    expect(within(rowCells[4]).getByText("70% (7/10)")).toBeInTheDocument();
+    expect(within(rowCells[5]).getByText("7 / 10")).toBeInTheDocument();
+    expect(within(rowCells[5]).getByText("Period:")).toBeInTheDocument();
+    expect(within(rowCells[5]).getByText("5%")).toBeInTheDocument();
+    expect(rowCells[6]).toHaveClass("tb-initiative-delta-cell");
+    expect(within(rowCells[6]).getByRole("button", { name: /Summarize completed cards for CEG-101/i })).toHaveTextContent("2");
     expect(screen.getByRole("columnheader", { name: "Delta" })).toHaveClass("tb-initiative-delta-head");
+  });
+
+  it("summarizes all selected-view epic statuses independently of matrix filters", async () => {
+    const epics = [
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-1", status: "Closed" },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-2", status: "Closed" },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-3", status: "Open" },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-4", status: "Analysis" },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-5" },
+    ];
+    mockInitiativesEndpoints(epics);
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-1")).toBeInTheDocument();
+    const breakdown = screen.getByLabelText("Configured epic status breakdown");
+    const entries = () => Array.from(breakdown.children, (entry) => entry.textContent);
+    const expected = ["Closed 2", "Not Closed 3 (Analysis 1 Open 1 Unknown 1)"];
+    expect(entries()).toEqual(expected);
+    expect(breakdown.closest("article")).toHaveTextContent("Configured Epics5");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
+    fireEvent.click(within(screen.getByRole("listbox", { name: "Epic Status options" })).getByLabelText("Closed"));
+    expect(screen.getByText("2 visible")).toBeInTheDocument();
+    expect(entries()).toEqual(expected);
+    fireEvent.input(screen.getByPlaceholderText("Epic key, name, work stream, type..."), { target: { value: "no match" } });
+    expect(screen.getByText("0 visible")).toBeInTheDocument();
+    expect(entries()).toEqual(expected);
+  });
+
+  it("omits the status breakdown for an empty configured view", async () => {
+    mockInitiativesEndpoints([]);
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("No initiative rows match the active filters.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Configured epic status breakdown")).not.toBeInTheDocument();
+    const card = screen.getByRole("heading", { name: "Configured Epics" }).closest("article");
+    expect(within(card!).getByText("0")).toBeInTheDocument();
+  });
+
+  it("shows zero Not Closed without parentheses when every epic is closed", async () => {
+    const epics = [{ ...DEFAULT_EPICS[0], status: "Closed", completionPercent: 70 }];
+    mockInitiativesEndpoints(epics);
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
+    const breakdown = screen.getByLabelText("Configured epic status breakdown");
+    expect(Array.from(breakdown.children, (entry) => entry.textContent)).toEqual(["Closed 1", "Not Closed 0"]);
   });
 
   it("shows epic candidates only when configure search input is focused", async () => {
@@ -345,13 +391,13 @@ describe("InitiativesScreen", () => {
       expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic \(/i }));
 
     await waitFor(() => {
       expect(getEpicOrder()).toEqual(["CEG-202", "CEG-101", "CEG-303"]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic \(/i }));
 
     await waitFor(() => {
       expect(getEpicOrder()).toEqual(["CEG-303", "CEG-101", "CEG-202"]);
@@ -503,6 +549,128 @@ describe("InitiativesScreen", () => {
     });
     expect(within(matrixTitle as HTMLElement).getByText("3 visible")).toBeInTheDocument();
     expect(timeBoundToggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("filters epic status with individual, combined and all-status selections", async () => {
+    const epics = [
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-CLOSED", status: "Done", isCompleted: true, completionPercent: 70 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-OPEN", status: "In Progress", isCompleted: false, completionPercent: 100 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-UNKNOWN", completionPercent: 100 },
+    ];
+    mockInitiativesEndpoints(epics);
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-CLOSED")).toBeInTheDocument();
+    const filter = screen.getByRole("combobox", { name: "Epic Status" });
+    expect(filter).toHaveTextContent("All statuses");
+    expect(screen.getByText("3 visible")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show closed epics" })).not.toBeInTheDocument();
+
+    fireEvent.click(filter);
+    const options = screen.getByRole("listbox", { name: "Epic Status options" });
+    const select = (status: string) => fireEvent.click(within(options).getByLabelText(status));
+    select("In Progress");
+    expect(filter).toHaveTextContent("In Progress");
+    expect(screen.getByText("CEG-OPEN")).toBeInTheDocument();
+    expect(screen.queryByText("CEG-CLOSED")).not.toBeInTheDocument();
+    expect(screen.queryByText("CEG-UNKNOWN")).not.toBeInTheDocument();
+    expect(screen.getByText("1 visible")).toBeInTheDocument();
+
+    select("Unknown");
+    expect(filter).toHaveTextContent("2 selected");
+    expect(screen.getByText("CEG-UNKNOWN")).toBeInTheDocument();
+    expect(screen.getByText("2 visible")).toBeInTheDocument();
+    const summary = screen.getByRole("heading", { name: "Configured Initiative Summary" }).closest("section");
+    expect(within(summary as HTMLElement).getByText("3", { selector: ".tb-value" })).toBeInTheDocument();
+
+    select("In Progress");
+    expect(filter).toHaveTextContent("Unknown");
+    expect(screen.queryByText("CEG-OPEN")).not.toBeInTheDocument();
+    expect(screen.getByText("CEG-UNKNOWN")).toBeInTheDocument();
+    select("Unknown");
+    expect(filter).toHaveTextContent("All statuses");
+    expect(screen.getByText("3 visible")).toBeInTheDocument();
+
+    select("Done");
+    expect(screen.getByText("CEG-CLOSED")).toBeInTheDocument();
+    expect(screen.queryByText("CEG-OPEN")).not.toBeInTheDocument();
+    expect(screen.queryByText("CEG-UNKNOWN")).not.toBeInTheDocument();
+    fireEvent.click(within(options).getByRole("button", { name: "Clear selection" }));
+    expect(filter).toHaveTextContent("All statuses");
+    expect(screen.getByText("3 visible")).toBeInTheDocument();
+  });
+
+  it("combines epic status with search and quick filters", async () => {
+    const epics = [
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-CLOSED", status: "Done", isCompleted: true },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-OPEN", status: "In Progress", isCompleted: false },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-NO-DELTA", status: "In Progress", isCompleted: false, completedInPeriod: 0 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-NO-TIMELINE", status: "In Progress", isCompleted: false, timelineEnabled: false },
+    ];
+    mockInitiativesEndpoints(epics);
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-CLOSED")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
+    const options = screen.getByRole("listbox", { name: "Epic Status options" });
+    fireEvent.click(within(options).getByLabelText("In Progress"));
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(screen.getByRole("button", { name: "Positive Delta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Time-bound" }));
+    expect(screen.getByText("CEG-OPEN")).toBeInTheDocument();
+    expect(screen.getByText("1 visible")).toBeInTheDocument();
+    expect(screen.queryByText("CEG-CLOSED")).not.toBeInTheDocument();
+    expect(screen.queryByText("CEG-NO-DELTA")).not.toBeInTheDocument();
+    expect(screen.queryByText("CEG-NO-TIMELINE")).not.toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText("Epic key, name, work stream, type...");
+    fireEvent.input(search, { target: { value: "CEG-CLOSED" } });
+    expect(screen.getByText("0 visible")).toBeInTheDocument();
+    expect(screen.getByText("No initiative rows match the active filters.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
+    fireEvent.click(within(screen.getByRole("listbox", { name: "Epic Status options" })).getByLabelText("Done"));
+    expect(screen.getByText("CEG-CLOSED")).toBeInTheDocument();
+    expect(screen.getByText("1 visible")).toBeInTheDocument();
+  });
+
+  it("displays epic status and supports sorting and persisted column visibility", async () => {
+    const preferences = new Map<string, string>();
+    vi.spyOn(persistence, "getPreferenceSync").mockImplementation((key) => preferences.get(key) ?? null);
+    vi.spyOn(persistence, "getPreference").mockImplementation(async (key) => preferences.get(key) ?? null);
+    vi.spyOn(persistence, "setPreference").mockImplementation(async (key, value) => { preferences.set(key, value); });
+    const epics = [
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-1", status: "In Progress", isCompleted: false, completionPercent: 100 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-2", status: "Done", isCompleted: true, completionPercent: 70 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-3" },
+    ];
+    mockInitiativesEndpoints(epics);
+    const view = render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-1")).toBeInTheDocument();
+    const row = (key: string) => screen.getByText(key).closest("tr") as HTMLElement;
+    expect(within(row("CEG-1")).getByText("In Progress")).toBeInTheDocument();
+    expect(within(row("CEG-2")).getByText("Done")).toBeInTheDocument();
+    expect(within(row("CEG-3")).getByText("Unknown")).toBeInTheDocument();
+    const order = () => Array.from(view.container.querySelectorAll("tbody .tb-initiative-epic-key"), (node) => node.textContent);
+
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic Status/ }));
+    expect(order()).toEqual(["CEG-2", "CEG-1", "CEG-3"]);
+    fireEvent.click(screen.getByRole("button", { name: /Sort by Epic Status/ }));
+    expect(order()).toEqual(["CEG-3", "CEG-1", "CEG-2"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    const dialog = screen.getByRole("dialog", { name: "Select Initiative Columns" });
+    expect(within(dialog).getByRole("checkbox", { name: "Epic Status" })).toBeChecked();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Epic Status" }));
+    expect(screen.queryByRole("button", { name: /Sort by Epic Status/ })).not.toBeInTheDocument();
+    expect(within(row("CEG-2")).queryByText("Done")).not.toBeInTheDocument();
+    view.unmount();
+
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sort by Epic Status/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    expect(screen.getByRole("checkbox", { name: "Epic Status" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Epic Status" }));
+    expect(screen.getByRole("button", { name: /Sort by Epic Status/ })).toBeInTheDocument();
+    expect(within(row("CEG-2")).getByText("Done")).toBeInTheDocument();
   });
 
   it("filters initiative matrix with multi-select dropdown filters", async () => {
@@ -782,7 +950,7 @@ it("loads and summarizes all 245 configured epics", async () => {
   render(<InitiativesScreen />);
   await screen.findByText("CEG-1244");
   const countCard = screen.getByRole("heading", { name: "Configured Epics" }).closest("article")!;
-  expect(within(countCard).getByText("245")).toBeInTheDocument();
+  expect(within(countCard).getByText("245", { selector: ".tb-value" })).toBeInTheDocument();
   const averageCard = screen.getByRole("heading", { name: "Avg Completion" }).closest("article")!;
   expect(within(averageCard).getByText(/81\.6/)).toBeInTheDocument();
   expect(screen.getByText("245 visible")).toBeInTheDocument();

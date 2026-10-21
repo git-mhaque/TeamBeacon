@@ -155,6 +155,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
 - `GET /api/metadata/epics?limit=50`
   - Optional query param: `epicKey=CEGBUPOL-4482`
 - `GET /api/metadata/epics/summary?limit=50`
+  - Each epic includes `status`, the synced JIRA status name (nullable when unavailable), matching the epic mapping inventory. `isCompleted` remains a separate completion classification used by delivery metrics.
   - Returns configured epics with completion metrics derived from local synced issue cards.
   - Optional query params:
     - `periodStart=2026-03-01`
@@ -208,7 +209,7 @@ python3 -m services.api.server --host 0.0.0.0 --port 8000 --web-dir app/web
 - Returns `savedCount`; invalid batches return 400 and stale assignments return 409. Entire batches roll back on failure. Only work stream assignments change; existing metadata/view membership is preserved. Previously unconfigured epics gain minimal metadata.
 
 ### Eligible project epic reconciliation
-Every sync independently searches the configured project for Epic issues with empty labels or labels not containing Triad. Full mode refreshes all eligible epics; incremental modes backfill missing epics regardless of age and refresh existing source changes. Results/progress include `projectEpicCount` and `projectEpicsSynced`; the final message summarizes reconciliation. Existing board issue sync remains in place. Mapping inventory uses the same project/label scope and rejects assignment of excluded epics. Metadata and saved views remain intact, and older backfills never lower the checkpoint. Search/pagination failures mark the sync failed rather than recording a successful complete inventory.
+Every sync independently searches the configured project for Epic issues with empty labels or labels not containing Triad. Full mode refreshes all eligible epics; incremental modes backfill missing epics regardless of age and refresh existing source changes. Results/progress include `projectEpicCount` and `projectEpicsSynced`; the final message summarizes reconciliation. Existing board issue sync remains in place. Mapping inventory includes all locally synced epics in the configured project regardless of labels, including Triad, and permits their assignment. Non-epic and missing issues remain invalid mapping targets. Metadata and saved views remain intact, and older backfills never lower the checkpoint. Search/pagination failures mark the sync failed rather than recording a successful complete inventory.
 
 ### Complete configured epic summaries
 Use `GET /api/metadata/epics/summary?limit=all` (with optional `viewId`, reporting period and timezone) to return every configured epic in the selected view. Numeric limits retain the default 50 and maximum 200. Initiative Insights, Team Report, and Team Dashboard delivery progress explicitly use complete summaries so counts and calculations include records beyond 200. No schema or configuration migration is required.

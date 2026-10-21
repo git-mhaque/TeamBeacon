@@ -285,6 +285,7 @@ export type EpicMetadataEntry = {
 };
 
 export type InitiativeEpicSummary = {
+  status?: string | null;
   isCompleted?: boolean;
   epicKey: string;
   epicName: string;

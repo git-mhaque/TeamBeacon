@@ -133,7 +133,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 
 ## 6.2.1 Bulk Work Stream Epic Mapping
 - Settings has two tabs: Initiative Metadata and Work Stream Epic Mapping.
-- Mapping inventory includes locally synced epics from the configured JIRA project, excluding epics labelled Triad, including epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
+- Mapping inventory includes locally synced epics from the configured JIRA project, including all labels (also Triad), epics without metadata and configured epics without a work stream; the last successful JIRA sync timestamp is displayed.
 - Saved mapping statistics show total, mapped, unmapped, coverage, and work stream distribution including unmapped. Counts are epic counts, not effort estimates.
 - Search, mapping/work stream/status filters, unmapped-first sorting, and 50-row pagination operate on saved assignments. Drafts and explicit selections persist across pages, filters, and tabs. Epic key, title, status, work stream, and changes headers toggle ascending/descending sorting with visible indicators and accessible sort state; sorting resets pagination and preserves edits/selections.
 - Epic keys link directly to the configured JIRA browse page and open in a new tab.
@@ -150,6 +150,7 @@ TeamBeacon is a self-hosted engineering management web app that aggregates deliv
 ### Complete configured epic analytics
 - Initiative Insights, Team Dashboard delivery progress, and Team Report consume the complete configured epic set for the selected view. Counts, completion averages, RAG and per-work-stream progress are not truncated to 200 epics.
 - `GET /api/metadata/epics/summary?limit=all` requests the full selected view. Numeric requests retain the default 50 and maximum 200 for compatibility.
+- Initiative Insights has a session-only Epic Status main filter with multi-select options drawn from synced JIRA status names, matching Settings; an empty selection defaults to All statuses. Status comes from the summary `status` field (the synced JIRA status name); missing status displays Unknown on both screens. Completion metrics retain the separate `isCompleted` field. The filter combines with search and other matrix filters and updates the visible count; selected-view summary totals remain unchanged. The sortable Epic Status column uses the same labels and can be shown or hidden through persisted Columns preferences; it is visible by default when no column preferences are saved. The Configured Epics card displays two lines for the complete selected view: Closed count, then Not Closed count with the individual remaining status counts in parentheses (including Unknown). Closed matches the JIRA status name, independent of child progress. Matrix filters do not affect these counts; empty views omit the breakdown.
 
 ## 6.3 Team Insights Semantics (Current Behavior)
 - Trend window:

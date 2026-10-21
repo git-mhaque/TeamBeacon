@@ -2931,6 +2931,14 @@ body {
   min-width: 0;
 }
 
+.tb-initiative-status-breakdown {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .tb-initiative-filter-toggle {
   border: 1px solid #c9d7ed;
   border-radius: 0.56rem;
@@ -5313,6 +5321,12 @@ body {
   color: #315f6c;
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+@media (min-width: 1161px) {
+  .tb-main-initiatives .tb-initiative-toolbar {
+    grid-template-columns: minmax(0, 1.35fr) repeat(4, minmax(0, 1fr)) minmax(0, 1.2fr);
+  }
 }
 
 .tb-main-initiatives .tb-initiative-toolbar {

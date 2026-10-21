@@ -180,7 +180,7 @@ Use this structure:
    - Existing secondary actions remain directly available.
 
 2. Summary strip
-   - Configured epics.
+   - Configured epics, with Closed and Not Closed counts on separate lines; Not Closed includes the remaining status counts in parentheses. Counts cover the full selected view, independent of matrix filters.
    - Average completion.
    - RAG distribution.
    - Completed in period.
@@ -188,9 +188,9 @@ Use this structure:
 
 3. Sticky filter toolbar
    - Search.
-   - Group, work type, and RAG filters.
-   - Quick-filter chips.
-   - Column preferences in a popover.
+   - Group, work type, RAG, and Epic Status multi-select filters. Epic Status offers synced JIRA status names matching Settings (Unknown when missing), defaults to All statuses, and resets on a new screen session.
+   - Quick-filter chips: Positive Delta and Time-bound.
+   - Column preferences in a popover, including a sortable Epic Status column (synced JIRA status name or Unknown).
 
 4. Progress matrix
    - Sticky header.
@@ -211,7 +211,7 @@ Use this structure:
 - **Team Insights:** keep trend-window selection in the page header and use synchronized chart legends, axes, and tooltips.
 - **Release Insights:** separate release readiness from historical cycle-time analysis. Show completed-release durations as teal bars with day labels, short version labels and full release/date hover details. Keep the average in the summary card without a chart overlay. Preserve chronological selection order and show missing-value markers only when needed; use local horizontal scrolling for dense selections.
 - **Global system status:** expose connection health, JIRA sync actions/history, and diagnostics from a compact header control. Use one accessible side sheet with internal views, keyboard focus containment, Escape dismissal, and trigger-focus restoration.
-- **Settings:** provide Initiative Metadata and Work Stream Epic Mapping tabs, with saved mapping statistics, searchable/filterable assignments for synced project epics excluding Triad labels, page-scoped selection, persistent drafts and atomic bulk save; operational integration state belongs to the global system-status sheet.
+- **Settings:** provide Initiative Metadata and Work Stream Epic Mapping tabs, with saved mapping statistics, searchable/filterable assignments for all synced project epics including Triad labels, page-scoped selection, persistent drafts and atomic bulk save; operational integration state belongs to the global system-status sheet.
 - **Security and Operations:** use one reusable coming-soon state until real workflows exist.
 
 ### 4.7 Visual System

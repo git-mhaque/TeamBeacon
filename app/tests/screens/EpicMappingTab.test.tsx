@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EpicMappingTab } from "../../src/components/content/screens/EpicMappingTab";
 import { IntegrationsScreen } from "../../src/components/content/screens/IntegrationsScreen";
@@ -26,6 +26,19 @@ const edit = () => fireEvent.change(screen.getByLabelText("Work stream for P-1")
 
 describe("Epic mapping", () => {
   afterEach(() => vi.restoreAllMocks());
+  it("uses synced JIRA status labels and an Unknown fallback in rows and filters", async () => {
+    mockInventory([
+      { ...epics[0], status: "In Progress" },
+      { ...epics[1], status: "" },
+    ]);
+    await renderTab();
+    expect(within(screen.getByText("P-1").closest("tr")!).getByText("In Progress")).toBeInTheDocument();
+    const statusFilter = screen.getByLabelText("Status filter");
+    expect(within(statusFilter).getByRole("option", { name: "In Progress" })).toBeInTheDocument();
+    fireEvent.change(statusFilter, { target: { value: "Unknown" } });
+    expect(screen.queryByText("P-1")).not.toBeInTheDocument();
+    expect(within(screen.getByText("P-2").closest("tr")!).getByText("Unknown")).toBeInTheDocument();
+  });
   it("stages edits, filters by saved values and saves only changes", async () => {
     const fetch = mockInventory(); await renderTab();
     const link = await screen.findByRole("link", { name: "Open P-1 in JIRA (new tab)" });
