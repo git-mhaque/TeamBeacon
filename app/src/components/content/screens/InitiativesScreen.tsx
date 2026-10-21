@@ -459,6 +459,7 @@ type MultiSelectFilterProps = {
   id: string;
   label: string;
   allLabel: string;
+  summaryLabel?: string;
   options: MultiSelectFilterOption[];
   selectedValues: string[];
   onChange: (values: string[]) => void;
@@ -483,6 +484,7 @@ function MultiSelectFilter({
   id,
   label,
   allLabel,
+  summaryLabel,
   options,
   selectedValues,
   onChange,
@@ -495,8 +497,8 @@ function MultiSelectFilter({
   const listboxId = `${id}-listbox`;
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
   const summary = useMemo(
-    () => formatMultiSelectSummary(selectedValues, options, allLabel),
-    [allLabel, options, selectedValues],
+    () => summaryLabel ?? formatMultiSelectSummary(selectedValues, options, allLabel),
+    [allLabel, options, selectedValues, summaryLabel],
   );
 
   const closeMenu = useCallback(() => setIsOpen(false), []);
@@ -571,7 +573,7 @@ function MultiSelectFilter({
           aria-label={`${label} options`}
           aria-multiselectable="true"
         >
-          {selectedValues.length > 0 ? (
+          {selectedValues.length > 0 || summaryLabel !== undefined ? (
             <button type="button" className="tb-initiative-multiselect-clear" onClick={() => onChange([])}>
               Clear selection
             </button>
@@ -741,7 +743,8 @@ export function InitiativesScreen() {
   const [ragFilters, setRagFilters] = useState<RagLabel[]>([]);
   const [positiveDeltaOnly, setPositiveDeltaOnly] = useState(false);
   const [timeBoundOnly, setTimeBoundOnly] = useState(false);
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  // null follows all non-Closed statuses as the selected view changes; [] explicitly shows all.
+  const [statusFilters, setStatusFilters] = useState<string[] | null>(null);
   const [visibleOptionalColumns, setVisibleOptionalColumns] = useState<OptionalColumnId[]>(readPersistedVisibleOptionalColumns);
   const [sortField, setSortField] = useState<SortField>("epic");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -1265,6 +1268,10 @@ export function InitiativesScreen() {
     return [...new Set(rows.map((row) => row.statusLabel))].sort();
   }, [rows]);
 
+  const selectedStatuses = useMemo(() => statusFilters ?? statusOptions.filter(
+    (status) => status.toLowerCase() !== "closed",
+  ), [statusFilters, statusOptions]);
+
   const statusBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
     for (const row of rows) {
@@ -1286,7 +1293,8 @@ export function InitiativesScreen() {
     const selectedTypes = new Set(typeFilters);
     const selectedRags = new Set<RagLabel>(ragFilters);
     return rows.filter((row) => {
-      if (statusFilters.length > 0 && !statusFilters.includes(row.statusLabel)) {
+      if (statusFilters === null ? row.statusLabel.toLowerCase() === "closed"
+        : statusFilters.length > 0 && !statusFilters.includes(row.statusLabel)) {
         return false;
       }
       if (selectedGroups.size > 0 && !row.groups.some((group) => selectedGroups.has(group.name))) {
@@ -2120,8 +2128,9 @@ export function InitiativesScreen() {
             id="initiative-status-filter"
             label="Epic Status"
             allLabel="All statuses"
+            summaryLabel={statusFilters === null ? "Not Closed" : undefined}
             options={statusOptions.map((status) => ({ value: status, label: status }))}
-            selectedValues={statusFilters}
+            selectedValues={selectedStatuses}
             onChange={setStatusFilters}
           />
 

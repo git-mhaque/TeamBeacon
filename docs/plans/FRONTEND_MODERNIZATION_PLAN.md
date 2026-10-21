@@ -188,7 +188,7 @@ Use this structure:
 
 3. Sticky filter toolbar
    - Search.
-   - Group, work type, RAG, and Epic Status multi-select filters. Epic Status offers synced JIRA status names matching Settings (Unknown when missing), defaults to All statuses, and resets on a new screen session.
+   - Group, work type, RAG, and Epic Status multi-select filters. Epic Status offers synced JIRA status names matching Settings (Unknown when missing), defaults to Not Closed (including Unknown), and resets on a new screen session. Clearing the selection shows All statuses.
    - Quick-filter chips: Positive Delta and Time-bound.
    - Column preferences in a popover, including a sortable Epic Status column (synced JIRA status name or Unknown).
 

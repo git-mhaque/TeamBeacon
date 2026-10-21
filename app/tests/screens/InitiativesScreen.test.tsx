@@ -259,7 +259,7 @@ describe("InitiativesScreen", () => {
     ];
     mockInitiativesEndpoints(epics);
     render(<InitiativesScreen />);
-    expect(await screen.findByText("CEG-1")).toBeInTheDocument();
+    expect(await screen.findByText("CEG-3")).toBeInTheDocument();
     const breakdown = screen.getByLabelText("Configured epic status breakdown");
     const entries = () => Array.from(breakdown.children, (entry) => entry.textContent);
     const expected = ["Closed 2", "Not Closed 3 (Analysis 1 Open 1 Unknown 1)"];
@@ -267,6 +267,7 @@ describe("InitiativesScreen", () => {
     expect(breakdown.closest("article")).toHaveTextContent("Configured Epics5");
 
     fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
+    fireEvent.click(within(screen.getByRole("listbox", { name: "Epic Status options" })).getByRole("button", { name: "Clear selection" }));
     fireEvent.click(within(screen.getByRole("listbox", { name: "Epic Status options" })).getByLabelText("Closed"));
     expect(screen.getByText("2 visible")).toBeInTheDocument();
     expect(entries()).toEqual(expected);
@@ -288,8 +289,12 @@ describe("InitiativesScreen", () => {
     const epics = [{ ...DEFAULT_EPICS[0], status: "Closed", completionPercent: 70 }];
     mockInitiativesEndpoints(epics);
     render(<InitiativesScreen />);
-    expect(await screen.findByText("CEG-101")).toBeInTheDocument();
-    const breakdown = screen.getByLabelText("Configured epic status breakdown");
+    const breakdown = await screen.findByLabelText("Configured epic status breakdown");
+    expect(screen.queryByText("CEG-101")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Epic Status" })).toHaveTextContent("Not Closed");
+    fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.getByText("CEG-101")).toBeInTheDocument();
     expect(Array.from(breakdown.children, (entry) => entry.textContent)).toEqual(["Closed 1", "Not Closed 0"]);
   });
 
@@ -551,6 +556,39 @@ describe("InitiativesScreen", () => {
     expect(timeBoundToggle).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("defaults to non-Closed epics and resets that default when reopened", async () => {
+    const epics = [
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-CLOSED", status: "Closed", isCompleted: true },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-OPEN", status: "Open", completionPercent: 100 },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-DONE", status: "Done", isCompleted: true },
+      { ...DEFAULT_EPICS[0], epicKey: "CEG-UNKNOWN" },
+    ];
+    mockInitiativesEndpoints(epics);
+    const view = render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-OPEN")).toBeInTheDocument();
+    expect(screen.queryByText("CEG-CLOSED")).not.toBeInTheDocument();
+    expect(screen.getByText("CEG-DONE")).toBeInTheDocument();
+    expect(screen.getByText("CEG-UNKNOWN")).toBeInTheDocument();
+    expect(screen.getByText("3 visible")).toBeInTheDocument();
+    const filter = screen.getByRole("combobox", { name: "Epic Status" });
+    expect(filter).toHaveTextContent("Not Closed");
+    fireEvent.click(filter);
+    const options = screen.getByRole("listbox", { name: "Epic Status options" });
+    expect(within(options).getByLabelText("Closed")).not.toBeChecked();
+    for (const status of ["Open", "Done", "Unknown"]) {
+      expect(within(options).getByLabelText(status)).toBeChecked();
+    }
+    fireEvent.click(within(options).getByRole("button", { name: "Clear selection" }));
+    expect(filter).toHaveTextContent("All statuses");
+    expect(screen.getByText("CEG-CLOSED")).toBeInTheDocument();
+    expect(screen.getByText("4 visible")).toBeInTheDocument();
+    view.unmount();
+    render(<InitiativesScreen />);
+    expect(await screen.findByText("CEG-OPEN")).toBeInTheDocument();
+    expect(screen.queryByText("CEG-CLOSED")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Epic Status" })).toHaveTextContent("Not Closed");
+  });
+
   it("filters epic status with individual, combined and all-status selections", async () => {
     const epics = [
       { ...DEFAULT_EPICS[0], epicKey: "CEG-CLOSED", status: "Done", isCompleted: true, completionPercent: 70 },
@@ -561,12 +599,13 @@ describe("InitiativesScreen", () => {
     render(<InitiativesScreen />);
     expect(await screen.findByText("CEG-CLOSED")).toBeInTheDocument();
     const filter = screen.getByRole("combobox", { name: "Epic Status" });
-    expect(filter).toHaveTextContent("All statuses");
+    expect(filter).toHaveTextContent("Not Closed");
     expect(screen.getByText("3 visible")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show closed epics" })).not.toBeInTheDocument();
 
     fireEvent.click(filter);
     const options = screen.getByRole("listbox", { name: "Epic Status options" });
+    fireEvent.click(within(options).getByRole("button", { name: "Clear selection" }));
     const select = (status: string) => fireEvent.click(within(options).getByLabelText(status));
     select("In Progress");
     expect(filter).toHaveTextContent("In Progress");
@@ -611,6 +650,7 @@ describe("InitiativesScreen", () => {
     expect(await screen.findByText("CEG-CLOSED")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("combobox", { name: "Epic Status" }));
     const options = screen.getByRole("listbox", { name: "Epic Status options" });
+    fireEvent.click(within(options).getByRole("button", { name: "Clear selection" }));
     fireEvent.click(within(options).getByLabelText("In Progress"));
     fireEvent.mouseDown(document.body);
     fireEvent.click(screen.getByRole("button", { name: "Positive Delta" }));
