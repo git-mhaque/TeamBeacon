@@ -8432,8 +8432,16 @@ body {
 .tb-mapping-stats > * { padding: 16px; border: 1px solid #ddd5cc; border-radius: 10px; background: #faf8f5; text-align: left; color: inherit; }
 .tb-mapping-stats strong { display: block; font-size: 26px; margin-top: 6px; }
 .tb-mapping-distribution { margin-bottom: 20px; }
-.tb-mapping-distribution > div { display: grid; grid-template-columns: minmax(180px, 1fr) 2fr 90px; gap: 12px; align-items: center; padding: 5px 0; }
+.tb-mapping-distribution-panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 10px; }
+.tb-mapping-distribution-panel { min-width: 0; border: 1px solid #ddd5cc; border-radius: 10px; padding: 14px; }
+.tb-mapping-distribution-panel h4 { margin: 0 0 4px; }
+.tb-mapping-distribution-panel > p { margin: 0 0 10px; }
+.tb-mapping-distribution-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) auto; gap: 12px; align-items: center; padding: 5px 0; }
+.tb-mapping-distribution-row > :last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tb-mapping-distribution progress { width: 100%; accent-color: #47778a; }
+@media (max-width: 800px) {
+  .tb-mapping-distribution-panels { grid-template-columns: 1fr; }
+}
 .tb-mapping-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
 .tb-epic-mapping select, .tb-mapping-filters input { border: 1px solid #d4cac0; border-radius: 6px; padding: 8px; background: white; color: #302b28; max-width: 100%; }
 .tb-mapping-editor { border: 0; margin: 0; padding: 0; min-width: 0; }

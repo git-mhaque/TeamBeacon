@@ -11,11 +11,13 @@ from services.api.server import build_handler
 
 class MappingRoutesTests(unittest.TestCase):
     def setUp(self):
+        self.received = []
         def save(changes):
             if changes == "conflict":
                 raise MappingConflict("P-1 changed")
             if not isinstance(changes, list):
                 raise ValueError("Invalid changes")  # noqa: TRY004 - API validation contract
+            self.received.append(changes)
             return {"savedCount": len(changes)}
 
         self.server = ThreadingHTTPServer(
@@ -56,3 +58,12 @@ class MappingRoutesTests(unittest.TestCase):
         for body in [[], {}, {"changes": None}]:
             self.assertEqual(self.request(body)[0], 400)
         self.assertEqual(self.request({"changes": "conflict"})[0], 409)
+
+    def test_work_type_and_combined_changes_reach_the_save_provider(self):
+        changes = [
+            {"epicKey": "P-1", "workTypeId": 10, "expectedWorkTypeId": None},
+            {"epicKey": "P-2", "workStreamId": 1, "expectedWorkStreamId": None,
+             "workTypeId": None, "expectedWorkTypeId": 10},
+        ]
+        self.assertEqual(self.request({"changes": changes}), (200, {"savedCount": 2}))
+        self.assertEqual(self.received, [changes])

@@ -60,6 +60,7 @@ class EpicMappingTests(unittest.TestCase):
                 "title": "Title P-1",
                 "status": "Open",
                 "workStreamId": None,
+                "workTypeId": None,
             },
         )
         self.assertEqual(inventory["lastSyncedAt"], "2026-10-14T10:00:00Z")
@@ -105,6 +106,54 @@ class EpicMappingTests(unittest.TestCase):
             get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]["groupIds"],
             [],
         )
+
+    def test_work_type_edits_preserve_stream_and_metadata_and_can_be_cleared(self):
+        upsert_epic_metadata(
+            epic_key="P-1", success_criteria=["Keep"], group_ids=[self.group],
+            work_type_ids=[], timeline_enabled=True, target_completion_date="2027-01-01",
+            db_path=self.db,
+        )
+        create_initiative_view(name="Type view", epic_keys=["P-1"], db_path=self.db)
+        before = get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]
+        views = get_initiative_views(db_path=self.db)
+        change = {"epicKey": "P-1", "workTypeId": self.work_type, "expectedWorkTypeId": None}
+        self.assertEqual(save_epic_mappings([change], self.db), {"savedCount": 1})
+        after = get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]
+        self.assertEqual(after["workTypeIds"], [self.work_type])
+        for field in ("groupIds", "successCriteria", "timelineEnabled", "targetCompletionDate"):
+            self.assertEqual(after[field], before[field])
+        self.assertEqual(get_initiative_views(db_path=self.db), views)
+        inventory = get_epic_mapping_inventory(self.db, project_key="P")["epics"]
+        self.assertEqual(inventory[0]["workTypeId"], self.work_type)
+        save_epic_mappings([{"epicKey": "P-1", "workTypeId": None, "expectedWorkTypeId": self.work_type}], self.db)
+        self.assertEqual(get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]["workTypeIds"], [])
+
+    def test_combined_stream_and_type_edits_create_metadata_and_save_atomically(self):
+        change = {**self.change(target=self.group), "workTypeId": self.work_type, "expectedWorkTypeId": None}
+        save_epic_mappings([change], self.db)
+        metadata = get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]
+        self.assertEqual(metadata["groupIds"], [self.group])
+        self.assertEqual(metadata["workTypeIds"], [self.work_type])
+        with self.assertRaises(MappingConflict):
+            save_epic_mappings([
+                self.change("P-2", target=self.other),
+                {"epicKey": "P-1", "workTypeId": None, "expectedWorkTypeId": None},
+            ], self.db)
+        self.assertIsNone(get_epic_mapping_inventory(self.db, project_key="P")["epics"][1]["workStreamId"])
+        self.assertEqual(get_epic_metadata(epic_key="P-1", db_path=self.db)["epics"][0]["workTypeIds"], [self.work_type])
+
+    def test_invalid_work_type_changes_are_rejected_without_writes(self):
+        for invalid in (
+            {"epicKey": "P-1", "workTypeId": self.work_type},
+            {"epicKey": "P-1", "expectedWorkTypeId": None},
+            {"epicKey": "P-1", "workTypeId": True, "expectedWorkTypeId": None},
+            {"epicKey": "P-1", "workTypeId": None, "expectedWorkTypeId": -1},
+            {"epicKey": "P-1", "workTypeId": 999, "expectedWorkTypeId": None},
+            {**self.change(target=self.group), "expectedWorkTypeId": None},
+        ):
+            with self.subTest(change=invalid), self.assertRaises(ValueError):
+                save_epic_mappings([self.change("P-2", self.group), invalid], self.db)
+        self.assertEqual(get_epic_metadata(db_path=self.db)["epics"], [])
 
     def test_invalid_batches_save_nothing(self):
         invalids = [

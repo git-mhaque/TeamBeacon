@@ -1439,7 +1439,7 @@ export async function fetchReleaseInsights(releaseLimit = 12, projectKey?: strin
   return (await response.json()) as ReleaseInsightsResponse;
 }
 
-export type EpicMapping = { epicKey: string; title: string; status: string; workStreamId: number | null };
+export type EpicMapping = { epicKey: string; title: string; status: string; workStreamId: number | null; workTypeId?: number | null };
 export type UnmappedCard = {
   issueKey: string;
   summary: string;
@@ -1465,7 +1465,13 @@ export async function fetchUnmappedCards(): Promise<UnmappedCardsInventory> {
 }
 
 export type EpicMappingInventory = { epics: EpicMapping[]; lastSyncedAt: string | null };
-export type EpicMappingChange = { epicKey: string; workStreamId: number | null; expectedWorkStreamId: number | null };
+export type EpicMappingChange = {
+  epicKey: string;
+  workStreamId?: number | null;
+  expectedWorkStreamId?: number | null;
+  workTypeId?: number | null;
+  expectedWorkTypeId?: number | null;
+};
 
 export async function fetchEpicMappingInventory(): Promise<EpicMappingInventory> {
   const response = await fetch(`${API_BASE}/api/metadata/epic-mappings`);

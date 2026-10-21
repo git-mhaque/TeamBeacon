@@ -28,7 +28,9 @@ def get_epic_mapping_inventory(
         rows = conn.execute(
             """
             SELECT i.issue_key AS epicKey, i.summary AS title,
-                   i.status_name AS status, g.group_id AS workStreamId
+                   i.status_name AS status, g.group_id AS workStreamId,
+                   (SELECT MIN(wt.work_type_id) FROM epic_metadata_work_types wt
+                    WHERE wt.epic_metadata_id = em.id) AS workTypeId
             FROM issues i
             LEFT JOIN epic_metadata em ON em.epic_key = i.issue_key
             LEFT JOIN epic_metadata_groups g ON g.epic_metadata_id = em.id
@@ -59,63 +61,73 @@ def save_epic_mappings(changes: Any, db_path: str | None = None) -> dict[str, An
         if not key.strip() or key in seen:
             raise ValueError("Epic keys must be nonempty and unique.")
         seen.add(key)
-        for field in ("workStreamId", "expectedWorkStreamId"):
-            if field not in change or (
-                change[field] is not None
-                and (type(change[field]) is not int or change[field] <= 0)
-            ):
-                raise ValueError(f"{key}: {field} must be a positive integer or null.")
+        if "workStreamId" not in change and "workTypeId" not in change:
+            raise ValueError(f"{key}: at least one assignment is required.")
+        for target_field, expected_field in (
+            ("workStreamId", "expectedWorkStreamId"),
+            ("workTypeId", "expectedWorkTypeId"),
+        ):
+            if target_field not in change and expected_field not in change:
+                continue
+            for field in (target_field, expected_field):
+                if field not in change or (
+                    change[field] is not None
+                    and (type(change[field]) is not int or change[field] <= 0)
+                ):
+                    raise ValueError(f"{key}: {field} must be a positive integer or null.")
     conn = _connect(db_path or _resolve_db_path())
     try:
         _ensure_metadata_schema(conn)
         conn.execute("BEGIN IMMEDIATE")
+        assignments = (
+            ("workStreamId", "expectedWorkStreamId", "epic_groups", "epic_metadata_groups", "group_id"),
+            ("workTypeId", "expectedWorkTypeId", "work_types", "epic_metadata_work_types", "work_type_id"),
+        )
         for change in changes:
-            key, target = change["epicKey"], change["workStreamId"]
+            key = change["epicKey"]
             issue = conn.execute(
-                "SELECT issue_type FROM issues WHERE issue_key = ?",
-                (key,),
+                "SELECT issue_type FROM issues WHERE issue_key = ?", (key,),
             ).fetchone()
             if issue is None or (issue[0] or "").casefold() != "epic":
                 raise ValueError(f"{key}: synced epic no longer exists.")
-            if (
-                target is not None
-                and not conn.execute(
-                    "SELECT 1 FROM epic_groups WHERE id = ?", (target,)
-                ).fetchone()
-            ):
-                raise ValueError(f"{key}: work stream no longer exists.")
-            current = conn.execute(
-                """
-                SELECT g.group_id FROM epic_metadata em
-                JOIN epic_metadata_groups g ON g.epic_metadata_id = em.id
-                WHERE em.epic_key = ?
-            """,
-                (key,),
-            ).fetchall()
-            ids = [row[0] for row in current]
-            expected = change["expectedWorkStreamId"]
-            if ids != ([] if expected is None else [expected]):
-                raise MappingConflict(
-                    f"{key}: assignment changed. Reload the inventory before saving."
-                )
+            for field, expected_field, lookup_table, mapping_table, column in assignments:
+                if field not in change:
+                    continue
+                target = change[field]
+                if target is not None and not conn.execute(
+                    f"SELECT 1 FROM {lookup_table} WHERE id = ?", (target,),
+                ).fetchone():
+                    raise ValueError(f"{key}: {field} no longer exists.")
+                current = conn.execute(
+                    f"""SELECT m.{column} FROM epic_metadata em
+                        JOIN {mapping_table} m ON m.epic_metadata_id = em.id
+                        WHERE em.epic_key = ?""", (key,),
+                ).fetchall()
+                expected = change[expected_field]
+                if [row[0] for row in current] != ([] if expected is None else [expected]):
+                    raise MappingConflict(
+                        f"{key}: assignment changed. Reload the inventory before saving."
+                    )
         for change in changes:
-            key, target = change["epicKey"], change["workStreamId"]
+            key = change["epicKey"]
             conn.execute(
                 "INSERT INTO epic_metadata (epic_key) VALUES (?) ON CONFLICT(epic_key) DO NOTHING",
                 (key,),
             )
             metadata_id = conn.execute(
-                "SELECT id FROM epic_metadata WHERE epic_key = ?", (key,)
+                "SELECT id FROM epic_metadata WHERE epic_key = ?", (key,),
             ).fetchone()[0]
-            conn.execute(
-                "DELETE FROM epic_metadata_groups WHERE epic_metadata_id = ?",
-                (metadata_id,),
-            )
-            if target is not None:
+            for field, _, _, mapping_table, column in assignments:
+                if field not in change:
+                    continue
                 conn.execute(
-                    "INSERT INTO epic_metadata_groups VALUES (?, ?)",
-                    (metadata_id, target),
+                    f"DELETE FROM {mapping_table} WHERE epic_metadata_id = ?", (metadata_id,),
                 )
+                if change[field] is not None:
+                    conn.execute(
+                        f"INSERT INTO {mapping_table} (epic_metadata_id, {column}) VALUES (?, ?)",
+                        (metadata_id, change[field]),
+                    )
             conn.execute(
                 "UPDATE epic_metadata SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (metadata_id,),

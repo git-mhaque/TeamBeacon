@@ -752,14 +752,19 @@ def _build_openapi_spec(server_url: str) -> dict[str, Any]:
                 }
             },
             "/api/metadata/epic-mappings": {
-                "get": {"summary": "List all synced epics and saved work stream assignments", "responses": {"200": {"description": "Inventory with last successful JIRA sync timestamp", "content": json_payload}}},
+                "get": {"summary": "List all synced epics and saved work stream and work type assignments", "responses": {"200": {"description": "Inventory with last successful JIRA sync timestamp", "content": json_payload}}},
                 "post": {
-                    "summary": "Atomically update work stream assignments only",
+                    "summary": "Atomically update work stream and work type assignments",
                     "requestBody": {"required": True, "content": {"application/json": {"schema": {
                         "type": "object", "required": ["changes"], "properties": {"changes": {
                             "type": "array", "minItems": 1, "maxItems": 1000, "items": {
-                                "type": "object", "required": ["epicKey", "workStreamId", "expectedWorkStreamId"],
-                                "properties": {"epicKey": {"type": "string"}, "workStreamId": {"type": ["integer", "null"], "minimum": 1}, "expectedWorkStreamId": {"type": ["integer", "null"], "minimum": 1}}
+                                "type": "object", "required": ["epicKey"],
+                                "anyOf": [{"required": ["workStreamId", "expectedWorkStreamId"]}, {"required": ["workTypeId", "expectedWorkTypeId"]}],
+                                "allOf": [
+                                    {"anyOf": [{"required": ["workStreamId", "expectedWorkStreamId"]}, {"not": {"anyOf": [{"required": ["workStreamId"]}, {"required": ["expectedWorkStreamId"]}]}}]},
+                                    {"anyOf": [{"required": ["workTypeId", "expectedWorkTypeId"]}, {"not": {"anyOf": [{"required": ["workTypeId"]}, {"required": ["expectedWorkTypeId"]}]}}]},
+                                ],
+                                "properties": {"epicKey": {"type": "string"}, "workStreamId": {"type": ["integer", "null"], "minimum": 1}, "expectedWorkStreamId": {"type": ["integer", "null"], "minimum": 1}, "workTypeId": {"type": ["integer", "null"], "minimum": 1}, "expectedWorkTypeId": {"type": ["integer", "null"], "minimum": 1}}
                             }
                         }}
                     }}}},

@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EpicMappingTab } from "../../src/components/content/screens/EpicMappingTab";
 import { IntegrationsScreen } from "../../src/components/content/screens/IntegrationsScreen";
 import { type EpicMapping } from "../../src/lib/api";
+import { readInitiativeSnapshot, writeInitiativeSnapshot } from "../../src/lib/initiativeSnapshotCache";
 
-const lookup = { groups: [{ id: 1, name: "Platform" }, { id: 2, name: "Delivery" }], workTypes: [] };
+const lookup = { groups: [{ id: 1, name: "Platform" }, { id: 2, name: "Delivery" }], workTypes: [{ id: 10, name: "Feature" }, { id: 20, name: "Tech debt" }] };
 const epics = [
   { epicKey: "P-1", title: "Alpha", status: "Open", workStreamId: null },
   { epicKey: "P-2", title: "Beta", status: "Done", workStreamId: 1 },
@@ -26,6 +27,105 @@ const edit = () => fireEvent.change(screen.getByLabelText("Work stream for P-1")
 
 describe("Epic mapping", () => {
   afterEach(() => vi.restoreAllMocks());
+  it("compares all-status and non-Closed distributions using each scope's saved totals", async () => {
+    mockInventory([
+      { ...epics[0], workStreamId: 1 },
+      { ...epics[1], status: "Closed", workStreamId: 2 },
+      { epicKey: "P-3", title: "Analysis", status: "Analysis", workStreamId: 1 },
+      { epicKey: "P-4", title: "Active", status: "In Progress", workStreamId: null },
+      { epicKey: "P-5", title: "Unknown status", status: "", workStreamId: 2 },
+    ]);
+    await renderTab();
+    const all = screen.getByRole("region", { name: "All statuses work stream distribution" });
+    const nonClosed = screen.getByRole("region", { name: "Not Closed work stream distribution" });
+    expect(within(all).getByText("5 epics")).toBeInTheDocument();
+    expect(within(nonClosed).getByText("4 epics")).toBeInTheDocument();
+    const assertCount = (scope: HTMLElement, stream: string, count: number, total: number, percentage: number) => {
+      const bar = within(scope).getByRole("progressbar", { name: new RegExp(`^${stream} epic count`) });
+      expect(bar).toHaveAttribute("value", String(count));
+      expect(bar).toHaveAttribute("max", String(total));
+      expect(bar.parentElement).toHaveTextContent(`${count} (${percentage}%)`);
+    };
+    assertCount(all, "Platform", 2, 5, 40);
+    assertCount(all, "Delivery", 2, 5, 40);
+    assertCount(all, "Unmapped", 1, 5, 20);
+    assertCount(nonClosed, "Platform", 2, 4, 50);
+    assertCount(nonClosed, "Delivery", 1, 4, 25);
+    assertCount(nonClosed, "Unmapped", 1, 4, 25);
+    fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "Closed" } });
+    fireEvent.change(screen.getByLabelText("Work stream for P-2"), { target: { value: "1" } });
+    expect(screen.getAllByText("1 epic shown")).toHaveLength(2);
+    assertCount(all, "Delivery", 2, 5, 40);
+    assertCount(nonClosed, "Delivery", 1, 4, 25);
+  });
+  it("shows zero non-Closed counts safely when every epic is closed", async () => {
+    mockInventory([{ ...epics[0], status: "Closed" }]);
+    await renderTab();
+    const nonClosed = screen.getByRole("region", { name: "Not Closed work stream distribution" });
+    expect(within(nonClosed).getByText("0 epics")).toBeInTheDocument();
+    for (const bar of within(nonClosed).getAllByRole("progressbar")) {
+      expect(bar).toHaveAttribute("value", "0");
+      expect(bar).toHaveAttribute("max", "1");
+      expect(bar.parentElement).toHaveTextContent("0 (0%)");
+    }
+  });
+  it("stages and saves work type changes without changing the work stream", async () => {
+    writeInitiativeSnapshot("work-type-edit", { workTypeId: 10 });
+    const fetch = mockInventory([{ ...epics[0], workTypeId: 10 }, epics[1]]);
+    await renderTab();
+    const type = screen.getByLabelText("Work type for P-1");
+    expect(type).toHaveValue("10");
+    fireEvent.change(type, { target: { value: "20" } });
+    expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+    expect(screen.getByLabelText("Work stream for P-1")).toHaveValue("unmapped");
+    expect(screen.getByText("P-1").closest("tr")).toHaveClass("is-edited");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByText("Saved 1 epic mappings.");
+    expect(readInitiativeSnapshot("work-type-edit")).toBeNull();
+    const post = fetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(post![1]!.body as string)).toEqual({ changes: [{ epicKey: "P-1", workTypeId: 20, expectedWorkTypeId: 10 }] });
+    expect(type).toHaveValue("20");
+    expect(screen.getByText("0 unsaved changes")).toBeInTheDocument();
+    fireEvent.change(type, { target: { value: "unset" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.getByText("0 unsaved changes")).toBeInTheDocument());
+    expect(JSON.parse(fetch.mock.calls.filter(([, init]) => init?.method === "POST")[1][1]!.body as string)).toEqual({ changes: [{ epicKey: "P-1", workTypeId: null, expectedWorkTypeId: 20 }] });
+  });
+  it("combines work type and stream drafts and reverts each field independently", async () => {
+    const fetch = mockInventory(); await renderTab();
+    fireEvent.change(screen.getByLabelText("Work type for P-1"), { target: { value: "10" } });
+    edit();
+    expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Work type for P-1"), { target: { value: "unset" } });
+    expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.getByLabelText("Work stream for P-1")).toHaveValue("unmapped");
+    expect(screen.getByLabelText("Work type for P-1")).toHaveValue("unset");
+    edit();
+    fireEvent.change(screen.getByLabelText("Work type for P-1"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByText("Saved 1 epic mappings.");
+    const post = fetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(post![1]!.body as string)).toEqual({ changes: [{ epicKey: "P-1", workStreamId: 2, expectedWorkStreamId: null, workTypeId: 10, expectedWorkTypeId: null }] });
+  });
+  it("preserves work type drafts on failed saves and supports sorting and reload", async () => {
+    mockInventory([{ ...epics[0], workTypeId: 20 }, { ...epics[1], workTypeId: 10 }], true);
+    await renderTab();
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Work type" }));
+    expect(screen.getAllByRole("row")[1]).toHaveTextContent("P-2");
+    fireEvent.change(screen.getByLabelText("Work type for P-1"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("P-1 changed");
+    expect(screen.getByLabelText("Work type for P-1")).toHaveValue("10");
+    expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Reload inventory" }));
+    expect(screen.getByText("1 unsaved changes")).toBeInTheDocument();
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Reload inventory" }));
+    await waitFor(() => expect(screen.getByLabelText("Work type for P-1")).toHaveValue("20"));
+    expect(screen.getByText("0 unsaved changes")).toBeInTheDocument();
+  });
   it("uses synced JIRA status labels and an Unknown fallback in rows and filters", async () => {
     mockInventory([
       { ...epics[0], status: "In Progress" },
@@ -61,25 +161,23 @@ describe("Epic mapping", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(screen.getByLabelText("Work stream for P-2")).toHaveValue("1");
   });
-  it("supports selection on pages, bulk updates, sorting and filters without losing drafts", async () => {
+  it("shows all matching epics and supports selection, bulk edits and filters without losing drafts", async () => {
     mockInventory([...epics, ...Array.from({ length: 50 }, (_, i) => ({ epicKey: `X-${i}`, title: `Extra ${i}`, status: "Open", workStreamId: null }))]);
     await renderTab();
     for (const value of ["key", "title", "status", "unmapped"]) fireEvent.change(screen.getByLabelText("Sort epics"), { target: { value } });
     fireEvent.click(screen.getByLabelText("Select P-1"));
     fireEvent.change(screen.getByLabelText("Bulk work stream"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply to selected" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByLabelText("Select this page"));
-    expect(screen.getByText("3 selected across pages")).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("Select this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    fireEvent.click(screen.getByLabelText("Select all filtered epics"));
+    expect(screen.getByText("52 selected")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Select all filtered epics"));
     expect(screen.getByLabelText("Work stream for P-1")).toHaveValue("1");
     fireEvent.click(screen.getByLabelText("Select P-1"));
-    fireEvent.click(screen.getByLabelText("Select this page"));
+    fireEvent.click(screen.getByLabelText("Select all filtered epics"));
     fireEvent.change(screen.getByLabelText("Bulk work stream"), { target: { value: "unmapped" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply to selected" }));
     fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
-    expect(screen.getByText("0 selected across pages")).toBeInTheDocument();
+    expect(screen.getByText("0 selected")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Search epics"), { target: { value: "Beta" } });
     fireEvent.change(screen.getByLabelText("Work stream filter"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "Done" } });
@@ -169,16 +267,36 @@ it("sorts every data header in both directions and preserves edits and selection
   expect(rowKeys()).toEqual(["P-1", "P-2", "P-10"]);
 });
 
-it("resets pagination and keeps native sort controls focusable", async () => {
-  mockInventory([...epics, ...Array.from({ length: 50 }, (_, i) => ({ epicKey: `X-${i}`, title: `Extra ${i}`, status: "Open", workStreamId: null }))]);
+it("shows all 245 epics without paging and keeps sort controls focusable", async () => {
+  mockInventory([...epics, ...Array.from({ length: 243 }, (_, i) => ({ epicKey: `X-${i}`, title: `Extra ${i}`, status: "Open", workStreamId: null }))]);
   await renderTab();
   fireEvent.click(screen.getByLabelText("Select P-1"));
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText("X-242")).toBeInTheDocument();
+  expect(screen.getAllByRole("row")).toHaveLength(246);
+  const counts = screen.getAllByText("245 epics shown");
+  expect(counts).toHaveLength(2);
+  expect(counts[0].compareDocumentPosition(screen.getByRole("table")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(counts[1].compareDocumentPosition(screen.getByRole("table")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   const header = screen.getByRole("button", { name: "Sort by Epic key" });
   expect(header).toHaveAttribute("type", "button");
   header.focus(); expect(header).toHaveFocus();
   fireEvent.click(header);
-  expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
   expect(screen.getByLabelText("Select P-1")).toBeChecked();
   expect(screen.getByRole("columnheader", { name: /Epic key/ })).toHaveAttribute("aria-sort", "ascending");
+});
+
+it("selects all filtered epics without removing hidden selections", async () => {
+  mockInventory(); await renderTab();
+  fireEvent.click(screen.getByLabelText("Select P-1"));
+  fireEvent.change(screen.getByLabelText("Search epics"), { target: { value: "Beta" } });
+  expect(screen.getAllByText("1 epic shown")).toHaveLength(2);
+  fireEvent.click(screen.getByLabelText("Select all filtered epics"));
+  expect(screen.getByText("2 selected")).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Select all filtered epics"));
+  expect(screen.getByText("1 selected")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Search epics"), { target: { value: "" } });
+  expect(screen.getByLabelText("Select P-1")).toBeChecked();
+  expect(screen.getByLabelText("Select P-2")).not.toBeChecked();
 });

@@ -84,8 +84,8 @@ Additional workstream: [Codex MCP integration](MCP_INTEGRATION_PLAN.md), with re
 
 ### Bulk work stream epic mapping
 - Delivered Settings tabs for Initiative Metadata and Work Stream Epic Mapping.
-- Includes saved coverage/distribution, all synced epics, filters, sorting, 50-row pages, explicit bulk selection and draft save/discard.
-- Assignment-only batches validate stale mappings and commit atomically, preserving other metadata and saved views. No schema or connector configuration change.
+- Includes saved coverage and side-by-side All statuses/Not Closed work stream distributions with separate totals and percentage denominators (including Unmapped), all synced epics, filters, sorting, all matching epics in one table without paging, explicit bulk selection and draft save/discard.
+- Work type dropdowns support assigning, changing and clearing a type alongside Work stream, with sorting and shared draft/save/discard behavior. Assignment-only batches validate only the submitted fields and commit atomically, preserving untouched assignments, other metadata and saved views. Existing stream-only requests remain compatible. No schema or connector configuration change.
 
 ### Eligible project epic sync
 - Added paginated project epic reconciliation to full, since-last, and since-date syncs, preserving the Test/Triad scope exclusions.
