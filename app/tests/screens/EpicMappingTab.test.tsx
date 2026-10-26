@@ -300,3 +300,23 @@ it("selects all filtered epics without removing hidden selections", async () => 
   expect(screen.getByLabelText("Select P-1")).toBeChecked();
   expect(screen.getByLabelText("Select P-2")).not.toBeChecked();
 });
+
+ it("shows synced labels after status, handles empty labels, and sorts labels both ways", async () => {
+  mockInventory([
+    { ...epics[0], labels: ["Security", "FY27Q1"] },
+    { ...epics[1], labels: ["CI-CD"] },
+    { epicKey: "P-3", title: "Unlabelled", status: "Open", workStreamId: null, labels: [] },
+  ]);
+  await renderTab();
+  const headers = screen.getAllByRole("columnheader");
+  expect(headers[3]).toHaveTextContent("Status");
+  expect(headers[4]).toHaveTextContent("Labels");
+  const row = screen.getByText("P-1").closest("tr")!;
+  expect(within(row).getByText("Security, FY27Q1")).toBeInTheDocument();
+  expect(screen.getByText("P-3").closest("tr")!.querySelectorAll("td")[4]).toHaveTextContent("—");
+  const rowKeys = () => screen.getAllByRole("row").slice(1).map((item) => item.querySelectorAll("td")[1].textContent);
+  fireEvent.click(screen.getByRole("button", { name: "Sort by Labels" }));
+  expect(rowKeys()).toEqual(["P-3", "P-2", "P-1"]);
+  fireEvent.click(screen.getByRole("button", { name: "Sort by Labels" }));
+  expect(rowKeys()).toEqual(["P-1", "P-2", "P-3"]);
+ });

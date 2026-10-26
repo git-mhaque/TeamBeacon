@@ -5,7 +5,7 @@ import { formatDisplayTimestamp } from "../../../lib/dateTime";
 import { clearInitiativeSnapshots } from "../../../lib/initiativeSnapshotCache";
 
 const SORT_COLUMNS = [
-  ["key", "Epic key"], ["title", "Title"], ["status", "Status"],
+  ["key", "Epic key"], ["title", "Title"], ["status", "Status"], ["labels", "Labels"],
   ["stream", "Work stream"], ["type", "Work type"], ["changes", "Changes"],
 ] as const;
 export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
@@ -73,6 +73,7 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
     if (sort === "unmapped") comparison = Number(a.workStreamId !== null) - Number(b.workStreamId !== null);
     if (sort === "title") comparison = a.title.localeCompare(b.title);
     if (sort === "status") comparison = a.status.localeCompare(b.status);
+    if (sort === "labels") comparison = (a.labels ?? []).join(", ").localeCompare((b.labels ?? []).join(", "));
     if (sort === "stream") {
       const streamName = (id: number | null) => lookup.groups.find((group) => group.id === id)?.name ?? "Unmapped";
       comparison = streamName(a.workStreamId).localeCompare(streamName(b.workStreamId));
@@ -183,6 +184,7 @@ export function EpicMappingTab({ lookup }: { lookup: EpicLookupConfig }) {
         </tr></thead><tbody>{rows.map((epic) => <tr key={epic.epicKey} className={editedKeys.includes(epic.epicKey) ? "is-edited" : ""}>
           <td><input type="checkbox" aria-label={`Select ${epic.epicKey}`} checked={selected.includes(epic.epicKey)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, epic.epicKey] : previous.filter((key) => key !== epic.epicKey))} /></td>
           <td>{jiraBaseUrl ? <a href={`${jiraBaseUrl}/browse/${encodeURIComponent(epic.epicKey)}`} target="_blank" rel="noopener noreferrer" className="tb-initiative-epic-key" aria-label={`Open ${epic.epicKey} in JIRA (new tab)`}>{epic.epicKey}</a> : epic.epicKey}</td><td>{epic.title}</td><td>{epic.status}</td>
+          <td className="tb-mapping-labels">{epic.labels?.length ? epic.labels.join(", ") : "—"}</td>
           <td><select aria-label={`Work stream for ${epic.epicKey}`} value={(Object.hasOwn(draft, epic.epicKey) ? draft[epic.epicKey] : epic.workStreamId) ?? "unmapped"} onChange={(event) => change([epic.epicKey], event.target.value === "unmapped" ? null : Number(event.target.value))}><option value="unmapped">Unmapped</option>{lookup.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></td>
           <td><select aria-label={`Work type for ${epic.epicKey}`} value={(Object.hasOwn(typeDraft, epic.epicKey) ? typeDraft[epic.epicKey] : epic.workTypeId) ?? "unset"} onChange={(event) => change([epic.epicKey], event.target.value === "unset" ? null : Number(event.target.value), "workTypeId")}><option value="unset">Not set</option>{lookup.workTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></td>
           <td>{editedKeys.includes(epic.epicKey) ? "Unsaved" : epic.workStreamId === null ? "Unmapped" : "—"}</td>

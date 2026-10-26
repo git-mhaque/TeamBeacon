@@ -59,6 +59,7 @@ class EpicMappingTests(unittest.TestCase):
                 "epicKey": "P-1",
                 "title": "Title P-1",
                 "status": "Open",
+                "labels": [],
                 "workStreamId": None,
                 "workTypeId": None,
             },
@@ -218,3 +219,17 @@ class EpicMappingTests(unittest.TestCase):
         saved = get_epic_mapping_inventory(self.db, project_key="P")["epics"]
         self.assertEqual(saved[0]["workStreamId"], self.group)
         self.assertEqual(saved[0]["status"], "Open")
+
+    def test_inventory_returns_synced_labels_and_handles_invalid_storage(self):
+        for stored, expected in [
+            ('["CI-CD", "FY27Q1"]', ["CI-CD", "FY27Q1"]),
+            ('["Security", 123, null]', ["Security"]),
+            ('invalid', []),
+            ('{"label": "Security"}', []),
+        ]:
+            with self.subTest(stored=stored):
+                with sqlite3.connect(self.db) as conn:
+                    conn.execute("UPDATE issues SET labels_json=? WHERE issue_key='P-1'", (stored,))
+                inventory = get_epic_mapping_inventory(self.db, project_key="P")
+                self.assertEqual(inventory["epics"][0]["labels"], expected)
+                self.assertEqual(inventory["epics"][1]["labels"], [])

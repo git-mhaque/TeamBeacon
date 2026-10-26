@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
@@ -28,7 +29,8 @@ def get_epic_mapping_inventory(
         rows = conn.execute(
             """
             SELECT i.issue_key AS epicKey, i.summary AS title,
-                   i.status_name AS status, g.group_id AS workStreamId,
+                   i.status_name AS status, i.labels_json AS labels,
+                   g.group_id AS workStreamId,
                    (SELECT MIN(wt.work_type_id) FROM epic_metadata_work_types wt
                     WHERE wt.epic_metadata_id = em.id) AS workTypeId
             FROM issues i
@@ -41,6 +43,12 @@ def get_epic_mapping_inventory(
             (project_key, project_key),
         ).fetchall()
         epics = [dict(row) for row in rows]
+        for epic in epics:
+            try:
+                labels = json.loads(epic["labels"])
+            except (TypeError, ValueError):
+                labels = []
+            epic["labels"] = [label for label in labels if isinstance(label, str)] if isinstance(labels, list) else []
         sync = conn.execute("""
             SELECT MAX(finished_at) FROM sync_run_history
             WHERE source_type = 'jira' AND status = 'completed'

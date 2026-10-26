@@ -1439,7 +1439,7 @@ export async function fetchReleaseInsights(releaseLimit = 12, projectKey?: strin
   return (await response.json()) as ReleaseInsightsResponse;
 }
 
-export type EpicMapping = { epicKey: string; title: string; status: string; workStreamId: number | null; workTypeId?: number | null };
+export type EpicMapping = { epicKey: string; title: string; status: string; labels?: string[]; workStreamId: number | null; workTypeId?: number | null };
 export type UnmappedCard = {
   issueKey: string;
   summary: string;
