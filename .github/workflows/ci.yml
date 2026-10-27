@@ -19,7 +19,8 @@ concurrency:
 jobs:
   api-runtime-compatibility:
     name: API import (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Python 3.9 is unavailable on newer Ubuntu runner images.
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     strategy:
       matrix:
