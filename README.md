@@ -151,7 +151,8 @@ python -m coverage report --include=services/api/issues/unmapped_cards.py --prec
 Run the two backend suites before the reports; a fresh `coverage run` replaces
 previous coverage data. The integration suite uses temporary loopback HTTP servers.
 
-CI also checks API startup imports on Python 3.9 and 3.11. To verify compatibility
+CI also checks API startup imports on Python 3.9 and 3.11 using Ubuntu 22.04,
+which provides both interpreter versions. To verify compatibility
 with the interpreter used by the local dev launcher, run
 `python3 -c "import services.api.server"`.
 

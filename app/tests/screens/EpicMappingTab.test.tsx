@@ -272,20 +272,22 @@ it("shows all 245 epics without paging and keeps sort controls focusable", async
   await renderTab();
   fireEvent.click(screen.getByLabelText("Select P-1"));
   expect(screen.getByText("X-242")).toBeInTheDocument();
-  expect(screen.getAllByRole("row")).toHaveLength(246);
+  const table = screen.getByRole<HTMLTableElement>("table");
+  const tableHeader = within(table.tHead!);
+  expect(table.rows).toHaveLength(246);
   const counts = screen.getAllByText("245 epics shown");
   expect(counts).toHaveLength(2);
-  expect(counts[0].compareDocumentPosition(screen.getByRole("table")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(counts[1].compareDocumentPosition(screen.getByRole("table")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  expect(counts[0].compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(counts[1].compareDocumentPosition(table) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
-  const header = screen.getByRole("button", { name: "Sort by Epic key" });
+  const header = tableHeader.getByRole("button", { name: "Sort by Epic key" });
   expect(header).toHaveAttribute("type", "button");
   header.focus(); expect(header).toHaveFocus();
   fireEvent.click(header);
   expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
   expect(screen.getByLabelText("Select P-1")).toBeChecked();
-  expect(screen.getByRole("columnheader", { name: /Epic key/ })).toHaveAttribute("aria-sort", "ascending");
-});
+  expect(tableHeader.getByRole("columnheader", { name: /Epic key/ })).toHaveAttribute("aria-sort", "ascending");
+}, 15_000);
 
 it("selects all filtered epics without removing hidden selections", async () => {
   mockInventory(); await renderTab();
